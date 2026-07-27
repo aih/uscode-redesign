@@ -30,3 +30,24 @@ Session-by-session record of how this site was built. One entry per working sess
   - Current release point 119-102not101 and download URL scheme confirmed live at uscode.house.gov/download/download.shtml (2026-07-27).
   - ~324 prior release points, back to the 113th Congress, per priorreleasepoints.htm; compound skip labels observed (e.g. `277not255not268`).
   - USLM 2.x sample location confirmed: https://uscode.house.gov/currency/uscinuslmv2samples.zip.
+
+## 002 — 2026-07-27 — CLAUDE.md, USLM fixtures, and Day 1 item 1 scaffold
+
+- **Tool/model:** Claude Code, Opus 5 (CLAUDE.md authoring) then Sonnet 5 (fixture trimming, scaffold, permissions — per PLAN §7 model assignment).
+- **Asked:** Execute GETTING-STARTED's sample-download step; write CLAUDE.md from PLAN.md so it's loaded into every future session; execute PLAN.md Day 1 item 1 (repo scaffold: `ingest/ api/ web/ db/`, uv, docker-compose + Postgres 16, Alembic, pytest, Makefile), committing in small steps; update project permissions for a more autopilot workflow.
+- **Decided:**
+  - Committed only 3 of the 57 USLM 2.x sample titles (usc16 for cross-schema parity, usc49 for heaviest table/layout markup, usc01 as a small fast fixture) instead of the full 594 MB zip — kept as a size/coverage tradeoff, not an ADR-level call; re-download `uscinuslmv2samples.zip` if another title is needed later.
+  - `data/*` (with `!data/manifests/`) added to `.gitignore` so the CLAUDE.md claim "never commit `data/`" (PLAN §11.4 provenance manifests still committed) is actually true — verified with `git check-ignore` before committing.
+  - DB URL is a single source of truth: `db/config.py` (`DATABASE_URL` env var, pydantic-settings) feeds both the app and Alembic's `env.py` (which also points `target_metadata` at `db.models.Base`) — no separate URL to drift.
+  - Docker image sets `UV_PROJECT_ENVIRONMENT=/opt/venv` so the dev bind mount (`.:/app`) doesn't shadow the container's venv with the host's.
+  - `make verify` is a stub that exits 1 with a message rather than silently succeeding — the real Day 7 full-corpus check (PLAN §11.5) doesn't exist yet.
+  - `.claude/settings.json` now auto-allows `git commit`/`git push` in this repo and common package-manager installs (uv/pip/brew/npm/yarn/bun/apt); uninstall/remove variants of the same tools are routed to `permissions.ask` explicitly rather than left to default behavior.
+- **Produced:** `samples/uslm1/usc16.xml`, `samples/uslm2/USLM2/{usc16,usc49,usc01}.xml`; `CLAUDE.md`; `pyproject.toml`/`uv.lock`, `ingest/ api/ web/ db/ tests/` packages; `db/config.py`, `db/base.py`, `db/models.py` (all 10 PLAN §3 tables); `api/main.py` (`/health`); `Dockerfile`, `docker-compose.yml`, `.env.example`; `alembic.ini`, `alembic/env.py`, initial migration `fce3a6c7a647_initial_schema.py`; `tests/test_health.py`, `tests/test_models.py`; `Makefile`; `.claude/settings.json`. 12 commits, `47744ec..d4eb0ae`.
+- **Verified:**
+  - `db.models.Base.metadata.tables.keys()` matches all 10 PLAN §3 tables exactly (`tests/test_models.py`, also spot-checked interactively via `uv run python`).
+  - `GET /health` returns `{"status": "ok"}` via FastAPI `TestClient` (`tests/test_health.py`).
+  - `docker compose up -d db` starts Postgres 16 cleanly; `alembic revision --autogenerate` detected all 10 tables with no drift; `alembic upgrade head` applied against the running container, confirmed via `psql \dt` (11 rows incl. `alembic_version`).
+  - `uv run pytest` — 4 passed, 0 failed, no live DB required.
+  - `make test` and `make verify` both run as expected (test passes; verify exits 1 with its stub message, by design).
+  - `git check-ignore -v` confirmed `data/zips/*` is ignored while `data/manifests/*` is not, before trusting the CLAUDE.md claim.
+  - Not yet done: `alembic downgrade base` round-trip untested (interrupted mid-session, not re-run); `docker compose up --build` (full containerized api service, as opposed to `make dev`'s locally-run API) untested end-to-end.
