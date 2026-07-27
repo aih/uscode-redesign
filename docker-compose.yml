@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: uscode
+      POSTGRES_PASSWORD: uscode
+      POSTGRES_DB: uscode
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uscode"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://uscode:uscode@db:5432/uscode
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command:
+      [
+        "uv", "run", "python", "-m", "uvicorn",
+        "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload",
+      ]
+
+volumes:
+  pgdata:
