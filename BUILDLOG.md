@@ -51,3 +51,17 @@ Session-by-session record of how this site was built. One entry per working sess
   - `make test` and `make verify` both run as expected (test passes; verify exits 1 with its stub message, by design).
   - `git check-ignore -v` confirmed `data/zips/*` is ignored while `data/manifests/*` is not, before trusting the CLAUDE.md claim.
   - Not yet done: `alembic downgrade base` round-trip untested (interrupted mid-session, not re-run); `docker compose up --build` (full containerized api service, as opposed to `make dev`'s locally-run API) untested end-to-end.
+
+## 003 — 2026-07-27 — Session 1 review; plan tuned for speed (pre-Session-2)
+
+- **Tool/model:** Claude (Cowork), Fable 5 — independent reviewer, fresh context.
+- **Asked:** Review Session 1 progress; update the plan to improve quality and speed.
+- **Findings:** Scaffold matches PLAN §3 faithfully (all 10 tables, correct constraints and keys); single-source DB config and the `UV_PROJECT_ENVIRONMENT` bind-mount fix are correct; BUILDLOG 002 debts confirmed as the only open items. Reviewer verification was **static (code review only)** — the review sandbox has no Python 3.12, so `uv run pytest` was not re-executed independently; Session 2 should not treat the test suite as independently confirmed until CI exists.
+- **Decided (plan updates):**
+  - Fixture-slice strategy: unit tests run against a small extracted `usc16_slice.xml`; the 32 MB file becomes a `@pytest.mark.slow` integration test asserting known-good counts. Default `make test` stays fast (PLAN Day 1 item 2; CLAUDE.md status).
+  - Secondary indexes specified up front (guid_map(release_id, identifier); section_release_map(release_id); section_versions(section_id, first_release_id)) — added to PLAN §3, scheduled for the ingest-session migration, before guid_map grows to tens of millions of rows.
+  - Session 3 rescoped from "schema + ingest" to "clear debts + indexes + ingest" (schema landed early).
+  - Parallel tracks declared unblocked: parser / reader-UI-on-fixtures / downloader port are mutually independent (PLAN Progress note; GETTING-STARTED §10).
+  - At Ari's request, `.claude/settings.json` rewritten for **autonomous sessions**: `defaultMode: acceptEdits`; allowlist covering the full build toolchain (uv/make/pytest/alembic upgrade/docker compose/git incl. push/curl/psql/file utils; WebFetch limited to uscode.house.gov, GitHub, core library docs); `ask` retained for `alembic downgrade`, `docker compose down`, volume removal, uninstalls; `deny` on sudo, out-of-repo `rm -rf`, force-push, `git reset --hard`, `git clean`, and reading `.env`. Safety rests on git recoverability + denied history-rewriting + repo-scoped blast radius (GETTING-STARTED §7a). Revisit `git push` auto-allow if/when the GitHub PR-review Action becomes the merge gate.
+- **Produced:** Edits to PLAN.md (progress block, fixture strategy, index spec), GETTING-STARTED.md (Sessions 2/3 prompts, §10), CLAUDE.md (status + test-speed rule), this entry.
+- **Verified:** Git history 47744ec..71ccaa8 reviewed commit-by-commit; models/tests/compose/Makefile read in full; `.claude/settings.json` audited. Re-check: `git log --oneline` and diff of this commit.

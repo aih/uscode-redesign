@@ -2,6 +2,8 @@
 
 Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering all release points, with retrieval of any provision at any version, reader navigation, and user watchlists.
 
+> **Progress:** Day 1 item 1 (scaffold) ✅ complete — see BUILDLOG 002. Carried debts: `alembic downgrade base` round-trip untested; `docker compose up --build` (containerized api) untested end-to-end. Clear both at the start of the schema/ingest session. **Unblocked for parallel work:** with the scaffold merged, the parser (Session 2), the reader UI against fixture JSON (Session 5), and the downloader port (Session 6) have no dependencies on each other — run them in parallel worktrees if throughput matters more than simplicity.
+
 ---
 
 ## 1. Research findings (verified against usc16.xml and uscode.house.gov, 2026-07-27)
@@ -83,6 +85,12 @@ section_versions(id, section_id,
 section_release_map(section_version_id, release_id)  -- resolve (section, RP) → version
 guid_map(guid text primary key,              -- globally unique by design:
          release_id, identifier text)        -- guid ≡ (provision, release point)
+
+-- Indexes beyond PKs/uniques (add in the ingest-session migration; guid_map
+-- alone will hold tens of millions of rows at full corpus):
+--   guid_map(release_id, identifier)         -- reverse lookup: provision @ RP → guid
+--   section_release_map(release_id)          -- "everything at this RP" scans
+--   section_versions(section_id, first_release_id)  -- version-timeline queries
 users(id, email, password_hash/oauth, created_at)
 watchlists(id, user_id, name)
 watchlist_items(id, watchlist_id, identifier text, title_id, note text,
@@ -123,7 +131,7 @@ Content negotiation: `Accept: application/xml` returns raw USLM fragment; HTML r
 | # | Deliverable | Notes |
 |---|---|---|
 | 1 | Repo scaffold: `ingest/ api/ web/ db/ docker-compose.yml` (Postgres 16 + API) | uv + FastAPI + SQLAlchemy + Alembic |
-| 2 | USLM parser layer: `detect_uslm_version` + `Uslm1Parser` (full) + `Uslm2Parser` (stub passing detection + basic section extraction on repo samples) | usc16.xml + samples/uslm2/ as fixtures; unit tests on s45f |
+| 2 | USLM parser layer: `detect_uslm_version` + `Uslm1Parser` (full) + `Uslm2Parser` (stub passing detection + basic section extraction on repo samples) | **Fixture strategy for speed:** first, script-extract a small fixture (`tests/fixtures/usc16_slice.xml`: title/meta wrapper + ch.1 through §45f + one each of repealed/omitted/transferred sections) and write unit tests against it — subsecond test runs. The full 32 MB usc16.xml runs as a `@pytest.mark.slow` integration test asserting the known-good counts (5,393 sections; 523/102/19/1 by status; s45f/c/5 guid mapping). Never let the default `make test` path parse 32 MB. |
 | 3 | Load Title 16 @ current RP + one prior RP (e.g. 119-94) with hash dedupe | proves versioning model |
 | 4 | Resolver + routes above (identifier, ?id, ?release, ?date) | OpenAPI docs live |
 | 5 | Minimal reader: TOC → section page, provision anchor highlight, prev/next, release picker | server-rendered (Jinja) or small React app |

@@ -93,10 +93,10 @@ Work one session per module. **Always:** start in plan mode (Shift+Tab), read th
 > Execute PLAN.md Day 1 item 1: repo scaffold with ingest/, api/, web/, db/ packages, pyproject via uv, docker-compose.yml with Postgres 16, Alembic wired up, pytest configured, Makefile with `make dev`, `make test`, `make verify` targets. Commit in small steps.
 
 **Session 2 — Parser layer (Opus; the hardest session):**
-> Execute PLAN.md Day 1 item 2: the UslmParser protocol, detect_uslm_version() (inspect samples/uslm1 and samples/uslm2 to derive the detection rule — record it in an ADR), Uslm1Parser as a streaming lxml.iterparse implementation emitting normalized SectionRecords, and a Uslm2Parser stub that passes detection and basic section extraction on the samples. Unit tests must cover /us/usc/t16/s45f including the (c)(5) provision and its guid id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd, plus repealed/omitted/transferred sections.
+> Execute PLAN.md Day 1 item 2: the UslmParser protocol, detect_uslm_version() (inspect samples/uslm1 and samples/uslm2 to derive the detection rule — record it in an ADR), Uslm1Parser as a streaming lxml.iterparse implementation emitting normalized SectionRecords, and a Uslm2Parser stub that passes detection and basic section extraction on the samples. Follow the fixture strategy in PLAN.md Day 1 item 2: first script-extract tests/fixtures/usc16_slice.xml (wrapper + ch.1 through §45f + one each repealed/omitted/transferred section) and unit-test against the slice; the full 32 MB file is a @pytest.mark.slow integration test asserting known-good counts (5,393 sections; 523 repealed / 102 omitted / 19 transferred / 1 reserved; guid id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd ↔ /us/usc/t16/s45f/c/5). Default make test must stay under a few seconds.
 
-**Session 3 — Schema + ingest (Sonnet, Opus review):**
-> Implement the Postgres schema from PLAN.md §3 as Alembic migrations, then the ingest command: `python -m ingest load <xmlfile> --release 119-102not101`. Include content-hash dedupe, guid_map population, seq_in_title, and the provenance manifest from PLAN §11.4. Load Title 16 at the current release point and verify: 5,393 sections expected.
+**Session 3 — Ingest (Sonnet, Opus review):** *(schema landed in Session 1; this session starts by clearing its two debts)*
+> First clear the BUILDLOG 002 debts: run alembic downgrade base && alembic upgrade head, and docker compose up --build end-to-end; fix anything that breaks. Then add the secondary indexes from PLAN.md §3 as a migration (guid_map(release_id, identifier); section_release_map(release_id); section_versions(section_id, first_release_id)). Then implement the ingest command: `python -m ingest load <xmlfile> --release 119-102not101`, with content-hash dedupe, guid_map population, seq_in_title, and the provenance manifest from PLAN §11.4. Load Title 16 at the current release point and verify: 5,393 sections, status counts 523/102/19/1.
 
 **Session 4 — API + resolver (Opus for resolver, Sonnet for routes):**
 > Implement the FastAPI app per PLAN.md §4: identifier routes with ?release/?date/?format, the guid lookup route, TOC, neighbors, versions, releases. Resolver algorithm per PLAN §3. Repository interface only — no SQL in handlers. Integration tests against the loaded Title 16.
@@ -122,6 +122,25 @@ This makes the prior art available to every later session via a small summary in
 
 Then continue with PLAN.md Days 2–7 the same way (backfill, reader polish, auth + watchlist, deploy, hardening). For each: plan mode first, one module per session, tests before merge.
 
+## 7a. Autonomous sessions — how this repo is configured
+
+`.claude/settings.json` (checked in) is set up so a session runs a full PLAN.md task **without permission prompts**:
+
+- **`defaultMode: "acceptEdits"`** — all file edits in this repo are auto-approved.
+- **Allow list** — every command the build actually uses (uv, make, pytest, alembic upgrade/revision, docker compose up/build/logs, git add/commit/push/branch/worktree/merge, curl, unzip, psql, file utilities) runs without asking. WebFetch is allowed only for uscode.house.gov, GitHub, and the core library docs.
+- **Ask list** — genuinely destructive-but-sometimes-needed operations still prompt: `alembic downgrade`, `docker compose down`, `docker volume rm`, package uninstalls. These are rare, so sessions stay hands-off in practice.
+- **Deny list** — never allowed, even if requested: `sudo`, `rm -rf` outside the repo, force-push, `git reset --hard`, `git clean`, reading `.env`.
+
+**What keeps this reasonably safe:** everything is in git (any bad edit is one revert away); force-push and hard-reset are denied, so history can't be silently rewritten; the blast radius is this repo — no sudo, no system-level writes; and the BUILDLOG + small-commit discipline means you review by reading diffs after the fact instead of clicking prompts during.
+
+To launch a fully hands-off session, give it the whole job in one prompt, e.g.:
+
+```bash
+claude "Execute Session 3 from GETTING-STARTED.md §7 in full: clear the BUILDLOG debts, add the PLAN §3 indexes, implement ingest, load Title 16, verify counts, run make test, update BUILDLOG.md, and commit in small steps. Do not stop to ask unless a test fails twice."
+```
+
+Check back when it's done; review with `git log --oneline` + `git diff main@{1}` (or the GitHub PR if you're on branches).
+
 ## 8. End every session with this prompt
 
 > Update BUILDLOG.md with an entry for this session: date, model, what was asked, key decisions (link any new ADR), commits made, what was verified and how. If any architectural decision was made, add a docs/adr/ file for it. Then commit.
@@ -134,7 +153,7 @@ Once you're pushing to GitHub: in a Claude Code session run `/install-github-app
 
 ## 10. Parallel work (Days 2+, optional)
 
-When you're comfortable, run two sessions at once with git worktrees so agents don't collide:
+With the scaffold merged (Session 1 ✅), three tracks are already independent: **Session 2 (parser)**, **Session 5 (reader UI — build against hand-written fixture JSON now, wire to the real API later)**, and **Session 6 (downloader port)**. If you want speed over simplicity, run two of them at once with git worktrees so agents don't collide:
 
 ```bash
 git worktree add ../uscode-web feature/reader-ui

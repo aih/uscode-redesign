@@ -4,7 +4,7 @@ Versioned US Code retrieval site: any provision, at any release point (RP), via 
 mirroring the USLM `@identifier`. FastAPI + Postgres v1, XCiteDB later behind a repository
 interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
 
-**Status:** planning complete, build not started. Sections marked _(TBD)_ get filled in as code lands.
+**Status:** scaffold complete (BUILDLOG 002) — packages, schema models + initial migration, compose, tests, Makefile. Next: parser layer (PLAN Day 1 item 2). Open debts before ingest work: `alembic downgrade base` round-trip untested; `docker compose up --build` untested e2e. **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml`; the full file is `@pytest.mark.slow`.
 
 ## Architecture rules (PLAN §2)
 
