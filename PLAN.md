@@ -1,0 +1,214 @@
+# US Code Redesign — Research Findings & Agent Build Plan
+
+Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering all release points, with retrieval of any provision at any version, reader navigation, and user watchlists.
+
+---
+
+## 1. Research findings (verified against usc16.xml and uscode.house.gov, 2026-07-27)
+
+**Schema versions — the site must handle both USLM 1.x and USLM 2.x.** Current USC release-point downloads are **USLM 1.0** (`USLM-1.0.15.xsd`, namespace `http://xml.house.gov/schemas/uslm/1.0`). OLRC has announced the move to USLM 2.x and publishes **sample USC titles in USLM 2.x** at `https://uscode.house.gov/currency/uscinuslmv2samples.zip` (samples will be committed to this repo under `samples/uslm2/`). Per OLRC's migration note, the main 1.x→2.x differences for the USC are: (1) tables of contents, (2) tables, (3) the indent model; USLM 2.0.17 also adds MathML 3 and new elements. The parser must detect the schema version per file (root attributes / `xsi:schemaLocation` / namespace — lock in the exact detection rule by inspecting the repo samples on Day 1) and normalize both into one internal model.
+
+**Identifiers (from the USLM User Guide + observed data):**
+- `@identifier` — logical, human-meaningful path (`/us/usc/t16/s45f/c/5`). Stable across releases *unless the provision is renumbered*. This is the primary key for the URL scheme.
+- `@id` — GUID (`id0b32dff7-810c-11f1-...`). GUIDs are **intentionally regenerated at each release point**: a GUID identifies the pair *(provision, release point)*, and that pair is unique. This makes `@id` a first-class, globally unique index — `?id=` lookup needs no release parameter because the GUID itself pins the version. **Design consequence: maintain a global `guid → (identifier, release)` index covering every element id in every ingested file.**
+- `@temporalId` — human-readable path-like name (`s1201_a_1_A`), not guaranteed unique; useful for display, not for keys.
+- `@status` — in Title 16: 523 `repealed`, 102 `omitted`, 19 `transferred`, 1 `reserved`. Must be surfaced in UI and kept retrievable.
+
+**Structure observed in Title 16:** 5,393 `<section>`, 153 chapters, 345 subchapters, 8,906 subsections, 15,810 paragraphs, 4,026 clauses; 32 MB XML. Sections carry `<num>`, `<heading>`, nested provisions, `<sourceCredit>` (refs to Pub. L. + dates), and `<note>` blocks (881 in t16). Big levels: title → chapter → subchapter → part → subpart → section.
+
+**Release points:**
+- Current RP: **119-102 (07/12/2026), except 119-101** → label `119-102not101`; `docPublicationName` = `Online@119-102not101`.
+- Download URL scheme (confirmed): `https://uscode.house.gov/download/releasepoints/us/pl/{congress}/{law}{notX...}/xml_usc{NN}[a]@{congress}-{law}{notX...}.zip` (e.g. `.../us/pl/119/102not101/xml_usc16@119-102not101.zip`; `xml_uscAll@...zip` for all titles; `05a`, `11a`, `18a`, `28a`, `50a` are appendices).
+- Prior release points page lists **~324 RPs back to the 113th Congress (2013)**. Skip labels can compound: `277not255not268`. RP labels are *not* lexically sortable — parse into (congress, law_num, excluded_laws[]) and assign a sequence.
+- Every RP republishes **all** titles, but only some titles changed — so full-corpus ingest must **dedupe by content hash** or storage explodes (~300 RPs × ~1 GB/RP uncompressed).
+
+**Date semantics.** An RP is named for the latest incorporated law; the site shows its date (e.g. 07/12/2026 for 119-102). `?date=` resolves to the latest RP whose currency date ≤ query date. Caveat to display: "not" laws mean the code text at that RP may not reflect every law enacted by that date.
+
+**Existing tooling to reuse: [dreamproit/loadusc-xcitedb](https://github.com/dreamproit/loadusc-xcitedb).** This repo already implements: (1) `downloadusc.py` — downloads *all* release points and emits `uscreleasepoints.json`, an inventory of `{name, date, titlesAffected, url}` per RP; (2) `loaduscxcite.py` — loads titles into XCiteDB; (3) `updateusc.sh` — nightly cron update. Three consequences for this plan:
+- The **RP inventory JSON is the seed for the `release_points` table** — it supplies the currency `date` (powers `?date=` resolution) and `titlesAffected` (tells ingest which titles actually changed per RP, so hash-dedupe becomes a verification step instead of the discovery mechanism).
+- The **Day 2–3 bulk downloader should port/modernize `downloadusc.py`** (it's Python 3.7-era) rather than be written from scratch.
+- The **XCiteDB future is closer than "later"**: the Repository interface's second implementation can wrap the existing loader; the nightly-cron pattern becomes the site's auto-update job for new RPs.
+
+**Prior art: [dreamproit/versions](https://github.com/dreamproit/versions)** — an older working site that uses this data + XCiteDB to display the US Code and **generate diffs between temporal versions**. It predates FastAPI and lacks the new site's feature set, but it is proven code: mine it for (a) the diff algorithm and rendering approach (feeds Day 4's version-timeline/diff feature directly), (b) display/navigation decisions that worked or didn't, and (c) XCiteDB query patterns for the eventual Repository v2. Study it before designing the resolver and the diff UI — don't rediscover solved problems.
+
+---
+
+## 2. Architecture (modular, storage-swappable)
+
+```
+ ┌────────────┐   ┌─────────────┐   ┌──────────────┐   ┌───────────┐
+ │  ingest/    │→ │  storage/    │← │  api/ FastAPI │← │  web/      │
+ │  fetch RPs, │   │  Postgres +  │   │  resolver +   │   │  reader UI │
+ │  parse USLM │   │  repository  │   │  auth +       │   │  watchlist │
+ │  split into │   │  interface   │   │  watchlist    │   │            │
+ │  sections   │   │  (swap to    │   └──────────────┘   └───────────┘
+ └────────────┘   │  xcitedb     │
+                   │  later)      │
+                   └─────────────┘
+```
+
+Hard rule: **API and UI talk only to a `Repository` interface** (get_section(identifier, release), get_toc(...), resolve_id(...), neighbors(...)). The Postgres implementation is v1; xcitedb becomes a second implementation later with no API/UI changes.
+
+Second hard rule: **the ingest layer is schema-plural.** A `UslmParser` protocol with `Uslm1Parser` and `Uslm2Parser` implementations, chosen by a `detect_uslm_version(file)` sniffer, both emitting the same normalized `SectionRecord` (identifier, guid, temporalId, num, heading, status, seq, raw XML fragment, source credit, notes). Everything downstream — storage, API, UI — is schema-agnostic; `schema_version` is carried as metadata so the original XML can always be returned verbatim. Fixtures for both parsers: `usc16.xml` (1.x) and `samples/uslm2/` (2.x).
+
+Sections are the storage atom (per your spec). Sub-section provisions (`/c/5`) are extracted from the section XML at request time — server-side via lxml XPath on `@identifier`, returning the full section with the target provision anchored/highlighted, so the reader always has context.
+
+---
+
+## 3. Postgres schema (core tables)
+
+```sql
+release_points(id, congress int, law_num int, excluded_laws int[],
+               label text unique,          -- '119-102not101'
+               currency_date date, seq int unique)  -- global ordering
+
+titles(id, num text unique, name text, is_positive_law bool)   -- '16', '05a'
+
+title_versions(id, title_id, release_id, source_zip_sha256,
+               schema_version text,          -- 'uslm-1.0.15' | 'uslm-2.x'
+               downloaded_at, unchanged_from_release_id nullable)
+               -- records per-RP title currency; null = new content
+
+sections(id, title_id, identifier text,      -- '/us/usc/t16/s45f'
+         unique(title_id, identifier))       -- identity across time
+
+section_versions(id, section_id,
+         first_release_id,                   -- RP where this content first appeared
+         content_hash bytea,                 -- dedupe key
+         xml xml/text, html_cache text nullable,
+         num text, heading text, status text nullable,
+         seq_in_title int,                   -- document order → prev/next
+         source_credit text, unique(section_id, content_hash, first_release_id))
+
+section_release_map(section_version_id, release_id)  -- resolve (section, RP) → version
+guid_map(guid text primary key,              -- globally unique by design:
+         release_id, identifier text)        -- guid ≡ (provision, release point)
+users(id, email, password_hash/oauth, created_at)
+watchlists(id, user_id, name)
+watchlist_items(id, watchlist_id, identifier text, title_id, note text,
+                pinned_release_id nullable, created_at)
+```
+
+Resolution of `GET /us/usc/t16/s45f/c/5?date=2026-07-12`:
+1. `?date` → latest `release_points` with `currency_date <= date` (or `?release=119-102` → label match; bare `119-102` should match `119-102not101` with a disambiguation note).
+2. Longest-prefix match: strip provision path down to the section identifier (`/us/usc/t16/s45f`), keeping remainder `/c/5`.
+3. `section_release_map` → section_version for that RP.
+4. XPath the fragment by `@identifier` for anchor/extract; return per `?format=` (html | xml | json).
+
+`GET /us/usc/?id=idXXXX` → `guid_map`. No release parameter needed: the GUID pins both provision and release point. This is also the stable citation form for "this exact text at this exact point in time."
+
+Prev/next: `seq_in_title` within the resolved RP, skipping nothing (repealed sections stay in reading order, flagged).
+
+---
+
+## 4. API surface (FastAPI, versioned OpenAPI)
+
+| Route | Purpose |
+|---|---|
+| `GET /us/usc/t{T}/s{S}[/provision-path]` | Provision by identifier; `?release=`, `?date=`, `?format=` |
+| `GET /us/usc/?id={guid}` | Lookup by XML @id — guid encodes provision + release point |
+| `GET /us/usc/t{T}` , `/t{T}/ch{C}` | TOC nodes at a version |
+| `GET /api/v1/sections/{...}/neighbors` | prev/next section |
+| `GET /api/v1/sections/{...}/versions` | list of RPs where the section changed (diff timeline) |
+| `GET /api/v1/releases` | all RPs with dates and changed-title flags |
+| `POST /api/v1/auth/*` | signup/login (email+password or GitHub/Google OAuth) |
+| `GET/POST/DELETE /api/v1/watchlist*` | watchlist CRUD; items open directly to reader |
+
+Content negotiation: `Accept: application/xml` returns raw USLM fragment; HTML rendering reuses OLRC's CSS conventions (`usctitle.css` classes are already in the XML `@class`/`@style`) so display fidelity is nearly free.
+
+---
+
+## 5. Day 1 — demonstrable MVP (Title 16, 2 release points)
+
+| # | Deliverable | Notes |
+|---|---|---|
+| 1 | Repo scaffold: `ingest/ api/ web/ db/ docker-compose.yml` (Postgres 16 + API) | uv + FastAPI + SQLAlchemy + Alembic |
+| 2 | USLM parser layer: `detect_uslm_version` + `Uslm1Parser` (full) + `Uslm2Parser` (stub passing detection + basic section extraction on repo samples) | usc16.xml + samples/uslm2/ as fixtures; unit tests on s45f |
+| 3 | Load Title 16 @ current RP + one prior RP (e.g. 119-94) with hash dedupe | proves versioning model |
+| 4 | Resolver + routes above (identifier, ?id, ?release, ?date) | OpenAPI docs live |
+| 5 | Minimal reader: TOC → section page, provision anchor highlight, prev/next, release picker | server-rendered (Jinja) or small React app |
+| 6 | Demo script: `/us/usc/t16/s45f/c/5?date=07/12/2026` end-to-end | |
+
+## 6. Week 1 — day-by-day
+
+- **Day 2:** All 54+ titles (incl. appendices) at current RP. Bulk downloader: port `downloadusc.py` from loadusc-xcitedb (modern Python, checksum cache, polite rate limiting); load its `uscreleasepoints.json` into `release_points`. HTML rendering polish; citation-style search box ("16 USC 45f(c)(5)" → identifier).
+- **Day 3:** Backfill prior RPs (~324, back to 2013). Downloader runs as a resumable queue (bandwidth-bound, ~40–80 GB of zips — start it Day 2 night; keep zips in S3/B2 or external disk). Ingest driven by `titlesAffected` per RP, hash-dedupe as verification; build `guid_map` per RP.
+- **Day 4:** Reader UX: keyboard nav, breadcrumbs, notes/sourceCredit toggles, status badges (repealed/omitted/transferred), version timeline per section ("changed at these RPs"), diffs between two versions — port/adapt the diff approach from dreamproit/versions rather than writing one from scratch.
+- **Day 5:** Auth + watchlists (provision, section, or whole-chapter items; optional pinned release). "My provisions" home page. Email is out of scope for v1 (no notifications yet — but schema supports it).
+- **Day 6:** Performance & deploy: HTTP caching (immutable per (identifier, RP) → cache-forever ETags), CDN in front, deploy API+DB (Fly.io/Render/VPS), smoke tests.
+- **Day 7:** Hardening: `Uslm2Parser` to full parity (TOC/tables/indent-model differences, validated against samples/uslm2/ — so the day OLRC flips to 2.x, ingest keeps working); full-corpus verification job (counts per title per RP vs source), accessibility pass, README + API docs, load test, backlog for xcitedb port.
+
+---
+
+## 7. Agent orchestration plan
+
+**Recommended interface: Claude Code (CLI or VS Code extension) on your machine, one git repo, using plan mode + subagents + git worktrees for parallel workstreams.** Cowork is right for docs/research (like this plan); Claude Code is better for a multi-module build because it gives you plan-mode review before edits, parallel worktree agents, hooks/tests on every change, and cheap re-runs. Optionally add the Claude GitHub Action so PRs get automatic review.
+
+Setup once: `CLAUDE.md` at repo root recording the conventions above (repository interface rule, identifier semantics, dedupe rule, test commands). Every agent session inherits it — this is what keeps a multi-agent build coherent.
+
+| Workstream | Agent / mode | Model | Rationale |
+|---|---|---|---|
+| Architecture decisions, schema review, resolver design | Plan-mode session (or `Plan` subagent) | **Opus 5** | Highest-stakes decisions; errors here are expensive |
+| USLM parser + ingest pipeline | Main Claude Code session | **Opus 5** | USLM edge cases (appendices, status, notes, big-title streaming) are the hardest code |
+| Repo scaffold, docker-compose, Alembic, CI | Main session or worktree agent | **Sonnet 5** | Well-trodden patterns; fast and cheap |
+| FastAPI routes + repository impl | Worktree agent | **Sonnet 5** | Straightforward once resolver is specified |
+| Frontend reader UI | Worktree agent | **Sonnet 5** | Iterative UI work; Sonnet iterates fastest |
+| Auth + watchlist | Worktree agent | **Sonnet 5** | Standard CRUD + auth patterns |
+| Bulk download/backfill scripts | One session writes; then runs unattended | **Sonnet 5** (code), no LLM at runtime | Long-running jobs are plain Python, not agent loops |
+| Test writing, fixture generation | `general-purpose` subagent per module | **Sonnet 5** | Parallel to feature work |
+| Verification: cross-check counts vs source XML, API contract tests, review PR diffs | Separate reviewer session / GitHub Action | **Opus 5** for review, **Haiku 4.5** for mechanical checks (lint, link checks, doc sweeps) | Independent verification catches what the author-agent misses |
+| Exploration ("where is X handled?") | `Explore` subagent | **Haiku 4.5 / Sonnet 5** | Keeps main context clean |
+| Build-log & ADR upkeep (see §11) | End of every session, same session | any | Documentation debt compounds; write it while context is hot |
+
+Working rhythm per module: Plan mode (Opus) → approve plan → implement (assigned model) in a worktree → tests pass → reviewer session (fresh context, Opus) reads the diff → merge. Merge order: schema → ingest → API → web → auth (each unblocks the next; UI can start against fixture JSON in parallel).
+
+---
+
+## 8. Accounts & setup you need
+
+**Claude access.** Heavy multi-agent use for a week means Opus + parallel sessions. Starting point here is Claude Pro + $100 API credits; see GETTING-STARTED.md §2 for the exact upgrade path. Summary:
+- **Upgrade Pro → Max** for the build week (Max 5x $100/mo minimum; **Max 20x $200/mo recommended** for Days 2–4 parallel work). Pro alone gives Claude Code with Sonnet only — no Opus — and its limits won't survive Day 1.
+- The **$100 API credits** are best spent on headless/CI agents (GitHub Action PR review, scheduled verification runs) and as overflow if subscription limits hit mid-day.
+
+**Development.**
+- GitHub repo (you have one initialized here already) + optionally the Claude Code GitHub App for PR review.
+- Local: Docker Desktop, Python 3.12 + uv, Node 20 (if React frontend), `lxml`, Postgres 16 via compose.
+- Disk: ~100 GB free for the RP zip archive, or an S3/Backblaze B2 bucket (~$5/mo) as the zip cache.
+
+**Hosting (Day 6).**
+- Simple: **Fly.io or Render** (FastAPI + managed Postgres). Postgres with all RPs deduped is likely 10–40 GB — check managed-tier pricing, or
+- Cheaper for storage-heavy DB: a **Hetzner/DO VPS** (~$20–40/mo) running compose, with Cloudflare (free) in front for caching immutable section responses.
+- Domain (~$12/yr) + Cloudflare DNS, optional.
+
+**No credentials needed** for uscode.house.gov — downloads are public. Be polite: sequential downloads, ~1 req/sec, cache everything, set a descriptive User-Agent.
+
+---
+
+## 9. Risks & gotchas (encode these in CLAUDE.md)
+
+1. **`@id` GUIDs are regenerated at each RP by design** — a GUID means (provision, release point). Treat it as a globally unique version pin, and never as a cross-release identity (that's `@identifier`'s job).
+1a. **Dual schemas** — never hard-code USLM 1.x element paths outside `Uslm1Parser`; all schema knowledge lives in the parser implementations.
+2. **Renumbering/transfers** break `@identifier` continuity — track `status="transferred"` and consider a redirects table; a section identifier may disappear at an RP without being repealed.
+3. **RP labels don't sort** — always use parsed (congress, law, exclusions) + `seq`; handle compound `notXnotY`.
+4. **"not" laws vs `?date`** — at RP `119-102not101` the text is *not* fully current through 07/12/2026; the UI must show the exception, not just the date.
+5. **Title 42 is huge** (multiples of Title 16) — parser must stream (`iterparse` + element clearing), never load whole trees; DB writes batched.
+6. **Appendix titles** (`05a` etc.) have their own files and sometimes looser structure — treat as distinct titles.
+7. **Early RPs (2013–2015)** use older USLM 1.0 converter output — expect attribute drift; validate ingest counts per title per RP.
+8. **Repealed/omitted sections** still occupy reading order — keep them in prev/next with badges.
+9. **xcitedb future** — everything version-resolution-related stays behind the Repository interface; no raw SQL in API handlers. The existing loader (dreamproit/loadusc-xcitedb) is the starting point for the XCiteDB Repository implementation and the nightly auto-update job.
+
+## 10. Demo definition of done
+
+Day 1: open the site → browse Title 16 TOC → open §45f → highlight (c)(5) via URL → flip release picker between two RPs → prev/next works.
+Day 7: any citation, any of ~324 RPs, by `?release` or `?date`; log in; watch `/us/usc/t16/s45f/c/5`; reopen it from watchlist in one click; section version timeline visible; both USLM 1.x and 2.x files ingest cleanly.
+
+## 11. Documentation & provenance (for the blog series and for AI-skeptical users)
+
+Every working session leaves a paper trail in the repo, so the build can be reconstructed step by step and independently verified:
+
+1. **`BUILDLOG.md`** — one entry per session: date, model used, what was asked, what was decided, commits produced, what was verified and how. Written at the end of each Claude Code session ("Update BUILDLOG.md for this session" is the last prompt, every time).
+2. **`docs/adr/`** — Architecture Decision Records: one short file per consequential decision (why Postgres first, why sections are the storage atom, why a dual-parser layer, GUID semantics). Skeptics can audit reasoning, not just results.
+3. **Commit discipline** — small commits, imperative messages, `Co-Authored-By: Claude <model>` trailers preserved. The git history *is* the walkthrough.
+4. **Data provenance manifests** — every ingest writes `data/manifests/{release}.json`: source URL, download timestamp, zip sha256, per-title section/element counts. Anyone can re-download from uscode.house.gov and confirm hashes and counts match — the strongest answer to "did the AI make this up?" is a mechanical check against the official source.
+5. **Verification artifacts committed** — test outputs and the Day-7 full-corpus count report live in `docs/verification/`, regenerated by `make verify`, so reliability claims are reproducible commands, not assertions.
+6. **README** — carries the project story, links to all of the above, and a standing "How this site was built" section that grows as the build progresses.
