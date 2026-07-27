@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(uv add *)",
+      "Bash(uv sync *)",
+      "Bash(pip install *)",
+      "Bash(pip3 install *)",
+      "Bash(brew install *)",
+      "Bash(npm install)",
+      "Bash(npm install *)",
+      "Bash(yarn add *)",
+      "Bash(bun install)",
+      "Bash(bun add *)",
+      "Bash(apt-get install *)",
+      "Bash(apt install *)"
+    ],
+    "ask": [
+      "Bash(uv remove *)",
+      "Bash(pip uninstall *)",
+      "Bash(pip3 uninstall *)",
+      "Bash(brew uninstall *)",
+      "Bash(brew remove *)",
+      "Bash(npm uninstall *)",
+      "Bash(npm remove *)",
+      "Bash(yarn remove *)",
+      "Bash(bun remove *)",
+      "Bash(apt-get remove *)",
+      "Bash(apt-get purge *)",
+      "Bash(apt remove *)"
+    ]
+  }
+}
