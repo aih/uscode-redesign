@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# US Code release-point archive: ~324 RP zips, 40-80 GB. Never committed.
+# Provenance manifests under data/manifests/ ARE committed (PLAN 11.4).
+data/*
+!data/manifests/
