@@ -69,15 +69,18 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 
 ## Commands
 
-_(TBD — fill in as they come to exist; PLAN §11.5 expects `make test` and `make verify`.)_
-
 ```
-make test      # test suite is the specification; nothing merges without it green   (TBD)
-make verify    # full-corpus counts vs source XML → docs/verification/              (TBD)
+make dev        # docker compose up -d db; alembic upgrade head; uvicorn --reload (local)
+make test       # uv run pytest — test suite is the specification; nothing merges without it green
+make verify     # (TBD — stub, exits 1) full-corpus counts vs source XML → docs/verification/, PLAN §11.5, Day 7
+docker compose up --build   # full containerized stack (db + api) instead of `make dev`'s local API
 ```
 
-Planned stack: Python 3.12 + uv, FastAPI, SQLAlchemy, Alembic, lxml, Postgres 16 via
-docker-compose, Node 20 if the reader ends up React.
+Stack: Python 3.12 + uv, FastAPI, SQLAlchemy, Alembic, lxml, Postgres 16 via docker-compose
+(`db` service; `api` service builds from `Dockerfile`, UV_PROJECT_ENVIRONMENT=/opt/venv so the
+dev bind mount doesn't shadow the container venv). `db/config.py` reads `DATABASE_URL` (see
+`.env.example`); Alembic's `env.py` pulls the same setting and `target_metadata` from
+`db.models.Base` — no separate URL to keep in sync. Node 20 if the reader ends up React.
 
 ## Documentation duties (PLAN §11) — non-negotiable, this project is built in the open
 
