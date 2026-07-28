@@ -10,7 +10,9 @@ from pathlib import Path
 from db.base import SessionLocal
 from ingest import backfill as backfill_mod
 from ingest import inventory as inventory_mod
+from ingest import load_all as load_all_mod
 from ingest import mirror as mirror_mod
+from ingest import verify as verify_mod
 from ingest.download import DOWNLOAD_DIR, download_title_zip, extract_title_xml, sha256_file
 from ingest.load import LoadStats, load_release
 from ingest.manifest import write_manifest
@@ -149,6 +151,42 @@ def main(argv: list[str] | None = None) -> int:
         "--no-verify", action="store_true", help="Skip hashing what was pulled"
     )
 
+    load_all_parser = subparsers.add_parser(
+        "load-all", help="Load the whole downloaded corpus, ledger-driven, resumable"
+    )
+    load_all_parser.add_argument("--dest", type=Path, default=DOWNLOAD_DIR)
+    load_all_parser.add_argument(
+        "--inventory", type=Path, default=inventory_mod.INVENTORY_PATH
+    )
+    load_all_parser.add_argument(
+        "--title", action="append", default=None, metavar="NUM", help="Restrict; repeatable"
+    )
+    load_all_parser.add_argument(
+        "--release", action="append", default=None, metavar="LABEL", help="Restrict; repeatable"
+    )
+    load_all_parser.add_argument(
+        "--limit", type=int, default=None, help="Stop after N titles (trial run)"
+    )
+    load_all_parser.add_argument(
+        "--plan-only", action="store_true", help="Print what would be loaded and exit"
+    )
+    load_all_parser.add_argument("--quiet", action="store_true")
+
+    verify_parser2 = subparsers.add_parser(
+        "verify", help="Check loaded counts against section_release_map and the source XML"
+    )
+    verify_parser2.add_argument(
+        "--deep", action="store_true", help="Re-parse source XML (independent recount; slow)"
+    )
+    verify_parser2.add_argument("--dest", type=Path, default=DOWNLOAD_DIR)
+    verify_parser2.add_argument(
+        "--limit", type=int, default=None, help="Check only the first N title-versions"
+    )
+    verify_parser2.add_argument(
+        "--out", type=Path, default=Path("docs/verification")
+    )
+    verify_parser2.add_argument("--no-write", action="store_true")
+
     load_parser = subparsers.add_parser("load", help="Load one USLM title file")
     load_parser.add_argument("xmlfile", type=Path)
     load_parser.add_argument(
@@ -180,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         "backfill": _cmd_backfill,
         "verify-downloads": _cmd_verify_downloads,
         "mirror": _cmd_mirror,
+        "load-all": _cmd_load_all,
+        "verify": _cmd_verify,
         "load": _cmd_load,
     }[args.command](args)
 
@@ -370,6 +410,68 @@ def _cmd_mirror(args: argparse.Namespace) -> int:
         print(f"missing after pull: {', '.join(report.missing[:10])}", file=sys.stderr)
     if report.mismatched:
         print(f"HASH MISMATCH: {', '.join(report.mismatched[:10])}", file=sys.stderr)
+    return 0 if report.sound else 1
+
+
+def _cmd_load_all(args: argparse.Namespace) -> int:
+    ledger = load_all_mod.default_ledger(args.dest)
+    if not ledger.entries:
+        print(f"nothing to load: no ledger at {args.dest / 'ledger.json'}", file=sys.stderr)
+        return 1
+    entries = inventory_mod.read_inventory(args.inventory)
+    tasks = load_all_mod.plan_loads(
+        ledger,
+        entries,
+        titles=set(args.title) if args.title else None,
+        releases=set(args.release) if args.release else None,
+    )
+    print(f"{len(tasks)} downloaded title-versions available to load")
+    if args.plan_only:
+        for task in tasks[:50]:
+            print(f"  seq {task.seq:>4}  {task.key}")
+        if len(tasks) > 50:
+            print(f"  … and {len(tasks) - 50} more")
+        return 0
+
+    try:
+        report = load_all_mod.run_load_all(
+            tasks, SessionLocal, limit=args.limit, on_event=None if args.quiet else print
+        )
+    except KeyboardInterrupt:
+        print("\ninterrupted — re-run to resume (the database is the state)", file=sys.stderr)
+        return 130
+
+    print(
+        f"\nplanned {report.planned}: {report.loaded} loaded, {report.skipped} skipped, "
+        f"{report.failed} failed"
+    )
+    print(
+        f"{report.sections_stored:,} sections stored — {report.new_versions:,} new versions, "
+        f"{report.deduped_versions:,} deduped ({report.dedupe_ratio:.1%})"
+    )
+    print(f"elapsed {report.elapsed_seconds / 60:.1f} min")
+    if report.mismatches:
+        print("\nTITLE MISMATCHES (file contents disagree with the URL):", file=sys.stderr)
+        for line in report.mismatches[:10]:
+            print(f"  {line}", file=sys.stderr)
+    if report.failures:
+        print("\nfailures (re-run to retry):", file=sys.stderr)
+        for key, detail in report.failures[:20]:
+            print(f"  {key}: {detail}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    ledger = load_all_mod.default_ledger(args.dest) if args.deep else None
+    with SessionLocal() as session:
+        report = verify_mod.verify_database(
+            session, deep=args.deep, ledger=ledger, limit=args.limit
+        )
+    print(verify_mod.summarize(report))
+    if not args.no_write:
+        path = verify_mod.write_report(report, directory=args.out)
+        print(f"report: {path}")
     return 0 if report.sound else 1
 
 

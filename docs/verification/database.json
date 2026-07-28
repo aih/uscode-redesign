@@ -1,0 +1,63 @@
+{
+  "checks": [
+    {
+      "raw_section_elements": 53,
+      "release_label": "113-21",
+      "rows_in_release_map": 39,
+      "sections_loaded": 39,
+      "source_raw_elements": null,
+      "source_sections": null,
+      "title_num": "1"
+    },
+    {
+      "raw_section_elements": 1244,
+      "release_label": "113-21",
+      "rows_in_release_map": 1220,
+      "sections_loaded": 1220,
+      "source_raw_elements": null,
+      "source_sections": null,
+      "title_num": "2"
+    },
+    {
+      "raw_section_elements": 80,
+      "release_label": "113-21",
+      "rows_in_release_map": 63,
+      "sections_loaded": 63,
+      "source_raw_elements": null,
+      "source_sections": null,
+      "title_num": "3"
+    },
+    {
+      "raw_section_elements": 51,
+      "release_label": "113-21",
+      "rows_in_release_map": 47,
+      "sections_loaded": 47,
+      "source_raw_elements": null,
+      "source_sections": null,
+      "title_num": "4"
+    }
+  ],
+  "count_mismatches": [],
+  "dedupe_ratio": 0.440609,
+  "deep": false,
+  "generated_at": "2026-07-28T20:00:32.251917+00:00",
+  "guid_rows": 0,
+  "incomplete_loads": [
+    "119-102not101/16",
+    "119-99/16"
+  ],
+  "release_map_rows": 11559,
+  "releases_covered": 1,
+  "section_versions": 6466,
+  "sections": 6464,
+  "sound": true,
+  "source_mismatches": [],
+  "title_versions_checked": 4,
+  "titles_covered": 4,
+  "unstored_element_gaps": {
+    "113-21/1": 14,
+    "113-21/2": 24,
+    "113-21/3": 17,
+    "113-21/4": 4
+  }
+}

@@ -324,22 +324,23 @@ def test_ingested_titles_are_distinguished_from_affected_titles(client):
     this release point" are different claims."""
     releases = {r["label"]: r for r in client.get("/api/v1/releases").json()}
 
-    assert releases[CURRENT]["ingested_titles"] == ["16"]
+    assert "16" in releases[CURRENT]["ingested_titles"]
     assert releases[BETWEEN]["ingested_titles"] == []
     assert releases[BETWEEN]["titles_affected"] == ["47"]
 
 
 def test_titles_lists_what_is_loaded(client):
-    titles = client.get("/api/v1/titles").json()
+    """Asserts Title 16's entry, not that it is the only one: `make dev-data` is
+    the floor this suite needs, and a database that also holds a bulk load
+    (`ingest load-all`) must still pass."""
+    titles = {t["num"]: t for t in client.get("/api/v1/titles").json()}
 
-    assert titles == [
-        {
-            "num": "16",
-            "name": "CONSERVATION",
-            "is_positive_law": False,
-            "ingested_releases": [PRIOR, CURRENT],
-        }
-    ]
+    assert titles["16"] == {
+        "num": "16",
+        "name": "CONSERVATION",
+        "is_positive_law": False,
+        "ingested_releases": [PRIOR, CURRENT],
+    }
 
 
 def test_openapi_documents_the_routes(client):

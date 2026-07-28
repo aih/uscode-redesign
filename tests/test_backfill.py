@@ -411,9 +411,21 @@ def test_ledger_survives_a_round_trip(tmp_path):
     assert entry.recorded_at  # stamped on record()
 
 
-def test_legacy_absolute_paths_normalize_on_load(tmp_path):
-    """A ledger written before paths went relative carries another machine's
-    absolute paths; loading it rewrites them to the {label}/{file} layout."""
+@pytest.mark.parametrize(
+    "recorded",
+    [
+        # Another machine's absolute path.
+        "/Users/someone-else/repo/data/releases/119-99/xml_usc16@119-99.zip",
+        # Relative, but already carrying the corpus prefix — re-prefixing this one
+        # produced data/releases/data/releases/… and silently hid the whole corpus.
+        "data/releases/119-99/xml_usc16@119-99.zip",
+        # Already in the contract form.
+        "119-99/xml_usc16@119-99.zip",
+    ],
+)
+def test_paths_normalize_to_the_layout_contract_on_load(tmp_path, recorded):
+    """Whatever a writer recorded, a reader resolves it to {label}/{file} under
+    its own corpus directory. Anything else makes a pulled ledger unusable."""
     ledger = DownloadLedger(tmp_path / "ledger.json")
     ledger.record(
         LedgerEntry(
@@ -421,7 +433,7 @@ def test_legacy_absolute_paths_normalize_on_load(tmp_path):
             title_num="16",
             status=str(FetchStatus.OK),
             url="https://example/x.zip",
-            path="/Users/someone-else/repo/data/releases/119-99/xml_usc16@119-99.zip",
+            path=recorded,
             sha256="a" * 64,
         )
     )

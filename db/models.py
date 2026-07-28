@@ -68,6 +68,17 @@ class TitleVersion(Base):
     unchanged_from_release_id: Mapped[int | None] = mapped_column(
         ForeignKey("release_points.id"), nullable=True
     )
+    sections_loaded: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    """Sections stored for this (title, release), written only once the load
+    finishes. **NULL means the load did not complete** — the row is created before
+    sections are read and `load_release` commits as it goes, so presence of the row
+    proves nothing on its own. This is the resume marker `load-all` skips on, and
+    the count `make verify` checks against `section_release_map`."""
+
+    raw_section_elements: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    """`<section>` elements in the source file, including the ~298-per-Title-16
+    that live inside `<quotedContent>` and are deliberately not stored (ADR-0005).
+    Kept alongside `sections_loaded` so the gap stays visible without a re-parse."""
 
 
 class Section(Base):

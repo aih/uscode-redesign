@@ -1,4 +1,4 @@
-.PHONY: dev dev-data test test-slow test-all fixtures verify
+.PHONY: dev dev-data test test-slow test-all fixtures verify verify-deep load-all
 
 dev:
 	docker compose up -d db
@@ -28,7 +28,15 @@ test-all:
 fixtures:
 	uv run python scripts/extract_fixture.py
 
+# Counts recorded at load vs. what section_release_map actually holds. Seconds.
 verify:
-	@echo "make verify: not yet implemented (PLAN.md §11.5, Day 7)."
-	@echo "Will regenerate docs/verification/ by comparing ingested counts against source XML."
-	@exit 1
+	uv run python -m ingest verify
+
+# Adds an independent recount by re-parsing every source file. Hours on a full
+# corpus — this is the one that doesn't just ask the loader to confirm itself.
+verify-deep:
+	uv run python -m ingest verify --deep
+
+# Load every downloaded title, ledger-driven, resumable (ADR-0014).
+load-all:
+	uv run python -m ingest load-all

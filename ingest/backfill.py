@@ -131,10 +131,14 @@ class DownloadLedger:
         document = json.loads(path.read_text())
         for record in document.get("entries", []):
             entry = LedgerEntry(**record)
-            if entry.path is not None and Path(entry.path).is_absolute():
-                # Ledgers written before paths went relative recorded the writing
-                # machine's absolute paths. The layout contract has always been
-                # {dest}/{label}/{filename}, so the last two parts are the truth.
+            if entry.path is not None:
+                # The layout contract has always been {dest}/{label}/{filename}, so
+                # the last two parts are the truth and everything before them is
+                # some writer's idea of where the corpus lives. Normalizing every
+                # path — not just absolute ones — is what makes a ledger portable:
+                # entries written before this rule recorded either an absolute path
+                # or a relative one that already included `data/releases`, and
+                # re-prefixing the latter produced `data/releases/data/releases/…`.
                 entry.path = str(Path(*Path(entry.path).parts[-2:]))
             ledger.entries[entry.key] = entry
         return ledger

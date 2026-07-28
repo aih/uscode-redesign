@@ -82,7 +82,12 @@ def load_release(
 
     release = _get_or_create_release(session, release_label, currency_date)
     title = _get_or_create_title(session, meta)
-    _get_or_create_title_version(session, title, release, xml_path, meta, source_zip)
+    title_version = _get_or_create_title_version(
+        session, title, release, xml_path, meta, source_zip
+    )
+    # Any earlier attempt at this (title, release) is being redone from the top;
+    # don't leave a stale completion count standing while it runs.
+    title_version.sections_loaded = None
     structure_nodes = _load_structure(session, parser, xml_path, title, release)
     session.commit()
 
@@ -164,9 +169,15 @@ def load_release(
 
     if guid_rows:
         _flush_guid_rows(session, guid_rows)
-    session.commit()
 
     raw_count = parser.count_section_elements(xml_path)
+
+    # The completion marker, written last and committed with the final batch:
+    # until this lands, `sections_loaded` is NULL and `load-all` treats the
+    # (title, release) as unloaded and redoes it.
+    title_version.sections_loaded = sections_ingested
+    title_version.raw_section_elements = raw_count
+    session.commit()
 
     return LoadStats(
         release_label=release_label,
