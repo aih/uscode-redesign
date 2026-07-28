@@ -272,3 +272,15 @@ Session-by-session record of how this site was built. One entry per working sess
   - Dedupe confirmed at scale on the first repeat title: Title 16 at 119-99 re-loaded **5,095 sections, 0 new versions, 100% deduped**.
   - `make verify` sound on the partial corpus; the two pre-column Title 16 loads correctly read as `incomplete`.
   - **In flight at session end:** download ~660/3,197 and bulk load running concurrently (network-bound vs CPU-bound, so they compose). Neither is finished; the dedupe ratio over the whole corpus is the headline number still to come.
+
+## 015 — 2026-07-29 — Status review across both checkouts; main synced
+
+- **Tool/model:** Claude (Cowork), Fable 5 — independent reviewer.
+- **Asked:** Review the status of `uscode-redesign` (main) and `uscode-web` (worktree), update documents, commit, and explain why there are two directories.
+- **Status found:**
+  - **Main:** Sessions through 8 built — backfill tool (ADR-0012), S3 mirror + EC2 remote-ops (ADR-0013, unexercised: no bucket yet), `load-all` + real `make verify` (ADR-0014), plus two post-013 fixes (structure repair `0c9d83f`, truncated-response retry `b86495e`). Backfill in flight locally: ledger 1,742 entries (1,698 ok / 44 unavailable), 5.1 GB in `data/releases/`; bulk load running concurrently. 22 provenance manifests from the in-flight runs were sitting uncommitted — now committed (`e844055`), per PLAN §11.4.
+  - **Worktree `../uscode-web`, branch `feature/reader-overhaul`:** Session 7 complete (BUILDLOG 014, on the branch): ADR-0010 separation implemented with a top-level composition root; Astro 5 + TS + USWDS reader at `/app`; Caddy owns the origin (ADR-0015); USLM→HTML renders in `frontend/src/lib/uslm.ts`; batched `/api/v1/labels` for one-query hover text; Jinja retired with its 35 tests; branch claims 209 API + 27 web tests and commits 375/1280px screenshots. Branch is 1 commit behind main; touches PLAN/README/CLAUDE/BUILDLOG, so the merge will carry doc conflicts — append-shaped, trivial.
+- **Why two directories:** one repo, two git worktrees — `uscode-redesign` (main: ingest/backfill/load work) and `uscode-web` (frontend branch) — created so Sessions 7 and 8 could run in parallel without colliding, per GETTING-STARTED §10. They share history and objects; `uscode-web` is disposable after merge (`git worktree remove ../uscode-web`).
+- **Merge gate, per the repo's own rule:** not merged here — this reviewer cannot execute the suites. Merge steps: in `../uscode-web`, `git merge main` (pick up the 2 ingest fixes), run `make test` + `make test-web` + build, resolve the doc conflicts, then fast-forward main and `git worktree remove`.
+- **Produced:** manifest commit `e844055`; PLAN.md progress note (Day 2–3 state, both checkouts); this entry.
+- **Verified:** Branch review is textual (diff shape, BUILDLOG 014, ADR-0015) — test counts and screenshots are the branch's claims, to be re-run at merge. Ledger numbers re-checkable: `python3 -c "import json,collections;d=json.load(open('data/releases/ledger.json'));print(d['count'],collections.Counter(e['status'] for e in d['entries']))"`.
