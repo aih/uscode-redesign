@@ -1,0 +1,22 @@
+---
+/**
+ * Gotcha 9 and gotcha 13, in one component: repealed, omitted and transferred
+ * provisions keep their place in reading order and arrive *badged*, and the set
+ * of statuses is not closed — USLM 2.x adds `renumbered`, and a subchapter can be
+ * `reserved`. So the status is printed, never mapped through an enum; only the
+ * colouring knows two of them by name.
+ */
+interface Props {
+  status?: string | null;
+}
+
+const { status } = Astro.props;
+---
+
+{
+  status && (
+    <span class={`usa-tag status-tag status-tag--${status}`} data-status={status}>
+      {status}
+    </span>
+  )
+}

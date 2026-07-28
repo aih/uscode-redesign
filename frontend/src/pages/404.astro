@@ -1,0 +1,12 @@
+---
+/** Anything under /app that is not a citation. */
+import Base from "../layouts/Base.astro";
+import ErrorPage from "../components/ErrorPage.astro";
+---
+
+<Base title="404 · U.S. Code">
+  <ErrorPage
+    status={404}
+    detail="That is not a page of this reader. A citation looks like /us/usc/t16/s45f/c/5."
+  />
+</Base>

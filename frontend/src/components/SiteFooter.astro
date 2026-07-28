@@ -1,0 +1,39 @@
+---
+/**
+ * The footer, which the BUILDLOG 008 review also found missing.
+ *
+ * It says what this site is, because a page of statutory text that does not
+ * identify its publisher is a page a researcher cannot cite. The source of the
+ * data is named, and linked, on every page.
+ */
+import { APP } from "../lib/url";
+---
+
+<footer class="usa-footer usa-footer--slim">
+  <div class="usa-footer__primary-section">
+    <div class="usa-footer__primary-container grid-row">
+      <nav class="usa-footer__nav" aria-label="Footer">
+        <ul class="usa-list usa-list--unstyled">
+          <li><a class="usa-footer__primary-link" href={`${APP}/`}>Titles</a></li>
+          <li><a class="usa-footer__primary-link" href={`${APP}/releases`}>Release points</a></li>
+          <li><a class="usa-footer__primary-link" href="/docs">API documentation</a></li>
+          <li>
+            <a
+              class="usa-footer__primary-link usa-link usa-link--external"
+              rel="noopener"
+              href="https://uscode.house.gov/download/download.shtml">Source XML (OLRC)</a
+            >
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+  <div class="usa-footer__secondary-section">
+    <div class="grid-container">
+      <p class="doc-meta">
+        A conceptual redesign of the Office of the Law Revision Counsel's site, built from the
+        official USLM downloads. Not an official publication of the United States government.
+      </p>
+    </div>
+  </div>
+</footer>

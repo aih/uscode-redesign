@@ -1,0 +1,503 @@
+/*
+ * USWDS, themed, plus the reader's own layer.
+ *
+ * USWDS is the federal government's design system — WCAG 2.1 AA and Section 508
+ * are its stated bar, and it is the natural visual language for the United States
+ * Code (ADR-0011). Only the packages this reader uses are forwarded, because
+ * forwarding all of them costs several hundred kilobytes of CSS for components
+ * no page renders.
+ *
+ * Two theme decisions worth stating:
+ *
+ *   * **System font stacks.** USWDS ships Public Sans, Merriweather and Roboto
+ *     Mono as ~5 MB of files. This site has no CDN by design, so those would be
+ *     5 MB in the repository and on the wire; the system stacks are already on
+ *     the reader's machine and cost nothing.
+ *   * **A serif reading face for statutory text, sans for everything about it.**
+ *     Carried over from the Jinja reader (BUILDLOG 007) — it is the distinction
+ *     between the law and the apparatus around the law.
+ */
+
+@use "uswds-core" with (
+  $theme-show-notifications: false,
+  $theme-image-path: "/app/uswds/img",
+  $theme-font-path: "/app/uswds/fonts",
+  $theme-font-type-sans: "system",
+  $theme-font-type-serif: "georgia",
+  $theme-font-role-heading: "sans",
+  $theme-font-role-body: "sans",
+  $theme-respect-user-font-size: true,
+  $utilities-use-important: false
+);
+
+@forward "uswds-global";
+@forward "usa-layout-grid";
+@forward "usa-header";
+@forward "usa-nav";
+@forward "usa-site-title";
+@forward "usa-skipnav";
+@forward "usa-breadcrumb";
+@forward "usa-button";
+@forward "usa-select";
+@forward "usa-label";
+@forward "usa-form";
+@forward "usa-tag";
+@forward "usa-link";
+@forward "usa-list";
+@forward "usa-table";
+@forward "usa-footer";
+@forward "usa-identifier";
+@forward "usa-summary-box";
+@forward "usa-alert";
+@forward "usa-icon";
+@forward "usa-prose";
+
+/* ------------------------------------------------------------------- tokens */
+
+:root {
+  color-scheme: light dark;
+
+  /* The one lever the BUILDLOG 008 review asked for by name: provision depth is
+   * a variable, small enough on a phone that a four-deep paragraph still has a
+   * column to be read in, and wide enough on a desktop to show structure. */
+  --indent-step: 0.75rem;
+
+  --reading: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --ink: #1b1b1b;
+  --muted: #565c65;
+  --rule: #dfe1e2;
+  --page: #ffffff;
+  --panel: #f0f0f0;
+  --link: #005ea2;
+  --target: rgba(255, 190, 46, 0.28);
+  --target-edge: #c05600;
+  --danger: #b50909;
+}
+
+@media (min-width: 40em) {
+  :root {
+    --indent-step: 1.6rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e8e6e1;
+    --muted: #a9aeb1;
+    --rule: #3d4551;
+    --page: #16150f;
+    --panel: #1c1d1f;
+    --link: #73b3e7;
+    --target: rgba(255, 190, 46, 0.22);
+    --target-edge: #ffbe2e;
+    --danger: #f2938c;
+  }
+
+  body {
+    background: var(--page);
+    color: var(--ink);
+  }
+
+  .usa-header,
+  .usa-footer {
+    background: var(--panel);
+    color: var(--ink);
+  }
+
+  a,
+  .usa-link {
+    color: var(--link);
+  }
+}
+
+/* USWDS hides the primary navigation behind a JavaScript menu button below the
+ * desktop breakpoint. This reader ships no JavaScript (ADR-0011), so on small
+ * screens the nav becomes what it is on paper: a short row of links that wraps.
+ * Three links do not need a drawer. */
+@media (max-width: 63.99em) {
+  .usa-nav {
+    display: block;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    background: transparent;
+    padding: 0 1rem 0.5rem;
+  }
+
+  .usa-nav__primary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.25rem;
+    margin: 0;
+  }
+
+  .usa-nav__primary-item {
+    border-top: none;
+  }
+
+  .usa-nav__primary > li > a {
+    padding: 0.5rem 0;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* -------------------------------------------------------------- the shell */
+
+body {
+  background: var(--page);
+  color: var(--ink);
+}
+
+.reader-wrap {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+}
+
+/* Breadcrumbs and the release picker share a contextual bar under the navbar —
+ * "where am I" and "as of when", the two questions a versioned reader must
+ * answer on every page. */
+.contextbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+}
+
+.contextbar__inner {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.contextbar .usa-breadcrumb {
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+/* USWDS's mobile breadcrumb parks every item but one off-screen at `left: -999em`
+ * and gives that one a back arrow. `--wrap` restores their `display` but not
+ * their position, so the trail still collapsed to a single crumb on a phone —
+ * and "where am I in the Code" is a question a versioned reader must answer at
+ * every width. Here the whole trail wraps, with the usual `›` separators. */
+.usa-breadcrumb--wrap .usa-breadcrumb__list-item {
+  position: static;
+  left: auto;
+}
+
+.usa-breadcrumb--wrap .usa-breadcrumb__list-item:nth-last-child(2) .usa-breadcrumb__link::before {
+  content: none;
+}
+
+/* iOS zooms the page when a control's text is under 16px; tap targets follow
+ * the 44px guidance. Both were BUILDLOG 008 findings. */
+.picker {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.picker__select,
+.picker__go {
+  font-size: 1rem;
+  min-height: 2.75rem;
+}
+
+.picker__select {
+  margin-top: 0;
+  max-width: 15rem;
+}
+
+.picker__label {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* --------------------------------------------------------- the section head */
+
+/* BUILDLOG 008, item 3: `§ 45f. Mineral King Valley addition authorized` is ONE
+ * line in the printed Code. The old reader broke the num onto a muted line of
+ * its own; here it is inline, in the reading face, with the badge after it. */
+.doc-title {
+  font-family: var(--reading);
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.25rem;
+  font-weight: 700;
+}
+
+.doc-title__num {
+  margin-right: 0.35em;
+}
+
+.doc-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.doc-meta__rp {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.status-tag {
+  vertical-align: 0.15em;
+  margin-left: 0.4em;
+}
+
+.status-tag--repealed,
+.status-tag--omitted {
+  background-color: var(--danger);
+}
+
+/* Gotcha 5: the caveat is not a footnote. `119-102not101` is *not* fully current
+ * through its date, and a page showing only the date is lying by omission. */
+.caveat,
+.served-note {
+  font-size: 0.9rem;
+  border-left: 4px solid var(--rule);
+  padding: 0.5rem 0 0.5rem 0.75rem;
+  margin: 1rem 0;
+  color: var(--muted);
+}
+
+.caveat {
+  border-left-color: var(--target-edge);
+}
+
+/* ------------------------------------------------------------ navigation */
+
+/* Item 4: a compact strip under the title, and the full block at the bottom —
+ * so a reader who has finished a section never has to scroll back up to move on. */
+.navstrip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.navstrip a {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.navstrip__spacer {
+  flex: 1;
+}
+
+.neighbors {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.9rem;
+}
+
+.neighbors > * {
+  flex: 1;
+  min-height: 2.75rem;
+}
+
+.neighbors__next {
+  text-align: right;
+}
+
+.neighbors__dir {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.formats {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.cite {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------- statutory text */
+
+.section-body {
+  font-family: var(--reading);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  margin-top: 1.5rem;
+}
+
+/* USLM writes a subsection as `<num>(a)</num><heading>Purpose</heading>` — two
+ * elements, one line of the printed Code. */
+.section-body .uslm-heading {
+  display: inline;
+  font-size: 1em;
+  font-family: var(--reading);
+}
+
+.section-body > .uslm-section > .uslm-num,
+.section-body > .uslm-section > .uslm-heading {
+  display: none; /* already the page's <h1> */
+}
+
+.section-body .uslm-num {
+  font-weight: 700;
+  margin-right: 0.4em;
+}
+
+.section-body p {
+  max-width: none;
+  margin: 0.75rem 0;
+}
+
+/* Every indent level is one step of a variable, so depth stays legible at 360px
+ * instead of eating 40% of the screen (BUILDLOG 008, item 1). */
+[class*="indent"] {
+  margin-left: var(--indent-step);
+}
+.indent2 {
+  margin-left: calc(2 * var(--indent-step));
+}
+.indent3 {
+  margin-left: calc(3 * var(--indent-step));
+}
+.indent4 {
+  margin-left: calc(4 * var(--indent-step));
+}
+.indent5 {
+  margin-left: calc(5 * var(--indent-step));
+}
+
+.uslm-sourceCredit {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 1.5rem;
+}
+
+.uslm-note,
+.uslm-notes {
+  font-size: 0.92rem;
+  border-left: 4px solid var(--rule);
+  padding-left: 0.75rem;
+  margin: 1rem 0;
+  color: var(--muted);
+}
+
+.uslm-quotedContent,
+.uslm-quotedText {
+  border-left: 4px solid var(--rule);
+  margin: 0.8rem 0 0.8rem 1rem;
+  padding-left: 0.8rem;
+}
+
+/* Wide tables scroll inside themselves rather than making the page scroll. */
+.section-body .uslm-table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  max-width: 100%;
+}
+
+.uslm-td,
+.uslm-th {
+  border: 1px solid var(--rule);
+  padding: 0.25rem 0.5rem;
+}
+
+/* A reference this site cannot resolve is text, not a broken link (refs.ts). */
+.uslm-ref-plain {
+  border-bottom: 1px dotted var(--rule);
+}
+
+/* ADR-0001: the whole section, with the provision the URL named marked inside. */
+.target {
+  background: var(--target);
+  outline: 2px solid var(--target-edge);
+  border-radius: 0.15rem;
+  scroll-margin-top: 4rem;
+}
+
+/* ---------------------------------------------------------------- listings */
+
+.toc {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+  max-width: none;
+}
+
+.toc li {
+  border-bottom: 1px solid var(--rule);
+}
+
+.toc li:last-child {
+  border-bottom: none;
+}
+
+.toc a {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.25rem;
+  min-height: 2.75rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.toc a:hover {
+  background: var(--panel);
+}
+
+.toc__num {
+  font-weight: 700;
+  color: var(--link);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 30em) {
+  .toc__num {
+    min-width: 6.5rem;
+  }
+}
+
+.toc__heading {
+  flex: 1 1 12rem;
+}
+
+.toc-group {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 1.75rem 0 0.25rem;
+}
+
+.lede {
+  font-size: 1.05rem;
+  color: var(--muted);
+  max-width: none;
+}

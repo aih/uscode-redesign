@@ -1,0 +1,60 @@
+---
+/**
+ * The shell every reader page shares: skip link, navbar, contextual bar, footer.
+ *
+ * Landmarks are not decoration here — a skip-nav link, `<header>`/`<main>`/
+ * `<footer>`, and one `<h1>` per page are what make a document of statutory text
+ * navigable by keyboard and screen reader, which is the whole reason ADR-0011
+ * chose a design system with Section 508 as its stated bar.
+ *
+ * No client JavaScript is loaded. Not "as little as possible" — none. Statutory
+ * text is a document; islands come later, for the things that genuinely interact.
+ */
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import ReleasePicker from "../components/ReleasePicker.astro";
+import type { Entry, Release } from "../lib/types";
+import "../styles/site.scss";
+
+interface Props {
+  title: string;
+  crumbs?: Entry[];
+  release?: string | null;
+  picker?: { action: string; options: Release[]; selected: string } | null;
+}
+
+const { title, crumbs = [], release = null, picker = null } = Astro.props;
+const hasContext = crumbs.length > 0 || picker !== null;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content="Any provision of the US Code, at any release point." />
+  </head>
+  <body>
+    <a class="usa-skipnav" href="#main">Skip to main content</a>
+
+    <SiteHeader />
+
+    {
+      hasContext && (
+        <div class="contextbar">
+          <div class="contextbar__inner">
+            <Breadcrumbs crumbs={crumbs} release={release} />
+            {picker && <ReleasePicker {...picker} />}
+          </div>
+        </div>
+      )
+    }
+
+    <main id="main" class="reader-wrap">
+      <slot />
+    </main>
+
+    <SiteFooter />
+  </body>
+</html>

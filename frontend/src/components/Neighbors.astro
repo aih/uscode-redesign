@@ -1,0 +1,50 @@
+---
+/**
+ * The bottom half of item 4: prev/next with their headings and badges, where a
+ * reader who has finished a section is actually looking.
+ *
+ * Repealed and omitted neighbours are shown, not skipped — they keep their place
+ * in the Code's reading order (gotcha 9), and a reader who cannot see the gap
+ * cannot tell a repeal from a renumbering.
+ */
+import StatusBadge from "./StatusBadge.astro";
+import type { Entry } from "../lib/types";
+import { appHref, trimNum } from "../lib/url";
+
+interface Props {
+  previous?: Entry | null;
+  next?: Entry | null;
+  release?: string | null;
+}
+
+const { previous = null, next = null, release = null } = Astro.props;
+---
+
+{
+  (previous || next) && (
+    <nav class="neighbors" aria-label="Previous and next section">
+      <div>
+        {previous && (
+          <a href={appHref(previous.identifier, release)} rel="prev">
+            <span class="neighbors__dir">Previous</span>
+            <span>
+              {trimNum(previous.num)} {previous.heading}
+            </span>
+            <StatusBadge status={previous.status} />
+          </a>
+        )}
+      </div>
+      <div class="neighbors__next">
+        {next && (
+          <a href={appHref(next.identifier, release)} rel="next">
+            <span class="neighbors__dir">Next</span>
+            <span>
+              {trimNum(next.num)} {next.heading}
+            </span>
+            <StatusBadge status={next.status} />
+          </a>
+        )}
+      </div>
+    </nav>
+  )
+}

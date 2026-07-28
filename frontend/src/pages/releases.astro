@@ -1,0 +1,59 @@
+---
+/**
+ * `/app/releases` — every release point the inventory knows, newest first.
+ *
+ * Two columns that must never be conflated: what OLRC says a release point
+ * changed (`titles_affected`), and what this database actually holds for it
+ * (`ingested_titles`). While the backfill runs they differ, and presenting one as
+ * the other would make an incomplete corpus look like missing law.
+ */
+import Base from "../layouts/Base.astro";
+import type { Release } from "../lib/types";
+
+const response = await fetch(
+  `${process.env.API_BASE_URL ?? "http://localhost:8000"}/api/v1/releases`,
+  { headers: { accept: "application/json" } },
+);
+const releases = (await response.json()) as Release[];
+
+function usDate(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${month}/${day}/${year}`;
+}
+---
+
+<Base title="Release points · U.S. Code">
+  <h1 class="doc-title">Release points</h1>
+  <p class="lede">
+    {releases.length} published release points. A label names the last public law incorporated;
+    <code>not</code> marks a law that was skipped, so the text is current through the date
+    <em>except</em> for that law.
+  </p>
+
+  <table class="usa-table usa-table--striped">
+    <caption>Release points, newest first</caption>
+    <thead>
+      <tr>
+        <th scope="col">Release point</th>
+        <th scope="col">Current through</th>
+        <th scope="col">Titles changed</th>
+        <th scope="col">Titles held here</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        releases.map((release) => (
+          <tr>
+            <th scope="row">{release.label}</th>
+            <td>
+              {usDate(release.currency_date)}
+              {release.is_partial && <span class="doc-meta"> — {release.caveat}</span>}
+            </td>
+            <td>{release.titles_affected.length}</td>
+            <td>{release.ingested_titles.length}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</Base>

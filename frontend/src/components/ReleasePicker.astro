@@ -1,0 +1,47 @@
+---
+/**
+ * "As of when" — the question a versioned reader has to keep answering.
+ *
+ * A plain GET form, submitted by a button, with no JavaScript at all: it works
+ * with scripting off, and what it produces is a URL you can paste. That was true
+ * of the Jinja reader (BUILDLOG 007) and it stays true here — the release picker
+ * is exactly the kind of thing a framework tempts you to make interactive and
+ * thereby fragile.
+ */
+import type { Release } from "../lib/types";
+
+interface Props {
+  action: string;
+  options: Release[];
+  selected: string;
+}
+
+const { action, options, selected } = Astro.props;
+
+function label(release: Release): string {
+  const [year, month, day] = release.currency_date.split("-");
+  return `${release.label} — ${month}/${day}/${year}`;
+}
+---
+
+{
+  options.length > 0 && (
+    <form class="picker" method="get" action={action}>
+      <div>
+        <label class="usa-label picker__label" for="release">
+          Release point
+        </label>
+        <select class="usa-select picker__select" id="release" name="release">
+          {options.map((option) => (
+            <option value={option.label} selected={option.label === selected}>
+              {label(option)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button class="usa-button picker__go" type="submit">
+        Go
+      </button>
+    </form>
+  )
+}

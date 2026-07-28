@@ -1,0 +1,38 @@
+---
+/**
+ * BUILDLOG 008, item 4 — the top half. A compact `← prev · up · next →` strip
+ * directly under the title, so moving through the Code does not require reading
+ * to the bottom of a section first. The full block is at the bottom (Neighbors).
+ */
+import type { Entry } from "../lib/types";
+import { appHref, trimNum } from "../lib/url";
+
+interface Props {
+  previous?: Entry | null;
+  next?: Entry | null;
+  up?: Entry | null;
+  release?: string | null;
+}
+
+const { previous = null, next = null, up = null, release = null } = Astro.props;
+---
+
+{
+  (previous || next || up) && (
+    <nav class="navstrip" aria-label="Section navigation">
+      {previous && (
+        <a href={appHref(previous.identifier, release)} rel="prev">
+          ← {trimNum(previous.num)}
+        </a>
+      )}
+      <span class="navstrip__spacer" />
+      {up && <a href={appHref(up.identifier, release)}>Up: {trimNum(up.num)}</a>}
+      <span class="navstrip__spacer" />
+      {next && (
+        <a href={appHref(next.identifier, release)} rel="next">
+          {trimNum(next.num)} →
+        </a>
+      )}
+    </nav>
+  )
+}

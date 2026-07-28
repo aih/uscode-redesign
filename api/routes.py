@@ -66,15 +66,24 @@ def list_releases(
     title: str | None = Query(
         default=None, description="Only release points that changed this title."
     ),
+    ingested_title: str | None = Query(
+        default=None,
+        description="Only release points this database actually holds this title "
+        "at — what a release picker can offer without offering empty answers.",
+    ),
 ) -> list[ReleaseOut]:
     """Every known release point, newest first.
 
     `titles_affected` is what OLRC says the release point changed;
     `ingested_titles` is what this database actually holds for it. The two differ
     for as long as the backfill is incomplete, and conflating them would make an
-    empty answer look like a missing law.
+    empty answer look like a missing law — which is why they are two parameters
+    and not one.
     """
-    return [ReleaseOut.of(r) for r in repository.list_releases(title_num=title)]
+    releases = repository.list_releases(title_num=title)
+    if ingested_title is not None:
+        releases = [r for r in releases if ingested_title in r.ingested_titles]
+    return [ReleaseOut.of(r) for r in releases]
 
 
 @api.get("/titles", response_model=list[TitleOut], summary="Ingested titles")

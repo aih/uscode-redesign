@@ -1,0 +1,35 @@
+---
+/**
+ * Where in the Code this page is — USWDS breadcrumbs, carrying the release point.
+ *
+ * `--wrap` is not cosmetic. USWDS's default breadcrumb hides every item but the
+ * second-to-last on small screens, on the theory that a phone wants a back link;
+ * a one-item trail (`Title 16`) therefore renders as *nothing at all*. In a
+ * versioned reader the trail is the answer to "where am I", so it wraps instead.
+ */
+import type { Entry } from "../lib/types";
+import { appHref, trimNum } from "../lib/url";
+
+interface Props {
+  crumbs: Entry[];
+  release?: string | null;
+}
+
+const { crumbs, release = null } = Astro.props;
+---
+
+{
+  crumbs.length > 0 && (
+    <nav class="usa-breadcrumb usa-breadcrumb--wrap" aria-label="Breadcrumbs">
+      <ol class="usa-breadcrumb__list">
+        {crumbs.map((crumb) => (
+          <li class="usa-breadcrumb__list-item">
+            <a class="usa-breadcrumb__link" href={appHref(crumb.identifier, release)}>
+              <span>{trimNum(crumb.num) || crumb.identifier}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}

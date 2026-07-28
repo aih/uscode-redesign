@@ -1,0 +1,42 @@
+---
+/**
+ * A wrong citation gets a page, not a JSON blob.
+ *
+ * A reader that hands a browser a stack of JSON when a citation is wrong has
+ * stopped being a reader at the moment it most needs to explain itself. The 404
+ * names the release point that was searched, because "no such provision" and
+ * "not at this release point" are different answers and only one of them means
+ * the URL is wrong. A 409 is a question — an ambiguous release label — so its
+ * candidates arrive as links.
+ */
+import { APP } from "../lib/url";
+
+interface Props {
+  status: number;
+  detail: string;
+  candidates?: string[];
+}
+
+const { status, detail, candidates = [] } = Astro.props;
+
+const headline =
+  { 404: "not found", 409: "which release point?", 422: "that request doesn’t parse" }[status] ??
+  "something went wrong";
+---
+
+<h1 class="doc-title">{status} — {headline}</h1>
+<p class="lede">{detail}</p>
+
+{
+  candidates.length > 0 && (
+    <ul class="usa-list">
+      {candidates.map((candidate) => (
+        <li>
+          <a href={`?release=${candidate}`}>{candidate}</a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+<p class="formats"><a href={`${APP}/`}>Start from the top</a></p>

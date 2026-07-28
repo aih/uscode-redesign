@@ -1,0 +1,27 @@
+{
+  "name": "uscode-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The /app reader: Astro 5 + TypeScript + USWDS, consuming /api/v1 (ADR-0011)",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "start": "node ./dist/server/entry.mjs",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "shots": "node scripts/screenshots.mjs"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.5.5",
+    "@uswds/uswds": "^3.13.0",
+    "@xmldom/xmldom": "^0.9.10",
+    "astro": "^5.18.2",
+    "sass": "^1.102.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
+  }
+}

@@ -1,0 +1,37 @@
+---
+/**
+ * The site navbar the BUILDLOG 008 review found missing entirely: a brand, and
+ * the three places a reader actually needs to reach from anywhere — the titles,
+ * the release points, and the API.
+ *
+ * USWDS's basic header, and no JavaScript: the nav is a plain list that wraps on
+ * a phone rather than a menu that has to be opened. A menu you must tap to see is
+ * worse than four links you can already read.
+ */
+import { APP } from "../lib/url";
+---
+
+<header class="usa-header usa-header--basic" role="banner">
+  <div class="usa-nav-container">
+    <div class="usa-navbar">
+      <div class="usa-logo">
+        <em class="usa-logo__text">
+          <a href={`${APP}/`} title="United States Code">United States Code</a>
+        </em>
+      </div>
+    </div>
+    <nav aria-label="Primary" class="usa-nav">
+      <ul class="usa-nav__primary usa-accordion">
+        <li class="usa-nav__primary-item">
+          <a class="usa-nav__link" href={`${APP}/`}><span>Titles</span></a>
+        </li>
+        <li class="usa-nav__primary-item">
+          <a class="usa-nav__link" href={`${APP}/releases`}><span>Release points</span></a>
+        </li>
+        <li class="usa-nav__primary-item">
+          <a class="usa-nav__link" href="/docs"><span>API docs</span></a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>

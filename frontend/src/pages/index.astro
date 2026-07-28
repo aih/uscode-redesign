@@ -1,0 +1,56 @@
+---
+/** `/app/` — the front page: what is loaded, and the demo citation. */
+import Base from "../layouts/Base.astro";
+import { fetchTitles } from "../lib/api";
+import { appHref } from "../lib/url";
+
+const titles = await fetchTitles();
+const DEMO = "/us/usc/t16/s45f/c/5?date=07/12/2026";
+
+function releaseCount(n: number): string {
+  return `${n} release point${n === 1 ? "" : "s"}`;
+}
+---
+
+<Base title="U.S. Code — versioned retrieval">
+  <h1 class="doc-title">The United States Code, at any release point</h1>
+
+  <p class="lede">
+    Any provision, as it stood at any published release point, addressed by a URL that mirrors the
+    USLM identifier the Office of the Law Revision Counsel publishes.
+  </p>
+
+  <div class="usa-summary-box" role="region" aria-labelledby="demo-heading">
+    <div class="usa-summary-box__body">
+      <h2 class="usa-summary-box__heading" id="demo-heading">Try a citation</h2>
+      <div class="usa-summary-box__text">
+        <a href={DEMO}><code>{DEMO}</code></a> — section 45f of Title 16, with paragraph (c)(5)
+        highlighted inside it, as the law stood on 12 July 2026.
+      </div>
+    </div>
+  </div>
+
+  <p class="toc-group">Titles loaded</p>
+  <ul class="toc">
+    {
+      titles.map((title) => (
+        <li>
+          <a href={appHref(`/us/usc/t${title.num}`)}>
+            <span class="toc__num">Title {title.num}</span>
+            <span class="toc__heading">{title.name}</span>
+            <span class="doc-meta">{releaseCount(title.ingested_releases.length)}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+
+  {
+    titles.length === 0 && (
+      <p class="lede">
+        Nothing is loaded yet. Run <code>make dev-data</code> to seed Title 16 at two release
+        points.
+      </p>
+    )
+  }
+</Base>

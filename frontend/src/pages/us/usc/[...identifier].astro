@@ -1,0 +1,250 @@
+---
+/**
+ * `/app/us/usc/…` — a section with the named provision highlighted, or, when the
+ * identifier names a structural node, that node's table of contents.
+ *
+ * The identifier decides which, and the API decides for us: one call answers with
+ * a section or a TOC, so the reader does not have to know what `/us/usc/t16/ch1`
+ * is before asking (the same design the API itself follows).
+ *
+ * Everything is fetched server-side and rendered to HTML. The page ships no
+ * client JavaScript.
+ */
+import Base from "../../../layouts/Base.astro";
+import ErrorPage from "../../../components/ErrorPage.astro";
+import NavStrip from "../../../components/NavStrip.astro";
+import Neighbors from "../../../components/Neighbors.astro";
+import Provenance from "../../../components/Provenance.astro";
+import StatusBadge from "../../../components/StatusBadge.astro";
+import {
+  ApiError,
+  fetchIdentifier,
+  fetchLabels,
+  fetchNeighbors,
+  fetchReleases,
+  fetchToc,
+  releaseParams,
+} from "../../../lib/api";
+import { citedIdentifiers } from "../../../lib/refs";
+import type {
+  Entry,
+  Labels,
+  Neighbors as NeighborsBody,
+  Release,
+  Section,
+  Toc,
+} from "../../../lib/types";
+import { isToc } from "../../../lib/types";
+import { apiHref, appHref, citationHref, provisionLabel, trimNum } from "../../../lib/url";
+import { hrefs, parseFragment, render } from "../../../lib/uslm";
+
+/** Name the subdivisions after what they actually are: a title lists chapters, a
+ * chapter lists subchapters, and USLM 2.x titles have subtitles. */
+function subdivisionLabel(children: Entry[]): string {
+  const levels = new Set(children.map((child) => child.level));
+  if (levels.size !== 1) return "Subdivisions";
+  const [level] = [...levels];
+  return `${level.charAt(0).toUpperCase()}${level.slice(1)}s`;
+}
+
+const identifier = `/us/usc/${Astro.params.identifier ?? ""}`.replace(/\/+$/u, "");
+const params = releaseParams(Astro.url);
+
+let body: Section | Toc | null = null;
+let failure: { status: number; detail: string } | null = null;
+try {
+  body = await fetchIdentifier(identifier, params);
+} catch (error) {
+  if (error instanceof ApiError) {
+    failure = { status: error.status, detail: error.detail };
+    Astro.response.status = error.status;
+  } else {
+    throw error;
+  }
+}
+
+// --- everything below only runs when the identifier resolved -----------------
+
+let title = "Not found · U.S. Code";
+let crumbs: Entry[] = [];
+let releases: Release[] = [];
+let selected = "";
+let neighbors: NeighborsBody | null = null;
+let labels: Labels = {};
+let parent: Toc | null = null;
+let sectionHtml = "";
+let toc: Toc | null = null;
+let section: Section | null = null;
+let titleNum: string | null = null;
+
+if (body && isToc(body)) {
+  toc = body;
+  selected = toc.served_from.label;
+  titleNum = toc.node.identifier.match(/^\/us\/usc\/t([0-9]+[a-zA-Z]?)/u)?.[1] ?? null;
+  crumbs = toc.ancestors;
+  releases = await fetchReleases(titleNum);
+  title = `${trimNum(toc.node.num)} ${toc.node.heading ?? ""} · ${selected} · U.S. Code`;
+} else if (body) {
+  section = body;
+  selected = section.served_from.label;
+  titleNum = section.title_num;
+
+  // The fragment is parsed once and used twice: to collect the citations it
+  // makes, and — after their labels come back — to render. Two passes over a
+  // parsed tree, never two parses.
+  const fragment = parseFragment(section.xml);
+
+  // Four calls, all server-side and all on localhost: the labels this page's
+  // citations need (one request for all of them), the neighbours, the release
+  // points a picker can offer, and the parent node whose ancestors are this
+  // page's breadcrumbs. That last one is the known Day-6 debt carried over from
+  // the Jinja reader — the parent chain is not on the section, because ADR-0008
+  // keeps per-release facts on the release map.
+  [labels, neighbors, releases, parent] = await Promise.all([
+    fetchLabels(citedIdentifiers(hrefs(fragment)), selected),
+    fetchNeighbors(section.identifier, selected),
+    fetchReleases(titleNum),
+    section.parent_identifier ? fetchToc(section.parent_identifier, selected) : null,
+  ]);
+
+  crumbs = parent ? [...parent.ancestors, parent.node] : [];
+  sectionHtml = render(fragment, {
+    target: identifier === section.identifier ? null : identifier,
+    release: selected,
+    labels,
+  });
+  title = `${trimNum(section.num)} ${section.heading ?? ""} · ${selected} · U.S. Code`;
+}
+
+const remainder = section ? identifier.slice(section.identifier.length) : "";
+const picker =
+  releases.length > 0 && body
+    ? { action: appHref(section ? section.identifier : toc!.node.identifier), options: releases, selected }
+    : null;
+const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
+---
+
+<Base title={title} crumbs={crumbs} release={selected} picker={picker}>
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    section && (
+      <>
+        <h1 class="doc-title">
+          <span class="doc-title__num">{trimNum(section.num)}.</span>
+          {section.heading}
+          <StatusBadge status={section.status} />
+        </h1>
+
+        <Provenance served={section.served_from} note={section.note} />
+
+        <NavStrip
+          previous={neighbors?.previous}
+          next={neighbors?.next}
+          up={upNode}
+          release={selected}
+        />
+
+        {remainder &&
+          (section.provision?.found ? (
+            <p class="doc-meta">
+              Showing {provisionLabel(remainder)} in the context of the whole section.
+            </p>
+          ) : (
+            <div class="usa-alert usa-alert--warning usa-alert--slim" role="status">
+              <div class="usa-alert__body">
+                <p class="usa-alert__text">
+                  There is no {provisionLabel(remainder)} in this section at {selected}.
+                </p>
+              </div>
+            </div>
+          ))}
+
+        <article class="section-body" set:html={sectionHtml} />
+
+        <Neighbors previous={neighbors?.previous} next={neighbors?.next} release={selected} />
+
+        <p class="formats">
+          <a href={apiHref(section.identifier, { release: selected, format: "xml" })}>
+            Source XML
+          </a>
+          <a href={apiHref(section.identifier, { release: selected, format: "json" })}>JSON</a>
+          <a href={`/api/v1/sections${section.identifier}/versions`}>Version history</a>
+        </p>
+
+        {section.guid && (
+          <p class="formats">
+            Cite this exact text:
+            <a class="cite" href={`/us/usc/?id=${section.guid}`}>
+              /us/usc/?id={section.guid}
+            </a>
+          </p>
+        )}
+
+        <p class="formats">
+          Citation URL:
+          <span class="cite">{citationHref(identifier, selected)}</span>
+        </p>
+      </>
+    )
+  }
+
+  {
+    toc && (
+      <>
+        <h1 class="doc-title">
+          <span class="doc-title__num">{trimNum(toc.node.num)}</span>
+          {toc.node.heading}
+          <StatusBadge status={toc.node.status} />
+        </h1>
+
+        <Provenance served={toc.served_from} note={toc.note} />
+
+        {toc.children.length === 0 && toc.sections.length === 0 && (
+          <p class="lede">Nothing is listed under this node at {selected}.</p>
+        )}
+
+        {toc.children.length > 0 && (
+          <>
+            <p class="toc-group">{subdivisionLabel(toc.children)}</p>
+            <ul class="toc">
+              {toc.children.map((child) => (
+                <li>
+                  <a href={appHref(child.identifier, selected)}>
+                    <span class="toc__num">{trimNum(child.num)}</span>
+                    <span class="toc__heading">{child.heading}</span>
+                    <StatusBadge status={child.status} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {toc.sections.length > 0 && (
+          <>
+            <p class="toc-group">Sections</p>
+            <ul class="toc">
+              {toc.sections.map((entry) => (
+                <li>
+                  <a href={appHref(entry.identifier, selected)}>
+                    <span class="toc__num">{trimNum(entry.num)}</span>
+                    <span class="toc__heading">{entry.heading}</span>
+                    <StatusBadge status={entry.status} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </>
+    )
+  }
+</Base>
+
+<script is:inline>
+  // The one line of script in the reader, and it is not required to read the
+  // page: bring a deep-linked provision into view when the browser has not.
+  const target = document.querySelector(".target");
+  if (target) target.scrollIntoView({ block: "center" });
+</script>

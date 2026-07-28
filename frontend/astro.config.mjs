@@ -1,0 +1,61 @@
+// @ts-check
+import { fileURLToPath } from "node:url";
+
+import node from "@astrojs/node";
+import { defineConfig } from "astro/config";
+
+/**
+ * The reader, at /app (ADR-0010, ADR-0011).
+ *
+ * `base: "/app"` is not cosmetic: it is the contract with the proxy in front of
+ * this process. Caddy sends /app/* here and everything else to FastAPI, so every
+ * route this app declares lives under that prefix and every asset it emits is
+ * addressed from it.
+ *
+ * `output: "server"` because a reader of versioned law cannot be prerendered:
+ * the page for one identifier differs at every release point, and there are 382
+ * of them.
+ *
+ * The dev proxy exists so `npm run dev` is a complete site rather than half of
+ * one — the reader on :4321 and the API it reads from on :8000, same origin as
+ * far as the browser is concerned, exactly as Caddy will arrange it in compose.
+ */
+const API = process.env.API_BASE_URL ?? "http://localhost:8000";
+
+export default defineConfig({
+  base: "/app",
+  trailingSlash: "ignore",
+  output: "server",
+  adapter: node({ mode: "standalone" }),
+  server: { port: 4321, host: true },
+  devToolbar: { enabled: false },
+  vite: {
+    css: {
+      preprocessorOptions: {
+        scss: {
+          loadPaths: [
+            fileURLToPath(
+              new URL("./node_modules/@uswds/uswds/packages", import.meta.url),
+            ),
+          ],
+          quietDeps: true,
+          silenceDeprecations: ["import", "global-builtin", "mixed-decls"],
+        },
+      },
+    },
+    server: {
+      // Deliberately NOT proxying `/us/usc` here, which looks like an omission
+      // and is not: the dev server strips `base` before the proxy sees a URL, so
+      // `/app/us/usc/t16/s45f` arrives as `/us/usc/t16/s45f` and every reader
+      // page would be proxied to the API — serving JSON where a page belongs.
+      // The bare citation URL is FastAPI's route anyway; in dev it answers on
+      // :8000, and under Caddy (`make dev-all`) both share one origin.
+      proxy: Object.fromEntries(
+        ["/api/v1", "/health", "/docs", "/openapi.json"].map((path) => [
+          `^${path}`,
+          { target: API, changeOrigin: true },
+        ]),
+      ),
+    },
+  },
+});
