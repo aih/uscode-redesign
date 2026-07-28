@@ -109,7 +109,7 @@ Work one session per module. **Always:** start in plan mode (Shift+Tab), read th
 **Session 4 — API + resolver: ✅ done, BUILDLOG 006 (Opus 5).** Three things the prompt below did not anticipate, all of which changed the design: the content-hash dedupe from Session 3 turned out to collapse nothing on real data (ADR-0007), reading order and parent chapter had to move off the deduped row (ADR-0008), and a request can legitimately name a release point that was never ingested — answered from the newest ingested one before it, reported as `served_from`.
 > Implement the FastAPI app per PLAN.md §4: identifier routes with ?release/?date/?format, the guid lookup route, TOC, neighbors, versions, releases. Resolver algorithm per PLAN §3. Repository interface only — no SQL in handlers. Integration tests against the loaded Title 16 at both release points. Decide up front where the Repository lives: PLAN §2's diagram says `storage/`, the repo has `db/` (models + config only) — put the `Repository` protocol and its Postgres implementation in `storage/`, importing models from `db/`, so the XCiteDB second implementation has an obvious home. Note that ingest writes to `db/` models directly and deliberately stays outside the Repository boundary (that rule governs `api/` and `web/`).
 
-**Session 5 — Reader UI (Sonnet) — next, and now against the real API rather than fixture JSON:**
+**Session 5 — Reader UI: ✅ done, BUILDLOG 007 (Opus 5).** Built as server-rendered Jinja in `web/`, at the *same* `/us/usc/…` URLs as the API rather than under a `/read/` prefix (ADR-0009) — and that choice immediately exposed a live bug: `Accept:` was substring-matched, so browsers had been getting raw USLM at the demo URL while `?format=html` covered for it in every test.
 > Build the minimal reader per PLAN.md Day 1 item 5: TOC page, section page with provision anchor highlighting, prev/next, release picker, status badges. Server-rendered Jinja is fine. Make /us/usc/t16/s45f/c/5?date=07/12/2026 demonstrable end to end.
 
 **Session 1.5 — Study prior art (Opus, read-only, ~30 min): ⚠️ never run — do it before Session 3.5.** It was scheduled before Session 2 and skipped; the parser session didn't need it, but Session 3.5's inventory port and Session 6's downloader both do (neither repo is cloned and `docs/prior-art.md` doesn't exist). Clone your existing repos next to this one so Claude Code can read them:
@@ -163,12 +163,12 @@ Once you're pushing to GitHub: in a Claude Code session run `/install-github-app
 
 ## 10. Parallel work (Days 2+, optional)
 
-With scaffold, parser, ingest, hierarchy, storage and the API merged (Sessions 1 ✅ 2 ✅ 3 ✅ 3.5 ✅ 4 ✅), the independent tracks are now: **Session 5 (reader UI — build straight against the running API; `make dev-data` gives it Title 16 at two release points)**, **Session 6 (bulk downloader — only Title 16 is loaded, at 2 of 382 release points)**, and **Session 1.5 (prior-art read, still never run; Session 6's downloader and Day 4's diff UI both want it).** If you want speed over simplicity, run the reader UI alongside 3.5 with git worktrees so agents don't collide:
+With scaffold, parser, ingest, hierarchy, storage, the API and the reader merged (Sessions 1 ✅ 2 ✅ 3 ✅ 3.5 ✅ 4 ✅ 5 ✅), Day 1 is done and the independent tracks are: **Session 6 (bulk downloader — only Title 16 is loaded, at 2 of 382 release points)**, **Session 1.5 (prior-art read, still never run; Session 6's downloader and Day 4's diff UI both want it)**, and **Day 4's reader polish** (keyboard nav, notes toggles, version timeline, diffs), which no longer blocks on anything. If you want speed over simplicity, run two of them in git worktrees so agents don't collide:
 
 ```bash
-git worktree add ../uscode-web feature/reader-ui
-# Terminal tab 1: cd ~/Documents/workspace/aih/uscode-redesign && claude   (backend session)
-# Terminal tab 2: cd ../uscode-web && claude                               (frontend session)
+git worktree add ../uscode-web feature/reader-polish
+# Terminal tab 1: cd ~/Documents/workspace/aih/uscode-redesign && claude   (downloader session)
+# Terminal tab 2: cd ../uscode-web && claude                               (reader session)
 ```
 
 Merge order per PLAN §7: schema → ingest → API → web → auth.

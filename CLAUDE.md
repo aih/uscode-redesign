@@ -4,7 +4,7 @@ Versioned US Code retrieval site: any provision, at any release point (RP), via 
 mirroring the USLM `@identifier`. FastAPI + Postgres v1, XCiteDB later behind a repository
 interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
 
-**Status:** Day 1 items 3, 3a and 4 complete (BUILDLOG 006). The release-point inventory is seeded (382 RPs with real `currency_date` and a true global `seq`); Title 16 is loaded at **two** release points, 119-99 and 119-102not101, with working dedupe (2 new / 5,093 deduped — see ADR-0007); `structure_nodes` holds the hierarchy (569 nodes) from a streaming TOC pass (ADR-0006); `storage/` has the `Repository` protocol + Postgres implementation, and `api/` serves PLAN §4's routes — identifier lookup with `?release`/`?date`/`?format`, `?id=` guid lookup, TOC, neighbors, versions, releases. `make test` = 125 tests. **Next: PLAN Day 1 item 5 (reader UI)** — GETTING-STARTED §7 Session 5. Open debts: **only Title 16, at 2 of 382 release points** (bulk download is Session 6/Day 2); a deduped fragment carries the guids of the release its text first appeared at (ADR-0007's recorded cost); `structure_nodes` is unversioned (`first_release_id` filters, `last_release_id` is informational); `?format=html` is the demo minimum, not the reader; `Uslm2Parser` has no table/indent handling (Day 7); `make verify` is still a stub. **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`. API integration tests need a loaded database (`make dev-data`) and skip without one.
+**Status:** Day 1 complete — items 3, 3a, 4 (BUILDLOG 006) and 5 (BUILDLOG 007). The release-point inventory is seeded (382 RPs with real `currency_date` and a true global `seq`); Title 16 is loaded at **two** release points, 119-99 and 119-102not101, with working dedupe (2 new / 5,093 deduped — see ADR-0007); `structure_nodes` holds the hierarchy (569 nodes) from a streaming TOC pass (ADR-0006); `storage/` has the `Repository` protocol + Postgres implementation; `api/` serves PLAN §4's routes — identifier lookup with `?release`/`?date`/`?format`, `?id=` guid lookup, TOC, neighbors, versions, releases; and `web/` is the reader — server-rendered Jinja at **the same identifier URLs**, chosen by `Accept:`/`?format=` (ADR-0009), with provision highlighting, breadcrumbs, prev/next, a release picker and status badges. `make test` = 162 tests. **Next: PLAN Day 2 / GETTING-STARTED §7 Session 6 (bulk downloader).** Open debts: **only Title 16, at 2 of 382 release points** (bulk download is Session 6/Day 2); a deduped fragment carries the guids of the release its text first appeared at (ADR-0007's recorded cost); `structure_nodes` is unversioned (`first_release_id` filters, `last_release_id` is informational); reader has no keyboard nav, notes toggles, or version timeline UI (Day 4), a flat `<h2>` heading outline (Day 7 accessibility), and section breadcrumbs cost an extra `get_toc` (Day 6); `Uslm2Parser` has no table/indent handling (Day 7); `make verify` is still a stub. **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`. API integration tests need a loaded database (`make dev-data`) and skip without one.
 
 ## Architecture rules (PLAN §2)
 
@@ -30,6 +30,12 @@ interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
    the target anchored/highlighted — the reader always keeps context.
 4. **Layout:** `ingest/` (fetch RPs, parse USLM, split into sections) → `storage/` (Postgres +
    repository interface) ← `api/` (FastAPI resolver, auth, watchlist) ← `web/` (reader, watchlist).
+5. **One URL per provision, two representations** (ADR-0009). `/us/usc/…` serves the reader or the
+   API depending on `?format=` (explicit, wins) or `Accept:` (q-values parsed — a browser asks for
+   `application/xml;q=0.9` and must still get HTML). `api/routes.py` negotiates and delegates the
+   HTML case to `web/reader.py`; `web/` is Jinja + one stylesheet, no build step, and the only
+   JavaScript scrolls the highlighted provision into view. All presentation — including the sole
+   place outside the parsers allowed to know USLM element names — lives in `web/uslm_html.py`.
 
 ## Identifier semantics (PLAN §1, ADR-0003) — the thing most likely to be gotten wrong
 
@@ -107,6 +113,7 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 
 ```
 make dev        # docker compose up -d db; alembic upgrade head; uvicorn --reload (local)
+                # then http://localhost:8000/ is the reader and /docs the API
 make dev-data   # seed release_points from the RP inventory, then load Title 16 at 119-99
                 # (downloaded, ~5 MB) and 119-102not101 (from samples/) — what the API
                 # integration tests need; they skip without it
