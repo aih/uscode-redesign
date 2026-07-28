@@ -176,3 +176,20 @@ Session-by-session record of how this site was built. One entry per working sess
   - `docker compose up --build` rebuilt after the jinja2 dependency was added; `/`, `/static/reader.css`, the demo URL and a 404 page all served from the container, not just from `TestClient`.
   - Not done: no keyboard navigation, no notes/sourceCredit toggles, no version timeline UI or diffs (all Day 4); dark mode is written but was not verified in a browser; USLM `<heading>` still renders as `<h2>` at every depth, so the heading outline is flat (accessibility pass, Day 7); breadcrumbs for a section cost an extra `get_toc` call on its parent (performance, Day 6). Still only Title 16, at 2 of 382 release points — Session 6.
 - **Also:** installed the official FastAPI skill (`fastapi/fastapi@fastapi`) at Ari's request and applied it to this session's code — `Annotated` dependencies (already the case), `HTMLResponse` with `response_class` instead of hand-set media types, and `app.frontend()` in place of a manual `StaticFiles` mount.
+
+## 008 — 2026-07-28 — Session 5 UI review; Session 7 (interface overhaul) specified
+
+- **Tool/model:** Claude (Cowork), Fable 5 — independent reviewer, fresh context. Review of `web/` templates/CSS/renderer by reading, not rendering (review sandbox cannot run the stack).
+- **Asked:** Review the post-Session-5 application with attention to interface and navigation; update Session 6+ tasks to add citation hover text, fix the section title, add a site navbar, put navigation top and bottom, and make the site mobile-first.
+- **Findings:**
+  - **Live bug: every section page ships broken links.** `web/uslm_html.py` copies `<ref href>` through verbatim, so source credits emit relative links to `/us/pl/111/24/tV/s512`, `/us/stat/123/1764` — paths this site does not serve. Also: internal `/us/usc/` refs drop the page's release context, and no ref anywhere has hover text.
+  - Section `<h1>` splits `§ 45f.` into a small muted block label above the heading (`h1 .num { display: block }`) — not how the Code prints a section title; user asked for the fix directly.
+  - No site menu exists; brand + breadcrumbs + release picker share one wrapping topbar row. Navigation appears only at the bottom (neighbors block); no footer.
+  - CSS is desktop-default, not mobile-first: fixed `indent1–4` margins up to 6.4rem (a deep provision on a 360px phone keeps ~40% of the screen for text), `.toc .num` reserves 5.5rem, sub-16px form controls trigger iOS zoom. Viewport meta is present.
+  - Worth keeping, explicitly: no build step, one stylesheet, single JS line, GET-form picker, badge/caveat/served-from tests, dark-mode variables (still unverified in a browser — noted in 007).
+- **Decided:**
+  - New **Session 7 — reader interface overhaul** (Sonnet, worktree), parallel to Session 6 — disjoint code (`web/` vs `ingest/`). Six-part spec in GETTING-STARTED §7 and PLAN Day 2–3: mobile-first restyle with an `--indent-step` variable; site navbar + contextual bar + skip link; one-line section title; top strip + bottom neighbors + footer; ref fix (internal refs get `?release=` + batched `title=` hover text, one repository query per page; `/us/pl/`+`/us/stat/` map to the govinfo link service or degrade to spans, never a local 404) with tests including "no rendered page contains a relative `/us/pl/` href".
+  - Day 4 polish (keyboard nav, toggles, timeline, diffs) now explicitly builds on Session 7's layout, so Session 7 precedes it.
+  - `.claude/settings.json`: govinfo.gov/congress.gov added to the WebFetch allowlist so Session 7 can verify link-service URL patterns before hard-coding them.
+- **Produced:** Edits to PLAN.md (progress note; Day 2–3 parallel-track spec; Day 4 rebased), GETTING-STARTED.md (Session 7 prompt; §10 parallel tracks), CLAUDE.md (status), `.claude/settings.json`, this entry.
+- **Verified:** Review grounded in file reads of `web/templates/*.html`, `web/static/reader.css`, `web/uslm_html.py`, `web/reader.py` at `6b1b0b5`; the `/us/pl/` claim re-checkable in one line: `grep -n 'href' web/uslm_html.py` (no scheme/host handling) plus any section page's source credit.
