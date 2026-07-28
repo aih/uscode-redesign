@@ -129,13 +129,13 @@ This makes the prior art available to every later session via a small summary in
 
 ```bash
 cd ~/Documents/workspace/aih/uscode-redesign
-df -h .                                    # need ~40–80 GB free (or symlink data/ to an external disk first)
+df -h .                                    # ~10 GB is enough — measured ~9 GB corpus, not the old 40–80 GB guess
 uv run python -m ingest backfill --plan-only | head    # sanity: ~3,197 downloads planned
 caffeinate -i nohup uv run python -m ingest backfill > backfill.log 2>&1 &
 tail -f backfill.log                       # watch; Ctrl-C the tail freely — the run keeps going
 ```
 
-At ~1 req/sec it takes several hours (3,197 files). It's resumable: if the laptop sleeps or the run dies, re-run the same command and it continues from the ledger with zero re-downloads. When it finishes: `uv run python -m ingest verify-downloads --deep`, and skim the ledger for `failed` entries (`--retry-unavailable` exists for the stubborn ones).
+Measured, not estimated: OLRC serves ~50 KB/s, so the full run is **40–50 hours** for ~9 GB — it spans sleep cycles, which is why the recommended path is the **remote run**: a disposable EC2 `t4g.micro` that pulls resume state from S3, backfills, pushes hourly, and powers itself off when done, for well under $1 (**[docs/remote-ops.md](docs/remote-ops.md)**, ADR-0013 — bucket + role once, `mirror push` the laptop's partial state, launch with `scripts/ec2-user-data.sh`). Either way it's resumable: re-run (or reboot the box) and it continues from the ledger with zero re-downloads. When it finishes: `uv run python -m ingest verify-downloads --deep`, commit `docs/verification/downloads.json`, and skim the ledger for `failed` entries (`--retry-unavailable` exists for the stubborn ones). Local dev never needs the full corpus — `uv run python -m ingest mirror pull --title 16` fetches a verified slice.
 
 **Session 8 — Bulk load (Sonnet; after the backfill finishes, or on a partial corpus — it's resumable too):**
 > Implement `python -m ingest load-all`: walk data/releases/ledger.json in inventory seq order (oldest first — the baseline RP loads first by construction), unzip each ok entry, and run the existing load path per title with its release label; idempotent (re-running loads nothing new), resumable, batched commits, one provenance manifest per release point. Then run it to completion. Afterward, implement make verify for real per PLAN §11.5: per-title-per-RP section counts vs the source XML, written to docs/verification/ and committed. Report: rows in section_versions vs sections×RPs (the dedupe ratio is the headline number), disk size of the database, any count mismatches — a mismatch is a finding, not a rounding error. Update BUILDLOG.md and commit.
