@@ -316,6 +316,32 @@ def test_lost_ledger_adopts_files_from_disk(tmp_path, entries):
     assert all(e.sha256 for e in rebuilt.entries.values())
 
 
+def test_moved_corpus_resumes_without_redownloading(tmp_path, entries):
+    """The mirror scenario: corpus + ledger downloaded on one machine, pulled to a
+    different path on another. Paths in the ledger are relative, so the run must
+    skip everything and verification must still find every file."""
+    tasks = plan_backfill(entries)
+    server = FakeServer(bodies={t.url: _zip_bytes(t.key.encode()) for t in tasks})
+    machine_a = tmp_path / "machine-a" / "releases"
+    ledger = DownloadLedger(machine_a / "ledger.json")
+    run_backfill(tasks, ledger, dest_dir=machine_a, opener=server.opener)
+    requests_before = len(server.requests)
+
+    machine_b = tmp_path / "machine-b" / "somewhere-else" / "releases"
+    machine_b.parent.mkdir(parents=True)
+    (tmp_path / "machine-a" / "releases").rename(machine_b)
+
+    moved = DownloadLedger.load(machine_b / "ledger.json")
+    report = run_backfill(tasks, moved, dest_dir=machine_b, opener=server.opener)
+    assert report.skipped == 6
+    assert report.downloaded == 0
+    assert len(server.requests) == requests_before
+
+    verification = verify_ledger(moved, deep=True)
+    assert verification.sound
+    assert not verification.missing_files
+
+
 def test_unavailable_is_recorded_and_not_re_asked(tmp_path, entries):
     server = FakeServer()  # everything 404s
     tasks = plan_backfill(entries)
@@ -383,6 +409,28 @@ def test_ledger_survives_a_round_trip(tmp_path):
     assert entry.sha256 == "a" * 64
     assert entry.bytes == 1234
     assert entry.recorded_at  # stamped on record()
+
+
+def test_legacy_absolute_paths_normalize_on_load(tmp_path):
+    """A ledger written before paths went relative carries another machine's
+    absolute paths; loading it rewrites them to the {label}/{file} layout."""
+    ledger = DownloadLedger(tmp_path / "ledger.json")
+    ledger.record(
+        LedgerEntry(
+            release_label="119-99",
+            title_num="16",
+            status=str(FetchStatus.OK),
+            url="https://example/x.zip",
+            path="/Users/someone-else/repo/data/releases/119-99/xml_usc16@119-99.zip",
+            sha256="a" * 64,
+        )
+    )
+    ledger.save()
+
+    reloaded = DownloadLedger.load(tmp_path / "ledger.json")
+    entry = reloaded.entries["119-99/16"]
+    assert entry.path == "119-99/xml_usc16@119-99.zip"
+    assert reloaded.resolve_path(entry) == tmp_path / "119-99" / "xml_usc16@119-99.zip"
 
 
 def test_ledger_save_is_atomic(tmp_path, entries):

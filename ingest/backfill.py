@@ -89,6 +89,9 @@ class LedgerEntry:
     status: str
     url: str
     path: str | None = None
+    """Relative to the corpus directory (`data/releases/`), so a ledger pushed to
+    the mirror resolves on any machine. Absolute paths from ledgers written before
+    this rule still resolve — see `resolve_path`."""
     sha256: str | None = None
     bytes: int = 0
     http_status: int | None = None
@@ -128,6 +131,11 @@ class DownloadLedger:
         document = json.loads(path.read_text())
         for record in document.get("entries", []):
             entry = LedgerEntry(**record)
+            if entry.path is not None and Path(entry.path).is_absolute():
+                # Ledgers written before paths went relative recorded the writing
+                # machine's absolute paths. The layout contract has always been
+                # {dest}/{label}/{filename}, so the last two parts are the truth.
+                entry.path = str(Path(*Path(entry.path).parts[-2:]))
             ledger.entries[entry.key] = entry
         return ledger
 
@@ -150,6 +158,14 @@ class DownloadLedger:
 
     def get(self, task: DownloadTask) -> LedgerEntry | None:
         return self.entries.get(task.key)
+
+    def resolve_path(self, entry: LedgerEntry) -> Path | None:
+        """An entry's file on *this* machine: relative paths resolve against the
+        ledger's own directory, so the same ledger works wherever it lands."""
+        if entry.path is None:
+            return None
+        path = Path(entry.path)
+        return path if path.is_absolute() else self.path.parent / path
 
     def _sorted(self) -> list[LedgerEntry]:
         return sorted(self.entries.values(), key=lambda e: (e.release_label, e.title_num))
@@ -277,14 +293,15 @@ def run_backfill(
             report.skipped += 1
             continue
 
+        target = zip_target(task.release_label, task.title_num, dest_dir=dest_dir)
         existing = ledger.get(task)
-        if existing is not None and _settled(existing, retry_unavailable=retry_unavailable):
+        if existing is not None and _settled(
+            existing, target, retry_unavailable=retry_unavailable
+        ):
             report.skipped += 1
             if existing.status == FetchStatus.UNAVAILABLE:
                 report.unavailable += 1
             continue
-
-        target = zip_target(task.release_label, task.title_num, dest_dir=dest_dir)
 
         # A file on disk with no ledger entry: adopt it rather than re-download.
         # This is what makes a lost or deleted ledger cheap.
@@ -294,7 +311,7 @@ def run_backfill(
                 title_num=task.title_num,
                 status=str(FetchStatus.OK),
                 url=task.url,
-                path=str(target),
+                path=str(target.relative_to(dest_dir)),
                 sha256=sha256_file(target),
                 bytes=target.stat().st_size,
                 baseline=task.baseline,
@@ -311,7 +328,7 @@ def run_backfill(
                 title_num=task.title_num,
                 status=str(result.status),
                 url=task.url,
-                path=str(result.path) if result.path else None,
+                path=str(result.path.relative_to(dest_dir)) if result.path else None,
                 sha256=result.sha256,
                 bytes=result.bytes,
                 http_status=result.http_status,
@@ -348,11 +365,14 @@ def run_backfill(
     return report
 
 
-def _settled(entry: LedgerEntry, *, retry_unavailable: bool) -> bool:
-    """Whether a ledger entry means "don't ask again this run"."""
+def _settled(entry: LedgerEntry, target: Path, *, retry_unavailable: bool) -> bool:
+    """Whether a ledger entry means "don't ask again this run".
+
+    The existence check is against where the file belongs *on this machine* —
+    never against the recorded path string, which may have been written on
+    another machine before the ledger travelled through the mirror."""
     if entry.status == FetchStatus.OK:
-        # Trust the record only if the file is still where it was left.
-        return entry.path is not None and Path(entry.path).exists()
+        return target.exists()
     if entry.status == FetchStatus.UNAVAILABLE:
         return not retry_unavailable
     return False  # `failed` is always worth another try
@@ -444,11 +464,12 @@ def verify_ledger(ledger: DownloadLedger, *, deep: bool = False) -> Verification
         report.total_bytes += entry.bytes
 
         digest = entry.sha256
-        if entry.path is None or not Path(entry.path).exists():
+        resolved = ledger.resolve_path(entry)
+        if resolved is None or not resolved.exists():
             report.missing_files.append(entry.key)
             continue
         if deep:
-            recomputed = sha256_file(Path(entry.path))
+            recomputed = sha256_file(resolved)
             if entry.sha256 is not None and recomputed != entry.sha256:
                 report.integrity_failures.append(
                     f"{entry.key}: ledger {entry.sha256[:12]}… != disk {recomputed[:12]}…"
