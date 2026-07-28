@@ -8,7 +8,7 @@ Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering al
 >
 > **Two findings worth carrying forward.** (1) Loading a *real* second release point showed the content-hash dedupe collapsing nothing — guids regenerate at every RP by design (§9.1), so an untouched section's raw XML differs at every one of them: 0 of 5,095 Title 16 sections had identical raw XML between the two RPs, 5,093 were identical once `@id` was stripped, 2 had really been amended. Hashing is now over guid-stripped content ([ADR-0007](docs/adr/0007-dedupe-on-guid-stripped-content.md)); §9.1 and §9.10 were both already written down, and what was missing was the observation that the first defeats the second. (2) Building the reader showed that **every browser had been getting raw XML at the demo URL**: `Accept:` was substring-matched, and Chrome asks for `application/xml;q=0.9`. `?format=html` had covered for it in every test. Content negotiation now reads q-values ([ADR-0009](docs/adr/0009-one-url-per-provision-negotiated-by-accept.md)) — and a hand-written `Accept:` header in a test is not the header a browser sends.
 >
-> **Next: Day 2 / Session 6 (bulk downloader) and Session 7 (reader interface overhaul) — independent; run in parallel worktrees.** Only Title 16 is loaded, at 2 of 382 release points. The Session-5 UI review (BUILDLOG 008) found the reader needs: mobile-first CSS, a real site navbar, the section title as one line, top+bottom navigation, citation hover text — and it ships broken `/us/pl/`+`/us/stat/` links on every section page (Session 7, spec in Day 2–3 below). `Uslm2Parser` still has no table/indent handling (Day 7); `make verify` is still a stub; deeper reader polish (keyboard nav, notes toggles, version timeline, diffs) is Day 4.
+> **Next: Day 2 / Session 6 (bulk downloader) and Session 7 (frontend: separation + Astro/USWDS reader) — independent; run in parallel worktrees.** Only Title 16 is loaded, at 2 of 382 release points. Session 7 now has two parts: **A** — separate reader and API per ADR-0010 (reader → `/app/us/usc/…`, API → `/api/v1/…`, bare citation URL becomes a 307 redirector); **B** — rebuild the reader as an Astro 5 + TypeScript + USWDS app at `/app` per ADR-0011 (proposed; research in `docs/research/2026-07-ui-framework.md`), implementing the BUILDLOG 008 spec (mobile-first, navbar, one-line section title, top+bottom nav, ref hover text, and the live broken `/us/pl/`+`/us/stat/` links) as the parity bar for retiring Jinja. `Uslm2Parser` still has no table/indent handling (Day 7); `make verify` is still a stub; deeper reader polish (keyboard nav, notes toggles, version timeline, diffs) is Day 4, on the Astro layout.
 
 ---
 
@@ -211,7 +211,7 @@ Working rhythm per module: Plan mode (Opus) → approve plan → implement (assi
 
 **Development.**
 - GitHub repo (you have one initialized here already) + optionally the Claude Code GitHub App for PR review.
-- Local: Docker Desktop, Python 3.12 + uv, Node 20 (if React frontend), `lxml`, Postgres 16 via compose.
+- Local: Docker Desktop, Python 3.12 + uv, Node 20+ (Astro frontend, ADR-0011), `lxml`, Postgres 16 via compose.
 - Disk: ~100 GB free for the RP zip archive, or an S3/Backblaze B2 bucket (~$5/mo) as the zip cache.
 
 **Hosting (Day 6).**

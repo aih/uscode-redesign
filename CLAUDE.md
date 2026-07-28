@@ -30,12 +30,16 @@ interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
    the target anchored/highlighted — the reader always keeps context.
 4. **Layout:** `ingest/` (fetch RPs, parse USLM, split into sections) → `storage/` (Postgres +
    repository interface) ← `api/` (FastAPI resolver, auth, watchlist) ← `web/` (reader, watchlist).
-5. **One URL per provision, two representations** (ADR-0009). `/us/usc/…` serves the reader or the
-   API depending on `?format=` (explicit, wins) or `Accept:` (q-values parsed — a browser asks for
-   `application/xml;q=0.9` and must still get HTML). `api/routes.py` negotiates and delegates the
-   HTML case to `web/reader.py`; `web/` is Jinja + one stylesheet, no build step, and the only
-   JavaScript scrolls the highlighted provision into view. All presentation — including the sole
-   place outside the parsers allowed to know USLM element names — lives in `web/uslm_html.py`.
+5. **Reader and API separated; the citation URL redirects (ADR-0010, amends ADR-0009 — not yet
+   implemented; Session 7).** Target state: reader at `/app/us/usc/…` (always HTML), API at
+   `/api/v1/us/usc/…` (JSON default, `?format=xml` verbatim; no Jinja imports under `api/`), and
+   the bare citation URL `/us/usc/…` a thin redirector — 307 to `/app` for HTML-winning `Accept:`,
+   307 to `/api/v1` otherwise, `?format=` wins, `Vary: Accept`. Until Session 7 lands, the code
+   still implements ADR-0009's single negotiated route. Frontend direction (ADR-0011, proposed):
+   Astro 5 + TypeScript + USWDS in `frontend/`, consuming `/api/v1` only; Jinja `web/` stays until
+   the Astro app passes the BUILDLOG 008 acceptance spec. Presentation — the sole place outside
+   the parsers allowed to know USLM element names — lives in `web/uslm_html.py` and its typed
+   successor in the Astro app.
 
 ## Identifier semantics (PLAN §1, ADR-0003) — the thing most likely to be gotten wrong
 
@@ -145,7 +149,8 @@ Stack: Python 3.12 + uv, FastAPI, SQLAlchemy, Alembic, lxml, Postgres 16 via doc
 (`db` service; `api` service builds from `Dockerfile`, UV_PROJECT_ENVIRONMENT=/opt/venv so the
 dev bind mount doesn't shadow the container venv). `db/config.py` reads `DATABASE_URL` (see
 `.env.example`); Alembic's `env.py` pulls the same setting and `target_metadata` from
-`db.models.Base` — no separate URL to keep in sync. Node 20 if the reader ends up React.
+`db.models.Base` — no separate URL to keep in sync. Node 20+ required once the Astro
+frontend (ADR-0011) lands in Session 7.
 
 ## Documentation duties (PLAN §11) — non-negotiable, this project is built in the open
 
