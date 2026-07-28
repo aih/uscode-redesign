@@ -27,4 +27,5 @@ testpaths = ["tests"]
 addopts = "-m 'not slow'"
 markers = [
     "slow: parses the full-size USLM samples; run with `make test-slow`",
+    "integration: needs Postgres with Title 16 loaded; skips when absent",
 ]

@@ -1,9 +1,20 @@
-.PHONY: dev test test-slow test-all fixtures verify
+.PHONY: dev dev-data test test-slow test-all fixtures verify
 
 dev:
 	docker compose up -d db
 	uv run alembic upgrade head
 	uv run python -m uvicorn api.main:app --reload
+
+# Everything the API integration tests need: the release-point inventory, then
+# Title 16 at the two release points the tests assert against. Title 16 @ 119-99
+# is downloaded from uscode.house.gov (~5 MB); 119-102not101 is in samples/.
+dev-data:
+	uv run alembic upgrade head
+	uv run python -m ingest inventory
+	uv run python -m ingest fetch --release 119-99 --title 16
+	uv run python -m ingest load data/releases/119-99/usc16.xml --release 119-99 \
+		--source-zip data/releases/119-99/xml_usc16@119-99.zip
+	uv run python -m ingest load samples/uslm1/usc16.xml --release 119-102not101
 
 test:
 	uv run pytest
