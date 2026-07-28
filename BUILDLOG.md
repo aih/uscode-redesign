@@ -331,3 +331,9 @@ Session-by-session record of how this site was built. One entry per working sess
 - **No new ADR.** This session made no architectural decision: it landed ones already recorded (ADR-0010 separation, ADR-0011 Astro/USWDS, ADR-0015 one-origin topology) and carried in main's ingest fix. The two judgement calls were documentation conventions, not architecture, and are recorded above rather than promoted to ADRs — keep the numbered series for decisions that constrain the code, or it stops being worth reading.
 - **Corpus state at close (from `loadall.log`, not asserted):** **1,163,760 sections stored — 151,772 new versions, 1,011,988 deduped (87.0%)** over 715 title-releases, in 100.3 min. That is the first real reading of the dedupe ratio at scale, and it is the number ADR-0007 predicted the shape of; the authoritative one still wants `make verify-deep` over the finished corpus, which recounts from source XML instead of trusting the loader's own bookkeeping.
 - **Next:** finish the backfill, re-run `make load-all` for the zips that landed after this pass, then `make verify-deep`; then Day 4 reader polish (keyboard nav, notes toggles, version timeline, diffs).
+
+## 017 — 2026-07-29 — Status review (no changes needed beyond manifests)
+
+- **Tool/model:** Claude (Cowork), Fable 5 — reviewer.
+- **Found:** BUILDLOG 016's merge close-out left every document current; nothing to fix. Since 016: the backfill advanced to **2,188 ledger entries (2,144 ok / 44 unavailable, ~68% of 3,197; 6.4 GB)** and wrote 3 new provenance manifests, committed here. `docs/verification/database.json` on disk predates the 715-title load — regenerate with `make verify` after the next load pass rather than trusting it.
+- **Next (unchanged from 016/CLAUDE.md):** finish the backfill → re-run `make load-all` → `make verify-deep` (corpus-wide dedupe ratio, independently recounted) → Day 4 reader polish on the Astro layout.
