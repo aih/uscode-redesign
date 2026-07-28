@@ -58,6 +58,15 @@ def test_parses_unpadded_date_and_pub_l_prose(by_label):
     assert by_label["116-155"].currency_date == date(2020, 8, 8)
 
 
+def test_spelled_out_date_is_used_when_there_is_no_numeric_one(by_label):
+    """115-40u1 is the one entry of 385 whose only date is prose — "(effective
+    July 1, 2017)". Before it was handled the release point vanished from the
+    inventory silently, and it is an RP that changed Title 16."""
+    entry = by_label["115-40u1"]
+    assert entry.currency_date == date(2017, 7, 1)
+    assert "16" in entry.titles_affected
+
+
 def test_parses_u1_update_labels(by_label):
     """`118-22u1` is a distinct release point from `118-22` (gotcha: labels carry
     an optional update suffix)."""
@@ -97,6 +106,22 @@ def test_seq_is_assigned_oldest_first_from_page_order(entries):
 def test_rejects_markup_it_cannot_parse():
     with pytest.raises(InventoryParseError):
         parse_inventory("<html><body>the page moved</body></html>")
+
+
+def test_warns_rather_than_silently_dropping_an_undated_entry():
+    html = (
+        '<ul class="releasepoints">'
+        '<li class="releasepoint"><a class="releasepoint" '
+        'href="releasepoints/us/pl/119/99/usc-rp@119-99.htm">Public Law 119-99 '
+        "(06/12/2026), affecting title 16.</a></li>"
+        '<li class="releasepoint"><a class="releasepoint" '
+        'href="releasepoints/us/pl/119/98/usc-rp@119-98.htm">Public Law 119-98, '
+        "affecting title 16.</a></li></ul>"
+    )
+    with pytest.warns(UserWarning, match="119-98"):
+        entries = parse_inventory(html)
+
+    assert [e.label for e in entries] == ["119-99"]
 
 
 def test_normalize_title_num():

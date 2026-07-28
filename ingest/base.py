@@ -285,6 +285,7 @@ class StreamingSectionParser:
             status=element.get("status"),
             seq=seq,
             xml=etree.tostring(element, encoding="unicode", with_tail=False),
+            content_key=self._content_key(element),
             source_credit=self._normalize(
                 element.find(self._q(self.elements.source_credit))
             ),
@@ -293,6 +294,27 @@ class StreamingSectionParser:
             ancestors=self._collect_ancestors(element),
             schema_version=schema_version,
         )
+
+    def _content_key(self, element: etree._Element) -> str:
+        """The section's XML with every `@id` guid removed — the dedupe key.
+
+        Guids are regenerated at every release point *by design* (ADR-0003), so the
+        raw XML of an untouched section changes at every one of the ~324 release
+        points. Hashing it deduped nothing at all: measured across 119-99 and
+        119-102not101, 0 of 5,095 Title 16 sections had identical raw XML, while
+        5,093 were identical once guids were dropped and exactly 2 had really been
+        amended (ADR-0007).
+
+        Removing the attributes in place and restoring them avoids copying the
+        subtree; only `@id` is touched, so everything else — including whitespace —
+        still participates in the hash.
+        """
+        removed = [(node, node.attrib.pop("id")) for node in element.iter() if "id" in node.attrib]
+        try:
+            return etree.tostring(element, encoding="unicode", with_tail=False)
+        finally:
+            for node, guid in removed:
+                node.set("id", guid)
 
     def _collect_notes(self, element: etree._Element) -> tuple[NoteRecord, ...]:
         note_tag = self._q(self.elements.note)

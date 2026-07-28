@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import re
 import urllib.request
+import warnings
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -60,6 +61,21 @@ _ENTRY_RE = re.compile(
 )
 _HREF_RE = re.compile(r"releasepoints/us/pl/\d+/[^/]+/usc-rp@(?P<label>[^.]+)\.htm")
 _DATE_RE = re.compile(r"(?P<month>\d{1,2})/(?P<day>\d{1,2})/(?P<year>\d{4})")
+_LONG_DATE_RE = re.compile(
+    r"(?P<month>January|February|March|April|May|June|July|August|September|October"
+    r"|November|December)\s+(?P<day>\d{1,2}),\s*(?P<year>\d{4})",
+    re.IGNORECASE,
+)
+_MONTHS = {
+    name: number
+    for number, name in enumerate(
+        (
+            "january february march april may june july august september "
+            "october november december"
+        ).split(),
+        start=1,
+    )
+}
 _TITLES_RE = re.compile(r"affecting titles?\s+(?P<titles>[^.]+)", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -178,6 +194,12 @@ def parse_inventory(html: str) -> list[ReleasePointEntry]:
         text = _clean_text(raw_text)
         entry_date = _parse_date(text)
         if entry_date is None:
+            # Dropping a release point silently would leave a hole nothing later
+            # notices — the ingest would just never be asked for that RP.
+            warnings.warn(
+                f"release point {label} has no parseable date, skipping: {text!r}",
+                stacklevel=2,
+            )
             continue
         titles = _parse_titles(text)
 
@@ -315,13 +337,27 @@ def _clean_text(raw: str) -> str:
 
 
 def _parse_date(text: str) -> date | None:
-    """First `M/D/YYYY` in the link text. Later dates in the same entry are
-    qualifiers ("and including Public Law 119-1 (January 29, 2025)"), not the
-    release point's currency date."""
+    """The release point's currency date, out of prose.
+
+    First `M/D/YYYY` wins: a later date in the same entry is a qualifier, as in
+    118-250's "…and including Public Law 119-1 (January 29, 2025)". A spelled-out
+    date is only used when there is no numeric one at all — true for exactly one
+    entry, 115-40u1's "(effective July 1, 2017)", which would otherwise be dropped
+    from the inventory in silence.
+    """
     match = _DATE_RE.search(text)
-    if match is None:
+    if match is not None:
+        return date(
+            int(match.group("year")), int(match.group("month")), int(match.group("day"))
+        )
+    long_match = _LONG_DATE_RE.search(text)
+    if long_match is None:
         return None
-    return date(int(match.group("year")), int(match.group("month")), int(match.group("day")))
+    return date(
+        int(long_match.group("year")),
+        _MONTHS[long_match.group("month").lower()],
+        int(long_match.group("day")),
+    )
 
 
 def _parse_titles(text: str) -> tuple[str, ...]:

@@ -76,7 +76,15 @@ class SectionRecord:
     """0-based position in document order among the emitted sections of one file."""
 
     xml: str
-    source_credit: str | None
+    """The section element serialized verbatim, guids and all."""
+
+    content_key: str = ""
+    """`xml` with every `@id` removed — what storage hashes to dedupe across
+    release points. Guids regenerate at every release point by design, so the raw
+    XML of an unchanged section is never byte-identical between two of them and
+    hashing `xml` deduplicates nothing (ADR-0007)."""
+
+    source_credit: str | None = None
     notes: tuple[NoteRecord, ...] = ()
     guid_refs: tuple[GuidRef, ...] = ()
     """Every `@id` in the section, section's own included — feeds `guid_map`."""
