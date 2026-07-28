@@ -1,11 +1,23 @@
-.PHONY: dev dev-data test test-slow test-all fixtures verify verify-deep load-all
+.PHONY: dev dev-web dev-all dev-data test test-web test-slow test-all fixtures \
+        verify verify-deep load-all shots
 
-# The reader is at /app, the API at /api/v1, and a citation URL redirects to
-# whichever the caller can read (ADR-0010).
+# The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
+# reader is a separate process (ADR-0011), so /app answers only under `dev-all`
+# or alongside `dev-web`.
 dev:
 	docker compose up -d db
 	uv run alembic upgrade head
 	uv run python -m uvicorn main:app --reload
+
+# The reader, on :4321, against whatever API_BASE_URL points at (default :8000).
+# Fast iteration on the frontend; the citation URL still belongs to the API.
+dev-web:
+	cd frontend && npm install && npm run dev
+
+# The whole site on :8000 — Caddy in front of both surfaces, exactly as deployed.
+# This is the only target where a pasted citation URL redirects into the reader.
+dev-all:
+	docker compose up --build
 
 # Everything the API integration tests need: the release-point inventory, then
 # Title 16 at the two release points the tests assert against. Title 16 @ 119-99
@@ -21,11 +33,23 @@ dev-data:
 test:
 	uv run pytest
 
+# The reader's own tests: the USLM renderer and the reference rules that keep
+# `/us/pl/` links off the page (BUILDLOG 008). Since the Jinja reader retired,
+# this is where reader coverage lives — CI must run both.
+test-web:
+	cd frontend && npm install && npm test
+
 test-slow:
 	uv run pytest -m slow
 
 test-all:
 	uv run pytest -m ""
+	$(MAKE) test-web
+
+# Headless screenshots of the demo URL, a TOC and home at 375px and 1280px,
+# written to docs/screenshots/. Needs the site running (`make dev-all`).
+shots:
+	cd frontend && npm run shots
 
 fixtures:
 	uv run python scripts/extract_fixture.py

@@ -1,3 +1,11 @@
+# The whole site: Postgres, the API, the reader, and the proxy that makes them
+# look like one origin (ADR-0010, ADR-0011).
+#
+#   browser :8000 ── proxy ─┬── /app/*  → frontend:4321   (Astro SSR on Node)
+#                           └── /*      → api:8001        (FastAPI)
+#
+# `make dev` runs only the API, locally, for API work. This file is the full
+# thing, and the only way to see the citation URL redirect into the reader.
 services:
   db:
     image: postgres:16
@@ -22,15 +30,40 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://uscode:uscode@db:5432/uscode
-    ports:
-      - "8000:8000"
+    expose:
+      - "8001"
     volumes:
       - .:/app
     command:
       [
         "uv", "run", "python", "-m", "uvicorn",
-        "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload",
+        "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload",
       ]
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - api
+    environment:
+      # Server-side rendering calls the API by service name, inside the network;
+      # the browser never talks to it directly (ADR-0011).
+      API_BASE_URL: http://api:8001
+      HOST: 0.0.0.0
+      PORT: "4321"
+    expose:
+      - "4321"
+
+  proxy:
+    image: caddy:2-alpine
+    depends_on:
+      - api
+      - frontend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
 
 volumes:
   pgdata:
+  caddydata:

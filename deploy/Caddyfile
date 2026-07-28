@@ -1,0 +1,29 @@
+# One origin, two surfaces (ADR-0010, ADR-0011).
+#
+# The split has to be invisible from the outside: a citation URL 307s to /app or
+# /api/v1, and a redirect that crossed origins would break the Accept-based
+# routing, cookies, and anything a browser scopes to a host. So a proxy owns the
+# port, and the two services behind it never need to know about each other.
+#
+# This is also what makes the surfaces independently deployable, which was the
+# point of separating them: /app can be rebuilt, rolled back, or replaced with a
+# static export without the API restarting, and vice versa.
+
+:8000 {
+	encode gzip zstd
+
+	handle /app* {
+		reverse_proxy frontend:4321
+	}
+
+	# Everything else is FastAPI: /api/v1, the citation redirector at /us/usc,
+	# /health, and the OpenAPI docs.
+	handle {
+		reverse_proxy api:8001
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
