@@ -22,6 +22,7 @@ CURRENT = "119-102not101"
 PRIOR = "119-99"
 BETWEEN = "119-100"  # published, ingested for no title, changed only title 47
 AMENDED = "/us/usc/t16/s2201"
+API = "/api/v1"  # the machine surface; the bare citation URL only redirects here
 
 
 # ------------------------------------------------------------------ identifiers
@@ -33,7 +34,7 @@ def test_health(client):
 
 def test_the_plan_demo_url(client):
     """PLAN §10's definition of done: a provision, by date, in context."""
-    response = client.get(f"{DEMO}?date=07/12/2026")
+    response = client.get(f"{API}{DEMO}?date=07/12/2026")
     body = response.json()
 
     assert response.status_code == 200
@@ -47,34 +48,34 @@ def test_the_plan_demo_url(client):
 
 def test_iso_and_us_dates_agree(client):
     """`07/12/2026` is the form uscode.house.gov prints and PLAN §10 demos."""
-    us = client.get(f"{SECTION}?date=07/12/2026").json()
-    iso = client.get(f"{SECTION}?date=2026-07-12").json()
+    us = client.get(f"{API}{SECTION}?date=07/12/2026").json()
+    iso = client.get(f"{API}{SECTION}?date=2026-07-12").json()
 
     assert us["served_from"]["label"] == iso["served_from"]["label"] == CURRENT
 
 
 def test_a_date_between_release_points_resolves_backwards(client):
-    body = client.get(f"{SECTION}?date=2026-06-20").json()
+    body = client.get(f"{API}{SECTION}?date=2026-06-20").json()
 
     assert body["release"]["label"] == PRIOR
     assert "falls between release points" in body["note"]
 
 
 def test_a_date_before_the_first_release_point_is_404(client):
-    response = client.get(f"{SECTION}?date=1999-01-01")
+    response = client.get(f"{API}{SECTION}?date=1999-01-01")
 
     assert response.status_code == 404
     assert "no release point on or before" in response.json()["detail"]
 
 
 def test_a_malformed_date_is_422(client):
-    assert client.get(f"{SECTION}?date=yesterday").status_code == 422
+    assert client.get(f"{API}{SECTION}?date=yesterday").status_code == 422
 
 
 def test_the_not_caveat_is_surfaced_not_just_the_date(client):
     """Gotcha 5: at 119-102not101 the text is *not* current through 07/12/2026 —
     Public Law 119-101 is excluded, and a date alone would hide that."""
-    response = client.get(f"{SECTION}?release={CURRENT}")
+    response = client.get(f"{API}{SECTION}?release={CURRENT}")
     body = response.json()
 
     assert body["release"]["is_partial"] is True
@@ -85,20 +86,20 @@ def test_the_not_caveat_is_surfaced_not_just_the_date(client):
 
 def test_a_bare_label_resolves_with_a_note(client):
     """`119-102` was never published on its own; `119-102not101` was."""
-    body = client.get(f"{SECTION}?release=119-102").json()
+    body = client.get(f"{API}{SECTION}?release=119-102").json()
 
     assert body["release"]["label"] == CURRENT
     assert "was published as 119-102not101" in body["note"]
 
 
 def test_an_unknown_label_is_404(client):
-    assert client.get(f"{SECTION}?release=42-1").status_code == 404
+    assert client.get(f"{API}{SECTION}?release=42-1").status_code == 404
 
 
 def test_a_release_point_we_never_ingested_answers_from_the_one_before_it(client):
     """119-100 exists and changed only title 47, so Title 16's text at 119-100 *is*
     its text at 119-99. Answering is right; answering silently would not be."""
-    response = client.get(f"{SECTION}?release={BETWEEN}")
+    response = client.get(f"{API}{SECTION}?release={BETWEEN}")
     body = response.json()
 
     assert response.status_code == 200
@@ -110,8 +111,8 @@ def test_a_release_point_we_never_ingested_answers_from_the_one_before_it(client
 
 
 def test_an_amended_section_differs_between_the_two_release_points(client):
-    old = client.get(f"{AMENDED}?release={PRIOR}").json()
-    new = client.get(f"{AMENDED}?release={CURRENT}").json()
+    old = client.get(f"{API}{AMENDED}?release={PRIOR}").json()
+    new = client.get(f"{API}{AMENDED}?release={CURRENT}").json()
 
     assert old["xml"] != new["xml"]
     assert len(new["xml"]) > len(old["xml"])
@@ -122,8 +123,8 @@ def test_an_amended_section_differs_between_the_two_release_points(client):
 def test_an_unchanged_section_is_stored_once_and_served_at_both(client):
     """ADR-0007: identical content deduped across release points. The bytes come
     from the release point they first appeared at, and the response says so."""
-    old = client.get(f"{SECTION}?release={PRIOR}").json()
-    new = client.get(f"{SECTION}?release={CURRENT}").json()
+    old = client.get(f"{API}{SECTION}?release={PRIOR}").json()
+    new = client.get(f"{API}{SECTION}?release={CURRENT}").json()
 
     assert old["xml"] == new["xml"]
     assert new["content_first_seen"]["label"] == PRIOR
@@ -131,7 +132,7 @@ def test_an_unchanged_section_is_stored_once_and_served_at_both(client):
 
 
 def test_a_missing_section_404s_naming_the_release_point(client):
-    response = client.get("/us/usc/t16/s9999")
+    response = client.get(f"{API}/us/usc/t16/s9999")
 
     assert response.status_code == 404
     assert "119-102not101" in response.json()["detail"]
@@ -141,8 +142,8 @@ def test_a_missing_section_404s_naming_the_release_point(client):
 
 
 def test_xml_format_returns_the_requested_fragment_verbatim(client):
-    section = client.get(f"{SECTION}?format=xml")
-    provision = client.get(f"{DEMO}?format=xml")
+    section = client.get(f"{API}{SECTION}?format=xml")
+    provision = client.get(f"{API}{DEMO}?format=xml")
 
     assert section.headers["content-type"].startswith("application/xml")
     assert section.text.startswith("<section")
@@ -151,25 +152,32 @@ def test_xml_format_returns_the_requested_fragment_verbatim(client):
 
 
 def test_accept_header_negotiates_xml(client):
-    response = client.get(SECTION, headers={"Accept": "application/xml"})
+    response = client.get(API + SECTION, headers={"Accept": "application/xml"})
 
     assert response.headers["content-type"].startswith("application/xml")
     assert response.text.startswith("<section")
 
 
-def test_html_format_highlights_the_requested_provision(client):
-    response = client.get(f"{DEMO}?format=html")
+def test_a_browser_aimed_at_the_api_gets_a_machine_format_never_a_template(client):
+    """ADR-0010: `/api/v1` serves machine formats only.
 
-    assert response.headers["content-type"].startswith("text/html")
-    assert "<!doctype html>" in response.text
-    assert f'id="{DEMO}"' in response.text
-    assert "target" in response.text
-    assert "Mineral King Valley" in response.text
+    Chrome's header asks for HTML at q=1 and XML at q=0.9, so with HTML off this
+    surface's menu the honest answer is XML — the client did say it accepts it,
+    and ranked it above the `*/*` that covers JSON. What must never happen is a
+    template: the reader is at `/app`, and the bare citation URL exists precisely
+    so that nobody has to arrive here by hand.
+    """
+    chrome = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    response = client.get(f"{API}{SECTION}", headers={"accept": chrome})
+
+    assert response.headers["content-type"].startswith("application/xml")
+    assert "<!doctype html>" not in response.text
+    assert client.get(f"{API}{SECTION}?format=json").json()["identifier"] == SECTION
 
 
 def test_etag_is_the_content_hash_and_is_stable(client):
     first = client.get(SECTION)
-    again = client.get(f"{SECTION}?release={CURRENT}")
+    again = client.get(f"{API}{SECTION}?release={CURRENT}")
 
     assert first.headers["etag"] == again.headers["etag"]
     assert len(first.headers["etag"].strip('"')) == 64
@@ -179,7 +187,7 @@ def test_etag_is_the_content_hash_and_is_stable(client):
 
 
 def test_guid_lookup_needs_no_release_parameter(client):
-    body = client.get(f"/us/usc/?id={S45F_C5_GUID_AT_CURRENT}").json()
+    body = client.get(f"{API}/us/usc/?id={S45F_C5_GUID_AT_CURRENT}").json()
 
     assert body["identifier"] == DEMO
     assert body["release"]["label"] == CURRENT
@@ -190,27 +198,27 @@ def test_guid_lookup_needs_no_release_parameter(client):
 def test_the_same_provision_has_a_different_guid_at_each_release_point(client):
     """ADR-0003: a guid pins (provision, release point). It is never cross-release
     identity — that is @identifier's job."""
-    old = client.get(f"{SECTION}?release={PRIOR}").json()
-    new = client.get(f"{SECTION}?release={CURRENT}").json()
+    old = client.get(f"{API}{SECTION}?release={PRIOR}").json()
+    new = client.get(f"{API}{SECTION}?release={CURRENT}").json()
 
     assert old["guid"] != new["guid"]
     assert (
-        client.get(f"/us/usc/?id={old['guid']}").json()["release"]["label"] == PRIOR
+        client.get(f"{API}/us/usc/?id={old['guid']}").json()["release"]["label"] == PRIOR
     )
     assert (
-        client.get(f"/us/usc/?id={new['guid']}").json()["release"]["label"] == CURRENT
+        client.get(f"{API}/us/usc/?id={new['guid']}").json()["release"]["label"] == CURRENT
     )
 
 
 def test_an_unknown_guid_is_404(client):
-    assert client.get("/us/usc/?id=idnope").status_code == 404
+    assert client.get(f"{API}/us/usc/?id=idnope").status_code == 404
 
 
 # -------------------------------------------------------------------------- toc
 
 
 def test_title_root_lists_its_chapters(client):
-    body = client.get("/us/usc/t16").json()
+    body = client.get(f"{API}/us/usc/t16").json()
 
     assert body["node"]["heading"] == "CONSERVATION"
     assert len(body["children"]) == 153
@@ -220,7 +228,7 @@ def test_title_root_lists_its_chapters(client):
 
 def test_a_chapter_lists_its_sections_in_reading_order_with_badges(client):
     """Gotcha 9: repealed and omitted sections keep their place, badged."""
-    body = client.get("/us/usc/t16/ch6").json()
+    body = client.get(f"{API}/us/usc/t16/ch6").json()
     sections = body["sections"]
 
     assert body["node"]["level"] == "chapter"
@@ -234,7 +242,7 @@ def test_a_chapter_lists_its_sections_in_reading_order_with_badges(client):
 
 
 def test_a_subchapter_carries_its_breadcrumb(client):
-    body = client.get("/us/usc/t16/ch1/schI").json()
+    body = client.get(f"{API}/us/usc/t16/ch1/schI").json()
 
     assert [a["identifier"] for a in body["ancestors"]] == [
         "/us/usc/t16",
@@ -244,17 +252,10 @@ def test_a_subchapter_carries_its_breadcrumb(client):
 
 def test_the_reserved_subchapter_is_retrievable_and_badged(client):
     """Title 16's only `reserved` is on a subchapter, not a section (gotcha 13)."""
-    body = client.get(f"/us/usc/t16/ch1?release={CURRENT}").json()
+    body = client.get(f"{API}/us/usc/t16/ch1?release={CURRENT}").json()
     reserved = [c for c in body["children"] if c["status"] == "reserved"]
 
     assert [c["identifier"] for c in reserved] == ["/us/usc/t16/ch1/schXCVII"]
-
-
-def test_toc_html_renders(client):
-    response = client.get("/us/usc/t16/ch6?format=html")
-
-    assert response.headers["content-type"].startswith("text/html")
-    assert "GAME AND BIRD PRESERVES" in response.text
 
 
 # ------------------------------------------------------------- neighbors, versions
@@ -359,6 +360,9 @@ def test_titles_lists_what_is_loaded(client):
 def test_openapi_documents_the_routes(client):
     paths = client.get("/openapi.json").json()["paths"]
 
-    assert "/us/usc/{identifier}" in paths
+    assert "/api/v1/us/usc/{identifier}" in paths
     assert "/api/v1/releases" in paths
     assert "/api/v1/sections/{identifier}/versions" in paths
+    # The reader and the redirector are not machine routes and are not documented
+    # as such (ADR-0010): the schema describes only what a program should call.
+    assert not [path for path in paths if path.startswith(("/app", "/us/usc"))]

@@ -1,38 +1,28 @@
-"""The routes of PLAN §4.
+"""The machine surface: PLAN §4's routes under `/api/v1`, and nothing else.
 
 Two families, on purpose:
 
-  * **`/us/usc/…`** mirrors the USLM `@identifier` exactly, so a citation is a URL
-    and a URL is a citation. One handler serves it, because the identifier decides
-    what the thing *is* — `/us/usc/t16/ch1` is a TOC node, `/us/usc/t16/s45f/c/5`
-    is a provision inside a section — and a caller shouldn't have to know which
-    before asking.
-  * **`/api/v1/…`** for everything that is about a provision rather than being one:
-    neighbours, version timeline, the release-point list.
+  * **`/api/v1/us/usc/…`** mirrors the USLM `@identifier` exactly, so a citation is
+    a URL and a URL is a citation. One handler serves it, because the identifier
+    decides what the thing *is* — `/us/usc/t16/ch1` is a TOC node,
+    `/us/usc/t16/s45f/c/5` is a provision inside a section — and a caller shouldn't
+    have to know which before asking.
+  * **`/api/v1/{sections,releases,titles}/…`** for everything that is about a
+    provision rather than being one: neighbours, version timeline, release points.
 
 No SQL and no version-resolution logic lives here (CLAUDE.md architecture rule 1);
 handlers resolve a release point, ask the `Repository`, and shape the answer.
 
-The HTML shape is the reader in `web/`, reached through the same URLs rather than
-a parallel set of them: one identifier, one address, and `?format=`/`Accept:`
-decides whether a person or a program is reading it.
+Machine formats only (ADR-0010): JSON by default, verbatim USLM for `?format=xml`
+or an XML `Accept:`. A browser's `Accept: text/html` gets JSON here rather than a
+template — the surface that answers people is `/app`, and the bare citation URL
+`/us/usc/…` is the redirector that sends each caller to the right one.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse
 
-from params import (
-    DateParam,
-    FormatParam,
-    ReleaseParam,
-    RepositoryDep,
-    negotiated_format,
-    normalize_identifier,
-    parse_date_param,
-    resolve_release_or_404,
-)
 from api.schemas import (
     ErrorOut,
     GuidOut,
@@ -44,15 +34,26 @@ from api.schemas import (
     VersionOut,
     VersionsOut,
 )
+from params import (
+    MACHINE_FORMATS,
+    DateParam,
+    FormatParam,
+    ReleaseParam,
+    RepositoryDep,
+    negotiated_format,
+    normalize_identifier,
+    not_found,
+    parse_date_param,
+    resolve_release_or_404,
+    served_note,
+)
 from storage import (
     Repository,
     ResolvedRelease,
     SectionResult,
     title_num_from_identifier,
 )
-from web import reader
 
-router = APIRouter()
 api = APIRouter(prefix="/api/v1", tags=["api"])
 
 
@@ -95,7 +96,7 @@ def neighbors(
     resolved = _resolve_for(repository, path, release, date)
     result = repository.neighbors(path, resolved)
     if result is None:
-        raise HTTPException(status_code=404, detail=_not_found(path, resolved))
+        raise HTTPException(status_code=404, detail=not_found(path, resolved))
     return NeighborsOut.of(result)
 
 
@@ -116,7 +117,7 @@ def versions(identifier: str, repository: RepositoryDep) -> VersionsOut:
     )
 
 
-@router.get(
+@api.get(
     "/us/usc/",
     response_model=GuidOut,
     tags=["us code"],
@@ -140,7 +141,7 @@ def lookup_by_guid(
     return GuidOut.of(resolution)
 
 
-@router.get(
+@api.get(
     "/us/usc/{identifier:path}",
     tags=["us code"],
     summary="A provision, section, or table-of-contents node by identifier",
@@ -150,7 +151,6 @@ def lookup_by_guid(
             "content": {
                 "application/json": {},
                 "application/xml": {},
-                "text/html": {},
             }
         },
         404: {"model": ErrorOut},
@@ -177,39 +177,32 @@ def get_by_identifier(
     """
     path = normalize_identifier(f"us/usc/{identifier}")
     resolved = _resolve_for(repository, path, release, date)
-    wanted = negotiated_format(request, format)
+    wanted = negotiated_format(request, format, allowed=MACHINE_FORMATS)
 
     section = repository.get_section(path, resolved)
     if section is not None:
-        return _section_response(repository, section, resolved, wanted, path)
+        return _section_response(section, resolved, wanted)
 
     toc = repository.get_toc(path, resolved)
     if toc is not None:
-        if wanted == "html":
-            return HTMLResponse(
-                content=reader.render_toc(repository, toc, resolved, note=resolved.note),
-                headers={"Vary": "Accept"},
-            )
         return TocOut.of(toc, note=resolved.note)
 
-    raise HTTPException(status_code=404, detail=_not_found(path, resolved))
+    raise HTTPException(status_code=404, detail=not_found(path, resolved))
 
 
 def _section_response(
-    repository: Repository,
     section: SectionResult,
     resolved: ResolvedRelease,
     wanted: str,
-    requested_path: str,
 ) -> Response | SectionOut:
-    note = _served_note(section, resolved)
+    note = served_note(section, resolved)
     headers = {
         # Content is immutable per (section text, release point): the same section
         # at the same release point can never change, so the hash of its content is
         # a true ETag (PLAN Day 6's cache-forever plan starts here).
         "ETag": f'"{section.content_hash}"',
-        # One URL serves the reader and the API (ADR-0009), so the ETag alone would
-        # let a cache hand a browser the JSON a program asked for first.
+        # JSON and XML still share this URL, so the ETag alone would let a cache
+        # hand one caller the representation another asked for first.
         "Vary": "Accept",
         "X-Release-Point": section.release.label,
         "X-Served-From": section.served_from.label,
@@ -229,33 +222,11 @@ def _section_response(
             content=fragment, media_type="application/xml; charset=utf-8", headers=headers
         )
 
-    if wanted == "html":
-        return HTMLResponse(
-            content=reader.render_section(
-                repository,
-                section,
-                resolved,
-                requested_identifier=requested_path,
-                note=note,
-            ),
-            headers=headers,
-        )
-
     out = SectionOut.of(section, note=note)
     return Response(
         content=out.model_dump_json(),
         media_type="application/json",
         headers=headers,
-    )
-
-
-def _not_found(path: str, resolved: ResolvedRelease) -> str:
-    """404s say which release point was searched — "no such provision" and "not at
-    this release point" are different answers, and only one of them means the URL
-    is wrong."""
-    return (
-        f"nothing at {path} in release point {resolved.release.label} "
-        f"({resolved.release.currency_date.isoformat()})"
     )
 
 
@@ -268,19 +239,3 @@ def _resolve_for(
         on_date=parse_date_param(date),
         title_num=title_num_from_identifier(path),
     )
-
-
-def _served_note(section: SectionResult, resolved: ResolvedRelease) -> str | None:
-    """Say when the answer came from a different release point than the one asked
-    for — the alternative is a silently wrong-looking date."""
-    parts = [resolved.note] if resolved.note else []
-    if not section.is_exact:
-        parts.append(
-            f"{section.release.label} is not ingested; this is Title "
-            f"{section.title_num} as published at {section.served_from.label} "
-            f"({section.served_from.currency_date.isoformat()}), which is the "
-            "latest release point at or before it that carries this title."
-        )
-    return " ".join(parts) or None
-
-

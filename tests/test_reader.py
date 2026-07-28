@@ -230,8 +230,8 @@ def test_prev_and_next_carry_the_release_point_and_their_badges():
     )
     html = render(repository)
 
-    assert '/us/usc/t16/s45e?release=119-102not101' in html
-    assert '/us/usc/t16/s45g?release=119-102not101' in html
+    assert '/app/us/usc/t16/s45e?release=119-102not101' in html
+    assert '/app/us/usc/t16/s45g?release=119-102not101' in html
     assert "status-repealed" in html
 
 
@@ -334,7 +334,7 @@ def test_a_toc_lists_children_and_sections_with_badges():
     assert "Subchapters" in html  # named after what the children actually are
     assert "status-reserved" in html
     assert "status-repealed" in html
-    assert "/us/usc/t16/s1?release=119-102not101" in html
+    assert "/app/us/usc/t16/s1?release=119-102not101" in html
 
 
 def test_an_empty_node_says_it_is_empty_rather_than_rendering_nothing():
@@ -349,10 +349,10 @@ def test_an_empty_node_says_it_is_empty_rather_than_rendering_nothing():
 def test_the_home_page_lists_loaded_titles_and_the_demo():
     html = reader.render_home(StubRepository())
 
-    assert "/us/usc/t16" in html
+    assert "/app/us/usc/t16" in html
     assert "CONSERVATION" in html
     assert "2 release points" in html
-    assert "/us/usc/t16/s45f/c/5?date=07/12/2026" in html
+    assert "/us/usc/t16/s45f/c/5?date=07/12/2026" in html  # the citation, verbatim
 
 
 def test_an_ambiguous_release_offers_the_candidates():
@@ -376,15 +376,15 @@ def test_provision_paths_are_written_the_way_a_lawyer_writes_them(remainder, exp
 # open the site, browse to a section, highlight a provision, flip release
 # points, page to the neighbour. These need `make dev-data` and skip without it.
 
-DEMO = "/us/usc/t16/s45f/c/5?date=07/12/2026"
+DEMO = "/app/us/usc/t16/s45f/c/5?date=07/12/2026"
 
 
 @pytest.mark.integration
 def test_the_front_page_links_to_the_loaded_title(client):
-    response = client.get("/")
+    response = client.get("/app/")
 
     assert response.headers["content-type"].startswith("text/html")
-    assert 'href="/us/usc/t16"' in response.text
+    assert 'href="/app/us/usc/t16"' in response.text
     assert "CONSERVATION" in response.text
 
 
@@ -392,7 +392,7 @@ def test_the_front_page_links_to_the_loaded_title(client):
 def test_the_stylesheet_is_served(client):
     """The reader is one stylesheet away from unreadable, and it is served by the
     app itself — no CDN, no build step."""
-    response = client.get("/static/reader.css")
+    response = client.get("/app/static/reader.css")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/css")
@@ -401,7 +401,7 @@ def test_the_stylesheet_is_served(client):
 @pytest.mark.integration
 def test_the_demo_url_is_a_readable_page(client):
     """`/us/usc/t16/s45f/c/5?date=07/12/2026`, in a browser."""
-    response = client.get(DEMO, headers={"accept": "text/html"})
+    response = client.get(DEMO)
     html = response.text
 
     assert response.status_code == 200
@@ -410,20 +410,16 @@ def test_the_demo_url_is_a_readable_page(client):
     assert 'id="/us/usc/t16/s45f/c/5"' in html
     assert html.count(' target"') == 1
     assert "except 119-101" in html  # gotcha 5, on the page and not in a tooltip
-    assert 'href="/us/usc/t16/ch1?release=119-102not101"' in html  # breadcrumb
-    assert "/us/usc/t16/s45e?release=119-102not101" in html  # previous
-    assert "/us/usc/t16/s45g?release=119-102not101" in html  # next
+    assert 'href="/app/us/usc/t16/ch1?release=119-102not101"' in html  # breadcrumb
+    assert "/app/us/usc/t16/s45e?release=119-102not101" in html  # previous
+    assert "/app/us/usc/t16/s45g?release=119-102not101" in html  # next
 
 
 @pytest.mark.integration
 def test_the_release_picker_switches_release_points(client):
     """What the picker submits is a URL — following it is the whole mechanism."""
-    at_current = client.get(
-        "/us/usc/t16/s2201?release=119-102not101", headers={"accept": "text/html"}
-    ).text
-    at_prior = client.get(
-        "/us/usc/t16/s2201?release=119-99", headers={"accept": "text/html"}
-    ).text
+    at_current = client.get("/app/us/usc/t16/s2201?release=119-102not101").text
+    at_prior = client.get("/app/us/usc/t16/s2201?release=119-99").text
 
     assert 'value="119-102not101" selected' in at_current
     assert 'value="119-99" selected' in at_prior
@@ -432,32 +428,45 @@ def test_the_release_picker_switches_release_points(client):
 
 
 @pytest.mark.integration
-def test_a_browser_gets_html_and_a_program_gets_json_from_one_url(client):
-    """Content negotiation is why the citation and the API call are the same URL."""
-    chrome = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-    browser = client.get("/us/usc/t16/s45f", headers={"accept": chrome})
-    program = client.get("/us/usc/t16/s45f")
+def test_the_reader_answers_in_html_whatever_the_client_asks_for(client):
+    """`/app` does not negotiate (ADR-0010). Whether the caller says JSON, XML or
+    nothing at all, this surface has one representation — which is what lets the
+    redirector treat "wants HTML" as a routing decision made once, up front."""
+    for accept in ("application/json", "application/xml", "*/*"):
+        response = client.get("/app/us/usc/t16/s45f", headers={"accept": accept})
 
-    assert browser.headers["content-type"].startswith("text/html")
-    assert program.headers["content-type"].startswith("application/json")
-    # Same URL, same ETag, two representations — a cache needs to be told (ADR-0009).
-    assert browser.headers["vary"] == program.headers["vary"] == "Accept"
-    assert browser.headers["etag"] == program.headers["etag"]
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/html")
+
+
+@pytest.mark.integration
+def test_a_guid_opens_the_page_it_pins(client):
+    """The guid form of a citation has to work in a browser too: it resolves to
+    one (provision, release point) and lands on that page (ADR-0003)."""
+    guid = "id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd"
+    response = client.get(f"/app/us/usc/?id={guid}")
+
+    assert response.status_code == 200
+    assert "Mineral King Valley addition authorized" in response.text
+    # This guid pins the *provision*, so it lands on the provision's URL — which
+    # is the section page with (c)(5) highlighted (ADR-0001).
+    assert str(response.url).endswith("/app/us/usc/t16/s45f/c/5?release=119-102not101")
+    assert response.text.count(' target"') == 1
 
 
 @pytest.mark.integration
 def test_a_chapter_toc_is_browsable(client):
-    response = client.get("/us/usc/t16/ch1", headers={"accept": "text/html"})
+    response = client.get("/app/us/usc/t16/ch1")
 
     assert "Subchapters" in response.text
-    assert 'href="/us/usc/t16/ch1/schVI?release=' in response.text
+    assert 'href="/app/us/usc/t16/ch1/schVI?release=' in response.text
 
 
 @pytest.mark.integration
 def test_a_wrong_citation_gets_a_page_not_a_json_blob(client):
-    response = client.get("/us/usc/t16/s9999", headers={"accept": "text/html"})
+    response = client.get("/app/us/usc/t16/s9999")
 
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("text/html")
     assert "119-102not101" in response.text  # which release point was searched
-    assert 'href="/"' in response.text
+    assert 'href="/app/"' in response.text

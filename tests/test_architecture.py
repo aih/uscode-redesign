@@ -55,6 +55,38 @@ def test_only_storage_writes_sql():
     assert offenders == []
 
 
+def test_the_api_imports_no_template_engine_and_no_reader():
+    """ADR-0010: `/api/v1` is machine-only.
+
+    The rule is stated directly rather than transitively — not "no Jinja reaches
+    the request path" but "nothing under `api/` imports it" — because the failure
+    it prevents is a gradual one: one HTML error page, then one template import,
+    and the surface that was supposed to be swappable for a static export is
+    carrying a rendering stack again. `params.py` is what the two surfaces share
+    instead of sharing each other.
+    """
+    offenders = {
+        path.relative_to(REPO_ROOT): sorted(
+            name
+            for name in _imports(path)
+            if name.split(".")[0] in {"jinja2", "web"}
+        )
+        for path in _modules(API)
+    }
+    assert {k: v for k, v in offenders.items() if v} == {}
+
+
+def test_the_reader_does_not_reach_into_the_api():
+    """The other direction of the same split: `web/` may not depend on `api/`
+    internals, or the two surfaces cannot be deployed apart."""
+    offenders = [
+        path.relative_to(REPO_ROOT)
+        for path in _modules(WEB)
+        if any(name.split(".")[0] == "api" for name in _imports(path))
+    ]
+    assert offenders == []
+
+
 def test_storage_does_not_import_the_api():
     """The dependency runs one way: api -> storage -> db."""
     offenders = [

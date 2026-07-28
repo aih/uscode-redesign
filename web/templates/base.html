@@ -9,12 +9,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page_title }}</title>
-  <link rel="stylesheet" href="/static/reader.css">
+  <link rel="stylesheet" href="/app/static/reader.css">
 </head>
 <body>
 <header class="topbar">
   <div class="wrap">
-    <a class="brand" href="/">U.S. Code</a>
+    <a class="brand" href="/app/">U.S. Code</a>
     <nav class="crumbs">
       {%- for crumb in crumbs %}
         {%- if not loop.first %}<span class="sep">/</span>{% endif %}

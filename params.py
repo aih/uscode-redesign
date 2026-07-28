@@ -27,6 +27,7 @@ from storage import (
     ReleaseNotFoundError,
     Repository,
     ResolvedRelease,
+    SectionResult,
     get_repository,
 )
 
@@ -89,6 +90,34 @@ def resolve_release_or_404(
         ) from exc
     except ReleaseNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def served_note(section: SectionResult, resolved: ResolvedRelease) -> str | None:
+    """Say when the answer came from a different release point than the one asked
+    for — the alternative is a silently wrong-looking date (gotcha 10).
+
+    Both surfaces owe the caller this sentence, and they have to owe it in the
+    same words: the reader prints it and the API returns it as `note`.
+    """
+    parts = [resolved.note] if resolved.note else []
+    if not section.is_exact:
+        parts.append(
+            f"{section.release.label} is not ingested; this is Title "
+            f"{section.title_num} as published at {section.served_from.label} "
+            f"({section.served_from.currency_date.isoformat()}), which is the "
+            "latest release point at or before it that carries this title."
+        )
+    return " ".join(parts) or None
+
+
+def not_found(path: str, resolved: ResolvedRelease) -> str:
+    """404s say which release point was searched — "no such provision" and "not at
+    this release point" are different answers, and only one of them means the URL
+    is wrong."""
+    return (
+        f"nothing at {path} in release point {resolved.release.label} "
+        f"({resolved.release.currency_date.isoformat()})"
+    )
 
 
 _ACCEPTED: dict[str, Format] = {

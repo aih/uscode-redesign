@@ -44,6 +44,23 @@ from web.uslm_html import render_fragment
 TEMPLATES = Path(__file__).parent / "templates"
 STATIC = Path(__file__).parent / "static"
 
+# Where the reader is mounted (ADR-0010). Every href the reader emits goes through
+# `app_href` rather than being concatenated at the call site, so this prefix is
+# stated once and the reader can move without a search-and-replace across five
+# templates.
+APP = "/app"
+API = "/api/v1"
+
+
+def app_href(identifier: str, at: str = "") -> str:
+    """The reader's URL for an identifier. The one place `/app` is spelled out."""
+    return f"{APP}{quote(identifier)}{at}"
+
+
+def api_href(identifier: str, query: dict[str, str]) -> str:
+    """The machine view of the same thing, on the other surface (ADR-0010)."""
+    return f"{API}{quote(identifier)}?{urlencode(query)}"
+
 _env = Environment(
     loader=FileSystemLoader(TEMPLATES),
     autoescape=True,
@@ -64,7 +81,7 @@ def render_home(repository: Repository) -> str:
         {
             "num": title.num,
             "name": title.name,
-            "href": f"/us/usc/t{title.num}",
+            "href": app_href(f"/us/usc/t{title.num}"),
             "releases": _count(len(title.ingested_releases), "release point"),
         }
         for title in repository.list_titles()
@@ -103,7 +120,7 @@ def render_section(
             "heading": section.heading,
             "status": section.status,
             "guid": section.guid,
-            "href": f"{section.identifier}{at}",
+            "href": app_href(section.identifier, at),
         },
         served=_release_view(section.served_from),
         caveat=section.served_from.caveat,
@@ -133,7 +150,7 @@ def render_section(
         formats={
             "xml": _with_format(requested_identifier, resolved, "xml"),
             "json": _with_format(requested_identifier, resolved, "json"),
-            "versions": f"/api/v1/sections{section.identifier}/versions",
+            "versions": f"{API}/sections{quote(section.identifier)}/versions",
         },
     )
 
@@ -202,9 +219,9 @@ def _release_query(resolved: ResolvedRelease) -> str:
 
 
 def _with_format(identifier: str, resolved: ResolvedRelease, wanted: str) -> str:
-    return identifier + "?" + urlencode(
-        {"release": resolved.release.label, "format": wanted}
-    )
+    """The machine views of this page live on the other surface (ADR-0010), so
+    "see the XML" is a link to `/api/v1`, not to this URL with a parameter."""
+    return api_href(identifier, {"release": resolved.release.label, "format": wanted})
 
 
 def _picker(
@@ -231,7 +248,7 @@ def _picker(
         return None
     if all(option["label"] != selected for option in options):  # pragma: no cover
         options.insert(0, {"label": selected, "date": ""})
-    return {"action": identifier, "options": options, "selected": selected}
+    return {"action": app_href(identifier), "options": options, "selected": selected}
 
 
 def _section_crumbs(
@@ -255,7 +272,10 @@ def _section_crumbs(
 
 
 def _crumb(entry: TocEntry, at: str) -> Crumb:
-    return Crumb(href=f"{entry.identifier}{at}", label=_trim(entry.num) or entry.identifier)
+    return Crumb(
+        href=app_href(entry.identifier, at),
+        label=_trim(entry.num) or entry.identifier,
+    )
 
 
 def _entry_view(entry: TocEntry | None, at: str) -> dict | None:
@@ -263,7 +283,7 @@ def _entry_view(entry: TocEntry | None, at: str) -> dict | None:
         return None
     return {
         "identifier": entry.identifier,
-        "href": f"{entry.identifier}{at}",
+        "href": app_href(entry.identifier, at),
         "num": _trim(entry.num),
         "heading": entry.heading,
         "status": entry.status,
@@ -304,4 +324,4 @@ def _count(n: int, noun: str) -> str:
 def section_url(identifier: str, release_label: str) -> str:
     """The reader URL for a provision at a release point — the form `?id=` lookups
     and watchlists (Day 5) should link to."""
-    return quote(identifier) + "?" + urlencode({"release": release_label})
+    return app_href(identifier, "?" + urlencode({"release": release_label}))
