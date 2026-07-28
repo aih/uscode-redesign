@@ -39,6 +39,10 @@ class ReleasePoint(Base):
     label: Mapped[str] = mapped_column(String, unique=True)  # e.g. '119-102not101'
     currency_date: Mapped[datetime.date] = mapped_column(Date)
     seq: Mapped[int] = mapped_column(Integer, unique=True)  # global ordering; labels don't sort
+    # Which titles this release point actually changed, from the RP inventory —
+    # every release point republishes all of them (gotcha 10). Drives ingest, and
+    # is what /api/v1/releases reports as changed-title flags.
+    titles_affected: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
 
 
 class Title(Base):
@@ -124,12 +128,6 @@ class SectionVersion(Base):
         # Version-timeline queries. The unique constraint's index has content_hash
         # between these two columns, so it doesn't serve them (migration aef3da4cc2e9).
         Index("ix_section_versions_section_id_first_release_id", "section_id", "first_release_id"),
-        # TOC leaf listing: the sections under one structure node, in reading order.
-        Index(
-            "ix_section_versions_parent_identifier_seq",
-            "parent_identifier",
-            "seq_in_title",
-        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -141,25 +139,39 @@ class SectionVersion(Base):
     num: Mapped[str | None] = mapped_column(String, nullable=True)
     heading: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str | None] = mapped_column(String, nullable=True)  # repealed/omitted/transferred/reserved
-    seq_in_title: Mapped[int] = mapped_column(Integer)  # document order -> prev/next
     source_credit: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Immediate structural parent ('/us/usc/t16/ch1/schI'), so a TOC node can list
-    # its sections. Versioned with the content rather than on `sections` because a
-    # section can be transferred between chapters. Caveat of hashing content only:
-    # a section that moves without a single character changing keeps the version row
-    # it deduped into, and with it that row's parent.
-    parent_identifier: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class SectionReleaseMap(Base):
+    """Which version of a section a release point publishes — and where it sits.
+
+    Reading order and parenthood are facts about (section, release point), not about
+    the text: a section keeps its words while the sections around it are added or
+    repealed, and a transferred section can move to another chapter without a
+    character changing. Since `section_versions` is deduped on content (ADR-0007),
+    storing either there would freeze it at the release the text first appeared in
+    (ADR-0008).
+    """
+
     __tablename__ = "section_release_map"
-    # "Everything at this RP" scans: release_id doesn't lead the PK.
-    __table_args__ = (Index("ix_section_release_map_release_id", "release_id"),)
+    __table_args__ = (
+        # "Everything at this RP" scans and prev/next: release_id doesn't lead the PK.
+        Index("ix_section_release_map_release_id_seq", "release_id", "seq_in_title"),
+        # TOC leaf listing: the sections under one structure node, in reading order.
+        Index(
+            "ix_section_release_map_parent",
+            "release_id",
+            "parent_identifier",
+            "seq_in_title",
+        ),
+    )
 
     section_version_id: Mapped[int] = mapped_column(
         ForeignKey("section_versions.id"), primary_key=True
     )
     release_id: Mapped[int] = mapped_column(ForeignKey("release_points.id"), primary_key=True)
+    seq_in_title: Mapped[int] = mapped_column(Integer)  # document order -> prev/next
+    parent_identifier: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class GuidMap(Base):

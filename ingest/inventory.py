@@ -317,6 +317,7 @@ def seed_release_points(session: Session, entries: list[ReleasePointEntry]) -> t
                     label=entry.label,
                     currency_date=entry.currency_date,
                     seq=entry.seq,
+                    titles_affected=list(entry.titles_affected),
                 )
             )
             inserted += 1
@@ -327,6 +328,7 @@ def seed_release_points(session: Session, entries: list[ReleasePointEntry]) -> t
             row.update_num = parsed.update_num
             row.currency_date = entry.currency_date
             row.seq = entry.seq
+            row.titles_affected = list(entry.titles_affected)
             updated += 1
     session.flush()
     return inserted, updated

@@ -126,25 +126,27 @@ def load_release(
                 num=record.num,
                 heading=record.heading,
                 status=record.status,
-                seq_in_title=record.seq,
                 source_credit=record.source_credit,
-                parent_identifier=record.ancestors[-1][1] if record.ancestors else None,
             )
             session.add(version)
             session.flush()
             existing_versions.setdefault(section.id, {})[content_hash] = version
             new_versions += 1
         else:
-            if version.parent_identifier is None and record.ancestors:
-                # Backfill for rows written before parent_identifier existed: a
-                # re-load dedupes on content, so nothing else would ever fill them.
-                version.parent_identifier = record.ancestors[-1][1]
             deduped += 1
 
+        # Reading order and parent are this release point's, even when the text
+        # deduped into a version created by an earlier one (ADR-0008).
+        placement = {
+            "seq_in_title": record.seq,
+            "parent_identifier": record.ancestors[-1][1] if record.ancestors else None,
+        }
         session.execute(
             pg_insert(SectionReleaseMap)
-            .values(section_version_id=version.id, release_id=release.id)
-            .on_conflict_do_nothing(index_elements=["section_version_id", "release_id"])
+            .values(section_version_id=version.id, release_id=release.id, **placement)
+            .on_conflict_do_update(
+                index_elements=["section_version_id", "release_id"], set_=placement
+            )
         )
 
         for guid_ref in record.guid_refs:
@@ -240,6 +242,10 @@ def _load_structure(
         node.parent_id = parent_id
         node.seq = record.seq
         node.depth = record.depth
+        if record.depth == 0 and record.heading and title.name == _fallback_title_name(title.num):
+            # USLM 1.0.15 has no <dc:title>, so ingest names titles "Title 16" and
+            # the real name — CONSERVATION — is only on the root structural element.
+            title.name = record.heading
         session.flush()  # pre-order guarantees the parent's id exists for its children
         ids_by_identifier[record.identifier] = node.id
 
@@ -336,12 +342,16 @@ def _get_or_create_title(session: Session, meta: DocumentMeta) -> Title:
         return existing
     title = Title(
         num=num,
-        name=meta.doc_title or f"Title {num}",
+        name=meta.doc_title or _fallback_title_name(num),
         is_positive_law=bool(meta.is_positive_law) if meta.is_positive_law is not None else False,
     )
     session.add(title)
     session.flush()
     return title
+
+
+def _fallback_title_name(num: str) -> str:
+    return f"Title {num}"
 
 
 def _get_or_create_title_version(

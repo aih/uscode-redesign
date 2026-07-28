@@ -3,9 +3,9 @@
   "source_url": "https://uscode.house.gov/download/releasepoints/us/pl/119/102not101/xml_usc16@119-102not101.zip",
   "titles": {
     "16": {
-      "deduped_section_versions": 5093,
-      "ingested_at": "2026-07-28T05:50:16.999615+00:00",
-      "new_section_versions": 2,
+      "deduped_section_versions": 5095,
+      "ingested_at": "2026-07-28T06:05:07.463529+00:00",
+      "new_section_versions": 0,
       "raw_section_elements": 5393,
       "schema_version": "uslm-1.0.15",
       "sections_ingested": 5095,
