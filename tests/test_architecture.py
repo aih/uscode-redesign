@@ -12,8 +12,8 @@ from pathlib import Path
 from tests.conftest import REPO_ROOT
 
 API = REPO_ROOT / "api"
-WEB = REPO_ROOT / "web"
 STORAGE = REPO_ROOT / "storage"
+SHARED = [REPO_ROOT / "main.py", REPO_ROOT / "citation.py", REPO_ROOT / "params.py"]
 
 
 def _imports(path: Path) -> set[str]:
@@ -28,17 +28,21 @@ def _imports(path: Path) -> set[str]:
 
 
 def _modules(*roots: Path) -> list[Path]:
-    return [p for root in roots for p in root.rglob("*.py")]
+    return [
+        path
+        for root in roots
+        for path in ([root] if root.is_file() else list(root.rglob("*.py")))
+    ]
 
 
-def test_api_and_web_never_import_the_models():
+def test_the_api_never_imports_the_models():
     """`db.models` is storage's business. The one thing `api/` may take from `db/`
     is a session factory, and only to hand it to a repository."""
     offenders = {
         path.relative_to(REPO_ROOT): sorted(
             name for name in _imports(path) if name.startswith("db.") and name != "db.base"
         )
-        for path in _modules(API, WEB)
+        for path in _modules(API, *SHARED)
     }
     assert {k: v for k, v in offenders.items() if v} == {}
 
@@ -49,42 +53,32 @@ def test_only_storage_writes_sql():
     place."""
     offenders = [
         path.relative_to(REPO_ROOT)
-        for path in _modules(API, WEB)
+        for path in _modules(API, *SHARED)
         if any(name.startswith("sqlalchemy") for name in _imports(path))
     ]
     assert offenders == []
 
 
-def test_the_api_imports_no_template_engine_and_no_reader():
-    """ADR-0010: `/api/v1` is machine-only.
+def test_no_python_module_renders_html():
+    """ADR-0010, and since Session 7 the strongest form of it: this process has
+    no template engine at all.
 
     The rule is stated directly rather than transitively — not "no Jinja reaches
-    the request path" but "nothing under `api/` imports it" — because the failure
-    it prevents is a gradual one: one HTML error page, then one template import,
-    and the surface that was supposed to be swappable for a static export is
-    carrying a rendering stack again. `params.py` is what the two surfaces share
-    instead of sharing each other.
+    the request path" but "nothing imports it" — because the failure it prevents
+    is a gradual one: one HTML error page, then one template import, and the
+    surface that was supposed to be swappable for a static export is carrying a
+    rendering stack again. The reader is an Astro app in `frontend/` (ADR-0011);
+    HTML is its job and nothing else's.
     """
     offenders = {
         path.relative_to(REPO_ROOT): sorted(
             name
             for name in _imports(path)
-            if name.split(".")[0] in {"jinja2", "web"}
+            if name.split(".")[0] in {"jinja2", "web", "starlette.templating"}
         )
-        for path in _modules(API)
+        for path in _modules(API, STORAGE, *SHARED)
     }
     assert {k: v for k, v in offenders.items() if v} == {}
-
-
-def test_the_reader_does_not_reach_into_the_api():
-    """The other direction of the same split: `web/` may not depend on `api/`
-    internals, or the two surfaces cannot be deployed apart."""
-    offenders = [
-        path.relative_to(REPO_ROOT)
-        for path in _modules(WEB)
-        if any(name.split(".")[0] == "api" for name in _imports(path))
-    ]
-    assert offenders == []
 
 
 def test_storage_does_not_import_the_api():
@@ -92,7 +86,7 @@ def test_storage_does_not_import_the_api():
     offenders = [
         path.relative_to(REPO_ROOT)
         for path in _modules(STORAGE)
-        if any(name.startswith(("api", "web")) for name in _imports(path))
+        if any(name.startswith(("api", "citation", "params")) for name in _imports(path))
     ]
     assert offenders == []
 
@@ -119,18 +113,16 @@ def test_uslm_element_names_stay_out_of_extraction_code():
     section (ADR-0005). If it appears in storage or in a route, extraction logic has
     escaped the ingest layer.
 
-    `web/uslm_html.py` is the deliberate exception, and a narrow one: it maps
-    element names to HTML tags, decides nothing about *what the data is*, and falls
-    back to a `<div>` for names it doesn't know (see the renderer tests), so a
-    schema change degrades its output rather than breaking retrieval. Presentation
-    has to know element names; nothing else does.
+    There is no longer an exception. `web/uslm_html.py` used to be one — narrow,
+    and justified, because presentation has to know element names — but the
+    renderer now lives in TypeScript in `frontend/src/lib/uslm.ts` (ADR-0011). No
+    Python file outside the parsers knows a USLM element name at all.
     """
     parsers = {"ingest/uslm1.py", "ingest/uslm2.py", "ingest/base.py"}
-    presentation = {"web/uslm_html.py"}
     offenders = [
         str(path.relative_to(REPO_ROOT))
-        for path in _modules(API, WEB, STORAGE, REPO_ROOT / "ingest")
+        for path in _modules(API, STORAGE, REPO_ROOT / "ingest", *SHARED)
         if "quotedContent" in path.read_text()
-        and str(path.relative_to(REPO_ROOT)) not in parsers | presentation
+        and str(path.relative_to(REPO_ROOT)) not in parsers
     ]
     assert offenders == []
