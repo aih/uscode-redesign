@@ -2,7 +2,14 @@
 
 Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering all release points, with retrieval of any provision at any version, reader navigation, and user watchlists.
 
-> **Progress:** Day 1 items 1–3 (scaffold, parser layer, ingest into Postgres) ✅ complete — see BUILDLOG 002–005. Detection rule locked in [ADR-0004](docs/adr/0004-uslm-version-detection-by-namespace.md); section-boundary rule and corrected Title 16 counts in [ADR-0005](docs/adr/0005-what-counts-as-a-section.md). `alembic downgrade base` round-trip and `docker compose up --build` both verified end-to-end (BUILDLOG 005); §3's secondary indexes migrated; `python -m ingest load` ingests a title with content-hash dedupe, `guid_map`, `seq_in_title`, and a provenance manifest — Title 16 @ 119-102not101 loaded and verified (5,095 sections; 522/102/19 repealed/omitted/transferred). Carried debts: `release_points.seq`/`currency_date` are per-ingest stopgaps until the Day 2 RP-inventory downloader supplies real cross-RP ordering; `Uslm2Parser` still has no TOC/table/indent handling (Day 7). **Unblocked for parallel work:** the reader UI against fixture JSON (Session 5) and the downloader port (Session 6) have no dependencies on the ingest session — run them in parallel worktrees if throughput matters more than simplicity.
+> **Progress:** Day 1 items 1–2 ✅ and item 3 ⚠️ half done — see BUILDLOG 002–005. Detection rule locked in [ADR-0004](docs/adr/0004-uslm-version-detection-by-namespace.md); section-boundary rule and corrected Title 16 counts in [ADR-0005](docs/adr/0005-what-counts-as-a-section.md). `alembic downgrade base` round-trip and `docker compose up --build` both verified end-to-end (BUILDLOG 005); §3's secondary indexes migrated; `python -m ingest load` ingests a title with content-hash dedupe, `guid_map`, `seq_in_title`, and a provenance manifest — Title 16 @ 119-102not101 loaded and verified (5,095 sections; 522/102/19 repealed/omitted/transferred).
+>
+> **Reviewing that result surfaced three things the next session must handle before the API work (item 4) can land** — all recorded in the Day 1 table and GETTING-STARTED §7's new Session 3.5:
+> 1. **Only one release point is loaded.** Item 3 wants two, and the §10 demo needs two to have a release picker at all. The prior RP's XML isn't in `samples/` — it must be downloaded, and chosen via `titlesAffected` so Title 16 actually differs between them.
+> 2. **Nothing stores the title's hierarchy** (new item 3a). Ingest persists sections only and drops `SectionRecord.ancestors`, so §4's TOC routes and the item-5 TOC page have no data source. Needs a `structure_nodes` table plus a TOC pass reading *structural elements*, not `<toc>`.
+> 3. **`release_points.seq`/`currency_date` are per-ingest stopgaps** — `?date=` resolution rests on both, so the RP-inventory seeding moves from Day 2 to a Day 1 prerequisite.
+>
+> `Uslm2Parser` still has no TOC/table/indent handling (Day 7). **Unblocked for parallel work:** the reader UI against fixture JSON (Session 5) can run in a worktree alongside Session 3.5; Session 4 cannot — it depends on 3.5's structure table and release points.
 
 ---
 
@@ -74,6 +81,16 @@ title_versions(id, title_id, release_id, source_zip_sha256,
 sections(id, title_id, identifier text,      -- '/us/usc/t16/s45f'
          unique(title_id, identifier))       -- identity across time
 
+-- Hierarchy above the section, for TOC nodes and breadcrumbs (added Day 1 item 3a;
+-- not in the original schema, and nothing else stores a chapter's name):
+structure_nodes(id, title_id, identifier text,   -- '/us/usc/t16/ch1/schVI'
+         level text,                         -- 'chapter'|'subchapter'|'part'|'subpart'
+         num text, heading text,
+         parent_id nullable, seq int,        -- document order among siblings
+         unique(title_id, identifier))
+-- Versioned the same way sections are if headings turn out to change across RPs;
+-- start unversioned and measure before adding a structure_versions table.
+
 section_versions(id, section_id,
          first_release_id,                   -- RP where this content first appeared
          content_hash bytea,                 -- dedupe key
@@ -130,16 +147,17 @@ Content negotiation: `Accept: application/xml` returns raw USLM fragment; HTML r
 
 | # | Deliverable | Notes |
 |---|---|---|
-| 1 | Repo scaffold: `ingest/ api/ web/ db/ docker-compose.yml` (Postgres 16 + API) | uv + FastAPI + SQLAlchemy + Alembic |
-| 2 | USLM parser layer: `detect_uslm_version` + `Uslm1Parser` (full) + `Uslm2Parser` (stub passing detection + basic section extraction on repo samples) | **Fixture strategy for speed:** first, script-extract a small fixture (`tests/fixtures/usc16_slice.xml`: title/meta wrapper + ch.1 through §45f + one each of repealed/omitted/transferred sections) and write unit tests against it — subsecond test runs. The full 32 MB usc16.xml runs as a `@pytest.mark.slow` integration test asserting the known-good counts (5,393 sections; 523/102/19/1 by status; s45f/c/5 guid mapping). Never let the default `make test` path parse 32 MB. |
-| 3 | Load Title 16 @ current RP + one prior RP (e.g. 119-94) with hash dedupe | proves versioning model |
-| 4 | Resolver + routes above (identifier, ?id, ?release, ?date) | OpenAPI docs live |
+| 1 | ✅ Repo scaffold: `ingest/ api/ web/ db/ docker-compose.yml` (Postgres 16 + API) | uv + FastAPI + SQLAlchemy + Alembic |
+| 2 | ✅ USLM parser layer: `detect_uslm_version` + `Uslm1Parser` (full) + `Uslm2Parser` (stub passing detection + basic section extraction on repo samples) | **Fixture strategy for speed:** first, script-extract a small fixture (`tests/fixtures/usc16_slice.xml`: title/meta wrapper + ch.1 through §45f + one each of repealed/omitted/transferred sections) and write unit tests against it — subsecond test runs. The full 32 MB usc16.xml runs as a `@pytest.mark.slow` integration test asserting the known-good counts (5,095 real sections of 5,393 `<section>` elements; 522/102/19 by section status; s45f/c/5 guid mapping — [ADR-0005](docs/adr/0005-what-counts-as-a-section.md) corrected the 5,393/523/102/19/1 figures this row used to carry). Never let the default `make test` path parse 32 MB. |
+| 3 | ⚠️ **half done** — Title 16 @ current RP (119-102not101) loaded with hash dedupe; **the prior RP is still outstanding** | proves versioning model. The dedupe path is proven mechanically (same content under a second label reuses `section_versions`, adds only `section_release_map`) but only against synthetic re-loads — a real prior RP has not been ingested, and its XML is not in `samples/`, so it must be downloaded. **Choose it via `titlesAffected`, not by picking a neighbouring number:** most RPs don't change most titles, so an arbitrary prior RP may be byte-identical for Title 16 — correct dedupe behaviour, useless demo. This makes item 3 depend on the RP inventory (Day 2's first task), which also replaces the per-ingest `currency_date`/`seq` stopgaps that item 4's `?date=` resolution rests on. |
+| 3a | **New — hierarchy storage + TOC pass** (structure table: title/chapter/subchapter/part/subpart with identifier, num, heading, parent, seq; filled by a parser-layer TOC pass) | Not previously scoped, and items 4 and 5 both assume it exists: ingest stores sections only, `SectionRecord.ancestors` is dropped on load, and no table holds a chapter's name — so the §4 TOC routes and the item-5 TOC page have no data source. **Read headings off the structural elements (`<chapter><num>/<heading>`), not the `<toc>` element:** structural markup is near-identical across USLM 1.x/2.x while `<toc>` is one of the three things OLRC actually changed in 2.x, and the existing fixture keeps structure headings intact (its `<toc>` bodies are truncated to 5 items). Streaming caveat (gotcha 5): `end` events on `<chapter>` buffer a whole chapter — track the open-ancestor stack and capture `num`/`heading` as they close. Decision worth an ADR when implemented. |
+| 4 | Resolver + routes above (identifier, ?id, ?release, ?date) | OpenAPI docs live. Repository interface lives in `storage/` per §2's diagram, importing models from `db/`; ingest writes `db/` models directly and stays outside that boundary by design. |
 | 5 | Minimal reader: TOC → section page, provision anchor highlight, prev/next, release picker | server-rendered (Jinja) or small React app |
 | 6 | Demo script: `/us/usc/t16/s45f/c/5?date=07/12/2026` end-to-end | |
 
 ## 6. Week 1 — day-by-day
 
-- **Day 2:** All 54+ titles (incl. appendices) at current RP. Bulk downloader: port `downloadusc.py` from loadusc-xcitedb (modern Python, checksum cache, polite rate limiting); load its `uscreleasepoints.json` into `release_points`. HTML rendering polish; citation-style search box ("16 USC 45f(c)(5)" → identifier).
+- **Day 2:** All 54+ titles (incl. appendices) at current RP. Bulk downloader: port `downloadusc.py` from loadusc-xcitedb (modern Python, checksum cache, polite rate limiting). **The inventory half moves earlier** — loading `uscreleasepoints.json` into `release_points` is now a Day 1 prerequisite (item 3), because both the second release point and `?date=` resolution depend on real currency dates and a true global `seq`; what remains here is the bulk, resumable download. HTML rendering polish; citation-style search box ("16 USC 45f(c)(5)" → identifier).
 - **Day 3:** Backfill prior RPs (~324, back to 2013). Downloader runs as a resumable queue (bandwidth-bound, ~40–80 GB of zips — start it Day 2 night; keep zips in S3/B2 or external disk). Ingest driven by `titlesAffected` per RP, hash-dedupe as verification; build `guid_map` per RP.
 - **Day 4:** Reader UX: keyboard nav, breadcrumbs, notes/sourceCredit toggles, status badges (repealed/omitted/transferred), version timeline per section ("changed at these RPs"), diffs between two versions — port/adapt the diff approach from dreamproit/versions rather than writing one from scratch.
 - **Day 5:** Auth + watchlists (provision, section, or whole-chapter items; optional pinned release). "My provisions" home page. Email is out of scope for v1 (no notifications yet — but schema supports it).
