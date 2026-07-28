@@ -12,4 +12,4 @@ Current OLRC release points are USLM 1.0 (`USLM-1.0.15.xsd`), but OLRC has annou
 
 ## Consequences
 
-Fixtures for both schemas live in `samples/`. The exact version-detection rule (root attributes vs `xsi:schemaLocation` vs namespace) is derived from the samples on Day 1 and documented here when locked. `Uslm2Parser` starts as a stub (detection + basic sections) and reaches parity by Day 7.
+Fixtures for both schemas live in `samples/`. The exact version-detection rule is **now locked: the root namespace URI decides — see [ADR-0004](0004-uslm-version-detection-by-namespace.md)**, which also records why `xsi:schemaLocation` labels the point version but does not route. What the parsers treat as a section, and the Title 16 count correction that fell out of it, are in [ADR-0005](0005-what-counts-as-a-section.md). `Uslm2Parser` is a stub as of Day 1 (detection, `<meta>`, section extraction — no TOC, tables, or indent model) and reaches parity by Day 7.
