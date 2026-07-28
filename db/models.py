@@ -11,6 +11,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -31,6 +32,10 @@ class ReleasePoint(Base):
     congress: Mapped[int] = mapped_column(Integer)
     law_num: Mapped[int] = mapped_column(Integer)
     excluded_laws: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
+    # `u1` re-issues of the same public law (`118-22` vs `118-22u1`): 17 of the 385
+    # published release points, and distinct release points with distinct files, so
+    # (congress, law_num, excluded_laws) does not identify one on its own.
+    update_num: Mapped[int | None] = mapped_column(Integer, nullable=True)
     label: Mapped[str] = mapped_column(String, unique=True)  # e.g. '119-102not101'
     currency_date: Mapped[datetime.date] = mapped_column(Date)
     seq: Mapped[int] = mapped_column(Integer, unique=True)  # global ordering; labels don't sort
@@ -74,6 +79,9 @@ class SectionVersion(Base):
     __tablename__ = "section_versions"
     __table_args__ = (
         UniqueConstraint("section_id", "content_hash", "first_release_id"),
+        # Version-timeline queries. The unique constraint's index has content_hash
+        # between these two columns, so it doesn't serve them (migration aef3da4cc2e9).
+        Index("ix_section_versions_section_id_first_release_id", "section_id", "first_release_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -91,6 +99,8 @@ class SectionVersion(Base):
 
 class SectionReleaseMap(Base):
     __tablename__ = "section_release_map"
+    # "Everything at this RP" scans: release_id doesn't lead the PK.
+    __table_args__ = (Index("ix_section_release_map_release_id", "release_id"),)
 
     section_version_id: Mapped[int] = mapped_column(
         ForeignKey("section_versions.id"), primary_key=True
@@ -100,6 +110,8 @@ class SectionReleaseMap(Base):
 
 class GuidMap(Base):
     __tablename__ = "guid_map"
+    # Reverse lookup: provision @ release point -> guid.
+    __table_args__ = (Index("ix_guid_map_release_id_identifier", "release_id", "identifier"),)
 
     guid: Mapped[str] = mapped_column(String, primary_key=True)  # (provision, release point) pin
     release_id: Mapped[int] = mapped_column(ForeignKey("release_points.id"))
