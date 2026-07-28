@@ -30,12 +30,17 @@ interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
    the target anchored/highlighted — the reader always keeps context.
 4. **Layout:** `ingest/` (fetch RPs, parse USLM, split into sections) → `storage/` (Postgres +
    repository interface) ← `api/` (FastAPI resolver, auth, watchlist) ← `web/` (reader, watchlist).
-5. **Reader and API separated; the citation URL redirects (ADR-0010, amends ADR-0009 — not yet
-   implemented; Session 7).** Target state: reader at `/app/us/usc/…` (always HTML), API at
+5. **Reader and API separated; the citation URL redirects (ADR-0010, amends ADR-0009 — done,
+   BUILDLOG 014).** Reader at `/app/us/usc/…` (always HTML, no negotiation), API at
    `/api/v1/us/usc/…` (JSON default, `?format=xml` verbatim; no Jinja imports under `api/`), and
    the bare citation URL `/us/usc/…` a thin redirector — 307 to `/app` for HTML-winning `Accept:`,
-   307 to `/api/v1` otherwise, `?format=` wins, `Vary: Accept`. Until Session 7 lands, the code
-   still implements ADR-0009's single negotiated route. Frontend direction (ADR-0011, proposed):
+   307 to `/api/v1` otherwise, `?format=` wins, `Vary: Accept`, query string copied through
+   verbatim. The app is assembled in top-level **`main.py`** (`uvicorn main:app`), the only module
+   that imports both surfaces; the HTTP helpers they share — `?release`/`?date`/`?format`, release
+   resolution, `Accept:` parsing — live in top-level **`params.py`**, and the redirector in
+   **`citation.py`**. `tests/test_architecture.py` enforces both directions: nothing under `api/`
+   imports `jinja2` or `web`, nothing under `web/` imports `api`. Every reader href goes through
+   `web.reader.app_href`/`api_href` — `/app` is spelled out once. Frontend direction (ADR-0011, proposed):
    Astro 5 + TypeScript + USWDS in `frontend/`, consuming `/api/v1` only; Jinja `web/` stays until
    the Astro app passes the BUILDLOG 008 acceptance spec. Presentation — the sole place outside
    the parsers allowed to know USLM element names — lives in `web/uslm_html.py` and its typed

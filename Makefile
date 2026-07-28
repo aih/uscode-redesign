@@ -1,5 +1,7 @@
 .PHONY: dev dev-data test test-slow test-all fixtures verify verify-deep load-all
 
+# The reader is at /app, the API at /api/v1, and a citation URL redirects to
+# whichever the caller can read (ADR-0010).
 dev:
 	docker compose up -d db
 	uv run alembic upgrade head

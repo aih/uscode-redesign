@@ -8,6 +8,11 @@ GET /us/usc/t16/s45f/c/5?date=07/12/2026
 GET /us/usc/?id=id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd   # guid = provision + release point
 ```
 
+Those are **citation URLs**, and they answer with a 307 to whichever surface the caller can read:
+the reader at `/app/us/usc/…` for a browser, the API at `/api/v1/us/usc/…` for everything else
+([ADR-0010](docs/adr/0010-reader-and-api-separated-behind-a-redirecting-citation-url.md)). One
+citation, one address, two surfaces that can be cached and deployed apart.
+
 Built on FastAPI + Postgres (v1), designed to swap to [XCiteDB](https://xcitedb.com) behind a repository interface (v2). Handles both USLM 1.x (current OLRC downloads) and USLM 2.x (OLRC's announced migration; samples in `samples/uslm2/`). Reader features: section-level display with provision anchoring, prev/next navigation, per-section version timelines, and user watchlists for the provisions a researcher actually works with.
 
 ## Documents
@@ -40,14 +45,18 @@ loaded at two release points — 119-99 (06/12/2026) and 119-102not101 (07/12/20
 ```bash
 docker compose up -d db
 make dev-data          # seed the release-point inventory; load Title 16 at both release points
-make dev               # the reader at http://localhost:8000/ , the API docs at /docs
+make dev               # the reader at http://localhost:8000/app/ , the API docs at /docs
 
-open "http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026"   # §45f, (c)(5) highlighted
-curl "http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026"   # the same URL, as JSON
+open "http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026"      # §45f, (c)(5) highlighted
+curl -L "http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026"   # the same URL, as JSON
+curl "http://localhost:8000/api/v1/us/usc/t16/s45f/c/5?date=07/12/2026"   # or address the API
 ```
 
-The two commands hit the same address on purpose: a citation has one URL, and `Accept:` decides
-whether a person or a program is reading it ([ADR-0009](docs/adr/0009-one-url-per-provision-negotiated-by-accept.md)).
+The first two commands paste the *same* citation and arrive in different places: a citation has one
+URL, and `Accept:` decides which surface serves it
+([ADR-0009](docs/adr/0009-one-url-per-provision-negotiated-by-accept.md), as amended by
+[ADR-0010](docs/adr/0010-reader-and-api-separated-behind-a-redirecting-citation-url.md)). `curl`
+needs `-L` because it now follows a redirect — or skip it and call `/api/v1` directly.
 
 Next: the bulk backfill of all titles and release points (PLAN Day 2), then reader polish —
 keyboard navigation, version timelines and diffs (Day 4). See BUILDLOG.md for what has been
