@@ -32,4 +32,19 @@ The data source is the official [OLRC XML downloads](https://uscode.house.gov/do
 
 ## Status
 
-Planning complete; build not yet started. See BUILDLOG.md for the current state.
+**The API is live locally and the Day-1 demo works end to end** (BUILDLOG 006). Title 16 is
+loaded at two release points — 119-99 (06/12/2026) and 119-102not101 (07/12/2026) — out of the
+382 the release-point inventory knows about, with the full hierarchy, a working resolver, and
+125 tests.
+
+```bash
+docker compose up -d db
+make dev-data          # seed the release-point inventory; load Title 16 at both release points
+make dev               # http://localhost:8000/docs
+
+curl "http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026"
+open "http://localhost:8000/us/usc/t16/ch1?format=html"
+```
+
+Next: the reader UI (PLAN Day 1 item 5), then the bulk backfill of all titles and release
+points. See BUILDLOG.md for what has been verified and how to re-check it.

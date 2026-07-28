@@ -2,14 +2,13 @@
 
 Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering all release points, with retrieval of any provision at any version, reader navigation, and user watchlists.
 
-> **Progress:** Day 1 items 1–2 ✅ and item 3 ⚠️ half done — see BUILDLOG 002–005. Detection rule locked in [ADR-0004](docs/adr/0004-uslm-version-detection-by-namespace.md); section-boundary rule and corrected Title 16 counts in [ADR-0005](docs/adr/0005-what-counts-as-a-section.md). `alembic downgrade base` round-trip and `docker compose up --build` both verified end-to-end (BUILDLOG 005); §3's secondary indexes migrated; `python -m ingest load` ingests a title with content-hash dedupe, `guid_map`, `seq_in_title`, and a provenance manifest — Title 16 @ 119-102not101 loaded and verified (5,095 sections; 522/102/19 repealed/omitted/transferred).
+> **Progress:** Day 1 items 1–4 ✅ — see BUILDLOG 002–006. Detection rule in [ADR-0004](docs/adr/0004-uslm-version-detection-by-namespace.md); section boundaries and corrected Title 16 counts in [ADR-0005](docs/adr/0005-what-counts-as-a-section.md); hierarchy from structural elements in [ADR-0006](docs/adr/0006-toc-from-structural-elements.md); the dedupe correction in [ADR-0007](docs/adr/0007-dedupe-on-guid-stripped-content.md); per-release facts in [ADR-0008](docs/adr/0008-per-release-facts-live-on-the-release-map.md).
 >
-> **Reviewing that result surfaced three things the next session must handle before the API work (item 4) can land** — all recorded in the Day 1 table and GETTING-STARTED §7's new Session 3.5:
-> 1. **Only one release point is loaded.** Item 3 wants two, and the §10 demo needs two to have a release picker at all. The prior RP's XML isn't in `samples/` — it must be downloaded, and chosen via `titlesAffected` so Title 16 actually differs between them.
-> 2. **Nothing stores the title's hierarchy** (new item 3a). Ingest persists sections only and drops `SectionRecord.ancestors`, so §4's TOC routes and the item-5 TOC page have no data source. Needs a `structure_nodes` table plus a TOC pass reading *structural elements*, not `<toc>`.
-> 3. **`release_points.seq`/`currency_date` are per-ingest stopgaps** — `?date=` resolution rests on both, so the RP-inventory seeding moves from Day 2 to a Day 1 prerequisite.
+> The release-point inventory is seeded (382 RPs, real currency dates, global `seq`), Title 16 is loaded at **two** release points (119-99 and 119-102not101), `structure_nodes` holds its 569-node hierarchy, and the API serves §4's routes over the `Repository` in `storage/`. `make test` is 125 tests including 35 API integration tests. The §10 demo URL works end to end.
 >
-> `Uslm2Parser` still has no TOC/table/indent handling (Day 7). **Unblocked for parallel work:** the reader UI against fixture JSON (Session 5) can run in a worktree alongside Session 3.5; Session 4 cannot — it depends on 3.5's structure table and release points.
+> **The one finding worth carrying forward:** loading a *real* second release point showed the content-hash dedupe collapsing nothing — guids regenerate at every RP by design (§9.1), so an untouched section's raw XML differs at every one of them. 0 of 5,095 Title 16 sections had identical raw XML between the two RPs; 5,093 were identical once `@id` was stripped; 2 had really been amended. Hashing is now over guid-stripped content ([ADR-0007](docs/adr/0007-dedupe-on-guid-stripped-content.md)). §9.1 and §9.10 were both already written down — what was missing was the observation that the first defeats the second.
+>
+> **Next: item 5, the reader UI** (GETTING-STARTED §7 Session 5), which can now build against the real API instead of fixture JSON. Then Session 6, the bulk downloader — only Title 16 is loaded, at 2 of 382 release points. `Uslm2Parser` still has no table/indent handling (Day 7); `make verify` is still a stub.
 
 ---
 
@@ -28,7 +27,7 @@ Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering al
 **Release points:**
 - Current RP: **119-102 (07/12/2026), except 119-101** → label `119-102not101`; `docPublicationName` = `Online@119-102not101`.
 - Download URL scheme (confirmed): `https://uscode.house.gov/download/releasepoints/us/pl/{congress}/{law}{notX...}/xml_usc{NN}[a]@{congress}-{law}{notX...}.zip` (e.g. `.../us/pl/119/102not101/xml_usc16@119-102not101.zip`; `xml_uscAll@...zip` for all titles; `05a`, `11a`, `18a`, `28a`, `50a` are appendices).
-- Prior release points page lists **~324 RPs back to the 113th Congress (2013)**. Skip labels can compound: `277not255not268`. RP labels are *not* lexically sortable — parse into (congress, law_num, excluded_laws[]) and assign a sequence.
+- Prior release points page lists **382 RPs back to the 113th Congress** (2013-07-18 through 2026-07-12) — counted, not estimated, by parsing the page on 2026-07-27; the earlier "~324" was an estimate. Skip labels can compound (`277not255not268`), and 17 carry a `u1` update suffix (`118-22u1`) that makes them distinct release points from the same public law. RP labels are *not* lexically sortable — parse into (congress, law_num, excluded_laws[], update_num) and take the global sequence from the page's own newest-first order.
 - Every RP republishes **all** titles, but only some titles changed — so full-corpus ingest must **dedupe by content hash** or storage explodes (~300 RPs × ~1 GB/RP uncompressed).
 
 **Date semantics.** An RP is named for the latest incorporated law; the site shows its date (e.g. 07/12/2026 for 119-102). `?date=` resolves to the latest RP whose currency date ≤ query date. Caveat to display: "not" laws mean the code text at that RP may not reflect every law enacted by that date.
@@ -68,7 +67,9 @@ Sections are the storage atom (per your spec). Sub-section provisions (`/c/5`) a
 
 ```sql
 release_points(id, congress int, law_num int, excluded_laws int[],
+               update_num int null,        -- the `u1` re-issue suffix: 118-22 vs 118-22u1
                label text unique,          -- '119-102not101'
+               titles_affected text[],     -- from the RP inventory; drives ingest
                currency_date date, seq int unique)  -- global ordering
 
 titles(id, num text unique, name text, is_positive_law bool)   -- '16', '05a'
@@ -85,21 +86,30 @@ sections(id, title_id, identifier text,      -- '/us/usc/t16/s45f'
 -- not in the original schema, and nothing else stores a chapter's name):
 structure_nodes(id, title_id, identifier text,   -- '/us/usc/t16/ch1/schVI'
          level text,                         -- 'chapter'|'subchapter'|'part'|'subpart'
-         num text, heading text,
+         num text, num_value text, heading text,
+         status text nullable,               -- t16's one 'reserved' is on a subchapter
          parent_id nullable, seq int,        -- document order among siblings
+         depth int,
+         first_release_id, last_release_id,  -- first filters TOCs; last is informational
          unique(title_id, identifier))
--- Versioned the same way sections are if headings turn out to change across RPs;
--- start unversioned and measure before adding a structure_versions table.
+-- Unversioned, as planned: headings rarely change, what changes is which nodes exist.
+-- Filled by a TOC pass over *structural elements*, never <toc> (ADR-0006).
 
 section_versions(id, section_id,
          first_release_id,                   -- RP where this content first appeared
-         content_hash bytea,                 -- dedupe key
+         content_hash bytea,                 -- sha256 of the *guid-stripped* XML (ADR-0007);
+                                             -- hashing raw XML dedupes nothing — guids
+                                             -- regenerate at every RP
          xml xml/text, html_cache text nullable,
          num text, heading text, status text nullable,
-         seq_in_title int,                   -- document order → prev/next
          source_credit text, unique(section_id, content_hash, first_release_id))
 
-section_release_map(section_version_id, release_id)  -- resolve (section, RP) → version
+-- Resolve (section, RP) → version. Also carries the facts that are true of a section
+-- *at* an RP rather than of its text (ADR-0008): a section keeps its words while its
+-- neighbours are repealed, and a transferred section changes chapter without changing.
+section_release_map(section_version_id, release_id,
+         seq_in_title int,                   -- document order → prev/next
+         parent_identifier text nullable)    -- immediate structure node → TOC listing
 guid_map(guid text primary key,              -- globally unique by design:
          release_id, identifier text)        -- guid ≡ (provision, release point)
 
@@ -114,11 +124,13 @@ watchlist_items(id, watchlist_id, identifier text, title_id, note text,
                 pinned_release_id nullable, created_at)
 ```
 
-Resolution of `GET /us/usc/t16/s45f/c/5?date=2026-07-12`:
-1. `?date` → latest `release_points` with `currency_date <= date` (or `?release=119-102` → label match; bare `119-102` should match `119-102not101` with a disambiguation note).
+Resolution of `GET /us/usc/t16/s45f/c/5?date=2026-07-12` (implemented in `storage/postgres.py`):
+1. `?date` → latest `release_points` with `currency_date <= date` (or `?release=119-102` → label match; bare `119-102` matches `119-102not101` with a disambiguation note).
 2. Longest-prefix match: strip provision path down to the section identifier (`/us/usc/t16/s45f`), keeping remainder `/c/5`.
 3. `section_release_map` → section_version for that RP.
 4. XPath the fragment by `@identifier` for anchor/extract; return per `?format=` (html | xml | json).
+
+**Step 2.5, which fell out of the data:** the requested RP may be one we never ingested. Since every RP republishes all titles and few change any, the text at an un-ingested RP *is* the text at the newest ingested RP at or before it — so resolution finds that RP (`served_from`) via `title_versions` and answers, rather than 404ing. Responses carry three release points: `release` (asked for), `served_from`, and `content_first_seen` (whose bytes are stored, since identical content is deduped across RPs). Answer, but never silently.
 
 `GET /us/usc/?id=idXXXX` → `guid_map`. No release parameter needed: the GUID pins both provision and release point. This is also the stable citation form for "this exact text at this exact point in time."
 
@@ -149,11 +161,11 @@ Content negotiation: `Accept: application/xml` returns raw USLM fragment; HTML r
 |---|---|---|
 | 1 | ✅ Repo scaffold: `ingest/ api/ web/ db/ docker-compose.yml` (Postgres 16 + API) | uv + FastAPI + SQLAlchemy + Alembic |
 | 2 | ✅ USLM parser layer: `detect_uslm_version` + `Uslm1Parser` (full) + `Uslm2Parser` (stub passing detection + basic section extraction on repo samples) | **Fixture strategy for speed:** first, script-extract a small fixture (`tests/fixtures/usc16_slice.xml`: title/meta wrapper + ch.1 through §45f + one each of repealed/omitted/transferred sections) and write unit tests against it — subsecond test runs. The full 32 MB usc16.xml runs as a `@pytest.mark.slow` integration test asserting the known-good counts (5,095 real sections of 5,393 `<section>` elements; 522/102/19 by section status; s45f/c/5 guid mapping — [ADR-0005](docs/adr/0005-what-counts-as-a-section.md) corrected the 5,393/523/102/19/1 figures this row used to carry). Never let the default `make test` path parse 32 MB. |
-| 3 | ⚠️ **half done** — Title 16 @ current RP (119-102not101) loaded with hash dedupe; **the prior RP is still outstanding** | proves versioning model. The dedupe path is proven mechanically (same content under a second label reuses `section_versions`, adds only `section_release_map`) but only against synthetic re-loads — a real prior RP has not been ingested, and its XML is not in `samples/`, so it must be downloaded. **Choose it via `titlesAffected`, not by picking a neighbouring number:** most RPs don't change most titles, so an arbitrary prior RP may be byte-identical for Title 16 — correct dedupe behaviour, useless demo. This makes item 3 depend on the RP inventory (Day 2's first task), which also replaces the per-ingest `currency_date`/`seq` stopgaps that item 4's `?date=` resolution rests on. |
-| 3a | **New — hierarchy storage + TOC pass** (structure table: title/chapter/subchapter/part/subpart with identifier, num, heading, parent, seq; filled by a parser-layer TOC pass) | Not previously scoped, and items 4 and 5 both assume it exists: ingest stores sections only, `SectionRecord.ancestors` is dropped on load, and no table holds a chapter's name — so the §4 TOC routes and the item-5 TOC page have no data source. **Read headings off the structural elements (`<chapter><num>/<heading>`), not the `<toc>` element:** structural markup is near-identical across USLM 1.x/2.x while `<toc>` is one of the three things OLRC actually changed in 2.x, and the existing fixture keeps structure headings intact (its `<toc>` bodies are truncated to 5 items). Streaming caveat (gotcha 5): `end` events on `<chapter>` buffer a whole chapter — track the open-ancestor stack and capture `num`/`heading` as they close. Decision worth an ADR when implemented. |
-| 4 | Resolver + routes above (identifier, ?id, ?release, ?date) | OpenAPI docs live. Repository interface lives in `storage/` per §2's diagram, importing models from `db/`; ingest writes `db/` models directly and stays outside that boundary by design. |
-| 5 | Minimal reader: TOC → section page, provision anchor highlight, prev/next, release picker | server-rendered (Jinja) or small React app |
-| 6 | Demo script: `/us/usc/t16/s45f/c/5?date=07/12/2026` end-to-end | |
+| 3 | ✅ Title 16 at **two** release points, 119-99 and 119-102not101, with dedupe that actually dedupes | The prior RP was chosen via `titlesAffected` as this row insisted: 119-99 is the newest earlier RP that changed Title 16, and 119-100 sits between them changing only title 47 — which made it the test case for serving an un-ingested RP. Downloading it also exposed that the BUILDLOG 005 dedupe collapsed nothing, because it had only ever been tested by re-loading one file ([ADR-0007](docs/adr/0007-dedupe-on-guid-stripped-content.md)): 0 of 5,095 sections had identical raw XML across the two RPs, 5,093 were identical once guids were stripped, 2 were genuinely amended. |
+| 3a | ✅ Hierarchy storage + TOC pass — `structure_nodes`, filled from structural elements ([ADR-0006](docs/adr/0006-toc-from-structural-elements.md)) | 569 nodes for Title 16 (1/153/345/57/13 title/chapter/subchapter/part/subpart), and the same pass yields 203 for USLM 2.x Title 49 including the `subtitle` level Title 16 never uses — which is the evidence for reading structure instead of `<toc>`. The streaming caveat held: frames open at `start` and close at `end`, so peak RSS on the 32 MB file is 35 MB. |
+| 4 | ✅ Resolver + routes (identifier, ?id, ?release, ?date, ?format) | `storage/repository.py` is the protocol, `storage/postgres.py` the only SQL, `storage/session.py` the FastAPI dependency — so `api/` holds no session and imports no models, enforced by `tests/test_architecture.py`. OpenAPI live at `/docs`. 35 integration tests against the two loaded RPs. |
+| 5 | Minimal reader: TOC → section page, provision anchor highlight, prev/next, release picker | server-rendered (Jinja) or small React app. `?format=html` already returns a readable section page with the target provision highlighted and a TOC page — the demo minimum to build on, not the reader. |
+| 6 | ✅ Demo: `/us/usc/t16/s45f/c/5?date=07/12/2026` end-to-end | Returns §45f with (c)(5) extracted and anchored, the `except 119-101` caveat, and an ETag. Add `&format=html` to read it. |
 
 ## 6. Week 1 — day-by-day
 
@@ -215,7 +227,7 @@ Working rhythm per module: Plan mode (Opus) → approve plan → implement (assi
 1. **`@id` GUIDs are regenerated at each RP by design** — a GUID means (provision, release point). Treat it as a globally unique version pin, and never as a cross-release identity (that's `@identifier`'s job).
 1a. **Dual schemas** — never hard-code USLM 1.x element paths outside `Uslm1Parser`; all schema knowledge lives in the parser implementations.
 2. **Renumbering/transfers** break `@identifier` continuity — track `status="transferred"` and consider a redirects table; a section identifier may disappear at an RP without being repealed.
-3. **RP labels don't sort** — always use parsed (congress, law, exclusions) + `seq`; handle compound `notXnotY`.
+3. **RP labels don't sort** — always use parsed (congress, law, exclusions, update) + `seq`; handle compound `notXnotY` and the `u1` re-issue suffix.
 4. **"not" laws vs `?date`** — at RP `119-102not101` the text is *not* fully current through 07/12/2026; the UI must show the exception, not just the date.
 5. **Title 42 is huge** (multiples of Title 16) — parser must stream (`iterparse` + element clearing), never load whole trees; DB writes batched.
 6. **Appendix titles** (`05a` etc.) have their own files and sometimes looser structure — treat as distinct titles.
@@ -225,7 +237,7 @@ Working rhythm per module: Plan mode (Opus) → approve plan → implement (assi
 
 ## 10. Demo definition of done
 
-Day 1: open the site → browse Title 16 TOC → open §45f → highlight (c)(5) via URL → flip release picker between two RPs → prev/next works.
+Day 1: open the site → browse Title 16 TOC → open §45f → highlight (c)(5) via URL → flip release picker between two RPs → prev/next works. **API side done (BUILDLOG 006);** what remains is the reader UI on top of it.
 Day 7: any citation, any of ~324 RPs, by `?release` or `?date`; log in; watch `/us/usc/t16/s45f/c/5`; reopen it from watchlist in one click; section version timeline visible; both USLM 1.x and 2.x files ingest cleanly.
 
 ## 11. Documentation & provenance (for the blog series and for AI-skeptical users)

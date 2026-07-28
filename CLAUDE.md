@@ -4,14 +4,18 @@ Versioned US Code retrieval site: any provision, at any release point (RP), via 
 mirroring the USLM `@identifier`. FastAPI + Postgres v1, XCiteDB later behind a repository
 interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
 
-**Status:** Day 1 item 3 complete (BUILDLOG 005) — `alembic downgrade base`/`docker compose up --build` verified end-to-end; secondary indexes migrated (PLAN §3); `python -m ingest load` ingests a USLM file into Postgres with content-hash dedupe, `guid_map`, `seq_in_title`, and a `data/manifests/{release}.json` provenance manifest. Title 16 @ 119-102not101 loaded and verified: 5,095 sections (522/102/19 repealed/omitted/transferred), 5,393 raw `<section>` elements per ADR-0005. **Next: PLAN Day 1 items 3/3a (second release point + hierarchy storage), which the API session depends on** — see GETTING-STARTED §7 Session 3.5. Open debts: **only one release point is loaded** (a prior RP must be downloaded, chosen via `titlesAffected`); **no hierarchy/TOC is stored at all** — ingest persists sections only and drops `SectionRecord.ancestors`, so nothing holds a chapter's heading and the §4 TOC routes have no data source yet; `release_points.seq`/`currency_date` are per-ingest stopgaps (sequential counter / required `--currency-date`) until the RP inventory is seeded; `Uslm2Parser` has no TOC/table/indent handling (Day 7). **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`.
+**Status:** Day 1 items 3, 3a and 4 complete (BUILDLOG 006). The release-point inventory is seeded (382 RPs with real `currency_date` and a true global `seq`); Title 16 is loaded at **two** release points, 119-99 and 119-102not101, with working dedupe (2 new / 5,093 deduped — see ADR-0007); `structure_nodes` holds the hierarchy (569 nodes) from a streaming TOC pass (ADR-0006); `storage/` has the `Repository` protocol + Postgres implementation, and `api/` serves PLAN §4's routes — identifier lookup with `?release`/`?date`/`?format`, `?id=` guid lookup, TOC, neighbors, versions, releases. `make test` = 125 tests. **Next: PLAN Day 1 item 5 (reader UI)** — GETTING-STARTED §7 Session 5. Open debts: **only Title 16, at 2 of 382 release points** (bulk download is Session 6/Day 2); a deduped fragment carries the guids of the release its text first appeared at (ADR-0007's recorded cost); `structure_nodes` is unversioned (`first_release_id` filters, `last_release_id` is informational); `?format=html` is the demo minimum, not the reader; `Uslm2Parser` has no table/indent handling (Day 7); `make verify` is still a stub. **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`. API integration tests need a loaded database (`make dev-data`) and skip without one.
 
 ## Architecture rules (PLAN §2)
 
-1. **API and UI talk only to the `Repository` interface** — `get_section(identifier, release)`,
-   `get_toc(...)`, `resolve_id(...)`, `neighbors(...)`. Postgres is implementation v1; XCiteDB
-   becomes a second implementation with no API/UI changes. **No raw SQL in API handlers**, and
-   nothing version-resolution-related outside the Repository.
+1. **API and UI talk only to the `Repository` interface** (`storage/repository.py`) —
+   `resolve_release(...)`, `get_section(identifier, release)`, `get_toc(...)`, `resolve_id(...)`,
+   `neighbors(...)`, `versions(...)`, `list_releases(...)`. Postgres is implementation v1
+   (`storage/postgres.py`, the only SQL in the project); XCiteDB becomes a second implementation
+   with no API/UI changes. **No raw SQL in API handlers**, and nothing version-resolution-related
+   outside the Repository. `api/` holds no database session either — `storage.get_repository` is
+   the FastAPI dependency. `tests/test_architecture.py` enforces all of this; ingest is
+   deliberately on the other side of the boundary and writes `db/` models directly.
 2. **The ingest layer is schema-plural.** A `UslmParser` protocol with `Uslm1Parser` and
    `Uslm2Parser`, selected by `detect_uslm_version(file)` — **the root namespace URI decides**
    (`xml.house.gov/schemas/uslm/1.0` → 1.x, `schemas.gpo.gov/xml/uslm` → 2.x); `xsi:schemaLocation`
@@ -40,12 +44,18 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 
 ## Gotchas (PLAN §9) — encoded here because each one has already bitten someone
 
-1. **Guids regenerate per RP by design.** Version pin, never cross-release identity.
+1. **Guids regenerate per RP by design.** Version pin, never cross-release identity. **This
+   defeats naive content dedupe** — an untouched section's raw XML differs at every RP, so
+   hashing it collapses nothing (measured: 0 of 5,095 Title 16 sections identical between
+   119-99 and 119-102not101; 5,093 identical once `@id` was stripped). Hash
+   `SectionRecord.content_key`, never `.xml` (ADR-0007).
 2. **Dual schemas** — no USLM 1.x paths outside `Uslm1Parser` (see architecture rule 2).
 3. **Renumbering/transfers break `@identifier` continuity.** Track `status="transferred"`; consider a
    redirects table. An identifier can vanish at an RP *without* being repealed.
-4. **RP labels do not sort lexically.** Parse into (congress, law_num, excluded_laws[]) plus a global
-   `seq`. Skip labels compound: `277not255not268`.
+4. **RP labels do not sort lexically.** Parse into (congress, law_num, excluded_laws[], update_num)
+   plus a global `seq` taken from the inventory page's order. Skip labels compound
+   (`277not255not268`), and 17 of the 385 published RPs carry a `u1` update suffix (`118-22u1`) —
+   `118-22` is a *different* release point with different files.
 5. **"not" laws vs `?date`.** At RP `119-102not101` the text is *not* fully current through
    07/12/2026. The UI must surface the exception, not just the date.
 6. **Title 42 is huge** (multiples of Title 16). Parsers must stream — `iterparse` + element
@@ -57,6 +67,9 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 9. **Repealed/omitted sections keep their place in reading order** — present in prev/next, badged.
 10. **Every RP republishes all titles** but few changed — dedupe by content hash or storage explodes
     (~300 RPs × ~1 GB). `titlesAffected` from the RP inventory drives ingest; hashing verifies.
+    The flip side is a *retrieval* rule: a request for an RP that was never ingested is answerable
+    from the newest ingested RP at or before it, because the title didn't change in between. The
+    Repository does that and reports it as `served_from` — answer, but never silently.
 11. **XCiteDB is the near future,** not "someday" — respect rule 1 strictly.
 12. **`<section>` inside `<quotedContent>` is not a section** — it is statutory text quoted by an
     amending act, carries no `@identifier`/`@id`, and must never be stored or counted (ADR-0005).
@@ -65,7 +78,10 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 13. **`@status` is not section-only and not a closed set.** Title 16's one `reserved` is on a
     `<subchapter>`; USLM 2.x Title 49 uses `renumbered`. Never model status as an enum.
 14. **USLM 1.0.15 emits no `@temporalId` at all** — zero in a 32 MB title. Display-only field;
-    do not build anything that assumes it is present.
+    do not build anything that assumes it is present. It also emits no `<dc:title>`, so a title's
+    real name (`CONSERVATION`) comes from the root structural element, not `<meta>`.
+15. **Facts that can change while the text does not** — reading order, parent chapter — belong on
+    `section_release_map`, never on the content-deduped `section_versions` row (ADR-0008).
 
 ## Fixtures
 
@@ -91,6 +107,9 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 
 ```
 make dev        # docker compose up -d db; alembic upgrade head; uvicorn --reload (local)
+make dev-data   # seed release_points from the RP inventory, then load Title 16 at 119-99
+                # (downloaded, ~5 MB) and 119-102not101 (from samples/) — what the API
+                # integration tests need; they skip without it
 make test       # uv run pytest (-m 'not slow') — the specification; nothing merges without it green
 make test-slow  # full-sample parser integration tests (~4 s): counts vs samples/, memory bound
 make test-all   # both
@@ -98,12 +117,21 @@ make fixtures   # regenerate tests/fixtures/usc16_slice.xml from samples/uslm1/u
 make verify     # (TBD — stub, exits 1) full-corpus counts vs source XML → docs/verification/, PLAN §11.5, Day 7
 docker compose up --build   # full containerized stack (db + api) instead of `make dev`'s local API
 
+# python -m ingest inventory [--from-file PATH] [--no-seed]
+#   Fetches uscode.house.gov/download/priorreleasepoints.htm, writes data/uscreleasepoints.json
+#   ({name, date, titlesAffected, url} per RP, loadusc-xcitedb's shape), and seeds release_points
+#   with real currency dates, titles_affected, and a global seq from page order.
+#
+# python -m ingest fetch --release <label> --title <num>
+#   Downloads and unpacks one title's zip into data/releases/{label}/ (~1 req/sec, cached on disk).
+#
 # python -m ingest load <xmlfile> --release <label> [--currency-date YYYY-MM-DD] [--source-url URL]
-#   Parses one USLM title file and loads it into Postgres: content-hash dedupe against existing
-#   section_versions, guid_map upsert, seq_in_title from document order, data/manifests/{release}.json
-#   provenance manifest. --currency-date is required the first time a --release label is ingested
-#   (source USLM files carry no currency date of their own); omit on later runs/titles for that release.
-#   Example: uv run python -m ingest load samples/uslm1/usc16.xml --release 119-102not101 --currency-date 2026-07-12
+#                                                   [--source-zip PATH]
+#   Parses one USLM title file into Postgres: content-hash dedupe (over the guid-stripped
+#   content_key — ADR-0007), guid_map upsert, structure_nodes from the TOC pass, per-release
+#   seq_in_title/parent_identifier, and a data/manifests/{release}.json provenance manifest.
+#   --currency-date is only needed for a release the inventory doesn't list.
+#   Example: uv run python -m ingest load samples/uslm1/usc16.xml --release 119-102not101
 ```
 
 Stack: Python 3.12 + uv, FastAPI, SQLAlchemy, Alembic, lxml, Postgres 16 via docker-compose
