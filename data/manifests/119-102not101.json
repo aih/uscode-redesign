@@ -1,0 +1,21 @@
+{
+  "release": "119-102not101",
+  "source_url": "https://uscode.house.gov/download/releasepoints/us/pl/119/102not101/xml_usc16@119-102not101.zip",
+  "titles": {
+    "16": {
+      "deduped_section_versions": 0,
+      "ingested_at": "2026-07-28T04:28:15.061852+00:00",
+      "new_section_versions": 5095,
+      "raw_section_elements": 5393,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 5095,
+      "sha256": "17f63bae6dbf0c68bf44d0e189d3a67fec235da45bded9b3e7c26c2df12715d6",
+      "source_path": "samples/uslm1/usc16.xml",
+      "status_counts": {
+        "omitted": 102,
+        "repealed": 522,
+        "transferred": 19
+      }
+    }
+  }
+}
