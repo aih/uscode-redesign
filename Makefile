@@ -3,7 +3,7 @@
 dev:
 	docker compose up -d db
 	uv run alembic upgrade head
-	uv run python -m uvicorn api.main:app --reload
+	uv run python -m uvicorn main:app --reload
 
 # Everything the API integration tests need: the release-point inventory, then
 # Title 16 at the two release points the tests assert against. Title 16 @ 119-99

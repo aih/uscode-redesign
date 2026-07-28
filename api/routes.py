@@ -23,7 +23,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 
-from api.deps import (
+from params import (
     DateParam,
     FormatParam,
     ReleaseParam,

@@ -11,7 +11,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-from api.deps import RepositoryDep
+from params import RepositoryDep
 from web import reader
 
 router = APIRouter(include_in_schema=False)

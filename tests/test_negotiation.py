@@ -8,7 +8,7 @@ import pytest
 from starlette.datastructures import Headers
 from starlette.requests import Request
 
-from api.deps import negotiated_format
+from params import negotiated_format
 
 CHROME = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8"
 

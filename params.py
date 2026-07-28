@@ -1,9 +1,17 @@
-"""Request-scoped dependencies, and the query parameters every route shares.
+"""The HTTP-shaped helpers the reader, the API, and the citation URL all share.
 
-`api/` never touches a database session at all: `storage.get_repository` yields the
-interface, and handlers depend on that (CLAUDE.md architecture rule 1). What lives
-here is the HTTP-shaped part — query parameters, content negotiation, and turning
-repository errors into status codes.
+These used to live in `api/deps.py`, back when one router served every surface.
+ADR-0010 split the surfaces — reader at `/app`, API at `/api/v1`, and the bare
+citation URL a redirector between them — and all three still need the same four
+things: a repository, the `?release`/`?date`/`?format` parameters, the translation
+of a repository error into a status code, and `Accept:` parsing.
+
+Keeping them here rather than in `api/` is what lets `web/` stop importing `api/`
+(and `api/` stop importing Jinja): neither surface depends on the other, both
+depend on this.
+
+Nothing here touches a database session — `storage.get_repository` is the
+dependency, per CLAUDE.md architecture rule 1.
 """
 
 from __future__ import annotations
@@ -91,8 +99,16 @@ _ACCEPTED: dict[str, Format] = {
     "application/json": "json",
 }
 
+MACHINE_FORMATS: frozenset[Format] = frozenset({"json", "xml"})
+ALL_FORMATS: frozenset[Format] = frozenset({"json", "xml", "html"})
 
-def negotiated_format(request: Request, requested: Format | None) -> Format:
+
+def negotiated_format(
+    request: Request,
+    requested: Format | None,
+    *,
+    allowed: frozenset[Format] = ALL_FORMATS,
+) -> Format:
     """`?format=` wins; otherwise honour `Accept:` (PLAN §4 content negotiation).
 
     The q-values have to be read, not just the media types. Chrome asks for
@@ -101,15 +117,20 @@ def negotiated_format(request: Request, requested: Format | None) -> Format:
     raw USLM. Highest q wins; ties go to whichever the client listed first; a
     client that asks for nothing we serve gets JSON, which is what a program
     with `*/*` wants.
+
+    `allowed` narrows the answer to what the surface can actually produce: the
+    citation redirector negotiates all three, but `/api/v1` serves no HTML, so a
+    browser's header there is not a reason to look for a template — it falls back
+    to JSON like any other unservable preference.
     """
-    if requested:
+    if requested and requested in allowed:
         return requested
 
     best: tuple[float, Format] | None = None
     for part in request.headers.get("accept", "").split(","):
         media_type, _, parameters = part.strip().partition(";")
         candidate = _ACCEPTED.get(media_type.strip().lower())
-        if candidate is None:
+        if candidate is None or candidate not in allowed:
             continue
         quality = 1.0
         for parameter in parameters.split(";"):

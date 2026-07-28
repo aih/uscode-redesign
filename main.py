@@ -1,15 +1,19 @@
-"""FastAPI application: versioned US Code retrieval (PLAN §4).
+"""The composition root: one FastAPI app, assembled from the surfaces.
 
-The app is thin on purpose — routes, content negotiation, and HTTP semantics. Every
-question about *which text* belongs to *which release point* is answered by the
-`Repository` behind `storage/` (CLAUDE.md architecture rule 1).
+It lives outside `api/` on purpose. `api/` is the machine surface and must import
+no template engine (ADR-0010); `web/` is the reader; neither should have to know
+the other exists. Something has to mount both, so that something is here, and it
+is the only module in the project allowed to import from both.
+
+Every question about *which text* belongs to *which release point* is answered by
+the `Repository` behind `storage/` (CLAUDE.md architecture rule 1).
 """
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
-from api.deps import negotiated_format
 from api.routes import api, router
+from params import negotiated_format
 from web import reader
 from web.reader import STATIC
 from web.routes import router as web_router

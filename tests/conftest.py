@@ -77,7 +77,7 @@ def loaded_database() -> None:
 def client(loaded_database):
     from fastapi.testclient import TestClient
 
-    from api.main import app
+    from main import app
 
     with TestClient(app) as test_client:
         yield test_client
