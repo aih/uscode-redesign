@@ -45,6 +45,13 @@ points — 119-99 (06/12/2026) and 119-102not101 (07/12/2026) — out of the 382
 inventory knows about, with the full hierarchy and a working resolver. 209 Python tests and 27
 frontend tests.
 
+**The full corpus is mid-flight.** The resumable backfill
+([ADR-0012](docs/adr/0012-resumable-backfill-driven-by-titles-affected.md)) has fetched
+**~1,834 of 3,197 title-releases (~57%)**, 5.3 GB of a measured ~9 GB corpus, mirrored to S3
+([ADR-0013](docs/adr/0013-s3-mirror-of-record-disposable-downloader.md)); the ledger-driven bulk
+load ([ADR-0014](docs/adr/0014-bulk-load-resume-state-lives-in-the-database.md)) runs behind it,
+with `make verify` / `make verify-deep` checking recorded counts against the source XML.
+
 ```bash
 docker compose up -d db
 make dev-data          # seed the release-point inventory; load Title 16 at both release points

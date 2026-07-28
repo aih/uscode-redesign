@@ -23,6 +23,7 @@ records what was kept and what changed, ADR-0012 why.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import time
 import urllib.error
 import urllib.request
@@ -151,7 +152,17 @@ def fetch_zip(
                     attempts=attempt,
                     detail=last_detail,
                 )
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            OSError,
+            # A truncated chunked response raises http.client.IncompleteRead, which
+            # descends from HTTPException — *not* from OSError. Without this it
+            # escapes the retry loop and kills an entire multi-hour run; it did,
+            # at 1,164 of 3,197 files. It is exactly the transient this loop exists
+            # to absorb.
+            http.client.HTTPException,
+        ) as exc:
             last_detail = f"{type(exc).__name__}: {exc}"
         else:
             last_http_status = http_status

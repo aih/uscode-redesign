@@ -197,8 +197,8 @@ Stack: Python 3.12 + uv, FastAPI, SQLAlchemy, Alembic, lxml, Postgres 16 via doc
 (`db` service; `api` service builds from `Dockerfile`, UV_PROJECT_ENVIRONMENT=/opt/venv so the
 dev bind mount doesn't shadow the container venv). `db/config.py` reads `DATABASE_URL` (see
 `.env.example`); Alembic's `env.py` pulls the same setting and `target_metadata` from
-`db.models.Base` — no separate URL to keep in sync. Node 20+ required once the Astro
-frontend (ADR-0011) lands in Session 7.
+`db.models.Base` — no separate URL to keep in sync. Node 20+ is required: the Astro
+frontend (ADR-0011) landed in Session 7 and `make test-web` runs under it.
 
 ## Documentation duties (PLAN §11) — non-negotiable, this project is built in the open
 

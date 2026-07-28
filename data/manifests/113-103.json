@@ -1,0 +1,124 @@
+{
+  "release": "113-103",
+  "source_url": null,
+  "titles": {
+    "10": {
+      "deduped_section_versions": 3242,
+      "ingested_at": "2026-07-28T20:29:11.027621+00:00",
+      "new_section_versions": 39,
+      "raw_section_elements": 3714,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 3281,
+      "sha256": "e6a419ad8591776dbbebc0217f775247d29318638fe2a46ddad6d52df41ec2fd",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-t0g0zjdn/usc10.xml",
+      "source_zip": "data/releases/113-103/xml_usc10@113-103.zip",
+      "source_zip_sha256": "ffc459832cdda2dcd8505b537a206ec19c7cddc14c7cccd46c6f72177727ffb7",
+      "status_counts": {
+        "renumbered": 74,
+        "repealed": 387
+      },
+      "structure_nodes": 399
+    },
+    "30": {
+      "deduped_section_versions": 634,
+      "ingested_at": "2026-07-28T20:29:13.300346+00:00",
+      "new_section_versions": 1,
+      "raw_section_elements": 652,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 635,
+      "sha256": "5300353b11b26e3894862e99be5a9c4a3569b84c5d0b6c5178c8b6b3d2d9834b",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-b5tyhc_e/usc30.xml",
+      "source_zip": "data/releases/113-103/xml_usc30@113-103.zip",
+      "source_zip_sha256": "73b82d1ca600e2b67b5ed22b8656e74ed091a4ead8185e9c4da6e56cf0dfc0e1",
+      "status_counts": {
+        "omitted": 11,
+        "repealed": 18
+      },
+      "structure_nodes": 85
+    },
+    "31": {
+      "deduped_section_versions": 469,
+      "ingested_at": "2026-07-28T20:29:15.725112+00:00",
+      "new_section_versions": 6,
+      "raw_section_elements": 540,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 475,
+      "sha256": "7bea1d0d4c86b17bf70e13990ec2baab30f65e85c87c03e5b451f1c6ee6d1383",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-3e0ndm0d/usc31.xml",
+      "source_zip": "data/releases/113-103/xml_usc31@113-103.zip",
+      "source_zip_sha256": "54f9c41436d3234fd6df6aefb49fe1b47b932cc70aabbf10892de02b53b9925b",
+      "status_counts": {
+        "repealed": 6,
+        "unknown": 1
+      },
+      "structure_nodes": 79
+    },
+    "38": {
+      "deduped_section_versions": 1030,
+      "ingested_at": "2026-07-28T20:29:20.540731+00:00",
+      "new_section_versions": 7,
+      "raw_section_elements": 1120,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 1037,
+      "sha256": "de85c41aacde21d499e467f7471a09f74dcab78324805301de4b027a5d25f2e0",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-hyaob5zu/usc38.xml",
+      "source_zip": "data/releases/113-103/xml_usc38@113-103.zip",
+      "source_zip_sha256": "c3ee95aa65e4c4e3221bfc44b4f92856e23208efb80b432a6ba25b361543d4c2",
+      "status_counts": {
+        "renumbered": 3,
+        "repealed": 15,
+        "vacant": 12
+      },
+      "structure_nodes": 170
+    },
+    "41": {
+      "deduped_section_versions": 226,
+      "ingested_at": "2026-07-28T20:29:21.346653+00:00",
+      "new_section_versions": 3,
+      "raw_section_elements": 229,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 229,
+      "sha256": "5f2f840eda78dac10f46827c18cf670cc15e10bbb30cde73c87f53402bc0e74c",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-icwdghq9/usc41.xml",
+      "source_zip": "data/releases/113-103/xml_usc41@113-103.zip",
+      "source_zip_sha256": "f0041fa652329d6e25ce40faac82741d0e1de381d1e62124e68b80d80f9e6939",
+      "status_counts": {},
+      "structure_nodes": 42
+    },
+    "42": {
+      "deduped_section_versions": 7368,
+      "ingested_at": "2026-07-28T20:30:12.196764+00:00",
+      "new_section_versions": 88,
+      "raw_section_elements": 8222,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 7456,
+      "sha256": "3714cf4ed46fa191e284dccba0f970bd5926b04d79a7f390c1ecb9d1f6904e3c",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-42ha_6zi/usc42.xml",
+      "source_zip": "data/releases/113-103/xml_usc42@113-103.zip",
+      "source_zip_sha256": "ec48441d20edf3b0094ab1f20acc7f5afd626f2451557503f823d11083864842",
+      "status_counts": {
+        "omitted": 86,
+        "repealed": 397,
+        "transferred": 62
+      },
+      "structure_nodes": 1527
+    },
+    "49": {
+      "deduped_section_versions": 1150,
+      "ingested_at": "2026-07-28T20:30:19.384880+00:00",
+      "new_section_versions": 87,
+      "raw_section_elements": 1405,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 1237,
+      "sha256": "2ed0fc95a94813a14efa047686709895ee02c6af4115a9b0f69900c05bca8764",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-uqc11nnj/usc49.xml",
+      "source_zip": "data/releases/113-103/xml_usc49@113-103.zip",
+      "source_zip_sha256": "e69390f08af8e0ca5550e5480f42e0cd9aef518716bb304bd5c2a8abeb32bade",
+      "status_counts": {
+        "renumbered": 3,
+        "repealed": 19
+      },
+      "structure_nodes": 192
+    }
+  }
+}

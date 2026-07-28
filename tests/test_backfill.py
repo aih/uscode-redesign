@@ -9,6 +9,7 @@ than mocking them out.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import io
 import json
 import urllib.error
@@ -56,6 +57,7 @@ class FakeServer:
         self.default = default
         self.requests: list[str] = []
         self.raise_times: dict[str, int] = {}
+        self.raise_errors: dict[str, list[BaseException]] = {}
 
     def opener(self, request, timeout):  # `timeout` unused; the signature is the contract
         return self._open(request.full_url)
@@ -63,6 +65,9 @@ class FakeServer:
     @contextmanager
     def _open(self, url: str):
         self.requests.append(url)
+        queued = self.raise_errors.get(url)
+        if queued:
+            raise queued.pop(0)
         remaining = self.raise_times.get(url, 0)
         if remaining:
             self.raise_times[url] = remaining - 1
@@ -162,6 +167,37 @@ def test_transport_error_retries_then_succeeds(tmp_path):
 
     assert result.status is FetchStatus.OK
     assert result.attempts == 3
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        urllib.error.URLError("connection reset"),
+        # Not an OSError — it descends from http.client.HTTPException. Uncaught,
+        # this killed a real backfill at 1,164 of 3,197 files.
+        http.client.IncompleteRead(b"partial"),
+        http.client.RemoteDisconnected("server closed connection"),
+        TimeoutError("timed out"),
+        ConnectionResetError("reset by peer"),
+    ],
+)
+def test_transport_errors_are_retried_not_raised(tmp_path, error):
+    """Every transport failure has to land in the retry loop. One that escapes
+    ends an hours-long unattended run, which is the failure this whole module is
+    built to prevent."""
+    body = _zip_bytes()
+    server = FakeServer(default=body)
+    server.raise_errors["https://example/usc16.zip"] = [error]
+
+    result = fetch_zip(
+        "https://example/usc16.zip",
+        tmp_path / "usc16.zip",
+        opener=server.opener,
+        sleep=lambda _: None,
+    )
+
+    assert result.status is FetchStatus.OK
+    assert result.attempts == 2
 
 
 def test_exhausted_retries_is_failed_not_unavailable(tmp_path):
