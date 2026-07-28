@@ -40,6 +40,22 @@ class Uslm1Parser(StreamingSectionParser):
         meta="meta",
         doc_number="docNumber",
         doc_publication_name="docPublicationName",
+        # Title 16 uses title/chapter/subchapter/part/subpart (569 nodes, all with
+        # @identifier and none inside <toc>, <notes> or <quotedContent>); the rest
+        # are listed because other titles use them — Title 5 has subtitles,
+        # Title 26 subchapters and parts, Title 42 divisions.
+        structure=(
+            "title",
+            "subtitle",
+            "chapter",
+            "subchapter",
+            "part",
+            "subpart",
+            "division",
+            "subdivision",
+            "article",
+            "subarticle",
+        ),
     )
 
     def _meta_extras(self, meta: etree._Element | None) -> dict[str, object]:

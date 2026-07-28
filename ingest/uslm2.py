@@ -48,6 +48,21 @@ class Uslm2Parser(StreamingSectionParser):
         meta="meta",
         doc_number="docNumber",
         doc_publication_name="docPublicationName",
+        # Same structural vocabulary as 1.x — which is the whole reason the TOC pass
+        # reads structural elements instead of <toc> (ADR-0006). Verified against
+        # usc49.xml (subtitle/chapter/subchapter/part/subpart) and usc01.xml.
+        structure=(
+            "title",
+            "subtitle",
+            "chapter",
+            "subchapter",
+            "part",
+            "subpart",
+            "division",
+            "subdivision",
+            "article",
+            "subarticle",
+        ),
     )
 
     def _meta_extras(self, meta: etree._Element | None) -> dict[str, object]:

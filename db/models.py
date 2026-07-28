@@ -68,11 +68,53 @@ class TitleVersion(Base):
 
 class Section(Base):
     __tablename__ = "sections"
-    __table_args__ = (UniqueConstraint("title_id", "identifier"),)
+    __table_args__ = (
+        UniqueConstraint("title_id", "identifier"),
+        # Resolution starts from a URL path and doesn't know the title_id yet.
+        Index("ix_sections_identifier", "identifier"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title_id: Mapped[int] = mapped_column(ForeignKey("titles.id"))
     identifier: Mapped[str] = mapped_column(String)  # '/us/usc/t16/s45f' — cross-release identity
+
+
+class StructureNode(Base):
+    """The hierarchy above the section: title → chapter → subchapter → part → subpart.
+
+    Nothing else holds a chapter's heading — `sections` stores only identifiers, and
+    the TOC routes need names (PLAN §3, Day 1 item 3a). Filled by the parser's TOC
+    pass from the *structural elements*, not from `<toc>` (ADR-0006).
+
+    Unversioned on purpose (PLAN §3: "start unversioned and measure"). Headings
+    change rarely; what does change is which nodes exist, so each row records the
+    first and last release point it was seen in. `first_release_id` is a real filter
+    — a chapter added at RP 119-99 must not appear in a 2013 TOC. `last_release_id`
+    is informational only: with a handful of the 385 release points ingested,
+    absence from the newest one is not evidence of removal.
+    """
+
+    __tablename__ = "structure_nodes"
+    __table_args__ = (
+        UniqueConstraint("title_id", "identifier"),
+        Index("ix_structure_nodes_parent_id_seq", "parent_id", "seq"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title_id: Mapped[int] = mapped_column(ForeignKey("titles.id"))
+    identifier: Mapped[str] = mapped_column(String)  # '/us/usc/t16/ch1/schVI'
+    level: Mapped[str] = mapped_column(String)  # 'chapter' | 'subchapter' | … free text
+    num: Mapped[str | None] = mapped_column(String, nullable=True)  # 'SUBCHAPTER VI—'
+    num_value: Mapped[str | None] = mapped_column(String, nullable=True)  # 'VI'
+    heading: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str | None] = mapped_column(String, nullable=True)  # t16's one 'reserved'
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("structure_nodes.id"), nullable=True  # null for the title root
+    )
+    seq: Mapped[int] = mapped_column(Integer)  # document order among siblings
+    depth: Mapped[int] = mapped_column(Integer)  # 0 = title root
+    first_release_id: Mapped[int] = mapped_column(ForeignKey("release_points.id"))
+    last_release_id: Mapped[int] = mapped_column(ForeignKey("release_points.id"))
 
 
 class SectionVersion(Base):
@@ -82,6 +124,12 @@ class SectionVersion(Base):
         # Version-timeline queries. The unique constraint's index has content_hash
         # between these two columns, so it doesn't serve them (migration aef3da4cc2e9).
         Index("ix_section_versions_section_id_first_release_id", "section_id", "first_release_id"),
+        # TOC leaf listing: the sections under one structure node, in reading order.
+        Index(
+            "ix_section_versions_parent_identifier_seq",
+            "parent_identifier",
+            "seq_in_title",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -95,6 +143,12 @@ class SectionVersion(Base):
     status: Mapped[str | None] = mapped_column(String, nullable=True)  # repealed/omitted/transferred/reserved
     seq_in_title: Mapped[int] = mapped_column(Integer)  # document order -> prev/next
     source_credit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Immediate structural parent ('/us/usc/t16/ch1/schI'), so a TOC node can list
+    # its sections. Versioned with the content rather than on `sections` because a
+    # section can be transferred between chapters. Caveat of hashing content only:
+    # a section that moves without a single character changing keeps the version row
+    # it deduped into, and with it that row's parent.
+    parent_identifier: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class SectionReleaseMap(Base):

@@ -5,6 +5,7 @@ EXPECTED_TABLES = {
     "titles",
     "title_versions",
     "sections",
+    "structure_nodes",
     "section_versions",
     "section_release_map",
     "guid_map",

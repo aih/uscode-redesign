@@ -14,8 +14,14 @@ from ingest.detect import (
     detect_uslm_version,
     sniff_schema,
 )
-from ingest.parser import iter_sections, parse_meta, parser_for
-from ingest.records import DocumentMeta, GuidRef, NoteRecord, SectionRecord
+from ingest.parser import iter_sections, iter_structure, parse_meta, parser_for
+from ingest.records import (
+    DocumentMeta,
+    GuidRef,
+    NoteRecord,
+    SectionRecord,
+    StructureRecord,
+)
 from ingest.uslm1 import Uslm1Parser
 from ingest.uslm2 import Uslm2Parser
 
@@ -27,6 +33,7 @@ __all__ = [
     "NoteRecord",
     "SchemaInfo",
     "SectionRecord",
+    "StructureRecord",
     "UnknownUslmSchemaError",
     "Uslm1Parser",
     "Uslm2Parser",
@@ -34,6 +41,7 @@ __all__ = [
     "UslmVersion",
     "detect_uslm_version",
     "iter_sections",
+    "iter_structure",
     "parse_meta",
     "parser_for",
     "sniff_schema",

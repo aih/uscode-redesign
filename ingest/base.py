@@ -17,7 +17,13 @@ from typing import ClassVar, Iterator, Protocol
 from lxml import etree
 
 from ingest.detect import UslmVersion, XmlSource, open_source, sniff_schema
-from ingest.records import DocumentMeta, GuidRef, NoteRecord, SectionRecord
+from ingest.records import (
+    DocumentMeta,
+    GuidRef,
+    NoteRecord,
+    SectionRecord,
+    StructureRecord,
+)
 
 DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
 
@@ -40,6 +46,42 @@ class ElementNames:
     meta: str
     doc_number: str
     doc_publication_name: str
+    structure: tuple[str, ...]
+    """Structural container levels above the section, outermost first. Not every
+    title uses every level (Title 16 has no `subtitle`), and the list is a
+    vocabulary to *recognize*, not a hierarchy to enforce — the tree comes from the
+    document, not from this order."""
+
+
+@dataclass(slots=True)
+class _StructureFrame:
+    """An open structural element: identity known at `start`, text filled in later."""
+
+    element: etree._Element
+    identifier: str
+    level: str
+    status: str | None
+    guid: str | None
+    parent_identifier: str | None
+    seq: int
+    depth: int
+    num: str | None = None
+    num_value: str | None = None
+    heading: str | None = None
+
+    def to_record(self) -> StructureRecord:
+        return StructureRecord(
+            identifier=self.identifier,
+            level=self.level,
+            num=self.num,
+            num_value=self.num_value,
+            heading=self.heading,
+            status=self.status,
+            guid=self.guid,
+            parent_identifier=self.parent_identifier,
+            seq=self.seq,
+            depth=self.depth,
+        )
 
 
 class UslmParser(Protocol):
@@ -54,6 +96,10 @@ class UslmParser(Protocol):
 
     def iter_sections(self, source: XmlSource) -> Iterator[SectionRecord]:
         """Yield one `SectionRecord` per real section, in document order."""
+        ...
+
+    def iter_structure(self, source: XmlSource) -> Iterator[StructureRecord]:
+        """Yield the hierarchy above the sections, parents before children."""
         ...
 
     def count_section_elements(self, source: XmlSource) -> int:
@@ -121,6 +167,82 @@ class StreamingSectionParser:
                 yield self._build_record(element, seq, schema_version)
                 seq += 1
                 self._prune(element)
+
+    def iter_structure(self, source: XmlSource) -> Iterator[StructureRecord]:
+        """Stream the structural skeleton: title → chapter → subchapter → part → …
+
+        Both events are needed, and for opposite reasons. A node's *identity* is
+        known at `start`, which is also where document pre-order is fixed; its
+        `<num>`/`<heading>` are only complete at their own `end`. Waiting for the
+        structural element's own `end` — the obvious reading of "parse chapters" —
+        would buffer an entire chapter of sections in memory, which Title 42 does
+        not forgive (CLAUDE.md gotcha 6). So: open a frame at `start`, fill it from
+        `num`/`heading` end events, close it at `end`, and prune the finished
+        sections as they go by.
+
+        Frames are collected in `start` order, which *is* document pre-order, and
+        yielded once the file is exhausted — a node isn't complete until its
+        heading arrives, and a tree has to be inserted parents-first. Only the
+        skeleton is held (569 nodes for all of Title 16), never section bodies.
+        """
+        structure_tags = {self._q(name) for name in self.elements.structure}
+        num_tag = self._q(self.elements.num)
+        heading_tag = self._q(self.elements.heading)
+        quoted_tag = self._q(self.elements.quoted_content)
+        section_tag = self._q(self.elements.section)
+        notes_tag = self._q(self.elements.notes)
+
+        stack: list[_StructureFrame] = []
+        frames: list[_StructureFrame] = []
+        sibling_seq: dict[str | None, int] = {}
+        quoted_depth = 0
+
+        with open_source(source) as handle:
+            for event, element in etree.iterparse(handle, events=("start", "end")):
+                tag = element.tag
+                if event == "start":
+                    if tag == quoted_tag:
+                        quoted_depth += 1
+                    elif (
+                        quoted_depth == 0
+                        and tag in structure_tags
+                        and element.get("identifier")
+                    ):
+                        parent = stack[-1].identifier if stack else None
+                        seq = sibling_seq.get(parent, 0)
+                        sibling_seq[parent] = seq + 1
+                        frame = _StructureFrame(
+                            element=element,
+                            identifier=element.get("identifier") or "",
+                            level=etree.QName(element).localname,
+                            status=element.get("status"),
+                            guid=element.get("id"),
+                            parent_identifier=parent,
+                            seq=seq,
+                            depth=len(stack),
+                        )
+                        stack.append(frame)
+                        frames.append(frame)
+                    continue
+
+                if tag == quoted_tag:
+                    quoted_depth -= 1
+                elif quoted_depth:
+                    continue
+                elif stack and tag in (num_tag, heading_tag):
+                    if element.getparent() is stack[-1].element:
+                        if tag == num_tag:
+                            stack[-1].num = self._normalize(element)
+                            stack[-1].num_value = element.get("value")
+                        else:
+                            stack[-1].heading = self._normalize(element)
+                elif tag in (section_tag, notes_tag):
+                    self._prune(element)  # the bulk of the document, already read
+                elif stack and element is stack[-1].element:
+                    self._prune(stack.pop().element)
+
+        for frame in frames:
+            yield frame.to_record()
 
     def count_section_elements(self, source: XmlSource) -> int:
         tag = self._q(self.elements.section)

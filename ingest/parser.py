@@ -12,7 +12,7 @@ from typing import Iterator
 
 from ingest.base import UslmParser
 from ingest.detect import UnknownUslmSchemaError, UslmVersion, XmlSource, sniff_schema
-from ingest.records import DocumentMeta, SectionRecord
+from ingest.records import DocumentMeta, SectionRecord, StructureRecord
 from ingest.uslm1 import Uslm1Parser
 from ingest.uslm2 import Uslm2Parser
 
@@ -34,6 +34,11 @@ def parser_for(source: XmlSource) -> UslmParser:
 def iter_sections(source: XmlSource) -> Iterator[SectionRecord]:
     """Stream sections from `source`, schema chosen automatically."""
     return parser_for(source).iter_sections(source)
+
+
+def iter_structure(source: XmlSource) -> Iterator[StructureRecord]:
+    """Stream the hierarchy above the sections, schema chosen automatically."""
+    return parser_for(source).iter_structure(source)
 
 
 def parse_meta(source: XmlSource) -> DocumentMeta:

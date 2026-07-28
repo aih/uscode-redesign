@@ -28,21 +28,23 @@ from db.models import (
     Section,
     SectionReleaseMap,
     SectionVersion,
+    StructureNode,
     Title,
     TitleVersion,
 )
+from ingest import inventory as inventory_mod
 from ingest.parser import parser_for
 from ingest.records import DocumentMeta
-from ingest.release_label import parse_release_label
+from ingest.release_label import parse_label
 
 GUID_BATCH_SIZE = 500
 
 
 class MissingCurrencyDateError(ValueError):
-    """Raised when a release point is being created for the first time but no
-    `--currency-date` was given. Source USLM files carry no currency date of
-    their own (verified against usc16.xml) — it has to come from the caller or
-    the RP inventory (PLAN.md Day 2), not from the XML."""
+    """Raised when a release point is being created for the first time and neither
+    `--currency-date` nor the release-point inventory supplies a date. Source USLM
+    files carry no currency date of their own (verified against usc16.xml) — it has
+    to come from the caller or from `data/uscreleasepoints.json`, never the XML."""
 
 
 @dataclass
@@ -56,6 +58,7 @@ class LoadStats:
     sections_ingested: int
     new_section_versions: int
     deduped_section_versions: int
+    structure_nodes: int = 0
     status_counts: dict[str, int] = field(default_factory=dict)
 
 
@@ -65,6 +68,7 @@ def load_release(
     session: Session,
     *,
     currency_date: date | None = None,
+    source_zip: Path | None = None,
 ) -> LoadStats:
     """Parse `xml_path` and load it into Postgres under `release_label`."""
     parser = parser_for(xml_path)
@@ -74,7 +78,8 @@ def load_release(
 
     release = _get_or_create_release(session, release_label, currency_date)
     title = _get_or_create_title(session, meta)
-    _get_or_create_title_version(session, title, release, xml_path, meta)
+    _get_or_create_title_version(session, title, release, xml_path, meta, source_zip)
+    structure_nodes = _load_structure(session, parser, xml_path, title, release)
     session.commit()
 
     existing_sections = {
@@ -116,6 +121,7 @@ def load_release(
                 status=record.status,
                 seq_in_title=record.seq,
                 source_credit=record.source_credit,
+                parent_identifier=record.ancestors[-1][1] if record.ancestors else None,
             )
             session.add(version)
             session.flush()
@@ -157,8 +163,90 @@ def load_release(
         sections_ingested=sections_ingested,
         new_section_versions=new_versions,
         deduped_section_versions=deduped,
+        structure_nodes=structure_nodes,
         status_counts=status_counts,
     )
+
+
+def _load_structure(
+    session: Session,
+    parser,
+    xml_path: Path,
+    title: Title,
+    release: ReleasePoint,
+) -> int:
+    """Upsert the title's hierarchy from the parser's TOC pass.
+
+    Nodes are keyed on `(title_id, identifier)` and updated in place: headings do
+    change (a chapter gets renamed), but the node is the same node, and `sections`
+    already points at it by identifier. Release bookkeeping goes by `seq`, not by
+    ingest order, so loading an older release point after a newer one — which is
+    exactly what this session does — still leaves `first_release_id` on the older.
+    """
+    existing = {
+        node.identifier: node
+        for node in session.scalars(
+            select(StructureNode).where(StructureNode.title_id == title.id)
+        )
+    }
+    seq_by_release: dict[int, int] = {
+        release_id: seq
+        for release_id, seq in session.execute(
+            select(ReleasePoint.id, ReleasePoint.seq)
+        ).all()
+    }
+    ids_by_identifier = {identifier: node.id for identifier, node in existing.items()}
+    guid_rows: list[dict[str, object]] = []
+    count = 0
+
+    for record in parser.iter_structure(xml_path):
+        parent_id = (
+            ids_by_identifier.get(record.parent_identifier)
+            if record.parent_identifier
+            else None
+        )
+        node = existing.get(record.identifier)
+        if node is None:
+            node = StructureNode(
+                title_id=title.id,
+                identifier=record.identifier,
+                first_release_id=release.id,
+                last_release_id=release.id,
+            )
+            session.add(node)
+            existing[record.identifier] = node
+        else:
+            if seq_by_release[release.id] < seq_by_release[node.first_release_id]:
+                node.first_release_id = release.id
+            if seq_by_release[release.id] > seq_by_release[node.last_release_id]:
+                node.last_release_id = release.id
+
+        node.level = record.level
+        node.num = record.num
+        node.num_value = record.num_value
+        node.heading = record.heading
+        node.status = record.status
+        node.parent_id = parent_id
+        node.seq = record.seq
+        node.depth = record.depth
+        session.flush()  # pre-order guarantees the parent's id exists for its children
+        ids_by_identifier[record.identifier] = node.id
+
+        if record.guid:
+            guid_rows.append(
+                {
+                    "guid": record.guid,
+                    "release_id": release.id,
+                    "identifier": record.identifier,
+                }
+            )
+        count += 1
+
+    if guid_rows:
+        # Chapter guids belong in guid_map too: `?id=` must resolve any @id in the
+        # file, not only the ones inside sections (ADR-0003).
+        _flush_guid_rows(session, guid_rows)
+    return count
 
 
 def _flush_guid_rows(session: Session, rows: list[dict[str, object]]) -> None:
@@ -173,31 +261,60 @@ def _flush_guid_rows(session: Session, rows: list[dict[str, object]]) -> None:
 def _get_or_create_release(
     session: Session, label: str, currency_date: date | None
 ) -> ReleasePoint:
+    """Find the release point, or create it from the inventory (or an explicit date).
+
+    Normal path once `python -m ingest inventory` has run: the row already exists
+    with its real `currency_date` and true global `seq`, and this is a lookup.
+    `--currency-date` remains for loading a release the inventory doesn't list.
+    """
     existing = session.scalars(
         select(ReleasePoint).where(ReleasePoint.label == label)
     ).first()
     if existing is not None:
         return existing
+
+    entry = _inventory_entry(label)
     if currency_date is None:
-        raise MissingCurrencyDateError(
-            f"release {label!r} does not exist yet and no --currency-date was given"
-        )
-    congress, law_num, excluded_laws = parse_release_label(label)
-    max_seq = session.scalars(select(func.max(ReleasePoint.seq))).first()
+        if entry is None:
+            raise MissingCurrencyDateError(
+                f"release {label!r} is neither in the database nor in "
+                f"{inventory_mod.INVENTORY_PATH} (run `python -m ingest inventory`), "
+                "and no --currency-date was given"
+            )
+        currency_date = entry.currency_date
+
+    parsed = parse_label(label)
+    if entry is not None:
+        seq = entry.seq
+    else:
+        # No inventory row: park the release after everything known rather than
+        # inventing an ordering. `python -m ingest inventory` renumbers on its next
+        # run, and until then this label only orders against itself.
+        max_seq = session.scalars(select(func.max(ReleasePoint.seq))).first()
+        seq = 0 if max_seq is None else max_seq + 1
+
     release = ReleasePoint(
-        congress=congress,
-        law_num=law_num,
-        excluded_laws=excluded_laws,
+        congress=parsed.congress,
+        law_num=parsed.law_num,
+        excluded_laws=list(parsed.excluded_laws),
+        update_num=parsed.update_num,
         label=label,
         currency_date=currency_date,
-        # Day-1 simplification: sequential assignment on first sight of a label.
-        # Day 2's RP inventory (PLAN §6) supplies true cross-RP ordering; until
-        # then this only holds within releases ingested by this command.
-        seq=0 if max_seq is None else max_seq + 1,
+        seq=seq,
     )
     session.add(release)
     session.flush()
     return release
+
+
+def _inventory_entry(label: str) -> inventory_mod.ReleasePointEntry | None:
+    """The inventory's record for `label`, if the inventory has been fetched."""
+    if not inventory_mod.INVENTORY_PATH.exists():
+        return None
+    for entry in inventory_mod.read_inventory():
+        if entry.label == label:
+            return entry
+    return None
 
 
 def _get_or_create_title(session: Session, meta: DocumentMeta) -> Title:
@@ -222,6 +339,7 @@ def _get_or_create_title_version(
     release: ReleasePoint,
     xml_path: Path,
     meta: DocumentMeta,
+    source_zip: Path | None = None,
 ) -> TitleVersion:
     existing = session.scalars(
         select(TitleVersion).where(
@@ -233,7 +351,10 @@ def _get_or_create_title_version(
     title_version = TitleVersion(
         title_id=title.id,
         release_id=release.id,
-        source_zip_sha256=_sha256_file(xml_path),
+        # The published artifact is the zip; hash that when we have it, so a
+        # re-download can be checked byte-for-byte. Falls back to the XML for files
+        # that arrived unzipped (the repo samples).
+        source_zip_sha256=_sha256_file(source_zip or xml_path),
         schema_version=meta.schema_version,
     )
     session.add(title_version)

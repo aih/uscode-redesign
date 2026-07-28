@@ -12,7 +12,13 @@ from collections import Counter
 import pytest
 from lxml import etree
 
-from ingest import UslmVersion, detect_uslm_version, iter_sections, parse_meta
+from ingest import (
+    UslmVersion,
+    detect_uslm_version,
+    iter_sections,
+    iter_structure,
+    parse_meta,
+)
 
 from .conftest import REPO_ROOT, USLM1_USC16, USLM2_USC16, USLM2_USC49, require
 
@@ -26,6 +32,8 @@ T16_QUOTED_SECTIONS = 298  # <section> inside <quotedContent> — not code secti
 T16_SECTIONS = 5095  # what the parser emits
 T16_STATUS = {"repealed": 522, "omitted": 102, "transferred": 19}
 T16_RESERVED_SUBCHAPTERS = 1  # the file's one status="reserved", not on a section
+
+T16_STRUCTURE = {"title": 1, "chapter": 153, "subchapter": 345, "part": 57, "subpart": 13}
 
 S45F_C5 = "/us/usc/t16/s45f/c/5"
 S45F_C5_GUID = "id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd"
@@ -87,6 +95,53 @@ def test_every_guid_in_the_file_is_indexed_exactly_once(usc16_sections):
 
     assert len(guids) == len(set(guids))
     assert len(guids) > 60_000
+
+
+def test_title_16_structure_counts():
+    """Every structural element in the file carries an `@identifier` and none sit
+    inside `<toc>`, `<notes>` or `<quotedContent>` — verified against the raw tree
+    below, so the TOC pass's totals are the document's totals, not a subset."""
+    nodes = list(iter_structure(require(USLM1_USC16)))
+    tree = etree.parse(str(require(USLM1_USC16)))
+    raw = [
+        element
+        for level in T16_STRUCTURE
+        for element in tree.findall(f".//{{{USLM1}}}{level}")
+    ]
+
+    assert dict(Counter(n.level for n in nodes)) == T16_STRUCTURE
+    assert len(nodes) == len(raw) == sum(T16_STRUCTURE.values())
+    assert all(element.get("identifier") for element in raw)
+
+
+def test_title_16_structure_is_one_tree_in_pre_order():
+    nodes = list(iter_structure(require(USLM1_USC16)))
+    seen: set[str] = set()
+
+    for node in nodes:
+        assert node.parent_identifier is None or node.parent_identifier in seen
+        seen.add(node.identifier)
+
+    assert [n.identifier for n in nodes if n.parent_identifier is None] == ["/us/usc/t16"]
+    assert len(seen) == len(nodes)
+
+
+def test_uslm2_structure_uses_the_same_element_vocabulary():
+    """ADR-0006's premise: structural markup barely moved between 1.x and 2.x, so
+    one TOC pass serves both. Title 49 also exercises `subtitle`, which Title 16
+    has no instance of."""
+    nodes = list(iter_structure(require(USLM2_USC49)))
+
+    assert dict(Counter(n.level for n in nodes)) == {
+        "title": 1,
+        "subtitle": 10,
+        "chapter": 114,
+        "subchapter": 58,
+        "part": 16,
+        "subpart": 4,
+    }
+    assert nodes[0].identifier == "/us/usc/t49"
+    assert nodes[0].heading == "TRANSPORTATION"
 
 
 def test_meta_of_the_current_release_point():

@@ -25,6 +25,7 @@ def write_manifest(
     stats: LoadStats,
     *,
     source_url: str | None = None,
+    source_zip: Path | None = None,
     manifest_dir: Path = MANIFEST_DIR,
 ) -> Path:
     manifest_dir.mkdir(parents=True, exist_ok=True)
@@ -40,7 +41,7 @@ def write_manifest(
 
     titles = manifest.setdefault("titles", {})
     assert isinstance(titles, dict)
-    titles[stats.title_num] = {
+    entry: dict[str, object] = {
         "source_path": str(xml_path),
         "sha256": _sha256_file(xml_path),
         "ingested_at": datetime.now(timezone.utc).isoformat(),
@@ -49,8 +50,15 @@ def write_manifest(
         "sections_ingested": stats.sections_ingested,
         "new_section_versions": stats.new_section_versions,
         "deduped_section_versions": stats.deduped_section_versions,
+        "structure_nodes": stats.structure_nodes,
         "status_counts": stats.status_counts,
     }
+    if source_zip is not None:
+        # The zip is what uscode.house.gov actually publishes, so its hash is the one
+        # a sceptic can reproduce with curl + sha256sum.
+        entry["source_zip"] = str(source_zip)
+        entry["source_zip_sha256"] = _sha256_file(source_zip)
+    titles[stats.title_num] = entry
 
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return manifest_path

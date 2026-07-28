@@ -92,6 +92,45 @@ class SectionRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class StructureRecord:
+    """One structural container above the section — chapter, subchapter, part, …
+
+    Emitted by the TOC pass in document pre-order (parents before their children),
+    which is the order a tree can be inserted in. Read off the *structural elements*
+    rather than the `<toc>` element: structural markup is near-identical across USLM
+    1.x and 2.x, while `<toc>` is one of the three things OLRC changed in 2.x
+    (ADR-0006).
+    """
+
+    identifier: str
+    """`/us/usc/t16/ch1/schVI`. Cross-release identity, same as a section's."""
+
+    level: str
+    """The element's local name: `title`, `chapter`, `subchapter`, `part`, `subpart`, …
+    Deliberately free text, not an enum — the level vocabulary differs per title
+    (Title 49 has `subtitle`, Title 16 does not) and per schema generation."""
+
+    num: str | None
+    num_value: str | None
+    heading: str | None
+    status: str | None
+    """`reserved` and friends. Title 16's only `reserved` is on a subchapter, which
+    is exactly why status can't be modelled as a section-only field (gotcha 13)."""
+
+    guid: str | None
+    """`@id` — pins (node, release point), like any other guid (ADR-0003)."""
+
+    parent_identifier: str | None
+    """None for the title root."""
+
+    seq: int
+    """Document order among siblings sharing a parent."""
+
+    depth: int
+    """0 for the title root; 1 for its children; … Cheap breadcrumb/indent hint."""
+
+
+@dataclass(frozen=True, slots=True)
 class DocumentMeta:
     """`<meta>` plus root attributes of one USLM title document."""
 
