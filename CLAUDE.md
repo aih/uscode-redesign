@@ -4,7 +4,7 @@ Versioned US Code retrieval site: any provision, at any release point (RP), via 
 mirroring the USLM `@identifier`. FastAPI + Postgres v1, XCiteDB later behind a repository
 interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
 
-**Status:** scaffold complete (BUILDLOG 002) — packages, schema models + initial migration, compose, tests, Makefile. Next: parser layer (PLAN Day 1 item 2). Open debts before ingest work: `alembic downgrade base` round-trip untested; `docker compose up --build` untested e2e. **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml`; the full file is `@pytest.mark.slow`.
+**Status:** parser layer complete (BUILDLOG 003) — `detect_uslm_version` + `Uslm1Parser` (streaming) + `Uslm2Parser` (sections only). Next: ingest into Postgres (PLAN Day 1 item 3). Open debts: `alembic downgrade base` round-trip untested; `docker compose up --build` untested e2e; `Uslm2Parser` has no TOC/table/indent handling (Day 7). **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`.
 
 ## Architecture rules (PLAN §2)
 
@@ -13,11 +13,14 @@ interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
    becomes a second implementation with no API/UI changes. **No raw SQL in API handlers**, and
    nothing version-resolution-related outside the Repository.
 2. **The ingest layer is schema-plural.** A `UslmParser` protocol with `Uslm1Parser` and
-   `Uslm2Parser`, selected by `detect_uslm_version(file)`. Both emit the same normalized
-   `SectionRecord` (identifier, guid, temporalId, num, heading, status, seq, raw XML fragment,
-   source credit, notes). **Never hard-code USLM 1.x element paths outside `Uslm1Parser`** — all
-   schema knowledge lives inside a parser implementation. Downstream layers are schema-agnostic;
-   `schema_version` rides along as metadata so original XML is always returnable verbatim.
+   `Uslm2Parser`, selected by `detect_uslm_version(file)` — **the root namespace URI decides**
+   (`xml.house.gov/schemas/uslm/1.0` → 1.x, `schemas.gpo.gov/xml/uslm` → 2.x); `xsi:schemaLocation`
+   only labels the point version (ADR-0004). Both emit the same normalized `SectionRecord`
+   (identifier, guid, temporalId, num, heading, status, seq, raw XML fragment, source credit,
+   notes, guid_refs, ancestors). **Never hard-code USLM element paths outside a parser
+   implementation** — `StreamingSectionParser` shares the traversal but knows no element names of
+   its own; each parser supplies an `ElementNames` vocabulary. Downstream layers are
+   schema-agnostic; `schema_version` rides along so original XML is always returnable verbatim.
 3. **Sections are the storage atom** (ADR-0001). Sub-section provisions (`/c/5`) are extracted from
    the section XML at request time via lxml XPath on `@identifier`, returning the whole section with
    the target anchored/highlighted — the reader always keeps context.
@@ -55,6 +58,14 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 10. **Every RP republishes all titles** but few changed — dedupe by content hash or storage explodes
     (~300 RPs × ~1 GB). `titlesAffected` from the RP inventory drives ingest; hashing verifies.
 11. **XCiteDB is the near future,** not "someday" — respect rule 1 strictly.
+12. **`<section>` inside `<quotedContent>` is not a section** — it is statutory text quoted by an
+    amending act, carries no `@identifier`/`@id`, and must never be stored or counted (ADR-0005).
+    Counting `<section>` elements naively inflates Title 16 by 298. Related: skipping such an
+    element must not *remove* it — it is part of the enclosing section's verbatim XML.
+13. **`@status` is not section-only and not a closed set.** Title 16's one `reserved` is on a
+    `<subchapter>`; USLM 2.x Title 49 uses `renumbered`. Never model status as an enum.
+14. **USLM 1.0.15 emits no `@temporalId` at all** — zero in a 32 MB title. Display-only field;
+    do not build anything that assumes it is present.
 
 ## Fixtures
 
@@ -63,15 +74,27 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
   table/layout markup), `usc01.xml` (253 K, fast iteration). Trimmed from OLRC's full 57-title,
   594 MB [sample zip](https://uscode.house.gov/currency/uscinuslmv2samples.zip) — re-download it if
   another title is needed.
+- `tests/fixtures/usc16_slice.xml` — 878 KB verbatim slice of usc16.xml (ch.1 subchapters I–VI
+  through §45f, plus schXIII for quoted sections and schXCVII for `reserved`). Every unit test runs
+  against this. Regenerate with `make fixtures` (`scripts/extract_fixture.py`).
 - Known-good assertion: `id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd` ↔ `/us/usc/t16/s45f/c/5`.
-- Title 16 @ 119-102not101: 5,393 sections; 523 repealed / 102 omitted / 19 transferred / 1 reserved.
+- Title 16 @ 119-102not101 — **two counts, don't conflate them (ADR-0005):**
+  - raw `<section>` elements: **5,393**; 523 repealed / 102 omitted / 19 transferred.
+  - real code sections the parser emits: **5,095**; 522 repealed / 102 omitted / 19 transferred.
+  - The 298-element gap is `<section>` inside `<quotedContent>` — statutory text quoted by amending
+    acts, with no `@identifier` and no `@id`. One of them is marked repealed, hence 523 vs 522.
+  - The file's **single `reserved` is on a `<subchapter>`** (`/us/usc/t16/ch1/schXCVII`), not a
+    section. Section status counts total 643, never 644.
 - **Never commit `data/`** — the ~324 RP zips are 40–80 GB and are gitignored.
 
 ## Commands
 
 ```
 make dev        # docker compose up -d db; alembic upgrade head; uvicorn --reload (local)
-make test       # uv run pytest — test suite is the specification; nothing merges without it green
+make test       # uv run pytest (-m 'not slow') — the specification; nothing merges without it green
+make test-slow  # full-sample parser integration tests (~4 s): counts vs samples/, memory bound
+make test-all   # both
+make fixtures   # regenerate tests/fixtures/usc16_slice.xml from samples/uslm1/usc16.xml
 make verify     # (TBD — stub, exits 1) full-corpus counts vs source XML → docs/verification/, PLAN §11.5, Day 7
 docker compose up --build   # full containerized stack (db + api) instead of `make dev`'s local API
 ```
