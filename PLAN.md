@@ -2,7 +2,7 @@
 
 Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering all release points, with retrieval of any provision at any version, reader navigation, and user watchlists.
 
-> **Progress:** Day 1 item 1 (scaffold) ✅ and item 2 (parser layer) ✅ complete — see BUILDLOG 002–003. Detection rule locked in [ADR-0004](docs/adr/0004-uslm-version-detection-by-namespace.md); section-boundary rule and corrected Title 16 counts in [ADR-0005](docs/adr/0005-what-counts-as-a-section.md). Carried debts: `alembic downgrade base` round-trip untested; `docker compose up --build` (containerized api) untested end-to-end; `Uslm2Parser` still has no TOC/table/indent handling (Day 7). **Unblocked for parallel work:** the reader UI against fixture JSON (Session 5) and the downloader port (Session 6) have no dependencies on the ingest session — run them in parallel worktrees if throughput matters more than simplicity.
+> **Progress:** Day 1 items 1–3 (scaffold, parser layer, ingest into Postgres) ✅ complete — see BUILDLOG 002–005. Detection rule locked in [ADR-0004](docs/adr/0004-uslm-version-detection-by-namespace.md); section-boundary rule and corrected Title 16 counts in [ADR-0005](docs/adr/0005-what-counts-as-a-section.md). `alembic downgrade base` round-trip and `docker compose up --build` both verified end-to-end (BUILDLOG 005); §3's secondary indexes migrated; `python -m ingest load` ingests a title with content-hash dedupe, `guid_map`, `seq_in_title`, and a provenance manifest — Title 16 @ 119-102not101 loaded and verified (5,095 sections; 522/102/19 repealed/omitted/transferred). Carried debts: `release_points.seq`/`currency_date` are per-ingest stopgaps until the Day 2 RP-inventory downloader supplies real cross-RP ordering; `Uslm2Parser` still has no TOC/table/indent handling (Day 7). **Unblocked for parallel work:** the reader UI against fixture JSON (Session 5) and the downloader port (Session 6) have no dependencies on the ingest session — run them in parallel worktrees if throughput matters more than simplicity.
 
 ---
 
@@ -86,7 +86,7 @@ section_release_map(section_version_id, release_id)  -- resolve (section, RP) �
 guid_map(guid text primary key,              -- globally unique by design:
          release_id, identifier text)        -- guid ≡ (provision, release point)
 
--- Indexes beyond PKs/uniques (add in the ingest-session migration; guid_map
+-- Indexes beyond PKs/uniques (migrated in aef3da4cc2e9, BUILDLOG 005; guid_map
 -- alone will hold tens of millions of rows at full corpus):
 --   guid_map(release_id, identifier)         -- reverse lookup: provision @ RP → guid
 --   section_release_map(release_id)          -- "everything at this RP" scans

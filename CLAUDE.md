@@ -4,7 +4,7 @@ Versioned US Code retrieval site: any provision, at any release point (RP), via 
 mirroring the USLM `@identifier`. FastAPI + Postgres v1, XCiteDB later behind a repository
 interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
 
-**Status:** parser layer complete (BUILDLOG 003) — `detect_uslm_version` + `Uslm1Parser` (streaming) + `Uslm2Parser` (sections only). Next: ingest into Postgres (PLAN Day 1 item 3). Open debts: `alembic downgrade base` round-trip untested; `docker compose up --build` untested e2e; `Uslm2Parser` has no TOC/table/indent handling (Day 7). **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`.
+**Status:** Day 1 item 3 complete (BUILDLOG 005) — `alembic downgrade base`/`docker compose up --build` verified end-to-end; secondary indexes migrated (PLAN §3); `python -m ingest load` ingests a USLM file into Postgres with content-hash dedupe, `guid_map`, `seq_in_title`, and a `data/manifests/{release}.json` provenance manifest. Title 16 @ 119-102not101 loaded and verified: 5,095 sections (522/102/19 repealed/omitted/transferred), 5,393 raw `<section>` elements per ADR-0005. Next: resolver + API routes (PLAN Day 1 item 4). Open debts: `release_points.seq`/`currency_date` are assigned per-ingest (sequential counter / required `--currency-date` flag) until the Day 2 RP-inventory downloader supplies real cross-RP ordering; `Uslm2Parser` has no TOC/table/indent handling (Day 7). **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`.
 
 ## Architecture rules (PLAN §2)
 
@@ -97,6 +97,13 @@ make test-all   # both
 make fixtures   # regenerate tests/fixtures/usc16_slice.xml from samples/uslm1/usc16.xml
 make verify     # (TBD — stub, exits 1) full-corpus counts vs source XML → docs/verification/, PLAN §11.5, Day 7
 docker compose up --build   # full containerized stack (db + api) instead of `make dev`'s local API
+
+# python -m ingest load <xmlfile> --release <label> [--currency-date YYYY-MM-DD] [--source-url URL]
+#   Parses one USLM title file and loads it into Postgres: content-hash dedupe against existing
+#   section_versions, guid_map upsert, seq_in_title from document order, data/manifests/{release}.json
+#   provenance manifest. --currency-date is required the first time a --release label is ingested
+#   (source USLM files carry no currency date of their own); omit on later runs/titles for that release.
+#   Example: uv run python -m ingest load samples/uslm1/usc16.xml --release 119-102not101 --currency-date 2026-07-12
 ```
 
 Stack: Python 3.12 + uv, FastAPI, SQLAlchemy, Alembic, lxml, Postgres 16 via docker-compose
