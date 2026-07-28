@@ -225,3 +225,12 @@ Session-by-session record of how this site was built. One entry per working sess
   - `uv run python -m ingest verify-downloads --deep` — 5 entries, 5 ok, 5 distinct hashes, no duplicates, sound. (Also confirms gotcha 1 at the zip level: Title 16 at 5 different RPs is 5 distinct files.)
   - Resumability, ledger adoption, the 404/HTML-error-page/backoff paths, and both duplicate classes are each covered by a named test in `tests/test_backfill.py`.
   - **Not done:** the backfill has not been run to completion — that is an unattended multi-hour run, and loading what it fetches is Day 2-3.
+
+## 011 — 2026-07-28 — Status sync; Session 8 (bulk load) specified
+
+- **Tool/model:** Claude (Cowork), Fable 5.
+- **Asked:** Check status, update PLAN.md and GETTING-STARTED.md, advise what to do next.
+- **Status confirmed:** Sessions 1–6 done (BUILDLOG 010 verified against git `aa2eef2..2d0b336`, ledger on disk with 5 ok entries, 193 tests claimed by 010). Open: the backfill *run* (3,197 downloads, unattended), Session 7 A+B, loading the fetched corpus, `make verify`.
+- **Decided:** The backfill run is operator work, not a Claude session — operator instructions (disk check, `caffeinate -i nohup … &`, resume semantics, `verify-downloads --deep` afterward) now live in GETTING-STARTED where Session 6's prompt was. **Session 8 — bulk load** specified: `ingest load-all` walking the ledger in inventory `seq` order (baseline first), idempotent and resumable, then `make verify` implemented for real (per-title-per-RP counts → `docs/verification/`, committed); headline metric is the dedupe ratio. Sessions 1.5/6 marked ✅ in GETTING-STARTED; PLAN progress note rewritten; §10 tracks now: backfill run ∥ Session 7 ∥ Session 8.
+- **Produced:** PLAN.md, GETTING-STARTED.md edits; this entry. No code.
+- **Verified:** Doc-level review only; repo state cross-checked via git log, ledger.json, and BUILDLOG 010's own verification section.

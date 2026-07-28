@@ -112,7 +112,7 @@ Work one session per module. **Always:** start in plan mode (Shift+Tab), read th
 **Session 5 — Reader UI: ✅ done, BUILDLOG 007 (Opus 5).** Built as server-rendered Jinja in `web/`, at the *same* `/us/usc/…` URLs as the API rather than under a `/read/` prefix (ADR-0009) — and that choice immediately exposed a live bug: `Accept:` was substring-matched, so browsers had been getting raw USLM at the demo URL while `?format=html` covered for it in every test.
 > Build the minimal reader per PLAN.md Day 1 item 5: TOC page, section page with provision anchor highlighting, prev/next, release picker, status badges. Server-rendered Jinja is fine. Make /us/usc/t16/s45f/c/5?date=07/12/2026 demonstrable end to end.
 
-**Session 1.5 — Study prior art (Opus, read-only, ~30 min): ⚠️ never run — do it before Session 3.5.** It was scheduled before Session 2 and skipped; the parser session didn't need it, but Session 3.5's inventory port and Session 6's downloader both do (neither repo is cloned and `docs/prior-art.md` doesn't exist). Clone your existing repos next to this one so Claude Code can read them:
+**Session 1.5 — Study prior art: ✅ done (BUILDLOG 010, `docs/prior-art.md`).** Kept for the record — it was originally scheduled before Session 2 and ran just before Session 6, which is when it was actually needed. Clone commands, for reference:
 
 ```bash
 cd ~/Documents/workspace/aih
@@ -125,8 +125,20 @@ Then in `claude`:
 
 This makes the prior art available to every later session via a small summary instead of re-reading two repos each time.
 
-**Session 6 — Bulk downloader (Sonnet), start of Day 2:** *(the inventory-seeding half moves earlier, into Session 3.5 — Session 4's resolver needs real dates and ordering. What remains here is the bulk, resumable download of all titles and all 382 RPs — `ingest/inventory.py` and `ingest/download.py` are the starting points, and `python -m ingest fetch` already does one title politely.)*
-> Using ../loadusc-xcitedb/downloadusc.py and docs/prior-art.md as reference, port the release-point downloader into ingest/ as a modern, resumable tool (Python 3.12, checksum cache, ~1 req/sec, descriptive User-Agent), building on the inventory fetch/seed already written in Session 3.5. Drive ingest from titlesAffected per RP, with hash-dedupe as the verification step. Record in an ADR what was reused vs. changed.
+**Session 6 — Bulk downloader: ✅ done (ADR-0012, BUILDLOG 010).** The tool exists and is trialled; **the run itself is yours to start** — it's unattended and needs no Claude session:
+
+```bash
+cd ~/Documents/workspace/aih/uscode-redesign
+df -h .                                    # need ~40–80 GB free (or symlink data/ to an external disk first)
+uv run python -m ingest backfill --plan-only | head    # sanity: ~3,197 downloads planned
+caffeinate -i nohup uv run python -m ingest backfill > backfill.log 2>&1 &
+tail -f backfill.log                       # watch; Ctrl-C the tail freely — the run keeps going
+```
+
+At ~1 req/sec it takes several hours (3,197 files). It's resumable: if the laptop sleeps or the run dies, re-run the same command and it continues from the ledger with zero re-downloads. When it finishes: `uv run python -m ingest verify-downloads --deep`, and skim the ledger for `failed` entries (`--retry-unavailable` exists for the stubborn ones).
+
+**Session 8 — Bulk load (Sonnet; after the backfill finishes, or on a partial corpus — it's resumable too):**
+> Implement `python -m ingest load-all`: walk data/releases/ledger.json in inventory seq order (oldest first — the baseline RP loads first by construction), unzip each ok entry, and run the existing load path per title with its release label; idempotent (re-running loads nothing new), resumable, batched commits, one provenance manifest per release point. Then run it to completion. Afterward, implement make verify for real per PLAN §11.5: per-title-per-RP section counts vs the source XML, written to docs/verification/ and committed. Report: rows in section_versions vs sections×RPs (the dedupe ratio is the headline number), disk size of the database, any count mismatches — a mismatch is a finding, not a rounding error. Update BUILDLOG.md and commit.
 
 **Session 7 — Frontend: separation + Astro/USWDS reader (start with an Opus plan, implement in Sonnet; worktree, independent of Session 6 — run them in parallel):** *(spec from the Session-5 UI review [BUILDLOG 008], ADR-0010 [reader/API separation], and ADR-0011 [Astro + USWDS, proposed]. This lands before Day 4's polish because everything Day 4 adds sits on this layout. This session is larger than the others — expect it to take two sittings; part A is a complete, shippable checkpoint.)*
 >
@@ -177,7 +189,7 @@ Once you're pushing to GitHub: in a Claude Code session run `/install-github-app
 
 ## 10. Parallel work (Days 2+, optional)
 
-With scaffold, parser, ingest, hierarchy, storage, the API and the reader merged (Sessions 1 ✅ 2 ✅ 3 ✅ 3.5 ✅ 4 ✅ 5 ✅), Day 1 is done and the independent tracks are: **Session 6 (bulk downloader — only Title 16 is loaded, at 2 of 382 release points)**, **Session 7 (reader interface overhaul — mobile-first, navbar, title fix, top+bottom nav, ref hover text; also fixes the broken /us/pl/ links)**, and **Session 1.5 (prior-art read, still never run; Session 6's downloader and Day 4's diff UI both want it)**. Day 4's deeper polish (keyboard nav, notes toggles, version timeline, diffs) follows Session 7, since it builds on that layout. Sessions 6 and 7 touch disjoint code (`ingest/` vs `web/`) — run them in git worktrees so agents don't collide:
+With Sessions 1–6 merged (1 ✅ 1.5 ✅ 2 ✅ 3 ✅ 3.5 ✅ 4 ✅ 5 ✅ 6 ✅), the three live tracks are fully independent and can all run at once: **the backfill run** (no Claude session — see Session 6 above; it's just bandwidth), **Session 7** (frontend: separation + Astro/USWDS reader), and — once zips are on disk — **Session 8** (bulk load; works on a partial corpus). Day 4's deeper polish (keyboard nav, notes toggles, version timeline, diffs) follows Session 7, since it builds on that layout. If running Sessions 7 and 8 together, use worktrees (`frontend/`+`web/`+`api/` vs `ingest/` — disjoint):
 
 ```bash
 git worktree add ../uscode-web feature/reader-polish
