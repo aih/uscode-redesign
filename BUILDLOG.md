@@ -308,3 +308,25 @@ Session-by-session record of how this site was built. One entry per working sess
 - **Merge gate, per the repo's own rule:** not merged here — this reviewer cannot execute the suites. Merge steps: in `../uscode-web`, `git merge main` (pick up the 2 ingest fixes), run `make test` + `make test-web` + build, resolve the doc conflicts, then fast-forward main and `git worktree remove`.
 - **Produced:** manifest commit `e844055`; PLAN.md progress note (Day 2–3 state, both checkouts); this entry.
 - **Verified:** Branch review is textual (diff shape, BUILDLOG 014, ADR-0015) — test counts and screenshots are the branch's claims, to be re-run at merge. Ledger numbers re-checkable: `python3 -c "import json,collections;d=json.load(open('data/releases/ledger.json'));print(d['count'],collections.Counter(e['status'] for e in d['entries']))"`.
+
+## 016 — 2026-07-28 — Merge session: `feature/reader-overhaul` → main; the worktree retired
+
+- **Tool/model:** Claude Code, Opus 5. Run from the worktree `../uscode-web`, landing in the main checkout.
+- **Asked:** Land the reader overhaul on main — merge, resolve the expected doc conflicts, re-run both suites and the build as the merge gate BUILDLOG 015 deferred, fast-forward, remove the worktree, and close the docs out.
+- **Guard honoured:** a backfill (PID 58744) and a bulk load (69185) were running from the main checkout. Neither was killed, no docker service was restarted, no migration was run. The load-all finished **on its own at 16:25**, four minutes before the fast-forward touched the working tree — it completed its planned batch rather than being disturbed by it (`planned 791: 715 loaded, 76 skipped, 0 failed`). The backfill is still running.
+- **What conflicted — two files, both append-shaped, exactly as predicted:**
+  - **BUILDLOG.md** — main had appended 015, the branch 014, both after 013. **No renumbering was needed:** 013 (07-28), 014 (07-28), 015 (07-29) were already in chronological order, so both sides' entries were kept at their own numbers and no cross-reference had to move.
+  - **PLAN.md** — the Day 2–3 progress note, rewritten by each side. Both sides' facts kept in one note: main's corpus numbers and ADR-0012/0013/0014, the branch's Session 7 completion. The caveats the merge falsified were dropped — main's "pending re-run of both suites and merge into main" and the branch's "Now: … Session 7", since the separation is now **implemented**.
+- **No code file conflicted.** The two tracks were as disjoint as believed: the only code main carried in was the truncated-response retry (`ingest/download.py`, +5 tests), which the branch had never touched. This is the fact that made the merge cheap, and it is worth recording that the prediction held.
+- **Stale claims the auto-merge left behind, fixed by hand** (a clean merge is not a correct document):
+  - `README.md` did not conflict at all — main never touched it — so the branch's demo commands survived intact, but its Status section still knew nothing of the corpus. Added main's numbers: ~1,834/3,197 fetched (~57%), 5.3 GB of a measured ~9 GB, ADR-0012/0013/0014.
+  - `CLAUDE.md` still said "Node 20+ required **once** the Astro frontend lands in Session 7" — it had landed.
+  - `PLAN.md`'s Day-1 banner and Day-1 plan table still described `web/` and the shared-`Accept:` URL in the present tense. Marked superseded rather than rewritten: they are dated snapshots, and falsifying the record to keep it tidy would be the worse error.
+- **Verified — the merge gate BUILDLOG 015 could not run, run here:**
+  - `make test` — **214 passed, 13 deselected (slow), 0 skipped.** The 214 is 209 (branch) + 5 backfill tests from main. **Nothing was skipped:** the API integration tests need a loaded database and skip silently without one, so a skip here would have been a hole in the gate — the database was up and they ran.
+  - `make test-web` — **27 passed** (2 files, 309 ms).
+  - `npm run build` — **succeeds**, server built in 4.49 s. The USWDS `img/usa-icons/*.svg` warnings are pre-existing runtime-resolved assets, not build errors.
+  - `docker compose config` — parses.
+- **Produced:** merge commit `daaa5fb`, fast-forwarded to main and pushed (`0c9d83f..daaa5fb`); worktree `../uscode-web` removed and `feature/reader-overhaul` deleted; CLAUDE.md status line and this entry.
+- **Corpus state at close (from `loadall.log`, not asserted):** **1,163,760 sections stored — 151,772 new versions, 1,011,988 deduped (87.0%)** over 715 title-releases, in 100.3 min. That is the first real reading of the dedupe ratio at scale, and it is the number ADR-0007 predicted the shape of; the authoritative one still wants `make verify-deep` over the finished corpus, which recounts from source XML instead of trusting the loader's own bookkeeping.
+- **Next:** finish the backfill, re-run `make load-all` for the zips that landed after this pass, then `make verify-deep`; then Day 4 reader polish (keyboard nav, notes toggles, version timeline, diffs).
