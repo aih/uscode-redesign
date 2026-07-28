@@ -23,3 +23,8 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+# The default run never parses the 32 MB samples (CLAUDE.md test speed rule).
+addopts = "-m 'not slow'"
+markers = [
+    "slow: parses the full-size USLM samples; run with `make test-slow`",
+]
