@@ -31,21 +31,25 @@ This site is being built with AI agents (Claude Code), deliberately in the open.
 
 - **Process**: `BUILDLOG.md` records each session (model, prompts, decisions, commits); `docs/adr/` records each design decision and its rationale; the git history preserves `Co-Authored-By` trailers showing which commits were AI-assisted.
 - **Data integrity**: every release point ingested has a manifest with the uscode.house.gov source URL and zip sha256 — re-download and compare; per-title section counts are verified against the source XML by `make verify`, and the reports are committed to `docs/verification/`.
-- **Behavior**: the test suite is the specification. `make test` runs it; nothing is merged without it passing.
+- **Behavior**: the test suite is the specification. `make test` (Python) and `make test-web` (the reader) run it; nothing is merged without both passing. `make shots` re-takes the screenshots in `docs/screenshots/` at 375px and 1280px, and fails if a page scrolls sideways at either width.
 
 The data source is the official [OLRC XML downloads](https://uscode.house.gov/download/download.shtml) (USLM). Release-point download tooling builds on [dreamproit/loadusc-xcitedb](https://github.com/dreamproit/loadusc-xcitedb).
 
 ## Status
 
-**Day 1 is done: the reader and the API are both live locally** (BUILDLOG 006–007). Title 16 is
-loaded at two release points — 119-99 (06/12/2026) and 119-102not101 (07/12/2026) — out of the
-382 the release-point inventory knows about, with the full hierarchy, a working resolver, and
-162 tests.
+**The reader and the API are live locally, and now separate** (BUILDLOG 006–007, 014). The reader
+is an Astro 5 + TypeScript app styled with [USWDS](https://designsystem.digital.gov/) at
+`/app`, server-rendered with no JavaScript bundle; the API is machine-only at `/api/v1`; and a
+citation URL redirects to whichever one the caller can read. Title 16 is loaded at two release
+points — 119-99 (06/12/2026) and 119-102not101 (07/12/2026) — out of the 382 the release-point
+inventory knows about, with the full hierarchy and a working resolver. 209 Python tests and 27
+frontend tests.
 
 ```bash
 docker compose up -d db
 make dev-data          # seed the release-point inventory; load Title 16 at both release points
-make dev               # the reader at http://localhost:8000/app/ , the API docs at /docs
+make dev-all           # the whole site on :8000 — Caddy in front of the reader and the API
+                       # (`make dev` runs the API alone; `make dev-web` the reader alone)
 
 open "http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026"      # §45f, (c)(5) highlighted
 curl -L "http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026"   # the same URL, as JSON

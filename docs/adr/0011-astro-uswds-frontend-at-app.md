@@ -1,6 +1,6 @@
 # ADR-0011: Astro + TypeScript + USWDS frontend at /app
 
-**Date:** 2026-07-28 · **Status:** Proposed (research done; Ari approves by green-lighting Session 7) · **Builds on:** ADR-0010
+**Date:** 2026-07-28 · **Status:** Accepted (implemented in Session 7, BUILDLOG 014) · **Builds on:** ADR-0010 · **Refined by:** ADR-0015
 
 ## Decision
 
@@ -36,6 +36,7 @@ swap safe, and the architecture tests must keep proving it.
   service; `make dev` starts both.
 - `web/uslm_html.py`'s USLM→HTML mapping is ported to a typed renderer in the Astro app
   (or exposed via the API as a rendered-HTML field — Session 7 decides and records which).
+  **Decided: the typed renderer, in `frontend/src/lib/uslm.ts` — see ADR-0015.**
 - Model assignment: frontend work stays Sonnet 5; the Astro scaffold + proxy wiring gets an
   Opus plan first (new service topology).
 - PLAN §8: Node 20+ becomes a firm requirement, not a maybe.

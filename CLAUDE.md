@@ -4,7 +4,7 @@ Versioned US Code retrieval site: any provision, at any release point (RP), via 
 mirroring the USLM `@identifier`. FastAPI + Postgres v1, XCiteDB later behind a repository
 interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
 
-**Status:** Day 1 complete — items 3, 3a, 4 (BUILDLOG 006) and 5 (BUILDLOG 007). The release-point inventory is seeded (382 RPs with real `currency_date` and a true global `seq`); Title 16 is loaded at **two** release points, 119-99 and 119-102not101, with working dedupe (2 new / 5,093 deduped — see ADR-0007); `structure_nodes` holds the hierarchy (569 nodes) from a streaming TOC pass (ADR-0006); `storage/` has the `Repository` protocol + Postgres implementation; `api/` serves PLAN §4's routes — identifier lookup with `?release`/`?date`/`?format`, `?id=` guid lookup, TOC, neighbors, versions, releases; and `web/` is the reader — server-rendered Jinja at **the same identifier URLs**, chosen by `Accept:`/`?format=` (ADR-0009), with provision highlighting, breadcrumbs, prev/next, a release picker and status badges; and `ingest/backfill.py` is the resumable bulk downloader (ADR-0012) — `python -m ingest backfill`, driven by `titlesAffected` (3,197 files, not 22,156), with a ledger at `data/releases/ledger.json` and hash-dedupe verification; and the corpus mirrors to S3 (ADR-0013) — `python -m ingest mirror push/pull`, a disposable EC2 box runs the backfill unattended and powers itself off (`docs/remote-ops.md`), sized by measurement at **~9 GB / 40–50 h**, not the old 40–80 GB guess. `make test` = 212 tests. **Next: launch the EC2 backfill run (remote-ops §1–3), then load what it fetches (Session 8) ∥ Session 7 (reader interface overhaul — GETTING-STARTED §7; mobile-first CSS, site navbar, one-line section title, top+bottom nav, ref hover text, and the live bug that source credits emit relative `/us/pl/`+`/us/stat/` links that 404 locally). The two touch disjoint code; run in parallel worktrees.** Open debts: **the backfill run is in progress (local trial; hand off to EC2 per remote-ops §2–3) — only Title 16 at 2 RPs is *loaded***; a deduped fragment carries the guids of the release its text first appeared at (ADR-0007's recorded cost); `structure_nodes` is unversioned — one row per node, holding **the newest loaded release's view**; `first_release_id`/`last_release_id` bound its life, and both those and the descriptive fields are gated on `seq`, so load order doesn't decide the answer (an older load silently relabelled a `reserved` subchapter `repealed` before that gate existed). Per-release structural history is still owed; reader has no keyboard nav, notes toggles, or version timeline UI (Day 4), a flat `<h2>` heading outline (Day 7 accessibility), and section breadcrumbs cost an extra `get_toc` (Day 6); `Uslm2Parser` has no table/indent handling (Day 7); `make verify` is real now (ADR-0014) but the corpus load is mid-flight. **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`. API integration tests need a loaded database (`make dev-data`) and skip without one.
+**Status:** Day 1 complete — items 3, 3a, 4 (BUILDLOG 006) and 5 (BUILDLOG 007). The release-point inventory is seeded (382 RPs with real `currency_date` and a true global `seq`); Title 16 is loaded at **two** release points, 119-99 and 119-102not101, with working dedupe (2 new / 5,093 deduped — see ADR-0007); `structure_nodes` holds the hierarchy (569 nodes) from a streaming TOC pass (ADR-0006); `storage/` has the `Repository` protocol + Postgres implementation; `api/` serves PLAN §4's routes — identifier lookup with `?release`/`?date`/`?format`, `?id=` guid lookup, TOC, neighbors, versions, releases; and `frontend/` is the reader — **Astro 5 + TypeScript + USWDS** at `/app/us/usc/…` (ADR-0011, ADR-0015), server-rendered with no JS bundle, with provision highlighting, breadcrumbs, prev/next top and bottom, a release picker, status badges, and citation hover text from one batched `/api/v1/labels` call; the Jinja reader retired in BUILDLOG 014; and `ingest/backfill.py` is the resumable bulk downloader (ADR-0012) — `python -m ingest backfill`, driven by `titlesAffected` (3,197 files, not 22,156), with a ledger at `data/releases/ledger.json` and hash-dedupe verification; and the corpus mirrors to S3 (ADR-0013) — `python -m ingest mirror push/pull`, a disposable EC2 box runs the backfill unattended and powers itself off (`docs/remote-ops.md`), sized by measurement at **~9 GB / 40–50 h**, not the old 40–80 GB guess. `make test` = 209 Python tests; `make test-web` = 27 frontend tests (**both are required** — reader coverage lives in Vitest since Jinja retired). **Next: finish the backfill + bulk load (Session 8 in flight), then Day 4 reader polish on the Astro layout — keyboard nav, notes toggles, version timeline, diffs.** Open debts: **the backfill run is in progress (local trial; hand off to EC2 per remote-ops §2–3) — only Title 16 at 2 RPs is *loaded***; a deduped fragment carries the guids of the release its text first appeared at (ADR-0007's recorded cost); `structure_nodes` is unversioned — one row per node, holding **the newest loaded release's view**; `first_release_id`/`last_release_id` bound its life, and both those and the descriptive fields are gated on `seq`, so load order doesn't decide the answer (an older load silently relabelled a `reserved` subchapter `repealed` before that gate existed). Per-release structural history is still owed; reader has no keyboard nav, notes toggles, or version timeline UI (Day 4), a flat `<h2>` heading outline (Day 7 accessibility), and section breadcrumbs cost an extra `get_toc` (Day 6); `Uslm2Parser` has no table/indent handling (Day 7); `make verify` is real now (ADR-0014) but the corpus load is mid-flight. **Test speed rule:** default `make test` never parses the 32 MB usc16.xml — unit tests use `tests/fixtures/usc16_slice.xml` (regenerate with `make fixtures`); full-sample tests are `@pytest.mark.slow`, run by `make test-slow`. API integration tests need a loaded database (`make dev-data`) and skip without one.
 
 ## Architecture rules (PLAN §2)
 
@@ -29,7 +29,9 @@ interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
    the section XML at request time via lxml XPath on `@identifier`, returning the whole section with
    the target anchored/highlighted — the reader always keeps context.
 4. **Layout:** `ingest/` (fetch RPs, parse USLM, split into sections) → `storage/` (Postgres +
-   repository interface) ← `api/` (FastAPI resolver, auth, watchlist) ← `web/` (reader, watchlist).
+   repository interface) ← `api/` (FastAPI resolver, auth, watchlist) ← `frontend/` (the Astro
+   reader, over HTTP only). Top-level `main.py` composes the app, `params.py` holds what the
+   surfaces share, `citation.py` is the redirector.
 5. **Reader and API separated; the citation URL redirects (ADR-0010, amends ADR-0009 — done,
    BUILDLOG 014).** Reader at `/app/us/usc/…` (always HTML, no negotiation), API at
    `/api/v1/us/usc/…` (JSON default, `?format=xml` verbatim; no Jinja imports under `api/`), and
@@ -38,13 +40,13 @@ interface. Full context in [PLAN.md](PLAN.md); decisions in `docs/adr/`.
    verbatim. The app is assembled in top-level **`main.py`** (`uvicorn main:app`), the only module
    that imports both surfaces; the HTTP helpers they share — `?release`/`?date`/`?format`, release
    resolution, `Accept:` parsing — live in top-level **`params.py`**, and the redirector in
-   **`citation.py`**. `tests/test_architecture.py` enforces both directions: nothing under `api/`
-   imports `jinja2` or `web`, nothing under `web/` imports `api`. Every reader href goes through
-   `web.reader.app_href`/`api_href` — `/app` is spelled out once. Frontend direction (ADR-0011, proposed):
-   Astro 5 + TypeScript + USWDS in `frontend/`, consuming `/api/v1` only; Jinja `web/` stays until
-   the Astro app passes the BUILDLOG 008 acceptance spec. Presentation — the sole place outside
-   the parsers allowed to know USLM element names — lives in `web/uslm_html.py` and its typed
-   successor in the Astro app.
+   **`citation.py`**. `tests/test_architecture.py` enforces it: **no Python module imports a
+   template engine**, which is the strongest form of the rule and true since the Jinja reader
+   retired. The reader is Astro 5 + TypeScript + USWDS in `frontend/` (ADR-0011, accepted),
+   consuming `/api/v1` over HTTP and nothing else; one Caddy (`deploy/Caddyfile`) owns :8000 and
+   routes `/app/*` to it, everything else to FastAPI on :8001 (ADR-0015). Every reader href goes
+   through `frontend/src/lib/url.ts` — `/app` is spelled out once. Presentation — the sole place
+   outside the parsers allowed to know USLM element names — is `frontend/src/lib/uslm.ts`.
 
 ## Identifier semantics (PLAN §1, ADR-0003) — the thing most likely to be gotten wrong
 
@@ -123,12 +125,15 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
 ## Commands
 
 ```
-make dev        # docker compose up -d db; alembic upgrade head; uvicorn --reload (local)
-                # then http://localhost:8000/ is the reader and /docs the API
+make dev        # the API alone: /api/v1, the citation redirector at /us/usc, /docs
+make dev-web    # the reader alone on :4321 (Astro), against API_BASE_URL
+make dev-all    # the whole site on :8000 — Caddy in front of both, as deployed
 make dev-data   # seed release_points from the RP inventory, then load Title 16 at 119-99
                 # (downloaded, ~5 MB) and 119-102not101 (from samples/) — what the API
                 # integration tests need; they skip without it
 make test       # uv run pytest (-m 'not slow') — the specification; nothing merges without it green
+make test-web   # vitest: the USLM renderer and the reference rules (reader coverage lives here now)
+make shots      # headless screenshots at 375px and 1280px → docs/screenshots/
 make test-slow  # full-sample parser integration tests (~4 s): counts vs samples/, memory bound
 make test-all   # both
 make fixtures   # regenerate tests/fixtures/usc16_slice.xml from samples/uslm1/usc16.xml
