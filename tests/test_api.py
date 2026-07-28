@@ -176,7 +176,7 @@ def test_a_browser_aimed_at_the_api_gets_a_machine_format_never_a_template(clien
 
 
 def test_etag_is_the_content_hash_and_is_stable(client):
-    first = client.get(SECTION)
+    first = client.get(API + SECTION)
     again = client.get(f"{API}{SECTION}?release={CURRENT}")
 
     assert first.headers["etag"] == again.headers["etag"]
@@ -256,6 +256,73 @@ def test_the_reserved_subchapter_is_retrievable_and_badged(client):
     reserved = [c for c in body["children"] if c["status"] == "reserved"]
 
     assert [c["identifier"] for c in reserved] == ["/us/usc/t16/ch1/schXCVII"]
+
+
+# --------------------------------------------------------------------- labels
+
+
+def test_labels_answers_many_identifiers_in_one_request(client):
+    """What the reader needs to put hover text on forty cross references without
+    asking forty times."""
+    body = client.get(
+        f"{API}/labels",
+        params={
+            "identifier": [SECTION, AMENDED, "/us/usc/t16/s1"],
+            "release": CURRENT,
+        },
+    ).json()
+
+    assert body[SECTION]["num"] == "§ 45f."
+    assert body[SECTION]["heading"] == "Mineral King Valley addition authorized"
+    assert set(body) == {SECTION, AMENDED, "/us/usc/t16/s1"}
+
+
+def test_labels_carry_status_so_a_citation_can_be_badged(client):
+    """Gotcha 9: an omitted or repealed section is still cited, and the citation
+    should say so before the reader follows it. Status is whatever the XML said —
+    never an enum (gotcha 13) — so the label repeats it rather than mapping it."""
+    body = client.get(
+        f"{API}/labels", params={"identifier": ["/us/usc/t16/s672"], "release": CURRENT}
+    ).json()
+    section = client.get(f"{API}/us/usc/t16/s672?release={CURRENT}").json()
+
+    assert body["/us/usc/t16/s672"]["status"] == "omitted"
+    assert body["/us/usc/t16/s672"]["status"] == section["status"]
+
+
+def test_an_unknown_identifier_is_absent_rather_than_an_error(client):
+    """A missing label costs the reader a tooltip, not a page.
+
+    Deliberately asserted with identifiers that can never resolve rather than with
+    an un-ingested title: which titles are loaded changes as the backfill lands,
+    and a test that reads "Title 54 is absent" is a test that fails the day Title
+    54 arrives.
+    """
+    body = client.get(
+        f"{API}/labels",
+        params={"identifier": [SECTION, "/us/usc/t16/s9999", "/us/usc/t99/s1"]},
+    ).json()
+
+    assert SECTION in body
+    assert "/us/usc/t16/s9999" not in body  # no such section in a title we hold
+    assert "/us/usc/t99/s1" not in body  # no such title, and never will be
+
+
+def test_labels_resolve_per_title_not_per_request(client):
+    """A release point ingested for Title 16 need not exist for another title, so
+    the answer is assembled title by title (gotcha 10)."""
+    body = client.get(
+        f"{API}/labels",
+        params={"identifier": [SECTION], "release": BETWEEN},  # never ingested
+    ).json()
+
+    assert body[SECTION]["heading"] == "Mineral King Valley addition authorized"
+
+
+def test_labels_with_no_identifiers_is_a_422(client):
+    """The parameter is required: an empty batch is a caller bug, not an empty
+    page of citations."""
+    assert client.get(f"{API}/labels").status_code == 422
 
 
 # ------------------------------------------------------------- neighbors, versions

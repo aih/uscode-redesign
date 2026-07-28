@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import datetime
 import re
+from collections.abc import Sequence
 
 from lxml import etree
-from sqlalchemy import Select, select
+from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.orm import Session
 
 from db.models import (
@@ -467,6 +468,73 @@ class PostgresRepository:
         )
 
     # ------------------------------------------------------------------ versions
+
+    def labels(
+        self, identifiers: Sequence[str], release: ResolvedRelease
+    ) -> dict[str, TocEntry]:
+        """Many identifiers, one query — the whole point (see the protocol).
+
+        The identifiers are grouped by title first, because "which release point
+        publishes this" is answered per title: a page of Title 16 can cite Title
+        54, and Title 54 may be ingested at different release points or not at
+        all. That is a handful of cheap lookups over the titles a page mentions —
+        typically one or two — followed by a single query for the labels
+        themselves, rather than one query per reference.
+        """
+        wanted = {identifier for identifier in identifiers if identifier}
+        if not wanted:
+            return {}
+
+        by_title: dict[str, set[str]] = {}
+        for identifier in wanted:
+            title_num = title_num_from_identifier(identifier)
+            if title_num is not None:
+                by_title.setdefault(title_num, set()).add(identifier)
+
+        scopes = []
+        for title_num, in_title in by_title.items():
+            title = self._title(title_num)
+            if title is None:
+                continue
+            served_from = self._served_from(title.id, release.release)
+            if served_from is None:
+                continue
+            scopes.append(
+                and_(
+                    Section.title_id == title.id,
+                    SectionReleaseMap.release_id == served_from.id,
+                    Section.identifier.in_(in_title),
+                )
+            )
+        if not scopes:
+            return {}
+
+        rows = self._session.execute(
+            select(
+                Section.identifier,
+                SectionVersion.num,
+                SectionVersion.heading,
+                SectionVersion.status,
+            )
+            .join(SectionVersion, SectionVersion.section_id == Section.id)
+            .join(
+                SectionReleaseMap,
+                SectionReleaseMap.section_version_id == SectionVersion.id,
+            )
+            .where(or_(*scopes))
+        ).all()
+
+        return {
+            identifier: TocEntry(
+                identifier=identifier,
+                level="section",
+                num=num,
+                heading=heading,
+                status=status,
+                is_section=True,
+            )
+            for identifier, num, heading, status in rows
+        }
 
     def versions(self, identifier: str) -> list[SectionVersionInfo]:
         match = self._longest_prefix_section(identifier)

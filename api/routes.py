@@ -21,6 +21,8 @@ template — the surface that answers people is `/app`, and the bare citation UR
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from api.schemas import (
@@ -30,6 +32,7 @@ from api.schemas import (
     ReleaseOut,
     SectionOut,
     TitleOut,
+    TocEntryOut,
     TocOut,
     VersionOut,
     VersionsOut,
@@ -98,6 +101,50 @@ def neighbors(
     if result is None:
         raise HTTPException(status_code=404, detail=not_found(path, resolved))
     return NeighborsOut.of(result)
+
+
+@api.get(
+    "/labels",
+    response_model=dict[str, TocEntryOut],
+    summary="Num and heading for many identifiers at once",
+)
+def labels(
+    repository: RepositoryDep,
+    identifier: Annotated[
+        list[str],
+        Query(
+            description="Repeat once per identifier. Unknown ones are absent from "
+            "the answer rather than an error.",
+            examples=[["/us/usc/t16/s45f", "/us/usc/t16/s1"]],
+        ),
+    ],
+    release: ReleaseParam = None,
+    date: DateParam = None,
+) -> dict[str, TocEntryOut]:
+    """What a list of citations *say*, in one request.
+
+    A section's text can carry forty cross references, and a reader that labels
+    them — hover text, so a citation is legible without following it — has to ask
+    once, not forty times.
+    """
+    paths = [normalize_identifier(one) for one in identifier]
+    resolved = resolve_release_or_404(
+        repository,
+        release=release,
+        on_date=parse_date_param(date),
+        title_num=next(
+            (
+                num
+                for num in map(title_num_from_identifier, paths)
+                if num is not None
+            ),
+            None,
+        ),
+    )
+    return {
+        found: TocEntryOut.of(entry)
+        for found, entry in repository.labels(paths, resolved).items()
+    }
 
 
 @api.get(

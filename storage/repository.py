@@ -27,6 +27,7 @@ more useful than pretending 119-100 was never published.
 from __future__ import annotations
 
 import datetime
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -274,4 +275,21 @@ class Repository(Protocol):
 
     def versions(self, identifier: str) -> list[SectionVersionInfo]:
         """The release points at which a section's content changed, oldest first."""
+        ...
+
+    def labels(
+        self, identifiers: Sequence[str], release: ResolvedRelease
+    ) -> dict[str, TocEntry]:
+        """Num, heading and status for many identifiers at once.
+
+        This exists for one reason: a section's text can carry forty cross
+        references, and a reader that wants to show what each one *says* — hover
+        text, so a citation is legible without following it — must not ask forty
+        times. Identifiers that name nothing this database holds are simply absent
+        from the result; a missing label is a missing courtesy, never an error.
+
+        The identifiers may span titles, and each title resolves to its own
+        served-from release point, because a release point ingested for Title 16
+        may not exist for Title 54 (gotcha 10).
+        """
         ...
