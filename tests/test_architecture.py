@@ -87,14 +87,14 @@ def test_uslm_element_names_stay_out_of_extraction_code():
     section (ADR-0005). If it appears in storage or in a route, extraction logic has
     escaped the ingest layer.
 
-    `api/render.py` is the deliberate exception, and a narrow one: it maps element
-    names to HTML tags, decides nothing about *what the data is*, and falls back to
-    a `<div>` for names it doesn't know (see the renderer tests), so a schema change
-    degrades its output rather than breaking retrieval. Presentation has to know
-    element names; nothing else does.
+    `web/uslm_html.py` is the deliberate exception, and a narrow one: it maps
+    element names to HTML tags, decides nothing about *what the data is*, and falls
+    back to a `<div>` for names it doesn't know (see the renderer tests), so a
+    schema change degrades its output rather than breaking retrieval. Presentation
+    has to know element names; nothing else does.
     """
     parsers = {"ingest/uslm1.py", "ingest/uslm2.py", "ingest/base.py"}
-    presentation = {"api/render.py"}
+    presentation = {"web/uslm_html.py"}
     offenders = [
         str(path.relative_to(REPO_ROOT))
         for path in _modules(API, WEB, STORAGE, REPO_ROOT / "ingest")

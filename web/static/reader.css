@@ -1,0 +1,235 @@
+/* The reader's whole stylesheet (PLAN Day 1 item 5).
+ *
+ * Two typefaces doing two jobs: a serif reading column for statutory text, and a
+ * sans-serif for everything that is *about* the text — breadcrumbs, release
+ * picker, badges, provenance. The USLM `@class` values OLRC ships (indent1…4,
+ * and the uslm-* names added by the renderer) are styled here rather than
+ * rewritten, per PLAN §4.
+ */
+
+:root {
+  color-scheme: light dark;
+  --ink: #1a1a1a;
+  --muted: #5c5c5c;
+  --rule: #dcdcdc;
+  --page: #fffdfa;
+  --panel: #f4f2ee;
+  --link: #14507d;
+  --target: rgba(255, 214, 0, 0.32);
+  --target-edge: rgba(196, 145, 0, 0.9);
+  --repealed: #8a2f2f;
+  --reading: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --chrome: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e8e6e1;
+    --muted: #a09c95;
+    --rule: #37352f;
+    --page: #16150f;
+    --panel: #201e18;
+    --link: #7fb6e6;
+    --target: rgba(255, 214, 0, 0.22);
+    --target-edge: rgba(255, 214, 0, 0.75);
+    --repealed: #e08b8b;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--reading);
+  line-height: 1.55;
+}
+
+a { color: var(--link); }
+a:hover { text-decoration-thickness: 2px; }
+
+.wrap { max-width: 48rem; margin: 0 auto; padding: 0 1.25rem 4rem; }
+
+/* ---------------------------------------------------------------- site chrome */
+
+.topbar {
+  font-family: var(--chrome);
+  font-size: 0.82rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+  padding: 0.55rem 0;
+  margin-bottom: 1.75rem;
+}
+
+.topbar .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0;
+}
+
+.brand { font-weight: 700; letter-spacing: 0.02em; text-decoration: none; color: var(--ink); }
+
+.crumbs { color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.3em; align-items: baseline; }
+.crumbs .sep { opacity: 0.5; }
+
+/* Release picker: a plain GET form, so it works without JavaScript. */
+.picker { display: flex; align-items: center; gap: 0.4rem; font-family: var(--chrome); }
+.picker select {
+  font: inherit;
+  font-family: var(--chrome);
+  padding: 0.15rem 0.35rem;
+  background: var(--page);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+}
+.picker button {
+  font: inherit;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* ----------------------------------------------------------------- provenance */
+
+.meta { font-family: var(--chrome); font-size: 0.8rem; color: var(--muted); }
+.meta .rp { color: var(--ink); font-weight: 600; }
+
+/* Gotcha 5: at `119-102not101` the text is not fully current through its date.
+ * The caveat is not a footnote — it sits under the heading, in the reading
+ * column, where a date alone would otherwise be believed. */
+.caveat, .note {
+  font-family: var(--chrome);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  border-left: 3px solid var(--rule);
+  padding: 0.4rem 0 0.4rem 0.7rem;
+  margin: 0.9rem 0;
+  color: var(--muted);
+}
+.caveat { border-left-color: var(--target-edge); }
+
+.status {
+  display: inline-block;
+  font-family: var(--chrome);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid currentColor;
+  border-radius: 0.2rem;
+  padding: 0 0.35em;
+  vertical-align: 0.18em;
+  color: var(--muted);
+}
+.status-repealed, .status-omitted { color: var(--repealed); }
+
+/* --------------------------------------------------------------- the document */
+
+h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 0.4rem; }
+h1 .num { display: block; font-size: 0.95rem; color: var(--muted); font-family: var(--chrome); }
+
+.section-body { margin-top: 1.75rem; }
+/* USLM writes a subsection as `<num>(a)</num><heading>Statement of purpose</heading>`
+ * — two elements, one line of the printed Code. */
+.section-body .uslm-heading { display: inline; font-size: 1rem; }
+.section-body > .uslm-section + * { margin-top: 1.1rem; }
+/* The section's own <num> and <heading> are already the page's <h1>; the ones
+ * belonging to subsections and paragraphs are not, and must stay. */
+.section-body > .uslm-section > .uslm-num,
+.section-body > .uslm-section > .uslm-heading { display: none; }
+.uslm-num { font-weight: 700; margin-right: 0.4em; }
+
+[class*="indent"] { margin-left: 1.6rem; }
+.indent2 { margin-left: 3.2rem; }
+.indent3 { margin-left: 4.8rem; }
+.indent4 { margin-left: 6.4rem; }
+
+.uslm-sourceCredit { font-size: 0.85rem; color: var(--muted); margin-top: 1.5rem; }
+.uslm-note, .uslm-notes {
+  font-size: 0.85rem;
+  border-left: 3px solid var(--rule);
+  padding-left: 0.75rem;
+  margin: 1rem 0;
+  color: var(--muted);
+}
+.uslm-quotedContent, .uslm-quotedText {
+  border-left: 3px solid var(--rule);
+  margin: 0.8rem 0 0.8rem 1rem;
+  padding-left: 0.8rem;
+}
+.uslm-table { border-collapse: collapse; font-size: 0.9rem; }
+.uslm-td, .uslm-th { border: 1px solid var(--rule); padding: 0.2rem 0.4rem; }
+
+/* The provision the URL asked for. ADR-0001: the reader always shows the whole
+ * section and marks the target inside it, rather than serving the fragment
+ * alone. */
+.target {
+  background: var(--target);
+  outline: 2px solid var(--target-edge);
+  border-radius: 0.15rem;
+  scroll-margin-top: 4rem;
+}
+
+/* ---------------------------------------------------------------- TOC + lists */
+
+.toc { list-style: none; padding: 0; margin: 1.5rem 0 0; }
+.toc li { border-bottom: 1px solid var(--rule); }
+.toc li:last-child { border-bottom: none; }
+.toc a {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.5rem 0.2rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+.toc a:hover { background: var(--panel); }
+.toc .num { font-weight: 700; min-width: 5.5rem; color: var(--link); font-variant-numeric: tabular-nums; }
+.toc .heading { flex: 1; }
+.toc .status { flex: none; align-self: center; }
+.toc-group { font-family: var(--chrome); font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin: 1.75rem 0 0.25rem; }
+
+/* ------------------------------------------------------------------ prev/next */
+
+.neighbors {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--chrome);
+  font-size: 0.85rem;
+}
+.neighbors a { flex: 1; text-decoration: none; }
+.neighbors .next { text-align: right; }
+.neighbors .dir { display: block; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); }
+.neighbors .label { color: var(--link); }
+
+.formats {
+  font-family: var(--chrome);
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.cite { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; }
+
+/* --------------------------------------------------------------------- home */
+
+.lede { font-size: 1.05rem; color: var(--muted); }
+.demo { font-family: var(--chrome); font-size: 0.85rem; background: var(--panel);
+  border: 1px solid var(--rule); border-radius: 0.35rem; padding: 0.9rem 1.1rem; margin: 1.5rem 0; }
+.demo code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

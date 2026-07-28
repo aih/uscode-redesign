@@ -5,9 +5,14 @@ question about *which text* belongs to *which release point* is answered by the
 `Repository` behind `storage/` (CLAUDE.md architecture rule 1).
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
+from api.deps import negotiated_format
 from api.routes import api, router
+from web import reader
+from web.reader import STATIC
+from web.routes import router as web_router
 
 DESCRIPTION = """
 Any provision of the US Code, at any release point, addressed by a URL that mirrors
@@ -34,10 +39,39 @@ app = FastAPI(
     description=DESCRIPTION,
 )
 
+app.include_router(web_router)
 app.include_router(router)
 app.include_router(api)
+
+# The reader's stylesheet. `app.frontend()` rather than a `StaticFiles` mount:
+# it registers low-priority routes, so `/us/usc/…` is still matched first no
+# matter what ends up in the directory later.
+app.frontend("/static", directory=STATIC)
 
 
 @app.get("/health", tags=["ops"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.exception_handler(HTTPException)
+def http_exception(request: Request, exc: HTTPException) -> Response:
+    """Errors answer in the format that was asked for.
+
+    A reader that hands a browser a JSON blob when a citation is wrong has
+    stopped being a reader at the moment it most needs to explain itself — and a
+    409 on an ambiguous release label is a question, so the HTML version offers
+    the candidates as links.
+    """
+    detail = exc.detail
+    candidates = None
+    if isinstance(detail, dict):
+        candidates = detail.get("candidates")
+        detail = detail.get("detail", "")
+
+    if negotiated_format(request, request.query_params.get("format")) == "html":
+        return HTMLResponse(
+            content=reader.render_error(exc.status_code, str(detail), candidates),
+            status_code=exc.status_code,
+        )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

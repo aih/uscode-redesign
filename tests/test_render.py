@@ -6,7 +6,7 @@ breaks when it meets one it doesn't: USLM 2.x adds elements, and a reader that
 silently dropped their text would be worse than one that renders a plain div.
 """
 
-from api.render import render_fragment, render_page
+from web.uslm_html import render_fragment
 
 USLM1 = "http://xml.house.gov/schemas/uslm/1.0"
 
@@ -79,12 +79,3 @@ def test_status_is_rendered_as_data_and_class():
 
     assert 'data-status="repealed"' in html
     assert "status-repealed" in html
-
-
-def test_page_wraps_the_fragment():
-    page = render_page(SECTION, title="§ 1. Establishment", subtitle="119-102not101")
-
-    assert page.startswith("<!doctype html>")
-    assert "<title>§ 1. Establishment</title>" in page
-    assert "119-102not101" in page
-    assert "Establishment" in page

@@ -12,13 +12,16 @@ Two families, on purpose:
 
 No SQL and no version-resolution logic lives here (CLAUDE.md architecture rule 1);
 handlers resolve a release point, ask the `Repository`, and shape the answer.
+
+The HTML shape is the reader in `web/`, reached through the same URLs rather than
+a parallel set of them: one identifier, one address, and `?format=`/`Accept:`
+decides whether a person or a program is reading it.
 """
 
 from __future__ import annotations
 
-from html import escape
-
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import HTMLResponse
 
 from api.deps import (
     DateParam,
@@ -30,7 +33,6 @@ from api.deps import (
     parse_date_param,
     resolve_release_or_404,
 )
-from api.render import PAGE_CSS, render_page
 from api.schemas import (
     ErrorOut,
     GuidOut,
@@ -46,9 +48,9 @@ from storage import (
     Repository,
     ResolvedRelease,
     SectionResult,
-    TocResult,
     title_num_from_identifier,
 )
+from web import reader
 
 router = APIRouter()
 api = APIRouter(prefix="/api/v1", tags=["api"])
@@ -179,13 +181,14 @@ def get_by_identifier(
 
     section = repository.get_section(path, resolved)
     if section is not None:
-        return _section_response(section, resolved, wanted, path)
+        return _section_response(repository, section, resolved, wanted, path)
 
     toc = repository.get_toc(path, resolved)
     if toc is not None:
         if wanted == "html":
-            return Response(
-                content=_toc_html(toc), media_type="text/html; charset=utf-8"
+            return HTMLResponse(
+                content=reader.render_toc(repository, toc, resolved, note=resolved.note),
+                headers={"Vary": "Accept"},
             )
         return TocOut.of(toc, note=resolved.note)
 
@@ -193,7 +196,11 @@ def get_by_identifier(
 
 
 def _section_response(
-    section: SectionResult, resolved: ResolvedRelease, wanted: str, requested_path: str
+    repository: Repository,
+    section: SectionResult,
+    resolved: ResolvedRelease,
+    wanted: str,
+    requested_path: str,
 ) -> Response | SectionOut:
     note = _served_note(section, resolved)
     headers = {
@@ -201,6 +208,9 @@ def _section_response(
         # at the same release point can never change, so the hash of its content is
         # a true ETag (PLAN Day 6's cache-forever plan starts here).
         "ETag": f'"{section.content_hash}"',
+        # One URL serves the reader and the API (ADR-0009), so the ETag alone would
+        # let a cache hand a browser the JSON a program asked for first.
+        "Vary": "Accept",
         "X-Release-Point": section.release.label,
         "X-Served-From": section.served_from.label,
     }
@@ -220,14 +230,14 @@ def _section_response(
         )
 
     if wanted == "html":
-        return Response(
-            content=render_page(
-                section.xml,
-                title=f"{section.num or ''} {section.heading or section.identifier}".strip(),
-                subtitle=_html_subtitle(section, note),
-                target_identifier=requested_path if requested_path != section.identifier else None,
+        return HTMLResponse(
+            content=reader.render_section(
+                repository,
+                section,
+                resolved,
+                requested_identifier=requested_path,
+                note=note,
             ),
-            media_type="text/html; charset=utf-8",
             headers=headers,
         )
 
@@ -274,45 +284,3 @@ def _served_note(section: SectionResult, resolved: ResolvedRelease) -> str | Non
     return " ".join(parts) or None
 
 
-def _html_subtitle(section: SectionResult, note: str | None) -> str:
-    bits = [
-        f"<strong>{escape(section.served_from.label)}</strong> "
-        f"({section.served_from.currency_date:%m/%d/%Y})"
-    ]
-    if section.status:
-        bits.append(f'<span class="status">{escape(section.status)}</span>')
-    if section.served_from.caveat:
-        bits.append(escape(section.served_from.caveat))
-    if note:
-        bits.append(escape(note))
-    return " &middot; ".join(bits)
-
-
-def _toc_html(toc: TocResult) -> str:
-    node = toc.node
-    rows = []
-    for entry in list(toc.children) + list(toc.sections):
-        status = (
-            f' <span class="status">{escape(entry.status)}</span>' if entry.status else ""
-        )
-        rows.append(
-            f'<li><a href="{escape(entry.identifier)}">'
-            f'<span class="uslm-num">{escape(entry.num or "")}</span> '
-            f"{escape(entry.heading or '')}</a>{status}</li>"
-        )
-    crumbs = " / ".join(
-        f'<a href="{escape(a.identifier)}">{escape((a.num or a.identifier).rstrip("—"))}</a>'
-        for a in toc.ancestors
-    )
-    served = toc.served_from
-    return (
-        "<!doctype html>\n"
-        '<html lang="en"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"<title>{escape(node.heading or node.identifier)}</title>"
-        f"<style>{PAGE_CSS}</style></head><body>"
-        f'<div class="meta">{crumbs} &middot; <strong>{escape(served.label)}</strong> '
-        f"({served.currency_date:%m/%d/%Y})</div>"
-        f"<h1>{escape(node.num or '')} {escape(node.heading or '')}</h1>"
-        f"<ul>{''.join(rows)}</ul></body></html>"
-    )

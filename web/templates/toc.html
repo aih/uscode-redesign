@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>
+  {%- if node.num %}<span class="num">{{ node.num }}</span>{% endif %}
+  {{ node.heading or node.identifier }}
+  {%- if node.status %} <span class="status status-{{ node.status }}">{{ node.status }}</span>{% endif %}
+</h1>
+
+<p class="meta">
+  <span class="rp">{{ served.label }}</span> — current through {{ served.date }}
+</p>
+{% if caveat %}<p class="caveat">{{ caveat }}</p>{% endif %}
+{% if note %}<p class="note">{{ note }}</p>{% endif %}
+
+{% if children %}
+<p class="toc-group">{{ children_label }}</p>
+<ul class="toc">
+  {%- for entry in children %}
+  <li><a href="{{ entry.href }}">
+    <span class="num">{{ entry.num }}</span>
+    <span class="heading">{{ entry.heading }}</span>
+    {%- if entry.status %}<span class="status status-{{ entry.status }}">{{ entry.status }}</span>{% endif %}
+  </a></li>
+  {%- endfor %}
+</ul>
+{% endif %}
+
+{#- Gotcha 9: repealed and omitted sections keep their place in reading order,
+    badged rather than hidden — a gap in the numbering is a question, a badge is
+    an answer. -#}
+{% if sections %}
+<p class="toc-group">Sections</p>
+<ul class="toc">
+  {%- for entry in sections %}
+  <li><a href="{{ entry.href }}">
+    <span class="num">{{ entry.num }}</span>
+    <span class="heading">{{ entry.heading }}</span>
+    {%- if entry.status %}<span class="status status-{{ entry.status }}">{{ entry.status }}</span>{% endif %}
+  </a></li>
+  {%- endfor %}
+</ul>
+{% endif %}
+
+{% if not children and not sections %}
+<p class="note">Nothing is listed under this node at {{ served.label }}.</p>
+{% endif %}
+{% endblock %}

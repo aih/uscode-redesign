@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<article>
+  <h1>
+    {%- if section.num %}<span class="num">{{ section.num }}</span>{% endif %}
+    {{ section.heading or section.identifier }}
+    {%- if section.status %} <span class="status status-{{ section.status }}">{{ section.status }}</span>{% endif %}
+  </h1>
+
+  <p class="meta">
+    <span class="rp">{{ served.label }}</span> — current through {{ served.date }}
+    {%- if section.guid %} &middot; <a class="cite" href="/us/usc/?id={{ section.guid }}">{{ section.guid }}</a>{% endif %}
+  </p>
+
+  {#- Gotcha 5: a "not" release point is not fully current through its date. -#}
+  {% if caveat %}<p class="caveat">{{ caveat }}</p>{% endif %}
+  {% if note %}<p class="note">{{ note }}</p>{% endif %}
+
+  {#- ADR-0001: a provision URL returns its whole section with the provision
+      marked, so the reader never loses the context the words depend on. -#}
+  {% if provision %}
+  <p class="note">
+    {% if provision.found %}
+      Showing {{ section.num or section.identifier }} with
+      <strong>{{ provision.label }}</strong> highlighted.
+      <a href="{{ section.href }}">Read the whole section</a>.
+    {% else %}
+      There is no <strong>{{ provision.label }}</strong> in
+      {{ section.num or section.identifier }} at {{ served.label }} — showing the
+      whole section instead.
+    {% endif %}
+  </p>
+  {% endif %}
+
+  <div class="section-body">{{ body | safe }}</div>
+
+  <nav class="neighbors">
+    {%- if neighbors and neighbors.previous %}
+    <a class="previous" href="{{ neighbors.previous.href }}">
+      <span class="dir">← Previous</span>
+      <span class="label">{{ neighbors.previous.num }} {{ neighbors.previous.heading }}</span>
+      {%- if neighbors.previous.status %} <span class="status status-{{ neighbors.previous.status }}">{{ neighbors.previous.status }}</span>{% endif %}
+    </a>
+    {%- else %}<span class="previous"></span>{% endif %}
+    {%- if neighbors and neighbors.next %}
+    <a class="next" href="{{ neighbors.next.href }}">
+      <span class="dir">Next →</span>
+      <span class="label">{{ neighbors.next.num }} {{ neighbors.next.heading }}</span>
+      {%- if neighbors.next.status %} <span class="status status-{{ neighbors.next.status }}">{{ neighbors.next.status }}</span>{% endif %}
+    </a>
+    {%- else %}<span class="next"></span>{% endif %}
+  </nav>
+
+  <p class="formats">
+    <a href="{{ formats.xml }}">USLM XML</a>
+    <a href="{{ formats.json }}">JSON</a>
+    <a href="{{ formats.versions }}">Version timeline</a>
+  </p>
+</article>
+
+<script>
+  // The target has an id containing slashes, so :target and the fragment
+  // syntax are awkward; scroll to it directly instead.
+  document.querySelector('.target')?.scrollIntoView({ block: 'center' });
+</script>
+{% endblock %}

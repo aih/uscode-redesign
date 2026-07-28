@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>The United States Code, at any release point</h1>
+<p class="lede">
+  Every provision addressed by a URL that mirrors its USLM <code>@identifier</code>,
+  at whichever release point you ask for — by label or by date.
+</p>
+
+<div class="demo">
+  Try <a href="/us/usc/t16/s45f/c/5?date=07/12/2026"><code>/us/usc/t16/s45f/c/5?date=07/12/2026</code></a>
+  — §&nbsp;45f as published at the release point current on that date, with
+  paragraph (c)(5) highlighted inside it.
+</div>
+
+{% if titles %}
+<p class="toc-group">Titles loaded</p>
+<ul class="toc">
+  {%- for title in titles %}
+  <li><a href="{{ title.href }}">
+    <span class="num">Title {{ title.num }}</span>
+    <span class="heading">{{ title.name }}</span>
+    <span class="status">{{ title.releases }}</span>
+  </a></li>
+  {%- endfor %}
+</ul>
+{% else %}
+<p class="note">No titles are loaded yet — run <code>make dev-data</code>.</p>
+{% endif %}
+
+<p class="formats">
+  <a href="/docs">API documentation</a>
+  <a href="/api/v1/releases">Release points (JSON)</a>
+</p>
+{% endblock %}
