@@ -83,16 +83,45 @@ def resolve_release_or_404(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+_ACCEPTED: dict[str, Format] = {
+    "text/html": "html",
+    "application/xhtml+xml": "html",
+    "application/xml": "xml",
+    "text/xml": "xml",
+    "application/json": "json",
+}
+
+
 def negotiated_format(request: Request, requested: Format | None) -> Format:
-    """`?format=` wins; otherwise honour `Accept:` (PLAN §4 content negotiation)."""
+    """`?format=` wins; otherwise honour `Accept:` (PLAN §4 content negotiation).
+
+    The q-values have to be read, not just the media types. Chrome asks for
+    `text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8` — a
+    substring check for `application/xml` matches that and hands a person the
+    raw USLM. Highest q wins; ties go to whichever the client listed first; a
+    client that asks for nothing we serve gets JSON, which is what a program
+    with `*/*` wants.
+    """
     if requested:
         return requested
-    accept = request.headers.get("accept", "")
-    if "application/xml" in accept or "text/xml" in accept:
-        return "xml"
-    if "text/html" in accept and "application/json" not in accept:
-        return "html"
-    return "json"
+
+    best: tuple[float, Format] | None = None
+    for part in request.headers.get("accept", "").split(","):
+        media_type, _, parameters = part.strip().partition(";")
+        candidate = _ACCEPTED.get(media_type.strip().lower())
+        if candidate is None:
+            continue
+        quality = 1.0
+        for parameter in parameters.split(";"):
+            key, _, value = parameter.partition("=")
+            if key.strip() == "q":
+                try:
+                    quality = float(value)
+                except ValueError:
+                    quality = 0.0
+        if quality > 0 and (best is None or quality > best[0]):
+            best = (quality, candidate)
+    return best[1] if best else "json"
 
 
 ReleaseParam = Annotated[
