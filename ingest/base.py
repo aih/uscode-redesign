@@ -56,6 +56,15 @@ class UslmParser(Protocol):
         """Yield one `SectionRecord` per real section, in document order."""
         ...
 
+    def count_section_elements(self, source: XmlSource) -> int:
+        """Count every `<section>` element, quoted ones included (ADR-0005).
+
+        Provenance manifests (PLAN §11.4) record this alongside the real count
+        from `iter_sections`; the gap between them is the quoted-content
+        exclusion, worth surfacing rather than only reporting one number.
+        """
+        ...
+
 
 class StreamingSectionParser:
     """`iterparse`-based section extraction, parameterized by `ElementNames`."""
@@ -112,6 +121,15 @@ class StreamingSectionParser:
                 yield self._build_record(element, seq, schema_version)
                 seq += 1
                 self._prune(element)
+
+    def count_section_elements(self, source: XmlSource) -> int:
+        tag = self._q(self.elements.section)
+        count = 0
+        with open_source(source) as handle:
+            for _event, element in etree.iterparse(handle, events=("end",), tag=tag):
+                count += 1
+                element.clear()
+        return count
 
     # ----------------------------------------------------------------- hooks
 

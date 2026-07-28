@@ -188,6 +188,20 @@ def test_meta(slice_path):
     assert meta.converter == "USCConverter 1.7.2"
 
 
+def test_count_section_elements_includes_quoted_sections(slice_path):
+    """PLAN §11.4 provenance manifests want both numbers side by side; the gap
+    between them is exactly ADR-0005's quoted-content exclusion."""
+    real = len(records(slice_path))
+    tree = etree.parse(str(slice_path))
+    quoted = [
+        e
+        for e in tree.findall(f".//{{{USLM}}}section")
+        if any(a.tag == f"{{{USLM}}}quotedContent" for a in e.iterancestors())
+    ]
+
+    assert Uslm1Parser().count_section_elements(slice_path) == real + len(quoted)
+
+
 def test_accepts_an_open_stream_as_well_as_a_path(slice_path):
     with open(slice_path, "rb") as handle:
         streamed = list(iter_sections(handle))
