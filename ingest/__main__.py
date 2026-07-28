@@ -10,6 +10,7 @@ from pathlib import Path
 from db.base import SessionLocal
 from ingest import backfill as backfill_mod
 from ingest import inventory as inventory_mod
+from ingest import mirror as mirror_mod
 from ingest.download import DOWNLOAD_DIR, download_title_zip, extract_title_xml, sha256_file
 from ingest.load import LoadStats, load_release
 from ingest.manifest import write_manifest
@@ -115,6 +116,39 @@ def main(argv: list[str] | None = None) -> int:
         "--no-write", action="store_true", help="Print the summary without writing the report"
     )
 
+    mirror_parser = subparsers.add_parser(
+        "mirror", help="Mirror the downloaded corpus to/from S3 (ADR-0013)"
+    )
+    mirror_sub = mirror_parser.add_subparsers(dest="direction", required=True)
+
+    push_parser = mirror_sub.add_parser(
+        "push", help="Upload corpus + inventory + manifests, then the ledger last"
+    )
+    push_parser.add_argument(
+        "--bucket", default=None, help=f"S3 bucket (default: ${mirror_mod.BUCKET_ENV_VAR})"
+    )
+    push_parser.add_argument("--dest", type=Path, default=DOWNLOAD_DIR)
+    push_parser.add_argument("--dry-run", action="store_true")
+
+    pull_parser = mirror_sub.add_parser(
+        "pull", help="Fetch the mirror (or a slice), then verify against the ledger"
+    )
+    pull_parser.add_argument(
+        "--bucket", default=None, help=f"S3 bucket (default: ${mirror_mod.BUCKET_ENV_VAR})"
+    )
+    pull_parser.add_argument("--dest", type=Path, default=DOWNLOAD_DIR)
+    pull_parser.add_argument(
+        "--title", action="append", default=None, metavar="NUM",
+        help="Restrict to a title; repeatable",
+    )
+    pull_parser.add_argument(
+        "--release", action="append", default=None, metavar="LABEL",
+        help="Restrict to a release point; repeatable",
+    )
+    pull_parser.add_argument(
+        "--no-verify", action="store_true", help="Skip hashing what was pulled"
+    )
+
     load_parser = subparsers.add_parser("load", help="Load one USLM title file")
     load_parser.add_argument("xmlfile", type=Path)
     load_parser.add_argument(
@@ -145,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         "fetch": _cmd_fetch,
         "backfill": _cmd_backfill,
         "verify-downloads": _cmd_verify_downloads,
+        "mirror": _cmd_mirror,
         "load": _cmd_load,
     }[args.command](args)
 
@@ -307,6 +342,34 @@ def _cmd_verify_downloads(args: argparse.Namespace) -> int:
     if not args.no_write:
         written = backfill_mod.write_verification(report, directory=args.out)
         print(f"\nreport: {written}")
+    return 0 if report.sound else 1
+
+
+def _cmd_mirror(args: argparse.Namespace) -> int:
+    try:
+        if args.direction == "push":
+            mirror_mod.push(args.bucket, dest_dir=args.dest, dry_run=args.dry_run)
+            print("mirror push complete (ledger uploaded last)")
+            return 0
+        report = mirror_mod.pull(
+            args.bucket,
+            dest_dir=args.dest,
+            titles=set(args.title) if args.title else None,
+            releases=set(args.release) if args.release else None,
+            verify=not args.no_verify,
+        )
+    except mirror_mod.MirrorError as exc:
+        print(f"mirror failed: {exc}", file=sys.stderr)
+        return 1
+
+    if not report.pulled_ledger:
+        print("mirror is empty (no ledger on S3) — nothing to pull; starting fresh is fine")
+        return 0
+    print(f"pulled; {report.verified}/{report.entries_checked} entries verified by hash")
+    if report.missing:
+        print(f"missing after pull: {', '.join(report.missing[:10])}", file=sys.stderr)
+    if report.mismatched:
+        print(f"HASH MISMATCH: {', '.join(report.mismatched[:10])}", file=sys.stderr)
     return 0 if report.sound else 1
 
 
