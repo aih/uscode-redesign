@@ -205,7 +205,16 @@ def _load_structure(
     change (a chapter gets renamed), but the node is the same node, and `sections`
     already points at it by identifier. Release bookkeeping goes by `seq`, not by
     ingest order, so loading an older release point after a newer one — which is
-    exactly what this session does — still leaves `first_release_id` on the older.
+    exactly what a bulk load does — still leaves `first_release_id` on the older.
+
+    **The descriptive fields follow the newest release loaded, never the last one
+    written.** The table holds one row per node with no per-release history (the
+    standing debt), so something has to decide which release's view it shows;
+    "whichever load ran most recently" is not an answer. Title 16's
+    `/us/usc/t16/ch1/schXCVII` is `repealed` in 2013 and `reserved` in 2026, and
+    loading the 2013 file after the 2026 one silently relabelled it — caught by
+    `test_the_reserved_subchapter_is_retrievable_and_badged` during the first bulk
+    load. Gating on `seq` makes the outcome independent of load order.
     """
     existing = {
         node.identifier: node
@@ -230,6 +239,7 @@ def _load_structure(
             else None
         )
         node = existing.get(record.identifier)
+        this_seq = seq_by_release[release.id]
         if node is None:
             node = StructureNode(
                 title_id=title.id,
@@ -239,20 +249,24 @@ def _load_structure(
             )
             session.add(node)
             existing[record.identifier] = node
+            describes_node = True
         else:
-            if seq_by_release[release.id] < seq_by_release[node.first_release_id]:
+            # Decided before last_release_id moves, or every release looks newest.
+            describes_node = this_seq >= seq_by_release[node.last_release_id]
+            if this_seq < seq_by_release[node.first_release_id]:
                 node.first_release_id = release.id
-            if seq_by_release[release.id] > seq_by_release[node.last_release_id]:
+            if this_seq > seq_by_release[node.last_release_id]:
                 node.last_release_id = release.id
 
-        node.level = record.level
-        node.num = record.num
-        node.num_value = record.num_value
-        node.heading = record.heading
-        node.status = record.status
-        node.parent_id = parent_id
-        node.seq = record.seq
-        node.depth = record.depth
+        if describes_node:
+            node.level = record.level
+            node.num = record.num
+            node.num_value = record.num_value
+            node.heading = record.heading
+            node.status = record.status
+            node.parent_id = parent_id
+            node.seq = record.seq
+            node.depth = record.depth
         if record.depth == 0 and record.heading and title.name == _fallback_title_name(title.num):
             # USLM 1.0.15 has no <dc:title>, so ingest names titles "Title 16" and
             # the real name — CONSERVATION — is only on the root structural element.

@@ -244,7 +244,7 @@ def test_a_subchapter_carries_its_breadcrumb(client):
 
 def test_the_reserved_subchapter_is_retrievable_and_badged(client):
     """Title 16's only `reserved` is on a subchapter, not a section (gotcha 13)."""
-    body = client.get("/us/usc/t16/ch1").json()
+    body = client.get(f"/us/usc/t16/ch1?release={CURRENT}").json()
     reserved = [c for c in body["children"] if c["status"] == "reserved"]
 
     assert [c["identifier"] for c in reserved] == ["/us/usc/t16/ch1/schXCVII"]
@@ -281,22 +281,35 @@ def test_the_first_section_of_a_title_has_no_previous(client):
     assert body["next"] is not None
 
 
-def test_versions_lists_one_entry_per_distinct_text(client):
-    amended = client.get(f"/api/v1/sections{AMENDED}/versions").json()
-    unchanged = client.get(f"/api/v1/sections{SECTION}/versions").json()
+def _fixture_versions(body: dict) -> list[dict]:
+    """Versions first seen at one of the two fixture release points.
 
-    assert [v["first_seen"]["label"] for v in amended["versions"]] == [PRIOR, CURRENT]
-    assert [v["releases"] for v in amended["versions"]] == [[PRIOR], [CURRENT]]
+    A bulk load (`ingest load-all`) adds older release points to the same
+    database, so these tests filter to the window they are about rather than
+    assuming Title 16 exists at exactly two.
+    """
+    return [v for v in body["versions"] if v["first_seen"]["label"] in {PRIOR, CURRENT}]
+
+
+def test_versions_lists_one_entry_per_distinct_text(client):
+    amended = _fixture_versions(client.get(f"/api/v1/sections{AMENDED}/versions").json())
+    unchanged = _fixture_versions(client.get(f"/api/v1/sections{SECTION}/versions").json())
+
+    assert [v["first_seen"]["label"] for v in amended] == [PRIOR, CURRENT]
+    assert [[r for r in v["releases"] if r in {PRIOR, CURRENT}] for v in amended] == [
+        [PRIOR],
+        [CURRENT],
+    ]
     # One text, published at both release points — the dedupe, seen from outside.
-    assert len(unchanged["versions"]) == 1
-    assert unchanged["versions"][0]["releases"] == [PRIOR, CURRENT]
+    assert len(unchanged) == 1
+    assert [r for r in unchanged[0]["releases"] if r in {PRIOR, CURRENT}] == [PRIOR, CURRENT]
 
 
 def test_versions_of_a_provision_path_resolve_to_its_section(client):
     body = client.get(f"/api/v1/sections{DEMO}/versions").json()
 
     assert body["identifier"] == DEMO
-    assert len(body["versions"]) == 1
+    assert len(_fixture_versions(body)) == 1
 
 
 # ---------------------------------------------------------------------- releases
@@ -334,13 +347,13 @@ def test_titles_lists_what_is_loaded(client):
     the floor this suite needs, and a database that also holds a bulk load
     (`ingest load-all`) must still pass."""
     titles = {t["num"]: t for t in client.get("/api/v1/titles").json()}
+    title16 = titles["16"]
 
-    assert titles["16"] == {
-        "num": "16",
-        "name": "CONSERVATION",
-        "is_positive_law": False,
-        "ingested_releases": [PRIOR, CURRENT],
-    }
+    assert title16["name"] == "CONSERVATION"
+    assert title16["is_positive_law"] is False
+    # Both fixture release points are listed, newest last. A bulk load adds older
+    # ones ahead of them; that must not change what this test is asserting.
+    assert title16["ingested_releases"][-2:] == [PRIOR, CURRENT]
 
 
 def test_openapi_documents_the_routes(client):
