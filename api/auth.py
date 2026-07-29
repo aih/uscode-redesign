@@ -33,6 +33,7 @@ from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
+from params import no_store
 from storage import DuplicateEmailError, SessionRef, UserRef, get_accounts
 from storage.accounts import AccountsRepository
 
@@ -48,7 +49,13 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 _hasher = PasswordHasher()
 
-auth = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+auth = APIRouter(
+    prefix="/api/v1/auth",
+    tags=["auth"],
+    # Session tokens and identity, on every route here. `no_store` is attached to
+    # the router rather than the routes so one added later cannot forget it.
+    dependencies=[Depends(no_store)],
+)
 
 AccountsDep = Annotated[AccountsRepository, Depends(get_accounts)]
 

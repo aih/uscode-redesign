@@ -4,7 +4,11 @@
  * is JSON-only, so this is a `fetch`-driven form rather than a plain POST.
  */
 import Base from "../layouts/Base.astro";
+import { setNoStore } from "../lib/cache";
 import { loginHref } from "../lib/url";
+
+// Same reason as login: a credential form, never cached.
+setNoStore(Astro.response.headers);
 
 const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
 ---

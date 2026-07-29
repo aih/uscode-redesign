@@ -37,7 +37,7 @@ from api.schemas import (
     WatchlistOut,
     WatchlistSummaryOut,
 )
-from params import RepositoryDep
+from params import RepositoryDep, no_store
 from storage import (
     AmbiguousReleaseError,
     ReleaseNotFoundError,
@@ -50,8 +50,14 @@ from storage import (
 )
 from storage.accounts import AccountsRepository, UserRef, WatchlistItemRef, WatchlistRef
 
-watchlists = APIRouter(prefix="/api/v1/watchlists", tags=["watchlists"])
-default_watchlist = APIRouter(prefix="/api/v1/watchlist", tags=["watchlists"])
+# One reader's watchlist handed to the next reader by a shared cache is the
+# failure this guards against — see params.no_store.
+watchlists = APIRouter(
+    prefix="/api/v1/watchlists", tags=["watchlists"], dependencies=[Depends(no_store)]
+)
+default_watchlist = APIRouter(
+    prefix="/api/v1/watchlist", tags=["watchlists"], dependencies=[Depends(no_store)]
+)
 
 DEFAULT_NAME = "My Provisions"
 

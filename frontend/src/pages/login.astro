@@ -8,7 +8,11 @@
  * inline instead of a full-page round trip.
  */
 import Base from "../layouts/Base.astro";
+import { setNoStore } from "../lib/cache";
 import { signupHref } from "../lib/url";
+
+// A credential form is not something a cache should be holding or replaying.
+setNoStore(Astro.response.headers);
 
 const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
 ---

@@ -183,6 +183,95 @@ def test_etag_is_the_content_hash_and_is_stable(client):
     assert len(first.headers["etag"].strip('"')) == 64
 
 
+# ---------------------------------------------------------------------- caching
+
+IMMUTABLE = "public, max-age=31536000, immutable"
+REVALIDATE = "public, max-age=300"
+
+
+def test_a_pinned_release_point_is_cacheable_forever(client):
+    """ADR-0018: `?release=119-102not101` can never mean a different release
+    point, so what it answers can never change."""
+    response = client.get(f"{API}{SECTION}?release={CURRENT}")
+
+    assert response.headers["cache-control"] == IMMUTABLE
+
+
+def test_an_unpinned_request_is_never_cacheable_forever(client):
+    """The heart of ADR-0018. Without a release point the answer is "newest
+    ingested at or before now" — which changes the moment a newer release point
+    is loaded. Caching that `immutable` would pin superseded law into caches
+    with no way to invalidate it."""
+    for url in (
+        f"{API}{SECTION}",  # no release parameter at all
+        f"{API}{SECTION}?date=07/12/2026",  # a date, not a release point
+    ):
+        assert client.get(url).headers["cache-control"] == REVALIDATE, url
+
+
+def test_a_label_that_resolved_elsewhere_is_not_pinned(client):
+    """`119-102` was never published; it resolves to `119-102not101` with a
+    note. The URL asked for something that does not exist yet, so its meaning
+    can still change — it is not pinned."""
+    response = client.get(f"{API}{SECTION}?release=119-102")
+
+    assert response.headers["cache-control"] == REVALIDATE
+
+
+def test_a_matching_etag_gets_304_with_no_body(client):
+    etag = client.get(f"{API}{SECTION}?release={CURRENT}").headers["etag"]
+
+    response = client.get(
+        f"{API}{SECTION}?release={CURRENT}", headers={"If-None-Match": etag}
+    )
+
+    assert response.status_code == 304
+    assert response.content == b""
+    assert response.headers["etag"] == etag
+    assert response.headers["cache-control"] == IMMUTABLE
+
+
+def test_conditional_requests_honour_the_full_if_none_match_grammar(client):
+    """A comma-separated list, weak validators, and `*` are all legal and all
+    mean "I already have it" (RFC 9110 §13.1.2)."""
+    etag = client.get(f"{API}{SECTION}?release={CURRENT}").headers["etag"]
+
+    for header in (etag, f"W/{etag}", f'"other", {etag}', "*"):
+        response = client.get(
+            f"{API}{SECTION}?release={CURRENT}", headers={"If-None-Match": header}
+        )
+        assert response.status_code == 304, header
+
+    stale = client.get(
+        f"{API}{SECTION}?release={CURRENT}", headers={"If-None-Match": '"stale"'}
+    )
+    assert stale.status_code == 200
+
+
+def test_a_diff_between_two_pinned_release_points_is_immutable(client):
+    response = client.get(
+        f"{API}/sections{AMENDED}/diff?from={PRIOR}&to={CURRENT}"
+    )
+
+    assert response.headers["cache-control"] == IMMUTABLE
+
+
+def test_public_routes_are_cacheable(client):
+    for url in (f"{API}/us/usc/t16/ch1", f"{API}/releases", f"{API}/titles"):
+        assert client.get(url).headers["cache-control"] == REVALIDATE, url
+
+
+def test_the_signed_in_surfaces_are_never_stored(client):
+    """A shared cache holding one reader's watchlist and handing it to the next
+    reader is the failure this guards against. It has to hold on the error
+    paths too — a raised HTTPException builds a fresh response, so the 401s are
+    the case most likely to regress."""
+    for url in (f"{API}/auth/me", f"{API}/watchlist", f"{API}/watchlists"):
+        response = client.get(url)
+        assert response.headers["cache-control"] == "private, no-store", url
+        assert response.headers["vary"] == "Cookie", url
+
+
 # ------------------------------------------------------------------------ guids
 
 

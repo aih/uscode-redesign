@@ -14,7 +14,12 @@ import Base from "../layouts/Base.astro";
 import RemoveWatchItem from "../components/RemoveWatchItem.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import { fetchDefaultWatchlist, fetchMe } from "../lib/api";
+import { setNoStore } from "../lib/cache";
 import { appHref, loginHref, trimNum } from "../lib/url";
+
+// One reader's watchlist rendered into HTML and handed to the next reader by a
+// shared cache is the failure this page is most exposed to (PLAN Day 6a).
+setNoStore(Astro.response.headers);
 
 const cookie = Astro.request.headers.get("cookie");
 const me = await fetchMe(cookie);

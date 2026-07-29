@@ -8,8 +8,25 @@
 # This is also what makes the surfaces independently deployable, which was the
 # point of separating them: /app can be rebuilt, rolled back, or replaced with a
 # static export without the API restarting, and vice versa.
+#
+# $SITE_ADDRESS is the site address. It defaults to :8000, which is the dev
+# stack: plain HTTP, no host matching. In production it is a hostname
+# (`uscode.example.org`), and Caddy provisions and renews the certificate for it
+# automatically — that one substitution is the whole HTTPS story.
 
-:8000 {
+{
+	# Caddy hands X-Forwarded-Proto to the API, and uvicorn is started with
+	# --proxy-headers so `request.url.scheme` is the *client's* scheme rather
+	# than the http of this hop. That is what decides whether the session cookie
+	# gets `Secure` (api/auth.py), so it is a security setting, not a cosmetic
+	# one — and USC_COOKIE_SECURE=true in production means a regression here
+	# cannot silently downgrade the cookie anyway.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+{$SITE_ADDRESS::8000} {
 	encode gzip zstd
 
 	handle /app* {
@@ -20,6 +37,22 @@
 	# /health, and the OpenAPI docs.
 	handle {
 		reverse_proxy api:8001
+	}
+
+	# Cache-Control is the origin's decision, never this file's: whether a
+	# response may be kept forever depends on whether the release point was
+	# pinned, which only the resolver knows (params.py, ADR-0018). Caddy passes
+	# those headers through untouched and adds no cache of its own — it has no
+	# built-in one, and the immutable headers are what a CDN in front would read
+	# if one is ever added.
+	header {
+		# Sent always; browsers are required to ignore it when it arrives over
+		# plain HTTP (RFC 6797 §8.1), so the dev stack on :8000 is unaffected.
+		?Strict-Transport-Security "max-age=31536000"
+		# The reader renders statutory XML into HTML; these cost nothing and
+		# close the obvious own-goals.
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
 	}
 
 	log {

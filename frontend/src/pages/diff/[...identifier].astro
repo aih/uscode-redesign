@@ -13,6 +13,7 @@
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import { ApiError, fetchDiff, fetchVersions } from "../../lib/api";
+import { IMMUTABLE, REVALIDATE } from "../../lib/cache";
 import { appHref, trimNum, versionsHref } from "../../lib/url";
 import { escapeHtml } from "../../lib/uslm";
 import type { Diff } from "../../lib/types";
@@ -41,6 +42,14 @@ if (!from || !to) {
     }
   }
 }
+
+// Both endpoints are named in the URL, so this redline is as fixed as the two
+// published texts it is drawn from — but only if each label resolved to itself.
+// A bare `119-102` resolving to `119-102not101` is a different release point
+// than the URL asked for, and the URL's meaning would change once `119-102`
+// existed, so those revalidate instead.
+const pinned = Boolean(diff && diff.from.release.label === from && diff.to.release.label === to);
+Astro.response.headers.set("Cache-Control", pinned ? IMMUTABLE : REVALIDATE);
 
 // The picker on this page reuses the section's own version list, so a reader
 // can pivot to a different pair without going back to the timeline page.

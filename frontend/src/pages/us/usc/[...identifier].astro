@@ -26,6 +26,7 @@ import {
   fetchReleases,
   releaseParams,
 } from "../../../lib/api";
+import { REVALIDATE, setPublicCache } from "../../../lib/cache";
 import { citedIdentifiers } from "../../../lib/refs";
 import type {
   Entry,
@@ -89,6 +90,10 @@ if (body && isToc(body)) {
   selected = toc.served_from.label;
   titleNum = toc.node.identifier.match(/^\/us\/usc\/t([0-9]+[a-zA-Z]?)/u)?.[1] ?? null;
   crumbs = toc.ancestors;
+  // A table of contents is structural, and `structure_nodes` holds one row per
+  // node rather than one per release point (ADR-0006), so it revalidates rather
+  // than being pinned even when the URL named a release point.
+  Astro.response.headers.set("Cache-Control", REVALIDATE);
   releases = await fetchReleases(titleNum);
   title = `${trimNum(toc.node.num)} ${toc.node.heading ?? ""} · ${selected} · U.S. Code`;
 } else if (body) {
@@ -114,6 +119,10 @@ if (body && isToc(body)) {
   ]);
 
   crumbs = section.ancestors ?? [];
+  // Same rule as the API (lib/cache.ts): forever only if this URL named a
+  // release point and got it. The page itself is identical for every reader —
+  // the Watch button is a client-side island — so `public` is safe here.
+  setPublicCache(Astro.response.headers, params.release, section.is_exact);
   sectionHtml = render(fragment, {
     target: identifier === section.identifier ? null : identifier,
     release: selected,

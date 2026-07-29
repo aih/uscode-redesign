@@ -12,6 +12,7 @@ import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import StatusBadge from "../../components/StatusBadge.astro";
 import { ApiError, fetchVersions } from "../../lib/api";
+import { REVALIDATE } from "../../lib/cache";
 import { appHref, diffHref, trimNum } from "../../lib/url";
 import type { Versions } from "../../lib/types";
 
@@ -31,6 +32,10 @@ try {
     throw error;
   }
 }
+
+// A timeline grows: loading a newer release point can add a row to this page,
+// so it revalidates rather than being pinned.
+Astro.response.headers.set("Cache-Control", REVALIDATE);
 
 const entries = versions?.versions ?? [];
 const current = entries.length > 0 ? entries[entries.length - 1] : null;

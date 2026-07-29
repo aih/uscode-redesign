@@ -21,6 +21,7 @@ from api.auth import auth
 from api.routes import api
 from api.watchlists import default_watchlist, watchlists
 from citation import router as citation_router
+from params import NO_STORE, PRIVATE_PREFIXES
 
 DESCRIPTION = """
 Any provision of the US Code, at any release point, addressed by a URL that mirrors
@@ -71,5 +72,18 @@ def http_exception(request: Request, exc: HTTPException) -> Response:
     The reader renders its own error pages from the status the API returns — a
     404 that names the release point it searched is still the answer, and `/app`
     is where it becomes a page.
+
+    The private surfaces get their `no-store` re-applied here. A raised
+    `HTTPException` never reaches the `Response` the `no_store` dependency wrote
+    to — this handler builds a fresh one — so without this a 401 from
+    `/api/v1/auth/me` would go out with no cache directives at all, and a shared
+    cache is free to heuristically store an uncacheable-looking error and hand it
+    to the next reader.
     """
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    response = JSONResponse(
+        status_code=exc.status_code, content={"detail": exc.detail}
+    )
+    if request.url.path.startswith(PRIVATE_PREFIXES):
+        response.headers["Cache-Control"] = NO_STORE
+        response.headers["Vary"] = "Cookie"
+    return response

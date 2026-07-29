@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.diff import diff_ops
 from api.schemas import (
@@ -42,15 +42,19 @@ from api.schemas import (
     VersionsOut,
 )
 from params import (
+    IMMUTABLE,
     MACHINE_FORMATS,
     DateParam,
     FormatParam,
     ReleaseParam,
     RepositoryDep,
+    cache_control,
+    if_none_match,
     negotiated_format,
     normalize_identifier,
     not_found,
     parse_date_param,
+    public_cache,
     resolve_release_or_404,
     served_note,
 )
@@ -61,7 +65,13 @@ from storage import (
     title_num_from_identifier,
 )
 
-api = APIRouter(prefix="/api/v1", tags=["api"])
+api = APIRouter(
+    prefix="/api/v1",
+    tags=["api"],
+    # Every route on this surface is public and cacheable; the section handler
+    # overrides this with `immutable` when the release point was pinned.
+    dependencies=[Depends(public_cache)],
+)
 
 
 @api.get("/releases", response_model=list[ReleaseOut], summary="All release points")
@@ -185,6 +195,7 @@ def versions(identifier: str, repository: RepositoryDep) -> VersionsOut:
 )
 def diff(
     identifier: str,
+    response: Response,
     repository: RepositoryDep,
     from_: str = Query(
         alias="from", description="Release point label to diff from.", examples=["119-99"]
@@ -210,6 +221,11 @@ def diff(
     to_section = repository.get_section(path, to_resolved)
     if to_section is None:
         raise HTTPException(status_code=404, detail=not_found(path, to_resolved))
+
+    if from_resolved.is_exact and to_resolved.is_exact:
+        # Both endpoints pinned: the redline between two published release points
+        # is as fixed as the two texts it is drawn from.
+        response.headers["Cache-Control"] = IMMUTABLE
 
     return DiffOut(
         identifier=path,
@@ -283,7 +299,7 @@ def get_by_identifier(
 
     section = repository.get_section(path, resolved)
     if section is not None:
-        return _section_response(section, resolved, wanted)
+        return _section_response(request, section, resolved, wanted)
 
     toc = repository.get_toc(path, resolved)
     if toc is not None:
@@ -293,24 +309,35 @@ def get_by_identifier(
 
 
 def _section_response(
+    request: Request,
     section: SectionResult,
     resolved: ResolvedRelease,
     wanted: str,
 ) -> Response | SectionOut:
     note = served_note(section, resolved)
+    etag = f'"{section.content_hash}"'
     headers = {
         # Content is immutable per (section text, release point): the same section
         # at the same release point can never change, so the hash of its content is
         # a true ETag (PLAN Day 6's cache-forever plan starts here).
-        "ETag": f'"{section.content_hash}"',
+        "ETag": etag,
         # JSON and XML still share this URL, so the ETag alone would let a cache
         # hand one caller the representation another asked for first.
         "Vary": "Accept",
+        # …but only a *pinned* release point may be cached forever: an unpinned
+        # request is answered from the newest ingested release point at or before
+        # it, and that changes under the URL. See params.cache_control.
+        "Cache-Control": cache_control(resolved),
         "X-Release-Point": section.release.label,
         "X-Served-From": section.served_from.label,
     }
     if section.release.caveat:
         headers["X-Release-Caveat"] = section.release.caveat
+
+    if if_none_match(request, etag):
+        # The caller already holds this text. 304 carries the validators and the
+        # freshness, never a body (RFC 9110 §15.4.5).
+        return Response(status_code=304, headers=headers)
 
     if wanted == "xml":
         # Exactly what the identifier names: the provision if one was asked for,

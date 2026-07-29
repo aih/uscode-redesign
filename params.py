@@ -20,7 +20,7 @@ import datetime
 import re
 from typing import Annotated, Literal
 
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import Depends, HTTPException, Query, Request, Response
 
 from storage import (
     AmbiguousReleaseError,
@@ -118,6 +118,88 @@ def not_found(path: str, resolved: ResolvedRelease) -> str:
         f"nothing at {path} in release point {resolved.release.label} "
         f"({resolved.release.currency_date.isoformat()})"
     )
+
+
+# ------------------------------------------------------------------- caching
+#
+# PLAN Day 6a: a (section, release point) response is immutable, so cache it
+# forever. The trap is that "the release point" is not what the URL says — it is
+# what the URL *resolved to*.
+#
+# `/us/usc/t16/s45f?release=119-99` names one release point and can never mean a
+# different one, so its answer can never change. `/us/usc/t16/s45f` with no
+# release, or with `?date=`, is answered from the newest ingested release point
+# at or before the request (gotcha 10) — and that answer changes the moment a
+# newer release point is loaded. Caching those two the same way would serve
+# superseded law from a cache with no way to invalidate it.
+#
+# So immutability is a property of the resolution, not of the URL. Everything
+# else revalidates against the ETag, which is cheap because the ETag is the
+# content hash and identical text across release points hashes the same.
+
+IMMUTABLE = "public, max-age=31536000, immutable"
+"""A year, which is as close to forever as `max-age` is worth spelling."""
+
+REVALIDATE = "public, max-age=300"
+"""Short, because "newest at or before" moves when a release point is ingested."""
+
+NO_STORE = "private, no-store"
+"""Anything a signed-in user sees. A shared cache holding one reader's watchlist
+and handing it to the next reader is the failure this exists to prevent."""
+
+PRIVATE_PREFIXES = ("/api/v1/auth", "/api/v1/watchlist")
+"""The path prefixes that must never be cached, by path rather than by route.
+
+The routers carry `no_store` as a dependency, but a raised `HTTPException`
+bypasses the response that dependency wrote to — so the error handler in
+`main.py` re-applies the header by matching these. `/api/v1/watchlist` covers
+`/api/v1/watchlists` too, which is the intent, not an accident of prefixes."""
+
+
+def cache_control(resolved: ResolvedRelease) -> str:
+    """`immutable` only when the caller pinned a release point and got it."""
+    return IMMUTABLE if resolved.requested_label and resolved.is_exact else REVALIDATE
+
+
+def if_none_match(request: Request, etag: str) -> bool:
+    """True when the client already holds this exact representation.
+
+    `If-None-Match` is a comma-separated list, entries may be weak (`W/"..."`),
+    and `*` matches anything the server has. Comparison is on the opaque tag, so
+    a weak validator matches a strong one of the same value — which is what the
+    weak-comparison rule in RFC 9110 §8.8.3.2 requires for conditional GETs.
+    """
+    header = request.headers.get("if-none-match", "")
+    if not header:
+        return False
+    if header.strip() == "*":
+        return True
+    wanted = etag.strip().removeprefix("W/").strip('"')
+    return any(
+        candidate.strip().removeprefix("W/").strip('"') == wanted
+        for candidate in header.split(",")
+    )
+
+
+def public_cache(response: Response) -> None:
+    """A FastAPI dependency for routes whose answer is public but not pinned.
+
+    Used on the routes that return a model rather than a hand-built `Response` —
+    setting the header here leaves their `response_model` serialization alone.
+    """
+    response.headers["Cache-Control"] = REVALIDATE
+
+
+def no_store(response: Response) -> None:
+    """A FastAPI dependency for the signed-in surfaces.
+
+    Attached to the auth and watchlist routers as a whole rather than to each
+    route, so a route added later cannot forget it. `Vary: Cookie` rides along
+    because these responses differ by session cookie, and a cache that missed
+    that would key them all together.
+    """
+    response.headers["Cache-Control"] = NO_STORE
+    response.headers["Vary"] = "Cookie"
 
 
 _ACCEPTED: dict[str, Format] = {
