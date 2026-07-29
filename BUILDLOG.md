@@ -337,3 +337,10 @@ Session-by-session record of how this site was built. One entry per working sess
 - **Tool/model:** Claude (Cowork), Fable 5 — reviewer.
 - **Found:** BUILDLOG 016's merge close-out left every document current; nothing to fix. Since 016: the backfill advanced to **2,188 ledger entries (2,144 ok / 44 unavailable, ~68% of 3,197; 6.4 GB)** and wrote 3 new provenance manifests, committed here. `docs/verification/database.json` on disk predates the 715-title load — regenerate with `make verify` after the next load pass rather than trusting it.
 - **Next (unchanged from 016/CLAUDE.md):** finish the backfill → re-run `make load-all` → `make verify-deep` (corpus-wide dedupe ratio, independently recounted) → Day 4 reader polish on the Astro layout.
+
+## 018 — 2026-07-29 — Session prompts written through Day 7 (Sessions 9–13)
+
+- **Tool/model:** Claude (Cowork), Fable 5.
+- **Asked:** Do prompts exist for the next steps including Day 4+? Add them if not.
+- **Found/Done:** GETTING-STARTED §7 stopped at Session 8 (now marked ✅, BUILDLOG 013). Added paste-ready prompts: **9** corpus completion + `verify-deep` (mismatches classified, never averaged away; final numbers to README), **10** Day 4 reader polish (version timeline, diffs per prior-art's `Diff_Timeout: 0` finding, keyboard-nav island, notes toggles, heading-outline fix pulled forward from Day 7), **11** Day 5 auth + watchlist, **12** Day 6 perf + CI + deploy (CI closes the no-independent-test-runner gap; deploy choice becomes an ADR), **13** Day 7 hardening (`Uslm2Parser` parity, accessibility audit, the public "how this was built" page, debt sweep). 9 ∥ 10 are worktree-safe (ingest vs frontend).
+- **Verified:** Prompts cross-checked against the open debts in CLAUDE.md's status line and BUILDLOG 013/014/016 — every recorded debt is owned by exactly one session.
