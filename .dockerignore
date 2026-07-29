@@ -1,0 +1,45 @@
+# Without this file, `COPY . .` in the Dockerfile copies the whole working tree
+# into the build context — including data/, which is the ~9.7 GB corpus. That is
+# how uscode-redesign-api came to be a 20.4 GB image for what is a few hundred
+# megabytes of Python. It also matters for the deploy: ADR-0020 gives the box a
+# 20 GB root volume, which a 20 GB image does not fit in.
+#
+# The corpus reaches the container through a mounted volume
+# (docker-compose.prod.yml maps ${DATA_ROOT}/releases), never through the image.
+
+# The corpus. Never in an image — it comes from the S3 mirror (ADR-0013).
+data/
+
+# The RP samples: 32 MB of USLM that only the test suite reads.
+samples/
+tests/fixtures/
+
+# Host build artefacts. The image builds its own (uv sync into /opt/venv,
+# npm ci in the frontend stage), and copying these in both bloats the image and
+# risks a host-architecture venv shadowing the container's.
+.venv/
+**/node_modules/
+**/dist/
+**/.astro/
+__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# History and local state.
+.git/
+.github/
+.ci-data/
+docs/screenshots/
+
+# Secrets must not be baked into a layer. The compose files pass real values as
+# environment variables at run time.
+.env
+.env.*
+!.env.example
+
+# Editor and OS noise.
+.DS_Store
+.vscode/
+.idea/

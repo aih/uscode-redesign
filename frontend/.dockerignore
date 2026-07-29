@@ -1,0 +1,17 @@
+# The frontend image builds from ./frontend as its context, so the root
+# .dockerignore does not apply here — this file is the one that governs it.
+#
+# node_modules is the important line: `npm ci` runs in the image, and copying
+# the host's tree in first both bloats the context and can drop
+# host-architecture binaries on top of the ones npm just installed.
+node_modules/
+dist/
+.astro/
+
+# Playwright's output from `make shots`.
+test-results/
+playwright-report/
+
+.env
+.env.*
+.DS_Store
