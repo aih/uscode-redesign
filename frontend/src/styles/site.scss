@@ -340,6 +340,23 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Day 5: the Watch button starts hidden (its island decides which state to
+ * show once it knows whether the browser is logged in) — this keeps that gap
+ * from flashing empty space while the fetches it depends on are in flight. */
+.watch-widget {
+  margin: 1rem 0;
+  min-height: 2.5rem;
+}
+
+.watch-widget .watch-status {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.watch-remove {
+  display: inline;
+}
+
 /* --------------------------------------------------------- statutory text */
 
 .section-body {

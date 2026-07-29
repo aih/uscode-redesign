@@ -1,0 +1,44 @@
+---
+/**
+ * The "Remove" control on `/app/provisions` (Day 5) — the same CSRF/fetch
+ * pattern as `WatchButton`'s remove button, but standalone: `provisions.astro`
+ * already knows the item id server-side (it fetched the list to render the
+ * page), so this island has nothing to look up, only a click to handle.
+ */
+interface Props {
+  itemId: number;
+}
+
+const { itemId } = Astro.props;
+---
+
+<span class="watch-remove">
+  <button type="button" class="usa-button usa-button--unstyled" data-item-id={itemId}>
+    Remove
+  </button>
+
+  <script is:inline>
+    {
+      const script = document.currentScript;
+      const button = script.previousElementSibling;
+
+      function csrfToken() {
+        const match = document.cookie.match(/(?:^|; )usc_csrf=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        const response = await fetch(`/api/v1/watchlist/items/${button.dataset.itemId}`, {
+          method: "DELETE",
+          headers: { "x-csrf-token": csrfToken() },
+        });
+        if (response.ok) {
+          window.location.reload();
+        } else {
+          button.disabled = false;
+        }
+      });
+    }
+  </script>
+</span>

@@ -17,6 +17,7 @@ import NavStrip from "../../../components/NavStrip.astro";
 import Neighbors from "../../../components/Neighbors.astro";
 import Provenance from "../../../components/Provenance.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
+import WatchButton from "../../../components/WatchButton.astro";
 import {
   ApiError,
   fetchIdentifier,
@@ -151,6 +152,8 @@ const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
         </p>
 
         <Provenance served={section.served_from} note={section.note} />
+
+        <WatchButton identifier={section.identifier} release={selected} />
 
         <NavStrip
           previous={neighbors?.previous}

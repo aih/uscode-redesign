@@ -1,0 +1,66 @@
+---
+/**
+ * `/app/provisions` — "My Provisions" (Day 5): everything the signed-in user
+ * is watching, enriched with what each one currently says, so a section that
+ * went `repealed`/`transferred` since being added is badged right here rather
+ * than only discovered by opening it.
+ *
+ * SSR like every other reader page, which means it has to forward the
+ * browser's session cookie to its own server-side API calls by hand
+ * (`fetchMe`/`fetchDefaultWatchlist`'s docstring) — the one thing that makes
+ * this page different from `releases.astro`.
+ */
+import Base from "../layouts/Base.astro";
+import RemoveWatchItem from "../components/RemoveWatchItem.astro";
+import StatusBadge from "../components/StatusBadge.astro";
+import { fetchDefaultWatchlist, fetchMe } from "../lib/api";
+import { appHref, loginHref, trimNum } from "../lib/url";
+
+const cookie = Astro.request.headers.get("cookie");
+const me = await fetchMe(cookie);
+const watchlist = me ? await fetchDefaultWatchlist(cookie) : null;
+---
+
+<Base title="My Provisions · U.S. Code">
+  <h1 class="doc-title">My Provisions</h1>
+
+  {
+    !me && (
+      <p class="lede">
+        <a href={loginHref("/app/provisions")}>Log in</a> to track provisions you care about.
+      </p>
+    )
+  }
+
+  {
+    me && watchlist && watchlist.items.length === 0 && (
+      <p class="lede">
+        Nothing watched yet. Open a section and use "Add to My Provisions" there.
+      </p>
+    )
+  }
+
+  {
+    me && watchlist && watchlist.items.length > 0 && (
+      <ul class="toc">
+        {watchlist.items.map((item) => (
+          <li>
+            <a href={appHref(item.identifier, item.pinned_release_label)}>
+              <span class="toc__num">{trimNum(item.num)}</span>
+              <span class="toc__heading">{item.heading ?? item.identifier}</span>
+              <StatusBadge status={item.status} />
+            </a>
+            <p class="doc-meta">
+              {item.pinned_release_label
+                ? `Pinned to ${item.pinned_release_label}`
+                : "Opens at the newest release this title is ingested at"}
+              {" · "}
+              <RemoveWatchItem itemId={item.id} />
+            </p>
+            {item.note && <p class="doc-meta">{item.note}</p>}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</Base>

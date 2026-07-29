@@ -1,0 +1,76 @@
+---
+/**
+ * `/app/login` — the reader's third island (Day 5), after `KeyboardNav` and
+ * `WatchButton`. A plain SSR form can't do this one: `/api/v1/auth/login`
+ * only accepts JSON (`api/auth.py`'s docstring — that's also most of its CSRF
+ * story), and a browser `<form>` cannot send `Content-Type: application/json`
+ * without JavaScript. So the form posts via `fetch` and handles the error
+ * inline instead of a full-page round trip.
+ */
+import Base from "../layouts/Base.astro";
+import { signupHref } from "../lib/url";
+
+const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
+---
+
+<Base title="Log in · U.S. Code">
+  <h1 class="doc-title">Log in</h1>
+
+  <form class="usa-form" id="login-form" data-next={next}>
+    <label class="usa-label" for="email">Email</label>
+    <input class="usa-input" type="email" id="email" name="email" required autocomplete="email" />
+
+    <label class="usa-label" for="password">Password</label>
+    <input
+      class="usa-input"
+      type="password"
+      id="password"
+      name="password"
+      required
+      autocomplete="current-password"
+    />
+
+    <div class="usa-alert usa-alert--error usa-alert--slim" id="login-error" role="alert" hidden>
+      <div class="usa-alert__body">
+        <p class="usa-alert__text" id="login-error-text"></p>
+      </div>
+    </div>
+
+    <button class="usa-button" type="submit">Log in</button>
+  </form>
+
+  <p class="doc-meta">
+    Need an account? <a href={signupHref(next)}>Sign up</a>
+  </p>
+</Base>
+
+<script is:inline>
+  {
+    const form = document.getElementById("login-form");
+    const error = document.getElementById("login-error");
+    const errorText = document.getElementById("login-error-text");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      error.hidden = true;
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      const response = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        window.location.assign(form.dataset.next || "/app/provisions");
+        return;
+      }
+
+      const body = await response.json().catch(() => ({}));
+      errorText.textContent = body.detail || "Login failed.";
+      error.hidden = false;
+    });
+  }
+</script>

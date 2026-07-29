@@ -1,0 +1,145 @@
+---
+/**
+ * "Watch" on a section page (Day 5) — the reader's second island, after
+ * `KeyboardNav`. Unlike the SSR pages, this genuinely needs client state: the
+ * section page itself is rendered once per request with no idea whether the
+ * browser is logged in, so the button has to ask for itself, client-side,
+ * after the page has already painted.
+ *
+ * It calls `/api/v1/auth/me` and `/api/v1/watchlist` directly with a relative
+ * `fetch` — no import from `lib/api.ts`, which is Node-only (`process.env`)
+ * and would break bundled into a browser script the way `lib/uslm.ts` cannot
+ * be (ADR-0011's presentation layer stays server-side). A same-origin fetch
+ * from the browser sends the session cookie on its own; nothing here forwards
+ * one by hand the way `provisions.astro`'s SSR fetch has to.
+ */
+import { loginHref } from "../lib/url";
+
+interface Props {
+  identifier: string;
+  release?: string | null;
+}
+
+const { identifier, release = null } = Astro.props;
+const next = `${Astro.url.pathname}${Astro.url.search}`;
+const loginTo = loginHref(next);
+---
+
+<div class="watch-widget">
+  <button type="button" class="usa-button usa-button--outline watch-btn" data-role="add" hidden>
+    ☆ Add to My Provisions
+  </button>
+  <button
+    type="button"
+    class="usa-button usa-button--outline watch-btn"
+    data-role="remove"
+    hidden
+  >
+    ★ Remove from My Provisions
+  </button>
+  <a class="usa-button usa-button--outline" data-role="login" href={loginTo} hidden>
+    Log in to track this section
+  </a>
+  <span class="doc-meta watch-status" data-role="status" hidden></span>
+
+  <script
+    is:inline
+    data-identifier={identifier}
+    data-release={release ?? ""}
+  >
+    {
+      const script = document.currentScript;
+      const widget = script.parentElement;
+      const identifier = script.dataset.identifier;
+      const release = script.dataset.release || null;
+
+      const addBtn = widget.querySelector('[data-role="add"]');
+      const removeBtn = widget.querySelector('[data-role="remove"]');
+      const loginHint = widget.querySelector('[data-role="login"]');
+      const statusEl = widget.querySelector('[data-role="status"]');
+
+      function csrfToken() {
+        const match = document.cookie.match(/(?:^|; )usc_csrf=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function showOnly(el) {
+        for (const candidate of [addBtn, removeBtn, loginHint]) {
+          candidate.hidden = candidate !== el;
+        }
+      }
+
+      function fail(message) {
+        statusEl.textContent = message;
+        statusEl.hidden = false;
+      }
+
+      let itemId = null;
+
+      async function init() {
+        const me = await fetch("/api/v1/auth/me", { headers: { accept: "application/json" } });
+        if (me.status === 401) {
+          showOnly(loginHint);
+          return;
+        }
+        if (!me.ok) return;
+
+        const watchlist = await fetch("/api/v1/watchlist", {
+          headers: { accept: "application/json" },
+        });
+        if (!watchlist.ok) return;
+        const body = await watchlist.json();
+        const existing = body.items.find((item) => item.identifier === identifier);
+        if (existing) {
+          itemId = existing.id;
+          showOnly(removeBtn);
+        } else {
+          showOnly(addBtn);
+        }
+      }
+
+      addBtn.addEventListener("click", async () => {
+        addBtn.disabled = true;
+        statusEl.hidden = true;
+        try {
+          const response = await fetch("/api/v1/watchlist/items", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-csrf-token": csrfToken() },
+            body: JSON.stringify({ identifier, pinned_release: release }),
+          });
+          if (!response.ok) {
+            fail("Could not add — try again.");
+            return;
+          }
+          const item = await response.json();
+          itemId = item.id;
+          showOnly(removeBtn);
+        } finally {
+          addBtn.disabled = false;
+        }
+      });
+
+      removeBtn.addEventListener("click", async () => {
+        if (itemId == null) return;
+        removeBtn.disabled = true;
+        statusEl.hidden = true;
+        try {
+          const response = await fetch(`/api/v1/watchlist/items/${itemId}`, {
+            method: "DELETE",
+            headers: { "x-csrf-token": csrfToken() },
+          });
+          if (!response.ok) {
+            fail("Could not remove — try again.");
+            return;
+          }
+          itemId = null;
+          showOnly(addBtn);
+        } finally {
+          removeBtn.disabled = false;
+        }
+      });
+
+      init();
+    }
+  </script>
+</div>

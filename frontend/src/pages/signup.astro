@@ -1,0 +1,74 @@
+---
+/**
+ * `/app/signup` — same shape and same reason as `login.astro`: `/api/v1/auth/signup`
+ * is JSON-only, so this is a `fetch`-driven form rather than a plain POST.
+ */
+import Base from "../layouts/Base.astro";
+import { loginHref } from "../lib/url";
+
+const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
+---
+
+<Base title="Sign up · U.S. Code">
+  <h1 class="doc-title">Sign up</h1>
+
+  <form class="usa-form" id="signup-form" data-next={next}>
+    <label class="usa-label" for="email">Email</label>
+    <input class="usa-input" type="email" id="email" name="email" required autocomplete="email" />
+
+    <label class="usa-label" for="password">Password</label>
+    <input
+      class="usa-input"
+      type="password"
+      id="password"
+      name="password"
+      required
+      minlength="8"
+      autocomplete="new-password"
+    />
+    <span class="usa-hint">At least 8 characters.</span>
+
+    <div class="usa-alert usa-alert--error usa-alert--slim" id="signup-error" role="alert" hidden>
+      <div class="usa-alert__body">
+        <p class="usa-alert__text" id="signup-error-text"></p>
+      </div>
+    </div>
+
+    <button class="usa-button" type="submit">Sign up</button>
+  </form>
+
+  <p class="doc-meta">
+    Already have an account? <a href={loginHref(next)}>Log in</a>
+  </p>
+</Base>
+
+<script is:inline>
+  {
+    const form = document.getElementById("signup-form");
+    const error = document.getElementById("signup-error");
+    const errorText = document.getElementById("signup-error-text");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      error.hidden = true;
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      const response = await fetch("/api/v1/auth/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        window.location.assign(form.dataset.next || "/app/provisions");
+        return;
+      }
+
+      const body = await response.json().catch(() => ({}));
+      errorText.textContent = body.detail || "Sign up failed.";
+      error.hidden = false;
+    });
+  }
+</script>
