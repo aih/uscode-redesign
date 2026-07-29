@@ -17,7 +17,9 @@ the `Repository` behind `storage/` (CLAUDE.md architecture rule 1).
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
+from api.auth import auth
 from api.routes import api
+from api.watchlists import default_watchlist, watchlists
 from citation import router as citation_router
 
 DESCRIPTION = """
@@ -51,6 +53,9 @@ app = FastAPI(
 )
 
 app.include_router(api)  # the machine surface, at /api/v1
+app.include_router(auth)  # /api/v1/auth: signup, login, logout, me (PLAN §4)
+app.include_router(watchlists)  # /api/v1/watchlists CRUD
+app.include_router(default_watchlist)  # /api/v1/watchlist: the reader's default list
 app.include_router(citation_router)  # the citation URL, redirecting to a surface
 
 

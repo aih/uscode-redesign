@@ -21,6 +21,8 @@ from storage import (
     TitleInfo,
     TocEntry,
     TocResult,
+    WatchlistItemRef,
+    WatchlistRef,
 )
 
 
@@ -313,3 +315,74 @@ class TitleOut(BaseModel):
 class ErrorOut(BaseModel):
     detail: str
     candidates: list[str] | None = None
+
+
+class WatchlistItemOut(BaseModel):
+    """One watched provision, enriched with what it currently says (Day 5) — a
+    badge that went `repealed`/`transferred` since it was added is just this
+    item's current `status`, fetched the same way a page's citations are
+    (`Repository.labels`, batched)."""
+
+    id: int
+    identifier: str
+    title_num: str
+    note: str | None
+    pinned_release_label: str | None = Field(
+        description="An exact release label the user pinned, or null to always "
+        "open at the newest release this title is ingested at."
+    )
+    created_at: datetime.datetime
+    num: str | None = Field(default=None, description="Absent when enrichment failed.")
+    heading: str | None = None
+    status: str | None = None
+
+    @classmethod
+    def of(cls, item: WatchlistItemRef, entry: TocEntry | None = None) -> "WatchlistItemOut":
+        return cls(
+            id=item.id,
+            identifier=item.identifier,
+            title_num=item.title_num,
+            note=item.note,
+            pinned_release_label=item.pinned_release_label,
+            created_at=item.created_at,
+            num=entry.num if entry else None,
+            heading=entry.heading if entry else None,
+            status=entry.status if entry else None,
+        )
+
+
+class WatchlistSummaryOut(BaseModel):
+    id: int
+    name: str
+    item_count: int
+
+    @classmethod
+    def of(cls, watchlist: WatchlistRef) -> "WatchlistSummaryOut":
+        return cls(id=watchlist.id, name=watchlist.name, item_count=watchlist.item_count)
+
+
+class WatchlistOut(BaseModel):
+    id: int
+    name: str
+    items: list[WatchlistItemOut]
+
+    @classmethod
+    def of(cls, watchlist: WatchlistRef, items: list[WatchlistItemOut]) -> "WatchlistOut":
+        return cls(id=watchlist.id, name=watchlist.name, items=items)
+
+
+class WatchlistCreateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class WatchlistItemCreateIn(BaseModel):
+    identifier: str = Field(description="A US Code identifier, e.g. /us/usc/t16/s45f")
+    pinned_release: str | None = Field(
+        default=None, description="An exact release label to pin, e.g. 119-99."
+    )
+    note: str | None = Field(default=None, max_length=4000)
+
+
+class WatchlistItemUpdateIn(BaseModel):
+    pinned_release: str | None = None
+    note: str | None = Field(default=None, max_length=4000)
