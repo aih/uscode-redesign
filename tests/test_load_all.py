@@ -221,3 +221,8 @@ def test_verify_reports_are_internally_consistent(session_factory):
         # Shallow verification's whole claim: the recorded count is the row count.
         assert check.stored_matches == (check.sections_loaded == check.rows_in_release_map)
     assert report.sound == (not report.count_mismatches and not report.source_mismatches)
+    # guid_rows is reported, not left at its default — it was declared on the
+    # report and never filled in, so the artifact claimed zero guids for a
+    # corpus with millions of them.
+    if report.release_map_rows:
+        assert report.guid_rows > report.release_map_rows

@@ -35,6 +35,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db.models import (
+    GuidMap,
     ReleasePoint,
     Section,
     SectionReleaseMap,
@@ -140,6 +141,10 @@ def verify_database(
     report.release_map_rows = (
         session.scalar(select(func.count()).select_from(SectionReleaseMap)) or 0
     )
+    # The `?id=` index: one row per (provision, release), subsections included —
+    # so it is much larger than the section counts and grows with every RP, since
+    # guids regenerate per release by design (gotcha 1).
+    report.guid_rows = session.scalar(select(func.count()).select_from(GuidMap)) or 0
 
     incomplete = session.execute(
         select(ReleasePoint.label, Title.num)
@@ -247,7 +252,7 @@ def summarize(report: VerifyReport) -> str:
         f"{report.title_versions_checked} title-versions checked "
         f"across {report.releases_covered} release points, {report.titles_covered} titles",
         f"sections {report.sections:,} | section_versions {report.section_versions:,} "
-        f"| release-map rows {report.release_map_rows:,}",
+        f"| release-map rows {report.release_map_rows:,} | guid_map rows {report.guid_rows:,}",
         f"dedupe ratio {report.dedupe_ratio:.1%} "
         f"(section_versions vs one row per section per release)",
     ]
