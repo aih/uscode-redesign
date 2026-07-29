@@ -14,8 +14,11 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to root: an unanchored `lib/` also matches `frontend/src/lib/`,
+# which is exactly how that directory went missing from Session 7's commit
+# (BUILDLOG 014/016) — `git add` silently skipped it, every time.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
