@@ -12,6 +12,7 @@
  */
 import Base from "../../../layouts/Base.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
+import KeyboardNav from "../../../components/KeyboardNav.astro";
 import NavStrip from "../../../components/NavStrip.astro";
 import Neighbors from "../../../components/Neighbors.astro";
 import Provenance from "../../../components/Provenance.astro";
@@ -35,7 +36,14 @@ import type {
   Toc,
 } from "../../../lib/types";
 import { isToc } from "../../../lib/types";
-import { apiHref, appHref, citationHref, provisionLabel, trimNum } from "../../../lib/url";
+import {
+  apiHref,
+  appHref,
+  citationHref,
+  provisionLabel,
+  trimNum,
+  versionsHref,
+} from "../../../lib/url";
 import { hrefs, parseFragment, render } from "../../../lib/uslm";
 
 /** Name the subdivisions after what they actually are: a title lists chapters, a
@@ -136,6 +144,12 @@ const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
           <StatusBadge status={section.status} />
         </h1>
 
+        <p class="doc-meta">
+          <a href={versionsHref(section.identifier)}>
+            Version history — every release point where this text changed
+          </a>
+        </p>
+
         <Provenance served={section.served_from} note={section.note} />
 
         <NavStrip
@@ -163,6 +177,13 @@ const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
         <article class="section-body" set:html={sectionHtml} />
 
         <Neighbors previous={neighbors?.previous} next={neighbors?.next} release={selected} />
+
+        <KeyboardNav
+          previous={neighbors?.previous}
+          next={neighbors?.next}
+          up={upNode}
+          release={selected}
+        />
 
         <p class="formats">
           <a href={apiHref(section.identifier, { release: selected, format: "xml" })}>

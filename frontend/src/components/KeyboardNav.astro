@@ -1,0 +1,67 @@
+---
+/**
+ * The reader's one island (Day 4): ←/→ or j/k for the previous/next section,
+ * `u` up a level. Everything else in this app ships zero client JavaScript
+ * (`Base.astro`'s docstring) — this is the one thing that is genuinely
+ * interactive rather than a GET form standing in for one.
+ *
+ * `is:inline` keeps it a plain, unbundled script (the same choice the one
+ * existing inline script on the identifier catch-all page already made) —
+ * Astro would otherwise turn it into an ES module, where
+ * `document.currentScript` is always `null`.
+ */
+import type { Entry } from "../lib/types";
+import { appHref } from "../lib/url";
+
+interface Props {
+  previous?: Entry | null;
+  next?: Entry | null;
+  up?: Entry | null;
+  release?: string | null;
+}
+
+const { previous = null, next = null, up = null, release = null } = Astro.props;
+
+const prevHref = previous ? appHref(previous.identifier, release) : "";
+const nextHref = next ? appHref(next.identifier, release) : "";
+const upHref = up ? appHref(up.identifier, release) : "";
+---
+
+{
+  (previous || next || up) && (
+    <p class="kbd-hint">
+      Keyboard: <kbd>←</kbd>/<kbd>j</kbd> previous · <kbd>→</kbd>/<kbd>k</kbd> next ·{" "}
+      <kbd>u</kbd> up a level
+    </p>
+  )
+}
+
+<script is:inline data-prev={prevHref} data-next={nextHref} data-up={upHref}>
+  {
+    const script = document.currentScript;
+    const targets = {
+      ArrowLeft: script.dataset.prev,
+      j: script.dataset.prev,
+      ArrowRight: script.dataset.next,
+      k: script.dataset.next,
+      u: script.dataset.up,
+    };
+
+    document.addEventListener("keydown", (event) => {
+      // No modifier traps: leave Cmd/Ctrl/Alt/Shift combinations alone
+      // (browser back-forward, tab switching, text selection) and never
+      // hijack a key typed into a form control.
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const el = event.target;
+      if (
+        el &&
+        (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))
+      ) {
+        return;
+      }
+
+      const href = targets[event.key];
+      if (href) window.location.assign(href);
+    });
+  }
+</script>

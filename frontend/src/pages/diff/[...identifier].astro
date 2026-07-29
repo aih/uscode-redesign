@@ -1,0 +1,125 @@
+---
+/**
+ * `/app/diff/…?from=&to=` — a redline between two release points of a section
+ * (Day 4, docs/adr/0016).
+ *
+ * The API diffs the verbatim XML — a generic text diff, no USLM vocabulary
+ * involved (`api/diff.py`). This page's only job is presentation: wrap each
+ * `insert`/`delete` chunk in `<ins>`/`<del>` and escape the rest, same as any
+ * text node the section renderer emits. It is a source-level diff, like the
+ * "Source XML" link already on every section page — not a word-level diff of
+ * the rendered reading text (ADR-0016 names this simplification directly).
+ */
+import Base from "../../layouts/Base.astro";
+import ErrorPage from "../../components/ErrorPage.astro";
+import { ApiError, fetchDiff, fetchVersions } from "../../lib/api";
+import { appHref, trimNum, versionsHref } from "../../lib/url";
+import { escapeHtml } from "../../lib/uslm";
+import type { Diff } from "../../lib/types";
+
+// The route's own static prefix is "diff", not "us/usc" (unlike the
+// identifier catch-all page) — the captured param already carries "us/usc/…".
+const identifier = `/${Astro.params.identifier ?? ""}`.replace(/\/+$/u, "");
+const from = Astro.url.searchParams.get("from");
+const to = Astro.url.searchParams.get("to");
+
+let diff: Diff | null = null;
+let failure: { status: number; detail: string } | null = null;
+
+if (!from || !to) {
+  failure = { status: 400, detail: "Add ?from=<release>&to=<release> to compare two versions." };
+  Astro.response.status = 400;
+} else {
+  try {
+    diff = await fetchDiff(identifier, from, to);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      failure = { status: error.status, detail: error.detail };
+      Astro.response.status = error.status;
+    } else {
+      throw error;
+    }
+  }
+}
+
+// The picker on this page reuses the section's own version list, so a reader
+// can pivot to a different pair without going back to the timeline page.
+const versions = diff ? await fetchVersions(identifier).catch(() => null) : null;
+const entries = versions?.versions ?? [];
+
+function diffHtml(d: Diff): string {
+  return d.ops
+    .map((op) => {
+      const text = escapeHtml(op.text);
+      if (op.op === "insert") return `<ins>${text}</ins>`;
+      if (op.op === "delete") return `<del>${text}</del>`;
+      return text;
+    })
+    .join("");
+}
+
+const title = diff
+  ? `Diff ${diff.from.release.label} → ${diff.to.release.label} · ${trimNum(diff.to.num)} · U.S. Code`
+  : "Diff · U.S. Code";
+---
+
+<Base title={title}>
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    diff && (
+      <>
+        <h1 class="doc-title">
+          <span class="doc-title__num">{trimNum(diff.to.num)}</span>
+          {diff.to.heading}
+        </h1>
+
+        <p class="doc-meta">
+          <a href={appHref(identifier, diff.to.release.label)}>← Back to the current text</a>
+          {" · "}
+          <a href={versionsHref(identifier)}>Version history</a>
+        </p>
+
+        <p class="lede">
+          Comparing <strong>{diff.from.release.label}</strong> to{" "}
+          <strong>{diff.to.release.label}</strong>.
+          {diff.from.content_hash === diff.to.content_hash && " The text is unchanged."}
+        </p>
+
+        {entries.length > 1 && (
+          <form class="diff-picker" method="get" action={`/app/diff${identifier}`}>
+            <div>
+              <label class="usa-label picker__label" for="from">
+                From
+              </label>
+              <select class="usa-select picker__select" id="from" name="from">
+                {entries.map((entry) => (
+                  <option value={entry.first_seen.label} selected={entry.first_seen.label === from}>
+                    {entry.first_seen.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label class="usa-label picker__label" for="to">
+                To
+              </label>
+              <select class="usa-select picker__select" id="to" name="to">
+                {entries.map((entry) => (
+                  <option value={entry.first_seen.label} selected={entry.first_seen.label === to}>
+                    {entry.first_seen.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button class="usa-button picker__go" type="submit">
+              Diff
+            </button>
+          </form>
+        )}
+
+        <div class="diff-view" set:html={diffHtml(diff)} />
+      </>
+    )
+  }
+</Base>

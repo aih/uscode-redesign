@@ -405,6 +405,117 @@ body {
   color: var(--muted);
 }
 
+/* Notes and the source credit collapse behind `<details>` — no JS (Day 4).
+ * Closed is the real, honest default (also what a phone gets): a source
+ * credit is citation apparatus, not the text of the law. Desktop overrides the
+ * native collapse to stay open, because there the extra scroll cost is small
+ * and readers doing comparative work want it visible without a tap. */
+.uslm-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+}
+
+/* Chromium's native <details> collapses its content through an internal
+ * `::details-content` box (block-size 0 + content-visibility, not a plain
+ * `display:none` on the light-DOM children) — overriding the children's own
+ * `display` does nothing, because that box is what is actually collapsed.
+ * `::details-content` is the author-facing hook the spec provides for exactly
+ * this. Browsers without it simply keep the native per-viewport default
+ * (closed, fully togglable) — a fine fallback, not a broken one. */
+@media (min-width: 40em) {
+  .uslm-details::details-content {
+    content-visibility: visible !important;
+    block-size: auto !important;
+    overflow: visible !important;
+  }
+}
+
+/* --------------------------------------------------------------- keyboard nav */
+
+/* The one island in the reader (Day 4): a footer hint plus a keydown listener,
+ * both driven by the same three hrefs the nav strip already rendered. */
+.kbd-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+
+.kbd-hint kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid var(--rule);
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.35rem;
+  background: var(--panel);
+}
+
+/* -------------------------------------------------------- versions and diffs */
+
+.timeline {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  border-left: 2px solid var(--rule);
+}
+
+.timeline li {
+  position: relative;
+  padding: 0.25rem 0 1.1rem 1.25rem;
+}
+
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: -0.4rem;
+  top: 0.4rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--link);
+}
+
+.timeline__release {
+  font-weight: 700;
+}
+
+.timeline__releases {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.diff-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.diff-view {
+  font-family: var(--reading);
+  font-size: 1.02rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  margin-top: 1.5rem;
+}
+
+.diff-view ins {
+  background: rgba(0, 166, 81, 0.18);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.diff-view del {
+  background: rgba(181, 9, 9, 0.14);
+  color: var(--muted);
+}
+
 .uslm-quotedContent,
 .uslm-quotedText {
   border-left: 4px solid var(--rule);

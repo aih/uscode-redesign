@@ -1,0 +1,137 @@
+---
+/**
+ * `/app/versions/…` — the change timeline for a section (Day 4): the release
+ * points where its text actually *changed*, not one row per release point.
+ *
+ * This is the feature the whole versioned architecture exists for, so it gets
+ * its own URL and a prominent link from the section page, not a footer
+ * afterthought (`[...identifier].astro`'s "Version history" link, next to the
+ * title).
+ */
+import Base from "../../layouts/Base.astro";
+import ErrorPage from "../../components/ErrorPage.astro";
+import StatusBadge from "../../components/StatusBadge.astro";
+import { ApiError, fetchVersions } from "../../lib/api";
+import { appHref, diffHref, trimNum } from "../../lib/url";
+import type { Versions } from "../../lib/types";
+
+// The route's own static prefix is "versions", not "us/usc" (unlike the
+// identifier catch-all page) — the captured param already carries "us/usc/…".
+const identifier = `/${Astro.params.identifier ?? ""}`.replace(/\/+$/u, "");
+
+let versions: Versions | null = null;
+let failure: { status: number; detail: string } | null = null;
+try {
+  versions = await fetchVersions(identifier);
+} catch (error) {
+  if (error instanceof ApiError) {
+    failure = { status: error.status, detail: error.detail };
+    Astro.response.status = error.status;
+  } else {
+    throw error;
+  }
+}
+
+const entries = versions?.versions ?? [];
+const current = entries.length > 0 ? entries[entries.length - 1] : null;
+const title = current
+  ? `Versions of ${trimNum(current.num)} · U.S. Code`
+  : "Versions · U.S. Code";
+---
+
+<Base title={title}>
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    versions && (
+      <>
+        <h1 class="doc-title">
+          Version history
+          {current && (
+            <>
+              {" — "}
+              <span class="doc-title__num">{trimNum(current.num)}</span>
+              {current.heading}
+            </>
+          )}
+        </h1>
+
+        <p class="doc-meta">
+          <a href={appHref(identifier)}>← Back to the current text</a>
+        </p>
+
+        <p class="lede">
+          {entries.length} distinct version{entries.length === 1 ? "" : "s"} of this section's
+          text, oldest first. Each entry is a release point where the text actually changed —
+          most release points leave most sections untouched (CLAUDE.md gotcha 10).
+        </p>
+
+        <ol class="timeline">
+          {entries.map((entry, index) => {
+            const previous = index > 0 ? entries[index - 1] : null;
+            return (
+              <li>
+                <a class="timeline__release" href={appHref(identifier, entry.first_seen.label)}>
+                  {entry.first_seen.label}
+                </a>{" "}
+                — {trimNum(entry.num)} {entry.heading}
+                <StatusBadge status={entry.status} />
+                <p class="timeline__releases">Unchanged through: {entry.releases.join(", ")}</p>
+                {previous && (
+                  <p>
+                    <a
+                      href={diffHref(
+                        identifier,
+                        previous.first_seen.label,
+                        entry.first_seen.label,
+                      )}
+                    >
+                      Diff since {previous.first_seen.label}
+                    </a>
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+
+        {
+          entries.length > 1 && (
+            <>
+              <p class="toc-group">Compare any two versions</p>
+              <form class="diff-picker" method="get" action={`/app/diff${identifier}`}>
+                <div>
+                  <label class="usa-label picker__label" for="from">
+                    From
+                  </label>
+                  <select class="usa-select picker__select" id="from" name="from">
+                    {entries.map((entry) => (
+                      <option value={entry.first_seen.label} selected={entry === entries[0]}>
+                        {entry.first_seen.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label class="usa-label picker__label" for="to">
+                    To
+                  </label>
+                  <select class="usa-select picker__select" id="to" name="to">
+                    {entries.map((entry) => (
+                      <option value={entry.first_seen.label} selected={entry === current}>
+                        {entry.first_seen.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button class="usa-button picker__go" type="submit">
+                  Diff
+                </button>
+              </form>
+            </>
+          )
+        }
+      </>
+    )
+  }
+</Base>
