@@ -228,3 +228,28 @@ class WatchlistItem(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class AuthSession(Base):
+    """A logged-in browser session (PLAN §4 auth).
+
+    `id` is the sha256 hex of the random token the session cookie carries, never
+    the token itself — the cookie is the only place the raw token exists, so a
+    database read (backup, dump, replica) discloses nothing usable. `csrf_token`
+    rides a second, readable cookie for the double-submit check on state-changing
+    routes (docs/adr/0017): the session cookie alone proves a browser has *a*
+    session, and the CSRF token proves the request came from a page that could
+    read this session's own cookies, i.e. same-origin.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # sha256(token)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), index=True
+    )
+    csrf_token: Mapped[str] = mapped_column(String)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

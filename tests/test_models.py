@@ -12,6 +12,7 @@ EXPECTED_TABLES = {
     "users",
     "watchlists",
     "watchlist_items",
+    "auth_sessions",
 }
 
 
