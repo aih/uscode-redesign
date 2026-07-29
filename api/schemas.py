@@ -70,6 +70,26 @@ class ProvisionOut(BaseModel):
     xml: str | None = None
 
 
+class TocEntryOut(BaseModel):
+    identifier: str
+    level: str
+    num: str | None
+    heading: str | None
+    status: str | None = None
+    is_section: bool = False
+
+    @classmethod
+    def of(cls, entry: TocEntry) -> "TocEntryOut":
+        return cls(
+            identifier=entry.identifier,
+            level=entry.level,
+            num=entry.num,
+            heading=entry.heading,
+            status=entry.status,
+            is_section=entry.is_section,
+        )
+
+
 class SectionOut(BaseModel):
     identifier: str
     title_num: str
@@ -86,6 +106,12 @@ class SectionOut(BaseModel):
     source_credit: str | None = None
     seq_in_title: int
     parent_identifier: str | None
+    ancestors: list[TocEntryOut] = Field(
+        default_factory=list,
+        description="Breadcrumb from the title root down to the section's parent, "
+        "inclusive. Carried here so a reader needn't fetch the parent's table of "
+        "contents to draw a breadcrumb trail.",
+    )
     xml: str
     provision: ProvisionOut | None = None
     release: ReleaseOut = Field(description="The release point that was asked for.")
@@ -113,6 +139,7 @@ class SectionOut(BaseModel):
             source_credit=section.source_credit,
             seq_in_title=section.seq_in_title,
             parent_identifier=section.parent_identifier,
+            ancestors=[TocEntryOut.of(entry) for entry in section.ancestors],
             xml=section.xml,
             provision=(
                 ProvisionOut(
@@ -128,26 +155,6 @@ class SectionOut(BaseModel):
             content_first_seen=ReleaseOut.of(section.content_first_seen),
             is_exact=section.is_exact,
             note=note,
-        )
-
-
-class TocEntryOut(BaseModel):
-    identifier: str
-    level: str
-    num: str | None
-    heading: str | None
-    status: str | None = None
-    is_section: bool = False
-
-    @classmethod
-    def of(cls, entry: TocEntry) -> "TocEntryOut":
-        return cls(
-            identifier=entry.identifier,
-            level=entry.level,
-            num=entry.num,
-            heading=entry.heading,
-            status=entry.status,
-            is_section=entry.is_section,
         )
 
 

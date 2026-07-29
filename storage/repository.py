@@ -108,6 +108,20 @@ class ResolvedRelease:
 
 
 @dataclass(frozen=True, slots=True)
+class TocEntry:
+    """A child of a TOC node: a structural node, or a section leaf."""
+
+    identifier: str
+    level: str
+    """`chapter`, `subchapter`, … or `section` for a leaf."""
+
+    num: str | None
+    heading: str | None
+    status: str | None = None
+    is_section: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class Provision:
     """A sub-section provision extracted from its section at request time (ADR-0001)."""
 
@@ -133,6 +147,20 @@ class SectionResult:
     source_credit: str | None
     seq_in_title: int
     parent_identifier: str | None
+
+    ancestors: tuple[TocEntry, ...]
+    """Breadcrumb from the title root down to the section's parent, inclusive.
+
+    Carried on the section because the alternative — the reader fetching the
+    parent's whole TOC to keep two fields of it — cost a chapter-wide section
+    query per section page (PLAN Day 6b). Bounded by the structural depth of the
+    Code, so two to four entries.
+
+    Approximate in the same way the TOC is: `structure_nodes` holds one row per
+    node, the newest loaded release's view (ADR-0006), so a chapter renamed
+    between release points shows its current name here.
+    """
+
     guid: str | None
     """The section's `@id` at `served_from` — the stable citation for this text at
     this release point (ADR-0003)."""
@@ -147,20 +175,6 @@ class SectionResult:
         """False when the requested release point isn't ingested and an earlier one
         answered for it."""
         return self.release.label == self.served_from.label
-
-
-@dataclass(frozen=True, slots=True)
-class TocEntry:
-    """A child of a TOC node: a structural node, or a section leaf."""
-
-    identifier: str
-    level: str
-    """`chapter`, `subchapter`, … or `section` for a leaf."""
-
-    num: str | None
-    heading: str | None
-    status: str | None = None
-    is_section: bool = False
 
 
 @dataclass(frozen=True, slots=True)

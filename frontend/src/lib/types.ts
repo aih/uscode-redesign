@@ -37,6 +37,8 @@ export interface Section {
   source_credit: string | null;
   seq_in_title: number;
   parent_identifier: string | null;
+  /** Title root down to the section's parent, inclusive — the breadcrumb trail. */
+  ancestors: Entry[];
   xml: string;
   provision: Provision | null;
   release: Release;

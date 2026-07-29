@@ -237,6 +237,7 @@ class PostgresRepository:
             source_credit=version.source_credit,
             seq_in_title=placement.seq_in_title,
             parent_identifier=placement.parent_identifier,
+            ancestors=self._breadcrumb(placement.parent_identifier),
             guid=self._guid_for(section.identifier, served_from.id),
             release=release.release,
             served_from=self._ref(served_from),
@@ -372,6 +373,24 @@ class PostgresRepository:
             release=release.release,
             served_from=self._ref(served_from),
         )
+
+    def _breadcrumb(self, parent_identifier: str | None) -> tuple[TocEntry, ...]:
+        """The chain from the title root down to `parent_identifier`, inclusive.
+
+        This is what a section page's breadcrumbs are, and it used to cost the
+        reader a whole `get_toc` on the parent — two multi-table joins returning
+        every section in the chapter — to keep the two fields it needed
+        (PLAN Day 6b). Here it is the `_ancestors` walk plus the parent itself:
+        a handful of primary-key lookups on `structure_nodes`.
+        """
+        if parent_identifier is None:
+            return ()
+        parent = self._session.scalars(
+            select(StructureNode).where(StructureNode.identifier == parent_identifier)
+        ).first()
+        if parent is None:
+            return ()
+        return (*self._ancestors(parent), _node_entry(parent))
 
     def _ancestors(self, node: StructureNode) -> list[TocEntry]:
         chain: list[TocEntry] = []

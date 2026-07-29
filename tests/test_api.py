@@ -214,6 +214,51 @@ def test_an_unknown_guid_is_404(client):
     assert client.get(f"{API}/us/usc/?id=idnope").status_code == 404
 
 
+# ------------------------------------------------------------------ breadcrumbs
+
+
+def test_a_section_carries_its_own_breadcrumb_trail(client):
+    body = client.get(f"{API}{SECTION}?release={CURRENT}").json()
+
+    assert [entry["identifier"] for entry in body["ancestors"]] == [
+        "/us/usc/t16",
+        "/us/usc/t16/ch1",
+        "/us/usc/t16/ch1/schVI",
+    ]
+    assert [entry["level"] for entry in body["ancestors"]] == [
+        "title",
+        "chapter",
+        "subchapter",
+    ]
+
+
+def test_the_breadcrumb_is_what_the_parent_toc_used_to_supply(client):
+    """PLAN Day 6b: the reader used to fetch the parent's whole table of
+    contents and keep two fields of it. This is the equivalence that made
+    dropping that call safe — same entries, same order, no `get_toc`."""
+    section = client.get(f"{API}{SECTION}?release={CURRENT}").json()
+    parent = client.get(
+        f"{API}{section['parent_identifier']}?release={CURRENT}"
+    ).json()
+
+    was = [*parent["ancestors"], parent["node"]]
+    assert [(e["identifier"], e["level"], e["num"], e["heading"]) for e in was] == [
+        (e["identifier"], e["level"], e["num"], e["heading"])
+        for e in section["ancestors"]
+    ]
+
+
+def test_a_provision_request_carries_the_sections_breadcrumb(client):
+    """The URL names (c)(5); the breadcrumb belongs to §45f that contains it."""
+    body = client.get(f"{API}{DEMO}?release={CURRENT}").json()
+
+    assert [entry["identifier"] for entry in body["ancestors"]] == [
+        "/us/usc/t16",
+        "/us/usc/t16/ch1",
+        "/us/usc/t16/ch1/schVI",
+    ]
+
+
 # -------------------------------------------------------------------------- toc
 
 

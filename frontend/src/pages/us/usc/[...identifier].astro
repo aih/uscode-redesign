@@ -24,7 +24,6 @@ import {
   fetchLabels,
   fetchNeighbors,
   fetchReleases,
-  fetchToc,
   releaseParams,
 } from "../../../lib/api";
 import { citedIdentifiers } from "../../../lib/refs";
@@ -80,7 +79,6 @@ let releases: Release[] = [];
 let selected = "";
 let neighbors: NeighborsBody | null = null;
 let labels: Labels = {};
-let parent: Toc | null = null;
 let sectionHtml = "";
 let toc: Toc | null = null;
 let section: Section | null = null;
@@ -103,20 +101,19 @@ if (body && isToc(body)) {
   // parsed tree, never two parses.
   const fragment = parseFragment(section.xml);
 
-  // Four calls, all server-side and all on localhost: the labels this page's
-  // citations need (one request for all of them), the neighbours, the release
-  // points a picker can offer, and the parent node whose ancestors are this
-  // page's breadcrumbs. That last one is the known Day-6 debt carried over from
-  // the Jinja reader — the parent chain is not on the section, because ADR-0008
-  // keeps per-release facts on the release map.
-  [labels, neighbors, releases, parent] = await Promise.all([
+  // Three calls, all server-side and all on localhost: the labels this page's
+  // citations need (one request for all of them), the neighbours, and the
+  // release points a picker can offer. There used to be a fourth — the parent
+  // node's whole table of contents, fetched to keep two fields of it — which is
+  // the Day-6 debt carried over from the Jinja reader. The breadcrumb now rides
+  // on the section itself (PLAN Day 6b).
+  [labels, neighbors, releases] = await Promise.all([
     fetchLabels(citedIdentifiers(hrefs(fragment)), selected),
     fetchNeighbors(section.identifier, selected),
     fetchReleases(titleNum),
-    section.parent_identifier ? fetchToc(section.parent_identifier, selected) : null,
   ]);
 
-  crumbs = parent ? [...parent.ancestors, parent.node] : [];
+  crumbs = section.ancestors ?? [];
   sectionHtml = render(fragment, {
     target: identifier === section.identifier ? null : identifier,
     release: selected,
