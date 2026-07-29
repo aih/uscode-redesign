@@ -17,7 +17,15 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from db.models import AuthSession, ReleasePoint, Title, User, Watchlist, WatchlistItem
+from db.models import (
+    AuthSession,
+    LoginAttempt,
+    ReleasePoint,
+    Title,
+    User,
+    Watchlist,
+    WatchlistItem,
+)
 from storage.accounts import (
     DuplicateEmailError,
     SessionRef,
@@ -72,6 +80,46 @@ class PostgresAccounts:
         user.password_hash = password_hash
         self._session.commit()
 
+    # ------------------------------------------------------- login attempts
+
+    def record_login_failure(self, *, email: str, ip: str | None) -> None:
+        self._session.add(LoginAttempt(email=email, ip=ip))
+        self._session.commit()
+
+    def count_recent_login_failures(
+        self, *, email: str, ip: str | None, since: datetime.datetime
+    ) -> tuple[int, int]:
+        by_email = self._session.scalar(
+            select(func.count())
+            .select_from(LoginAttempt)
+            .where(LoginAttempt.email == email, LoginAttempt.created_at >= since)
+        )
+        by_ip = 0
+        if ip:
+            by_ip = self._session.scalar(
+                select(func.count())
+                .select_from(LoginAttempt)
+                .where(LoginAttempt.ip == ip, LoginAttempt.created_at >= since)
+            )
+        return int(by_email or 0), int(by_ip or 0)
+
+    def clear_login_failures(self, *, email: str, ip: str | None) -> None:
+        # The address is cleared too: a shared address (an office, a campus) is
+        # otherwise locked out by whoever fumbled their password before you.
+        criteria = [LoginAttempt.email == email]
+        if ip:
+            criteria.append(LoginAttempt.ip == ip)
+        for criterion in criteria:
+            self._session.execute(delete(LoginAttempt).where(criterion))
+        self._session.commit()
+
+    def purge_login_failures(self, *, before: datetime.datetime) -> int:
+        result = self._session.execute(
+            delete(LoginAttempt).where(LoginAttempt.created_at < before)
+        )
+        self._session.commit()
+        return int(result.rowcount or 0)
+
     # ------------------------------------------------------------ sessions
 
     def create_session(
@@ -111,6 +159,13 @@ class PostgresAccounts:
         if row is not None:
             self._session.delete(row)
             self._session.commit()
+
+    def delete_expired_sessions(self, *, now: datetime.datetime) -> int:
+        result = self._session.execute(
+            delete(AuthSession).where(AuthSession.expires_at < now)
+        )
+        self._session.commit()
+        return int(result.rowcount or 0)
 
     # ---------------------------------------------------------- watchlists
 

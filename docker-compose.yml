@@ -34,10 +34,16 @@ services:
       - "8001"
     volumes:
       - .:/app
+    # --proxy-headers makes request.url.scheme the *client's* scheme rather than
+    # the http of Caddy's hop to here, which is what decides whether the session
+    # cookie carries `Secure` (api/auth.py, ADR-0019). Trusting `*` is safe only
+    # because port 8001 is `expose`d, not published: nothing outside this compose
+    # network can reach it to forge the header.
     command:
       [
         "uv", "run", "python", "-m", "uvicorn",
         "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload",
+        "--proxy-headers", "--forwarded-allow-ips", "*",
       ]
 
   frontend:

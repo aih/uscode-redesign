@@ -81,7 +81,12 @@ def http_exception(request: Request, exc: HTTPException) -> Response:
     to the next reader.
     """
     response = JSONResponse(
-        status_code=exc.status_code, content={"detail": exc.detail}
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        # Headers raised with the exception are part of the answer, not
+        # decoration: `Retry-After` on a 429 is the only thing that tells a
+        # throttled caller when to come back (ADR-0019).
+        headers=exc.headers,
     )
     if request.url.path.startswith(PRIVATE_PREFIXES):
         response.headers["Cache-Control"] = NO_STORE

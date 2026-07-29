@@ -7,6 +7,7 @@ test can stub without reimplementing `PostgresAccounts`. Each test gets its own
 collide with each other or with a previous run against the same database.
 """
 
+import datetime
 import uuid
 
 import pytest
@@ -15,6 +16,27 @@ pytestmark = pytest.mark.integration
 
 AUTH = "/api/v1/auth"
 PASSWORD = "correct horse battery staple"
+
+
+@pytest.fixture(autouse=True)
+def _clean_login_attempts():
+    """Every test here shares one client address, so the per-IP failure counter
+    accumulates across tests and across runs within its 15-minute window — a
+    test that deliberately fails five logins would otherwise throttle whatever
+    ran next. Each test starts from an empty table."""
+    from db.base import SessionLocal
+    from storage.postgres_accounts import PostgresAccounts
+
+    def purge():
+        with SessionLocal() as session:
+            PostgresAccounts(session).purge_login_failures(
+                before=datetime.datetime.now(datetime.timezone.utc)
+                + datetime.timedelta(days=1)
+            )
+
+    purge()
+    yield
+    purge()
 
 
 def _email() -> str:
@@ -154,3 +176,117 @@ def test_logout_with_the_wrong_csrf_token_is_403(fresh_client):
     assert response.status_code == 403
     # the session survives a rejected logout
     assert fresh_client.get(f"{AUTH}/me").status_code == 200
+
+
+# ----------------------------------------------------------- rate limiting
+
+
+def test_repeated_failures_are_throttled_with_429_and_retry_after(fresh_client):
+    """ADR-0019. A delay, not a lockout: an account that could be locked by
+    guessing badly at its address would make the defence into the attack."""
+    _, email, _ = _signup(fresh_client)
+
+    for _ in range(5):
+        wrong = fresh_client.post(
+            f"{AUTH}/login", json={"email": email, "password": "not the password"}
+        )
+        assert wrong.status_code == 401
+
+    throttled = fresh_client.post(
+        f"{AUTH}/login", json={"email": email, "password": PASSWORD}
+    )
+
+    assert throttled.status_code == 429
+    assert int(throttled.headers["retry-after"]) > 0
+
+
+def test_a_successful_login_clears_the_throttle(fresh_client):
+    """Someone who mistypes twice and then gets it right is not left throttled."""
+    _, email, _ = _signup(fresh_client)
+    for _ in range(3):
+        fresh_client.post(
+            f"{AUTH}/login", json={"email": email, "password": "not the password"}
+        )
+
+    assert (
+        fresh_client.post(
+            f"{AUTH}/login", json={"email": email, "password": PASSWORD}
+        ).status_code
+        == 200
+    )
+    # …and the counter is back to zero, so the next slip is not the fifth.
+    for _ in range(4):
+        assert (
+            fresh_client.post(
+                f"{AUTH}/login", json={"email": email, "password": "wrong again"}
+            ).status_code
+            == 401
+        )
+
+
+def test_an_unknown_email_is_throttled_too(fresh_client):
+    """Otherwise probing for which addresses exist is free — the throttle has to
+    count attempts against addresses that were never registered."""
+    unknown = _email()
+
+    for _ in range(5):
+        assert (
+            fresh_client.post(
+                f"{AUTH}/login", json={"email": unknown, "password": PASSWORD}
+            ).status_code
+            == 401
+        )
+
+    assert (
+        fresh_client.post(
+            f"{AUTH}/login", json={"email": unknown, "password": PASSWORD}
+        ).status_code
+        == 429
+    )
+
+
+def test_an_unknown_email_and_a_wrong_password_are_indistinguishable(fresh_client):
+    """Same status, same body — and the unknown-email path now runs argon2
+    against a dummy hash so it is not measurably faster either."""
+    _, email, _ = _signup(fresh_client)
+
+    wrong_password = fresh_client.post(
+        f"{AUTH}/login", json={"email": email, "password": "not the password"}
+    )
+    unknown_email = fresh_client.post(
+        f"{AUTH}/login", json={"email": _email(), "password": PASSWORD}
+    )
+
+    assert wrong_password.status_code == unknown_email.status_code == 401
+    assert wrong_password.json() == unknown_email.json()
+
+
+# --------------------------------------------------------- cookie security
+
+
+def test_the_session_cookie_is_secure_behind_a_trusted_https_proxy(fresh_client):
+    """The deploy bug this closes: `secure` used to come from the scheme uvicorn
+    saw, which is http behind Caddy — so a TLS deployment would have shipped
+    session cookies without `Secure`."""
+    from params import cookie_settings
+
+    original = cookie_settings.usc_cookie_secure
+    cookie_settings.usc_cookie_secure = "true"
+    try:
+        response, _, _ = _signup(fresh_client)
+        cookies = response.headers.get_list("set-cookie")
+        assert all("Secure" in c for c in cookies), cookies
+    finally:
+        cookie_settings.usc_cookie_secure = original
+
+
+def test_cookie_security_is_configuration_not_inference(fresh_client):
+    """`auto` is what the tests run under: plain http, so no `Secure` — which is
+    exactly why production sets it explicitly rather than trusting inference."""
+    from params import cookie_settings
+
+    assert cookie_settings.usc_cookie_secure == "auto"
+    response, _, _ = _signup(fresh_client)
+
+    cookies = response.headers.get_list("set-cookie")
+    assert not any("Secure" in c for c in cookies)

@@ -29,11 +29,11 @@ import secrets
 from typing import Annotated
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
-from params import no_store
+from params import cookies_are_secure, no_store
 from storage import DuplicateEmailError, SessionRef, UserRef, get_accounts
 from storage.accounts import AccountsRepository
 
@@ -49,6 +49,24 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 _hasher = PasswordHasher()
 
+# A hash of a value nobody knows, verified against when the email is unknown so
+# that "no such account" costs the same as "wrong password". Without it, the
+# unknown-email path returns before argon2 runs and is measurably faster — which
+# turns a login form into an account-enumeration oracle no matter how carefully
+# the two cases are worded identically.
+_DUMMY_HASH = _hasher.hash(secrets.token_urlsafe(32))
+
+# Rate limiting (ADR-0019). Deliberately a delay rather than a lockout: locking
+# an account on failed attempts lets anyone lock anyone out by guessing badly at
+# their address, which turns the defence into the attack.
+LOGIN_WINDOW = datetime.timedelta(minutes=15)
+MAX_FAILURES_PER_EMAIL = 5
+MAX_FAILURES_PER_IP = 50
+"""Much higher than the per-email limit, because one address is legitimately
+many people — an office, a campus, any NAT — while one email is one person.
+Its job is to stop credential stuffing across many accounts from one host, not
+to police a single account, which the per-email limit already does."""
+
 auth = APIRouter(
     prefix="/api/v1/auth",
     tags=["auth"],
@@ -62,6 +80,19 @@ AccountsDep = Annotated[AccountsRepository, Depends(get_accounts)]
 
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _client_ip(request: Request) -> str | None:
+    """The caller's address, trusting the proxy only as far as it is configured.
+
+    Behind Caddy every request arrives from the proxy, so `request.client` is
+    the same address for everyone and useless as a rate-limit key. Uvicorn is
+    started with `--proxy-headers`, which rewrites `request.client` from
+    `X-Forwarded-For` *for trusted proxies only* — so reading it here is right,
+    and reading the raw header ourselves would not be: a client can send that
+    header and would then choose its own rate-limit bucket.
+    """
+    return request.client.host if request.client else None
 
 
 class SignupIn(BaseModel):
@@ -94,7 +125,7 @@ class UserOut(BaseModel):
 def _set_session_cookies(
     response: Response, request: Request, token: str, csrf_token: str
 ) -> None:
-    secure = request.url.scheme == "https"
+    secure = cookies_are_secure(request)
     max_age = int(SESSION_TTL.total_seconds())
     response.set_cookie(
         SESSION_COOKIE, token, httponly=True, samesite="lax", secure=secure,
@@ -139,6 +170,13 @@ def current_session(
     if session is None:
         return None
     if session.expires_at < datetime.datetime.now(datetime.timezone.utc):
+        # Expired rows were only ever ignored, never removed, so `auth_sessions`
+        # grew without bound. Presenting an expired cookie is the moment we know
+        # one exists, and it is a rare path, so the sweep costs nothing on the
+        # requests that matter.
+        accounts.delete_expired_sessions(
+            now=datetime.datetime.now(datetime.timezone.utc)
+        )
         return None
     return session
 
@@ -193,16 +231,43 @@ def signup(
 def login(
     body: LoginIn, request: Request, response: Response, accounts: AccountsDep
 ) -> UserOut:
-    user = accounts.get_user_by_email(body.email.strip().lower())
-    if user is None or user.password_hash is None:
+    email = body.email.strip().lower()
+    ip = _client_ip(request)
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    by_email, by_ip = accounts.count_recent_login_failures(
+        email=email, ip=ip, since=now - LOGIN_WINDOW
+    )
+    if by_email >= MAX_FAILURES_PER_EMAIL or by_ip >= MAX_FAILURES_PER_IP:
+        # 429 before the password is even looked at, so a throttled attacker
+        # learns nothing from the response and spends no argon2 time of ours.
+        raise HTTPException(
+            status_code=429,
+            detail="too many failed login attempts; try again later",
+            headers={"Retry-After": str(int(LOGIN_WINDOW.total_seconds()))},
+        )
+
+    user = accounts.get_user_by_email(email)
+    # An unknown email is verified against a dummy hash rather than returning
+    # early. Identical wording is not enough when the two paths take measurably
+    # different amounts of time — that difference is an enumeration oracle.
+    stored = user.password_hash if user and user.password_hash else _DUMMY_HASH
+    try:
+        _hasher.verify(stored, body.password)
+        authenticated = user is not None and user.password_hash is not None
+    except (VerifyMismatchError, InvalidHashError):
+        authenticated = False
+
+    if not authenticated or user is None:
+        accounts.record_login_failure(email=email, ip=ip)
         # Same message either way: which part was wrong is not this API's business.
         raise HTTPException(status_code=401, detail="invalid email or password")
-    try:
-        _hasher.verify(user.password_hash, body.password)
-    except VerifyMismatchError as exc:
-        raise HTTPException(status_code=401, detail="invalid email or password") from exc
+
+    assert user.password_hash is not None
     if _hasher.check_needs_rehash(user.password_hash):
         accounts.update_password_hash(user.id, _hasher.hash(body.password))
+    # Someone who mistypes twice and then succeeds should not stay throttled.
+    accounts.clear_login_failures(email=email, ip=ip)
     _start_session(user, request, response, accounts)
     return UserOut.of(user)
 

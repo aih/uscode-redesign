@@ -21,6 +21,7 @@ import re
 from typing import Annotated, Literal
 
 from fastapi import Depends, HTTPException, Query, Request, Response
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from storage import (
     AmbiguousReleaseError,
@@ -200,6 +201,38 @@ def no_store(response: Response) -> None:
     """
     response.headers["Cache-Control"] = NO_STORE
     response.headers["Vary"] = "Cookie"
+
+
+# ------------------------------------------------------------------- cookies
+
+
+class CookieSettings(BaseSettings):
+    """Cookie policy, which is an HTTP concern and so lives here rather than in
+    `db/config.py` — `api/` may not import anything from `db/` but the session
+    factory (`tests/test_architecture.py`)."""
+
+    usc_cookie_secure: Literal["auto", "true", "false"] = "auto"
+    """Whether session cookies carry `Secure` (ADR-0019).
+
+    `auto` infers it from the request scheme, which is right locally and is what
+    this has always done. Inference is not enough in production: behind a proxy
+    the scheme uvicorn sees is `http` unless `--proxy-headers` is on *and* the
+    proxy is trusted, and if either regresses the cookie goes out without
+    `Secure` — a downgrade with no exception and no log line. A deployment
+    served over HTTPS sets this to `true` and stops depending on inference.
+    """
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+cookie_settings = CookieSettings()
+
+
+def cookies_are_secure(request: Request) -> bool:
+    setting = cookie_settings.usc_cookie_secure
+    if setting == "auto":
+        return request.url.scheme == "https"
+    return setting == "true"
 
 
 _ACCEPTED: dict[str, Format] = {

@@ -109,6 +109,36 @@ class AccountsRepository(Protocol):
         outdated hash is the natural moment to re-hash and save (`check_needs_rehash`)."""
         ...
 
+    # ------------------------------------------------------- login attempts
+
+    def record_login_failure(self, *, email: str, ip: str | None) -> None:
+        """Remember one failed attempt, for both the email and the address.
+
+        Only failures. A successful login calls `clear_login_failures`, so what
+        is stored is the tail of an ongoing guessing run — not an audit log.
+        """
+        ...
+
+    def count_recent_login_failures(
+        self, *, email: str, ip: str | None, since: datetime.datetime
+    ) -> tuple[int, int]:
+        """Failures for this email, and failures from this address, since `since`.
+
+        Two numbers rather than one because they defend against different
+        attacks: counting only by email lets one host spray many accounts, and
+        counting only by address lets a botnet grind one account.
+        """
+        ...
+
+    def clear_login_failures(self, *, email: str, ip: str | None) -> None:
+        """Forget this account's failures — called on a successful login, so a
+        person who mistypes twice and then succeeds is not left throttled."""
+        ...
+
+    def purge_login_failures(self, *, before: datetime.datetime) -> int:
+        """Drop attempts older than the window; returns how many went."""
+        ...
+
     # ------------------------------------------------------------ sessions
 
     def create_session(
@@ -126,6 +156,11 @@ class AccountsRepository(Protocol):
         ...
 
     def delete_session(self, token_hash: str) -> None: ...
+
+    def delete_expired_sessions(self, *, now: datetime.datetime) -> int:
+        """Rows past their expiry are already treated as absent on read; this is
+        what actually removes them. Returns how many went."""
+        ...
 
     # ---------------------------------------------------------- watchlists
 

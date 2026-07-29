@@ -230,6 +230,40 @@ class WatchlistItem(Base):
     )
 
 
+class LoginAttempt(Base):
+    """One failed login, kept just long enough to slow the next one down.
+
+    Only failures are recorded: a successful login clears the account's rows, so
+    this table holds the tail of an ongoing guessing run and nothing else. It is
+    deliberately not an audit log — there is no success record, no user agent,
+    no session link — because an audit log of who signed in when is a different
+    feature with different retention questions, and this one only has to answer
+    "how many times has this been tried lately".
+
+    Both `email` and `ip` are counted, separately: throttling only by email lets
+    one host spray many accounts, and throttling only by IP lets a botnet grind
+    one account. `email` is stored as typed-and-normalized rather than joined to
+    `users`, so attempts against addresses that were never registered are
+    counted too — otherwise probing for valid emails would be free.
+    """
+
+    __tablename__ = "login_attempts"
+    # Every read is "this key, within this window", so the window belongs in the
+    # index rather than being a filter applied after it.
+    __table_args__ = (
+        Index("ix_login_attempts_email_created_at", "email", "created_at"),
+        Index("ix_login_attempts_ip_created_at", "ip", "created_at"),
+        Index("ix_login_attempts_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String)
+    ip: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class AuthSession(Base):
     """A logged-in browser session (PLAN §4 auth).
 

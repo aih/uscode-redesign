@@ -16,4 +16,7 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uv", "run", "python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers: behind a proxy, request.url.scheme must be the client's, not
+# this hop's — the Secure cookie decision reads it (ADR-0019).
+CMD ["uv", "run", "python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", \
+     "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
