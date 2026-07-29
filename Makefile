@@ -82,3 +82,8 @@ verify-deep:
 # Load every downloaded title, ledger-driven, resumable (ADR-0014).
 load-all:
 	uv run python -m ingest load-all
+
+# Load test of the top routes against a running `make dev-all` (PLAN Day 6c).
+# Needs `brew install hey`. Writes docs/verification/loadtest.json.
+loadtest:
+	scripts/loadtest.sh
