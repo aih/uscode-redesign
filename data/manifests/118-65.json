@@ -1,0 +1,61 @@
+{
+  "release": "118-65",
+  "source_url": null,
+  "titles": {
+    "10": {
+      "deduped_section_versions": 3678,
+      "ingested_at": "2026-07-29T13:25:49.880617+00:00",
+      "new_section_versions": 122,
+      "raw_section_elements": 4115,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 3800,
+      "sha256": "f9a9686f1f3b6d61a5bf97d21acbf60c256813d0a3cec36b77652855537b08f9",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-co_jb7x9/usc10.xml",
+      "source_zip": "data/releases/118-65/xml_usc10@118-65.zip",
+      "source_zip_sha256": "9c655848898175a024a2d13f1c95951e3852fe13fa40041a86f265985360d22e",
+      "status_counts": {
+        "omitted": 16,
+        "renumbered": 287,
+        "repealed": 182,
+        "reserved": 13,
+        "transferred": 3,
+        "unknown": 1
+      },
+      "structure_nodes": 502
+    },
+    "34": {
+      "deduped_section_versions": 666,
+      "ingested_at": "2026-07-29T13:25:53.492414+00:00",
+      "new_section_versions": 127,
+      "raw_section_elements": 826,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 793,
+      "sha256": "515fdc0eadf209137254b4fd20925a313e6f114735cc7a3d03c33b768cf529bb",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-1569fwkw/usc34.xml",
+      "source_zip": "data/releases/118-65/xml_usc34@118-65.zip",
+      "source_zip_sha256": "0ad219939c0f2826497868aeedda05ce592ea11e1be221432d4974fd1c843002",
+      "status_counts": {
+        "repealed": 7,
+        "transferred": 1
+      },
+      "structure_nodes": 205
+    },
+    "49": {
+      "deduped_section_versions": 1355,
+      "ingested_at": "2026-07-29T13:26:02.597726+00:00",
+      "new_section_versions": 16,
+      "raw_section_elements": 1638,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 1371,
+      "sha256": "6edb4ddde127e6b752b46ff6c1ead22901b0209dd2bf954f96c651fa706e0d44",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-g5acttsa/usc49.xml",
+      "source_zip": "data/releases/118-65/xml_usc49@118-65.zip",
+      "source_zip_sha256": "e0bac148307aae4b577ccb848001bd093f1d0753a144c5892297e7969fb4a3ce",
+      "status_counts": {
+        "renumbered": 9,
+        "repealed": 51
+      },
+      "structure_nodes": 203
+    }
+  }
+}

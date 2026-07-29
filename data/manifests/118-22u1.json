@@ -1,0 +1,48 @@
+{
+  "release": "118-22u1",
+  "source_url": null,
+  "titles": {
+    "11a": {
+      "deduped_section_versions": 0,
+      "ingested_at": "2026-07-29T12:48:47.618664+00:00",
+      "new_section_versions": 0,
+      "raw_section_elements": 0,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 0,
+      "sha256": "76c4513872fd2f915f49e5d76a3f29b9c407f1cb0f4001e173a0ff6c62791efa",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-rd5dyh6h/usc11a.xml",
+      "source_zip": "data/releases/118-22u1/xml_usc11a@118-22u1.zip",
+      "source_zip_sha256": "9ca7b59920b531729542073e850d6fa73ad39b696cb0989fe98c5ac533fd6000",
+      "status_counts": {},
+      "structure_nodes": 10
+    },
+    "18a": {
+      "deduped_section_versions": 26,
+      "ingested_at": "2026-07-29T12:48:47.729538+00:00",
+      "new_section_versions": 0,
+      "raw_section_elements": 28,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 26,
+      "sha256": "515da11ff0f3ff6b92c9a8b08ce5f3cb5cf1b3c04653ae87f48dc89592b432b6",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-jy3nrr80/usc18a.xml",
+      "source_zip": "data/releases/118-22u1/xml_usc18a@118-22u1.zip",
+      "source_zip_sha256": "ecac460f9049c9d2c03c98107ce89d8b2fbc2d32c78e6d7236b7bdd5b7acb6da",
+      "status_counts": {},
+      "structure_nodes": 9
+    },
+    "28a": {
+      "deduped_section_versions": 0,
+      "ingested_at": "2026-07-29T12:48:47.863462+00:00",
+      "new_section_versions": 0,
+      "raw_section_elements": 0,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 0,
+      "sha256": "eb757530706c9fd77e7955aa3732543700eacf57a25c257bedd2eff134ce94e9",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-5gtd2xux/usc28a.xml",
+      "source_zip": "data/releases/118-22u1/xml_usc28a@118-22u1.zip",
+      "source_zip_sha256": "fafbd1e7c603e535f2a69e5843e4f19f068ae919a77ff7809931b22830783e26",
+      "status_counts": {},
+      "structure_nodes": 29
+    }
+  }
+}

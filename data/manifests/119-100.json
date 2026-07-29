@@ -1,0 +1,23 @@
+{
+  "release": "119-100",
+  "source_url": null,
+  "titles": {
+    "47": {
+      "deduped_section_versions": 430,
+      "ingested_at": "2026-07-29T15:20:31.922256+00:00",
+      "new_section_versions": 2,
+      "raw_section_elements": 497,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 432,
+      "sha256": "02b376d483936ad516ee124ea2717a589d61f4133f960f70903387e40c10b58b",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-he71k12z/usc47.xml",
+      "source_zip": "data/releases/119-100/xml_usc47@119-100.zip",
+      "source_zip_sha256": "e5a9d0780de5b4b47a9422a7c875b5eed534fa7f9cf9e84cab9667843991d800",
+      "status_counts": {
+        "omitted": 8,
+        "repealed": 21
+      },
+      "structure_nodes": 67
+    }
+  }
+}

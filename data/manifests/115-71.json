@@ -1,0 +1,55 @@
+{
+  "release": "115-71",
+  "source_url": null,
+  "titles": {
+    "18": {
+      "deduped_section_versions": 1327,
+      "ingested_at": "2026-07-29T07:32:45.625518+00:00",
+      "new_section_versions": 39,
+      "raw_section_elements": 1388,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 1366,
+      "sha256": "50a7cb9fbc0430fc1ff3dfb53459a0acaee251cfa824e32008cea3d553843a29",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-0rdn2scv/usc18.xml",
+      "source_zip": "data/releases/115-71/xml_usc18@115-71.zip",
+      "source_zip_sha256": "8e99664bed057d8f706020432c2bc59201fb3365bf782629a35aae7deac81dd0",
+      "status_counts": {
+        "renumbered": 3,
+        "repealed": 66
+      },
+      "structure_nodes": 154
+    },
+    "34": {
+      "deduped_section_versions": 680,
+      "ingested_at": "2026-07-29T07:32:48.076101+00:00",
+      "new_section_versions": 26,
+      "raw_section_elements": 730,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 706,
+      "sha256": "a6cfd7c82bed9974e0c914b710deae78e192261fa9957d5cf2b52cc6aa6626fc",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-82xuzfud/usc34.xml",
+      "source_zip": "data/releases/115-71/xml_usc34@115-71.zip",
+      "source_zip_sha256": "396f03b23e841aa3259025083b07bdc3be733d64b162d7e668673da6099b8ae9",
+      "status_counts": {},
+      "structure_nodes": 194
+    },
+    "42": {
+      "deduped_section_versions": 6667,
+      "ingested_at": "2026-07-29T07:33:56.683153+00:00",
+      "new_section_versions": 1299,
+      "raw_section_elements": 8313,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 7966,
+      "sha256": "cfd1bff68374e9fd5223168a1201777fe1573d1461cf0e9394fb397d9caaf2ef",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-ox78t3m_/usc42.xml",
+      "source_zip": "data/releases/115-71/xml_usc42@115-71.zip",
+      "source_zip_sha256": "caa3b55039ee4c6fae95dff7435a824dc9d497145c5cfed3dddd16c21cb961f4",
+      "status_counts": {
+        "omitted": 207,
+        "repealed": 689,
+        "transferred": 903
+      },
+      "structure_nodes": 1532
+    }
+  }
+}

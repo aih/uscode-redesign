@@ -1,0 +1,60 @@
+{
+  "release": "118-71",
+  "source_url": null,
+  "titles": {
+    "18": {
+      "deduped_section_versions": 1393,
+      "ingested_at": "2026-07-29T13:32:18.544798+00:00",
+      "new_section_versions": 2,
+      "raw_section_elements": 1420,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 1395,
+      "sha256": "e53ccb8ffefea60303e9da4ddfe379b99e75470fe0fcf5540c9f6869b7ffb8f4",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-zp2sph8f/usc18.xml",
+      "source_zip": "data/releases/118-71/xml_usc18@118-71.zip",
+      "source_zip_sha256": "12beca755b732f3e1b05d309778600cec4e3bffb6be50f3fe32c452714456f6a",
+      "status_counts": {
+        "renumbered": 3,
+        "repealed": 75
+      },
+      "structure_nodes": 155
+    },
+    "20": {
+      "deduped_section_versions": 1834,
+      "ingested_at": "2026-07-29T13:32:29.968977+00:00",
+      "new_section_versions": 194,
+      "raw_section_elements": 2118,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 2028,
+      "sha256": "fd5a286ca61fff5e30f448c7c076d99b1b0ae96231909dccaa56b59d9e8d38d5",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-z7rkjqex/usc20.xml",
+      "source_zip": "data/releases/118-71/xml_usc20@118-71.zip",
+      "source_zip_sha256": "9e9ca90d1736a7e20ec797fa4a6bd1620efd684d5635890b65602cf55696de76",
+      "status_counts": {
+        "omitted": 139,
+        "repealed": 304,
+        "transferred": 22
+      },
+      "structure_nodes": 665
+    },
+    "5": {
+      "deduped_section_versions": 1153,
+      "ingested_at": "2026-07-29T13:32:12.680148+00:00",
+      "new_section_versions": 3,
+      "raw_section_elements": 1347,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 1156,
+      "sha256": "d2b251f52fcebf78010bc954390bb4fbcf8e511c0185ed512c2c9cd5fd7b93c0",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-0fohpb0t/usc05.xml",
+      "source_zip": "data/releases/118-71/xml_usc05@118-71.zip",
+      "source_zip_sha256": "eb43499c542689c5be12d25b7aa7c95b5edfa25f5ac41e4d7263b720716782c5",
+      "status_counts": {
+        "omitted": 3,
+        "renumbered": 3,
+        "repealed": 27,
+        "transferred": 1
+      },
+      "structure_nodes": 185
+    }
+  }
+}

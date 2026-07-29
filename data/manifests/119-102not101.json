@@ -17,6 +17,25 @@
         "transferred": 19
       },
       "structure_nodes": 569
+    },
+    "5": {
+      "deduped_section_versions": 1159,
+      "ingested_at": "2026-07-29T15:20:39.369239+00:00",
+      "new_section_versions": 4,
+      "raw_section_elements": 1356,
+      "schema_version": "uslm-1.0.15",
+      "sections_ingested": 1163,
+      "sha256": "0915a161c07d73c4d824157ef36ea7d1cb9ebd7b8645b3a5479c349e4dfd0b57",
+      "source_path": "/var/folders/8q/5l14rk7d0cx5pbtty99fggt80000gn/T/usc-load-dkd__nzk/usc05.xml",
+      "source_zip": "data/releases/119-102not101/xml_usc05@119-102not101.zip",
+      "source_zip_sha256": "0cdd6c087f3dfc3dd7c76ce4cc49f6fd42a03aa189c413a51e36e439d0f6c332",
+      "status_counts": {
+        "omitted": 3,
+        "renumbered": 3,
+        "repealed": 27,
+        "transferred": 1
+      },
+      "structure_nodes": 186
     }
   }
 }
