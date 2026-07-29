@@ -437,3 +437,16 @@ Session-by-session record of how this site was built. One entry per working sess
   login-attempt rate limiting (PLAN's Day 5 description scopes email out of v1 entirely);
   the general `/api/v1/watchlists` CRUD has no frontend UI yet (only the default-list
   convenience endpoints the reader actually uses are wired to a page).
+
+## 021 — 2026-07-29 — Code review of Days 4–5; GETTING-STARTED synced to reality
+
+- **Tool/model:** Claude (Cowork), Fable 5 — reviewer, fresh context. Static review (this sandbox has no Python 3.12); test counts remain the sessions' claims until CI exists.
+- **Asked:** Review the code, update GETTING-STARTED, say what to do next.
+- **Reviewed:** `api/auth.py`, `api/watchlists.py`, `api/diff.py`, `storage/accounts.py`, `storage/postgres_accounts.py`, `frontend/src/{lib,components}`, and the Day 4/5 commits (`bcbe24b..cfd868b`).
+- **Findings — the code is sound; four things worth naming:**
+  - **Auth is well-built for its stated scope.** Argon2 with `check_needs_rehash` on login; sessions are server-side rows keyed by `sha256(token)`, so a database read never yields a usable cookie and logout revokes rather than merely forgetting; double-submit CSRF with `compare_digest`; identical error text for unknown-email and wrong-password. The docstring's argument for exempting login/signup from CSRF is correct and, more usefully, *written down* — the reasoning is auditable, which is the point of this repo.
+  - **Ownership checks are consistent**, not sampled: every watchlist and item route resolves through `_owned_watchlist`/`_owned_item` before touching anything.
+  - **`api/diff.py` respects architecture rule 5** — it diffs two opaque strings and names no USLM element; `Diff_Timeout = 0` is carried over from prior art with the reason in the docstring.
+  - **One real risk for deploy, not for now:** `_set_session_cookies` derives `secure` from `request.url.scheme`, which behind Caddy is `http` unless proxy headers are trusted — the cookie would ship without `Secure` on the deployed site. Added to the Session 12 prompt (verify end-to-end, don't assume), along with `no-store` on authenticated responses so the caching work can't cache someone's My Provisions, and the BUILDLOG 020 auth scope cuts (rate-limiting; password reset decided either way) as pre-public-exposure gates.
+- **Produced:** GETTING-STARTED §7 synced — Sessions 10 (Day 4) and 11 (Day 5) marked ✅ with their findings and scope cuts; **Session 9 marked UNBLOCKED** (ledger now 3,197 planned / 3,153 ok / 44 unavailable — the backfill is complete); Session 12 expanded per above. This entry.
+- **Verified:** Ledger read directly (`data/releases/ledger.json`); commit range read from git log; code claims are from reading the files named above.
