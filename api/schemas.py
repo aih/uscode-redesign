@@ -70,6 +70,20 @@ class ProvisionOut(BaseModel):
     xml: str | None = None
 
 
+class DuplicateOccurrenceOut(BaseModel):
+    """One further element published under the same @identifier at the same release
+    point. See `SectionOut.duplicates` and ADR-0021."""
+
+    num: str | None = None
+    heading: str | None = None
+    status: str | None = None
+    xml: str
+    content_hash: str
+    guid: str | None = None
+    seq_in_title: int
+    source_credit: str | None = None
+
+
 class TocEntryOut(BaseModel):
     identifier: str
     level: str
@@ -114,6 +128,13 @@ class SectionOut(BaseModel):
     )
     xml: str
     provision: ProvisionOut | None = None
+    duplicates: list["DuplicateOccurrenceOut"] = Field(
+        default_factory=list,
+        description="Further elements the source published under this same "
+        "@identifier at this same release point, in reading order after this one. "
+        "Normally empty; when it isn't, the published XML repeats the section and "
+        "every occurrence is returned rather than one being picked (ADR-0021).",
+    )
     release: ReleaseOut = Field(description="The release point that was asked for.")
     served_from: ReleaseOut = Field(
         description="The ingested release point this content is published at. Differs "
@@ -150,6 +171,19 @@ class SectionOut(BaseModel):
                 if section.provision
                 else None
             ),
+            duplicates=[
+                DuplicateOccurrenceOut(
+                    num=other.num,
+                    heading=other.heading,
+                    status=other.status,
+                    xml=other.xml,
+                    content_hash=other.content_hash,
+                    guid=other.guid,
+                    seq_in_title=other.seq_in_title,
+                    source_credit=other.source_credit,
+                )
+                for other in section.duplicates
+            ],
             release=ReleaseOut.of(section.release),
             served_from=ReleaseOut.of(section.served_from),
             content_first_seen=ReleaseOut.of(section.content_first_seen),

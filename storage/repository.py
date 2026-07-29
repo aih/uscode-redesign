@@ -131,6 +131,34 @@ class Provision:
 
 
 @dataclass(frozen=True, slots=True)
+class DuplicateOccurrence:
+    """A further element the source published under the *same* `@identifier` at the
+    same release point.
+
+    OLRC's XML occasionally repeats a section: Title 19 at 117-80 carries three
+    `<section identifier="/us/usc/t19/s2502">` elements — two empty stubs headed
+    "Purposes" and then the real "Congressional statement of purposes" — and
+    Title 54 at 113-296not287 repeats three sections with differing amounts of
+    notes. These are not the quoted statutory text an amending act carries, which
+    the parser drops (gotcha 12, ADR-0005): they hold real `@identifier` and
+    `@id` values, so the parser is right to emit them and storage right to keep
+    them.
+
+    Because they are indistinguishable by identifier, no rule picks a winner
+    honestly — so every occurrence is served and the reader says so (ADR-0021).
+    """
+
+    num: str | None
+    heading: str | None
+    status: str | None
+    xml: str
+    content_hash: str
+    guid: str | None
+    seq_in_title: int
+    source_credit: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class SectionResult:
     """One section at one release point, plus the provision the URL pointed at."""
 
@@ -169,6 +197,20 @@ class SectionResult:
     served_from: ReleaseRef
     content_first_seen: ReleaseRef
     provision: Provision | None = None
+
+    duplicates: tuple[DuplicateOccurrence, ...] = ()
+    """Further elements published under this identifier at this release point, in
+    source reading order after this one. Empty for all but a handful of
+    title-releases — see `DuplicateOccurrence` and ADR-0021."""
+
+    @property
+    def is_duplicated(self) -> bool:
+        """True when the source published this identifier more than once here."""
+        return bool(self.duplicates)
+
+    @property
+    def occurrence_count(self) -> int:
+        return 1 + len(self.duplicates)
 
     @property
     def is_exact(self) -> bool:

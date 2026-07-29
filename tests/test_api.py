@@ -540,8 +540,14 @@ def test_ingested_titles_are_distinguished_from_affected_titles(client):
     releases = {r["label"]: r for r in client.get("/api/v1/releases").json()}
 
     assert "16" in releases[CURRENT]["ingested_titles"]
-    assert releases[BETWEEN]["ingested_titles"] == []
     assert releases[BETWEEN]["titles_affected"] == ["47"]
+    # Title 16 is answerable at 119-100 — the resolver serves it from 119-99
+    # (gotcha 10) — but it is not *held* here, which is the distinction. Asserted
+    # as an absence rather than an empty list: `make dev-data` has ingested
+    # nothing at this release point, while the full corpus has ingested exactly
+    # the title it affected, and both must pass.
+    assert "16" not in releases[BETWEEN]["ingested_titles"]
+    assert set(releases[BETWEEN]["ingested_titles"]) <= {"47"}
 
 
 def test_titles_lists_what_is_loaded(client):
@@ -567,3 +573,99 @@ def test_openapi_documents_the_routes(client):
     # The reader and the redirector are not machine routes and are not documented
     # as such (ADR-0010): the schema describes only what a program should call.
     assert not [path for path in paths if path.startswith(("/app", "/us/usc"))]
+
+
+# ------------------------------------------------------- repeated identifiers
+
+
+DUPLICATED = "/us/usc/t19/s2502"
+DUPLICATED_RELEASE = "117-80"
+
+
+def _duplicated_section(client):
+    """The corpus-only fixture: skips on a `make dev-data` database, which holds
+    Title 16 alone."""
+    response = client.get(f"{API}{DUPLICATED}?release={DUPLICATED_RELEASE}")
+    if response.status_code != 200:
+        pytest.skip(f"{DUPLICATED} at {DUPLICATED_RELEASE} not loaded (needs load-all)")
+    return response.json()
+
+
+def test_a_repeated_identifier_serves_every_occurrence(client):
+    """Title 19 at 117-80 publishes three <section> elements under one identifier
+    — two byte-identical empty stubs headed "Purposes" and the real section. The
+    stubs dedupe to one stored text (ADR-0007), leaving two distinct texts, and
+    both are returned rather than one being picked (ADR-0021)."""
+    body = _duplicated_section(client)
+
+    assert len(body["duplicates"]) == 1
+    texts = [body["xml"]] + [d["xml"] for d in body["duplicates"]]
+    headings = [body["heading"]] + [d["heading"] for d in body["duplicates"]]
+
+    assert "Purposes" in headings
+    assert "Congressional statement of purposes" in headings
+    # The substantive text is served, not just the stub that precedes it.
+    assert any("The purposes of this Act are" in xml for xml in texts)
+
+
+def test_repeated_occurrences_come_back_in_source_order(client):
+    """Reading order is the only order the source gives, so it is the one used —
+    and it is stable, which the previous unordered query was not."""
+    body = _duplicated_section(client)
+    seqs = [body["seq_in_title"]] + [d["seq_in_title"] for d in body["duplicates"]]
+
+    assert seqs == sorted(seqs)
+    assert len(set(seqs)) == len(seqs)
+
+
+def test_a_repeated_identifier_is_stable_across_requests(client):
+    """The bug this replaced: `.first()` with no ORDER BY handed back whichever
+    row Postgres felt like, so the same URL could serve an empty stub one moment
+    and the real section the next."""
+    def shape(body):
+        return tuple(
+            (occurrence["heading"], len(occurrence["xml"]))
+            for occurrence in [body] + body["duplicates"]
+        )
+
+    seen = {shape(_duplicated_section(client)) for _ in range(5)}
+
+    assert len(seen) == 1
+
+
+def test_a_deep_link_finds_its_provision_in_a_later_occurrence(client):
+    """`/s2502/1` exists only in the substantive occurrence; the stub that sorts
+    first has no paragraphs at all. Highlighting has to search across the
+    occurrences or a deep link lands on nothing."""
+    response = client.get(f"{API}{DUPLICATED}/1?release={DUPLICATED_RELEASE}")
+    if response.status_code != 200:
+        pytest.skip(f"{DUPLICATED} at {DUPLICATED_RELEASE} not loaded (needs load-all)")
+    body = response.json()
+
+    assert body["provision"]["identifier"] == f"{DUPLICATED}/1"
+    assert body["provision"]["found"] is True
+
+
+def test_neighbors_of_a_repeated_identifier_bracket_the_group(client):
+    """This route used to 500 outright: it asked for the section's one place in
+    reading order with `scalar_one_or_none`, and a repeated identifier holds
+    several. Every affected section page was unreachable as a result."""
+    response = client.get(
+        f"{API}/sections{DUPLICATED}/neighbors?release={DUPLICATED_RELEASE}"
+    )
+    if response.status_code == 404:
+        pytest.skip(f"{DUPLICATED} at {DUPLICATED_RELEASE} not loaded (needs load-all)")
+    body = response.json()
+
+    assert response.status_code == 200
+    # The neighbours are other sections, never another occurrence of this one.
+    for side in ("previous", "next"):
+        if body[side] is not None:
+            assert body[side]["identifier"] != DUPLICATED
+
+
+def test_an_ordinary_section_has_no_duplicates(client):
+    """The overwhelmingly common case stays clean: an empty list, not a null."""
+    body = client.get(f"{API}{SECTION}?release={CURRENT}").json()
+
+    assert body["duplicates"] == []

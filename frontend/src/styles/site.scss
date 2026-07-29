@@ -249,6 +249,26 @@ body {
   font-weight: 700;
 }
 
+// Labels the repeated bodies apart when the source published one identifier more
+// than once at a release point (ADR-0021). Rare, so it stays quiet: a rule and a
+// small caption, not a second layout.
+.doc-occurrence {
+  margin: 1.5rem 0 0.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule, #dfe1e2);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.doc-occurrence__heading {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .status-tag {
   vertical-align: 0.15em;
   margin-left: 0.4em;

@@ -27,6 +27,20 @@ export interface Provision {
   xml: string | null;
 }
 
+/** A further element the source published under the same `@identifier` at the
+ *  same release point. Normally there are none; when there are, the reader shows
+ *  every occurrence rather than picking one (ADR-0021). */
+export interface DuplicateOccurrence {
+  num: string | null;
+  heading: string | null;
+  status: string | null;
+  xml: string;
+  content_hash: string;
+  guid: string | null;
+  seq_in_title: number;
+  source_credit: string | null;
+}
+
 export interface Section {
   identifier: string;
   title_num: string;
@@ -41,6 +55,7 @@ export interface Section {
   ancestors: Entry[];
   xml: string;
   provision: Provision | null;
+  duplicates: DuplicateOccurrence[];
   release: Release;
   served_from: Release;
   content_first_seen: Release;

@@ -81,6 +81,9 @@ let selected = "";
 let neighbors: NeighborsBody | null = null;
 let labels: Labels = {};
 let sectionHtml = "";
+/** One rendered body per further occurrence the source published under this same
+ *  identifier — normally empty (ADR-0021). */
+let duplicateHtml: string[] = [];
 let toc: Toc | null = null;
 let section: Section | null = null;
 let titleNum: string | null = null;
@@ -105,6 +108,11 @@ if (body && isToc(body)) {
   // makes, and — after their labels come back — to render. Two passes over a
   // parsed tree, never two parses.
   const fragment = parseFragment(section.xml);
+  // The source repeats a few identifiers at the same release point; each extra
+  // occurrence is a full section body and is rendered like the first, so its
+  // citations must join the same batched label lookup — one request for the
+  // page, not one per occurrence.
+  const dupFragments = (section.duplicates ?? []).map((d) => parseFragment(d.xml));
 
   // Three calls, all server-side and all on localhost: the labels this page's
   // citations need (one request for all of them), the neighbours, and the
@@ -113,7 +121,10 @@ if (body && isToc(body)) {
   // the Day-6 debt carried over from the Jinja reader. The breadcrumb now rides
   // on the section itself (PLAN Day 6b).
   [labels, neighbors, releases] = await Promise.all([
-    fetchLabels(citedIdentifiers(hrefs(fragment)), selected),
+    fetchLabels(
+      citedIdentifiers([fragment, ...dupFragments].flatMap((f) => hrefs(f))),
+      selected,
+    ),
     fetchNeighbors(section.identifier, selected),
     fetchReleases(titleNum),
   ]);
@@ -123,11 +134,13 @@ if (body && isToc(body)) {
   // release point and got it. The page itself is identical for every reader —
   // the Watch button is a client-side island — so `public` is safe here.
   setPublicCache(Astro.response.headers, params.release, section.is_exact);
-  sectionHtml = render(fragment, {
+  const renderOptions = {
     target: identifier === section.identifier ? null : identifier,
     release: selected,
     labels,
-  });
+  };
+  sectionHtml = render(fragment, renderOptions);
+  duplicateHtml = dupFragments.map((f) => render(f, renderOptions));
   title = `${trimNum(section.num)} ${section.heading ?? ""} · ${selected} · U.S. Code`;
 }
 
@@ -183,7 +196,42 @@ const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
             </div>
           ))}
 
+        {duplicateHtml.length > 0 && (
+          <div class="usa-alert usa-alert--info" role="note">
+            <div class="usa-alert__body">
+              <h2 class="usa-alert__heading">
+                This section appears more than once at this release point
+              </h2>
+              <p class="usa-alert__text">
+                The official XML for this title at {selected} publishes{" "}
+                {duplicateHtml.length + 1} distinct texts under the identifier{" "}
+                <code>{section.identifier}</code>. Nothing in the source marks one
+                of them as the authoritative version, so all{" "}
+                {duplicateHtml.length + 1} are shown below, in the order they appear
+                in the source — rather than one being chosen here.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {duplicateHtml.length > 0 && (
+          <p class="doc-occurrence">Occurrence 1 of {duplicateHtml.length + 1}</p>
+        )}
+
         <article class="section-body" set:html={sectionHtml} />
+
+        {section.duplicates?.map((other, index) => (
+          <>
+            <p class="doc-occurrence">
+              Occurrence {index + 2} of {duplicateHtml.length + 1}
+              {other.heading && other.heading !== section!.heading && (
+                <span class="doc-occurrence__heading"> — {other.heading}</span>
+              )}
+              <StatusBadge status={other.status} />
+            </p>
+            <article class="section-body" set:html={duplicateHtml[index]} />
+          </>
+        ))}
 
         <Neighbors previous={neighbors?.previous} next={neighbors?.next} release={selected} />
 

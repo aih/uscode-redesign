@@ -36,6 +36,7 @@ from db.models import (
 )
 from storage.repository import (
     AmbiguousReleaseError,
+    DuplicateOccurrence,
     GuidResolution,
     Neighbors,
     Provision,
@@ -207,7 +208,13 @@ class PostgresRepository:
         served_from = self._served_from(section.title_id, release.release)
         if served_from is None:
             return None
-        row = self._session.execute(
+        # Ordered, and every row taken rather than the first: the source publishes
+        # a handful of identifiers more than once at the same release point, and
+        # an unordered `.first()` served whichever one Postgres happened to hand
+        # back — for /us/usc/t19/s2502 at 117-80 that was a coin flip between an
+        # empty stub and the real section. All occurrences are returned in source
+        # reading order and the reader shows them all (ADR-0021).
+        rows = self._session.execute(
             select(SectionVersion, SectionReleaseMap)
             .join(
                 SectionReleaseMap,
@@ -217,14 +224,34 @@ class PostgresRepository:
                 SectionVersion.section_id == section.id,
                 SectionReleaseMap.release_id == served_from.id,
             )
-        ).first()
-        if row is None:
+            .order_by(SectionReleaseMap.seq_in_title, SectionVersion.id)
+        ).all()
+        if not rows:
             return None
-        version, placement = row
+        version, placement = rows[0]
 
         title = self._session.get(Title, section.title_id)
         first_seen = self._session.get(ReleasePoint, version.first_release_id)
         assert title is not None and first_seen is not None
+
+        guid = self._guid_for(section.identifier, served_from.id)
+        duplicates = tuple(
+            DuplicateOccurrence(
+                num=other.num,
+                heading=other.heading,
+                status=other.status,
+                xml=other.xml,
+                content_hash=other.content_hash.hex(),
+                # The guid_map holds one row per (identifier, release), so a
+                # repeated identifier cannot be told apart there — every
+                # occurrence reports the same guid, which is the source's own
+                # ambiguity showing through rather than ours to invent around.
+                guid=guid,
+                seq_in_title=other_placement.seq_in_title,
+                source_credit=other.source_credit,
+            )
+            for other, other_placement in rows[1:]
+        )
 
         return SectionResult(
             identifier=section.identifier,
@@ -238,14 +265,35 @@ class PostgresRepository:
             seq_in_title=placement.seq_in_title,
             parent_identifier=placement.parent_identifier,
             ancestors=self._breadcrumb(placement.parent_identifier),
-            guid=self._guid_for(section.identifier, served_from.id),
+            guid=guid,
             release=release.release,
             served_from=self._ref(served_from),
             content_first_seen=self._ref(first_seen),
             provision=(
-                self._extract_provision(version.xml, identifier) if remainder else None
+                self._provision_across(rows, identifier) if remainder else None
             ),
+            duplicates=duplicates,
         )
+
+    def _provision_across(
+        self, rows: Sequence[tuple[SectionVersion, SectionReleaseMap]], identifier: str
+    ) -> Provision | None:
+        """Find the requested sub-provision in whichever occurrence carries it.
+
+        With a repeated identifier the target may live in the second element and
+        not the first — the empty "Purposes" stub of t19/s2502 has no `(c)(5)` to
+        highlight, the real section does. Searching in source order and keeping
+        the first hit means a deep link still lands on text.
+        """
+        attempts = [self._extract_provision(version.xml, identifier) for version, _ in rows]
+        # `_extract_provision` always returns a Provision — `found=False` when the
+        # XPath missed — so the test is `.found`, not `is not None`. Checking for
+        # None instead stopped at the first occurrence and reported "no such
+        # provision" whenever an empty stub sorted ahead of the real section.
+        for attempt in attempts:
+            if attempt.found:
+                return attempt
+        return attempts[0] if attempts else None
 
     def _longest_prefix_section(self, identifier: str) -> tuple[Section, str] | None:
         """PLAN §3 step 2, in one query: try every prefix, keep the longest hit."""
@@ -415,24 +463,32 @@ class PostgresRepository:
         if served_from is None:
             return None
 
-        current = self._session.execute(
-            select(SectionReleaseMap.seq_in_title)
-            .join(
-                SectionVersion,
-                SectionVersion.id == SectionReleaseMap.section_version_id,
-            )
-            .where(
-                SectionVersion.section_id == section.id,
-                SectionReleaseMap.release_id == served_from.id,
-            )
-        ).scalar_one_or_none()
-        if current is None:
+        # A section can hold more than one place in reading order: where the source
+        # repeats an identifier (ADR-0021), each occurrence has its own
+        # `seq_in_title`. `scalar_one_or_none` raised outright on those — a 500 on
+        # every affected section page — so all the positions are taken and the
+        # neighbours bracket the group: what precedes the first occurrence, and
+        # what follows the last.
+        seqs = sorted(
+            self._session.scalars(
+                select(SectionReleaseMap.seq_in_title)
+                .join(
+                    SectionVersion,
+                    SectionVersion.id == SectionReleaseMap.section_version_id,
+                )
+                .where(
+                    SectionVersion.section_id == section.id,
+                    SectionReleaseMap.release_id == served_from.id,
+                )
+            ).all()
+        )
+        if not seqs:
             return None
 
         return Neighbors(
             identifier=section.identifier,
-            previous=self._neighbor(section.title_id, served_from.id, current, before=True),
-            next=self._neighbor(section.title_id, served_from.id, current, before=False),
+            previous=self._neighbor(section.title_id, served_from.id, seqs[0], before=True),
+            next=self._neighbor(section.title_id, served_from.id, seqs[-1], before=False),
             release=release.release,
             served_from=self._ref(served_from),
         )
