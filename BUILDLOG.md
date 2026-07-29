@@ -367,3 +367,73 @@ Session-by-session record of how this site was built. One entry per working sess
   - `make shots` — 8 screenshots at 375px/1280px, no horizontal scroll at either width, refreshed in `docs/screenshots/`.
   - Found and fixed in passing: the docker `api` container had been running a stale image whose reload target (`api.main:app`) predates the ADR-0010 split — every file save was crash-looping it silently (`Error loading ASGI app`). `docker compose up -d api` recreated it against the current `docker-compose.yml` (`main:app` on :8001, no host port — Caddy's job, ADR-0015); not otherwise touched.
 - **No corpus work this session** — the backfill/verify-deep track from BUILDLOG 017/018's Session 9 is untouched; this was Session 10 only.
+
+## 020 — 2026-07-28 — Day 5: auth + watchlists
+
+- **Tool/model:** Claude Code, Sonnet 5.
+- **Asked:** PLAN §4's auth + watchlists — email+password signup/login in `api/` (argon2,
+  HTTP-only session cookies, CSRF on state-changing routes), watchlist CRUD (items =
+  identifier + optional pinned release + note), a Watch button island, a My Provisions page
+  with one-click open at current-or-pinned release, and status badges for a watched
+  section that's since gone repealed/transferred — plus tests including the auth-required
+  boundaries and the architecture suite.
+- **Decided:** Full reasoning in ADR-0017. In short: sessions are server-side rows keyed by
+  `sha256(token)` (revocable logout, not just a forgotten cookie); CSRF is a double-submit
+  cookie pair (`usc_session` HttpOnly + `usc_csrf` readable), required on logout and every
+  watchlist mutation but not on signup/login (no session yet to hijack, and the JSON-only +
+  no-CORS combination already blocks a forged cross-site request from reaching either
+  route); accounts get a second storage module (`storage/accounts.py` +
+  `storage/postgres_accounts.py`, own `AccountsRepository` protocol and its own
+  protocol/implementation contract test) rather than new methods bolted onto the
+  version-resolution `Repository`, so `api/` still holds no SQL and no DB session either
+  way; a watchlist item's status badge is a live `Repository.labels()` lookup grouped by
+  resolved release, the same batched call a section page already makes for citation hover
+  text — not a copy of the status recorded at add time.
+  - **Reader-side choice, not in the ADR:** the reader gains three small `is:inline` islands
+    (Watch button, login form, signup form) alongside Day 4's keyboard-nav island — auth
+    genuinely needs client state (is this browser logged in, what does it currently watch)
+    that a purely SSR page can't have without every page forwarding cookies, so this is a
+    deliberate, small widening of "no JS by default," not an oversight. The **My Provisions
+    page stays pure SSR** like every other reader page, by forwarding the browser's
+    `Cookie` header to its own server-side API calls (`lib/api.ts`'s `fetchMe`/
+    `fetchDefaultWatchlist`) — the one thing that makes it different from `releases.astro`.
+  - A user's watchlists are lazily provisioned: no "create your first list" step — the
+    reader's convenience endpoint (`GET /api/v1/watchlist`) auto-creates "My Provisions" on
+    first use, and the general `/api/v1/watchlists` CRUD the schema supports (multiple named
+    lists) exists underneath it for anyone who wants more than one.
+- **Produced:** `db/models.py` (`AuthSession`), migration `c1f9a2b6d3e4`; `storage/accounts.py`,
+  `storage/postgres_accounts.py`, `storage/session.py`/`storage/__init__.py` wiring;
+  `api/auth.py` (signup/login/logout/me), `api/watchlists.py` (CRUD + the `/api/v1/watchlist`
+  convenience singular), `api/schemas.py` additions; `main.py` router wiring;
+  `tests/test_auth.py` (13 tests), `tests/test_watchlists.py` (13 tests), an accounts
+  protocol-conformance test in `tests/test_architecture.py`, `tests/test_models.py` updated
+  for `auth_sessions`, a `fresh_client` fixture in `tests/conftest.py` (function-scoped, so
+  auth tests' cookies never leak into the session-scoped `client` other suites share);
+  `frontend/src/lib/types.ts` (`User`/`Watchlist`/`WatchlistItem`), `frontend/src/lib/api.ts`
+  (`fetchMe`/`fetchDefaultWatchlist`, cookie-forwarding), `frontend/src/lib/url.ts`
+  (`provisionsHref`/`loginHref`/`signupHref` + 4 new Vitest cases);
+  `frontend/src/components/{WatchButton,RemoveWatchItem}.astro`,
+  `frontend/src/pages/{login,signup,provisions}.astro`, `SiteHeader.astro` nav link,
+  `site.scss` additions; `docs/adr/0017-…`; this entry.
+- **Verified:**
+  - `make test` — **249 passed** (was 222; +27: 13 auth, 13 watchlist, 1 architecture), 13
+    deselected. `make test-web` — **37 passed** (was 34; +3 URL-helper cases). `npx astro
+    check` — 0 errors on the new files. `npm run build` — succeeds.
+  - Against the real stack (API on :8123 against the docker `db`, Astro server build on
+    :4321, `API_BASE_URL` pointed at the API): signup sets an `HttpOnly` session cookie and a
+    non-`HttpOnly` CSRF cookie (checked via the raw `Set-Cookie` header, not just presence);
+    a watchlist mutation without `X-CSRF-Token` is 403, with it 201/204; a bad-password login
+    and an unknown-email login both return 401 with the same message; logout revokes the
+    session (`/me` 401 immediately after); an end-to-end pass — sign up via the API, add
+    `/us/usc/t16/s672` (known `omitted`, per `test_labels_carry_status_so_a_citation_can_be_badged`
+    in `tests/test_api.py`) to the watchlist, then load `/app/provisions` on the *frontend*
+    process with the browser's cookie forwarded by hand — rendered the heading, the `omitted`
+    status badge, and the note text, proving the SSR cookie-forwarding path and the
+    enrichment query both work together, not just in isolation.
+  - `tests/test_architecture.py`'s existing suite still passes unmodified against the new
+    files: no `db.*` import, no `sqlalchemy` import, and no template-engine import anywhere
+    under `api/` — `api/auth.py` and `api/watchlists.py` go through `storage.accounts` only.
+- **Open debt, named rather than silent:** no email verification, no password reset, no
+  login-attempt rate limiting (PLAN's Day 5 description scopes email out of v1 entirely);
+  the general `/api/v1/watchlists` CRUD has no frontend UI yet (only the default-list
+  convenience endpoints the reader actually uses are wired to a page).
