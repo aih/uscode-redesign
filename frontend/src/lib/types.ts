@@ -121,3 +121,34 @@ export interface Title {
   is_positive_law: boolean;
   ingested_releases: string[];
 }
+
+/** Mirrors `UserOut` (Day 5) — the whole shape `/api/v1/auth/me` returns. */
+export interface User {
+  id: string;
+  email: string;
+}
+
+/** Mirrors `WatchlistItemOut` — a watched provision, enriched with what it
+ * currently says. `num`/`heading`/`status` are null when enrichment failed
+ * (an item pinned to a release the title was never ingested at), never when
+ * the section simply has no heading. */
+export interface WatchlistItem {
+  id: number;
+  identifier: string;
+  title_num: string;
+  note: string | null;
+  pinned_release_label: string | null;
+  created_at: string;
+  num: string | null;
+  heading: string | null;
+  status: string | null;
+}
+
+/** Mirrors `WatchlistOut` — a named list plus its items, the shape both
+ * `GET /api/v1/watchlist` (the reader's default list) and
+ * `GET /api/v1/watchlists/{id}/items` return. */
+export interface Watchlist {
+  id: number;
+  name: string;
+  items: WatchlistItem[];
+}

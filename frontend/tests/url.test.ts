@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { apiHref, appHref, citationHref, diffHref, provisionLabel, trimNum, versionsHref } from "../src/lib/url";
+import {
+  apiHref,
+  appHref,
+  citationHref,
+  diffHref,
+  loginHref,
+  provisionLabel,
+  provisionsHref,
+  signupHref,
+  trimNum,
+  versionsHref,
+} from "../src/lib/url";
 
 describe("trimNum", () => {
   it("strips a single trailing period so the page's own punctuation doesn't double up", () => {
@@ -62,5 +73,25 @@ describe("versionsHref and diffHref", () => {
     expect(diffHref("/us/usc/t16/s45f", "119-99", "119-102not101")).toBe(
       "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101",
     );
+  });
+});
+
+describe("provisionsHref", () => {
+  it("addresses My Provisions", () => {
+    expect(provisionsHref()).toBe("/app/provisions");
+  });
+});
+
+describe("loginHref and signupHref", () => {
+  it("carry a next path, URL-encoded", () => {
+    expect(loginHref("/app/us/usc/t16/s45f?release=119-99")).toBe(
+      "/app/login?next=%2Fapp%2Fus%2Fusc%2Ft16%2Fs45f%3Frelease%3D119-99",
+    );
+    expect(signupHref("/app/provisions")).toBe("/app/signup?next=%2Fapp%2Fprovisions");
+  });
+
+  it("omit the query string with no next", () => {
+    expect(loginHref()).toBe("/app/login");
+    expect(signupHref(null)).toBe("/app/signup");
   });
 });

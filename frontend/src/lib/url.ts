@@ -50,6 +50,21 @@ export function diffHref(identifier: string, from: string, to: string): string {
   return `${APP}/diff${identifier}?${new URLSearchParams({ from, to }).toString()}`;
 }
 
+/** `/app/provisions` — the reader's one watchlist page (Day 5). */
+export function provisionsHref(): string {
+  return `${APP}/provisions`;
+}
+
+/** `/app/login`, carrying where to return to after signing in. */
+export function loginHref(next?: string | null): string {
+  return next ? `${APP}/login?next=${encodeURIComponent(next)}` : `${APP}/login`;
+}
+
+/** `/app/signup`, same `next` convention as `loginHref`. */
+export function signupHref(next?: string | null): string {
+  return next ? `${APP}/signup?next=${encodeURIComponent(next)}` : `${APP}/signup`;
+}
+
 /** `45f.` → `45f`: the page supplies its own punctuation (`doc-title__num`
  * already appends "."), so a source num that carries a trailing period would
  * otherwise double it. */

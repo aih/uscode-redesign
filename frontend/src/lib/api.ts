@@ -15,7 +15,9 @@ import type {
   Section,
   Title,
   Toc,
+  User,
   Versions,
+  Watchlist,
 } from "./types";
 import { isToc } from "./types";
 
@@ -132,4 +134,38 @@ export async function fetchVersions(identifier: string): Promise<Versions> {
 /** A redline between two release points of the same section (Day 4). */
 export async function fetchDiff(identifier: string, from: string, to: string): Promise<Diff> {
   return getJson<Diff>(`/api/v1/sections${identifier}/diff${qs({ from, to })}`);
+}
+
+/**
+ * Auth-aware SSR reads (Day 5) — `/app/provisions` is rendered server-side like
+ * every other page, so it has to forward the *browser's* session cookie to this
+ * process's own server-side fetch by hand: a Node `fetch` to `API_BASE_URL` is a
+ * separate request with no cookie jar of its own, unlike a same-origin fetch
+ * from client-side JS (which is how `WatchButton.astro`'s island stays logged
+ * in without any of this).
+ */
+async function getJsonWithCookie<T>(path: string, cookie: string | null): Promise<T | null> {
+  const response = await fetch(`${BASE}${path}`, {
+    headers: { accept: "application/json", ...(cookie ? { cookie } : {}) },
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) {
+    const body: { detail?: string } = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }));
+    throw new ApiError(response.status, body.detail ?? response.statusText);
+  }
+  return (await response.json()) as T;
+}
+
+/** `null` when the browser has no valid session — not an error, just "signed out". */
+export async function fetchMe(cookie: string | null): Promise<User | null> {
+  return getJsonWithCookie<User>("/api/v1/auth/me", cookie);
+}
+
+/** The reader's one watchlist ("My Provisions"), auto-created on first use.
+ * `null` when signed out — callers check `fetchMe` first to tell that apart
+ * from "signed in with nothing watched yet" (an empty `items`). */
+export async function fetchDefaultWatchlist(cookie: string | null): Promise<Watchlist | null> {
+  return getJsonWithCookie<Watchlist>("/api/v1/watchlist", cookie);
 }
