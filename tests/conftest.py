@@ -9,6 +9,7 @@ green on a fresh clone — but it is the API's real contract test, and CI must r
 it against a loaded database (`docker compose up -d db && make dev-data`).
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,19 @@ def uslm2_usc01() -> Path:
 REQUIRED_RELEASES = {"119-99", "119-102not101"}
 
 
+def _unavailable(reason: str) -> None:
+    """Skip locally, fail loudly where the suite is *supposed* to be complete.
+
+    A skip is right on a fresh clone with no Postgres. It is exactly wrong in
+    CI: a misconfigured database would turn the API's real contract tests into
+    silent no-ops and the run would still go green. `USC_REQUIRE_INTEGRATION=1`
+    is CI saying "these must actually run" — so there, absence is a failure.
+    """
+    if os.environ.get("USC_REQUIRE_INTEGRATION"):
+        pytest.fail(f"USC_REQUIRE_INTEGRATION is set but {reason}", pytrace=False)
+    pytest.skip(reason)
+
+
 @pytest.fixture(scope="session")
 def loaded_database() -> None:
     """Skip the integration suite unless Title 16 is loaded at both release points."""
@@ -62,11 +76,11 @@ def loaded_database() -> None:
                 )
             )
     except Exception as exc:  # pragma: no cover - environment-dependent
-        pytest.skip(f"no database: {exc}")
+        _unavailable(f"no database: {exc}")
 
     missing = REQUIRED_RELEASES - labels
     if missing:  # pragma: no cover - environment-dependent
-        pytest.skip(
+        _unavailable(
             "Title 16 is not loaded at "
             + ", ".join(sorted(missing))
             + " — run `make dev-data`"

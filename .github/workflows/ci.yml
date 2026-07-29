@@ -1,0 +1,100 @@
+# Until this existed, every test count in BUILDLOG.md was the authoring
+# session's own claim ("test counts remain the sessions' claims until CI
+# exists"). This is the independent machine that re-runs them.
+#
+# Two suites, both required (ADR-0015): `make test` covers Python, and since the
+# Jinja reader retired, reader coverage lives entirely in `make test-web`.
+#
+# Nothing here touches uscode.house.gov. The fixture data is committed and
+# loaded by `make ci-data` — see the comment on that target.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  schedule:
+    # The full-sample parser tests parse the 32 MB usc16.xml; nightly, not per push.
+    - cron: "17 6 * * *"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: make test (Postgres 16)
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: uscode
+          POSTGRES_PASSWORD: uscode
+          POSTGRES_DB: uscode
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U uscode"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql+psycopg://uscode:uscode@localhost:5432/uscode
+      # The API integration tests skip themselves when the database isn't
+      # loaded. In CI that would be a green run that tested nothing, so here
+      # absence is a failure instead — see tests/conftest.py::_unavailable.
+      USC_REQUIRE_INTEGRATION: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: Load the fixture corpus (offline)
+        run: make ci-data
+
+      - run: make test
+
+  web:
+    name: make test-web (Vitest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Test
+        working-directory: frontend
+        run: npm test
+
+  slow:
+    name: make test-slow (full samples)
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - run: make test-slow

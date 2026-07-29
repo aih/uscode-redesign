@@ -1,5 +1,5 @@
-.PHONY: dev dev-web dev-all dev-data test test-web test-slow test-all fixtures \
-        verify verify-deep load-all shots
+.PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
+        verify verify-deep load-all shots loadtest
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -29,6 +29,22 @@ dev-data:
 	uv run python -m ingest load data/releases/119-99/usc16.xml --release 119-99 \
 		--source-zip data/releases/119-99/xml_usc16@119-99.zip
 	uv run python -m ingest load samples/uslm1/usc16.xml --release 119-102not101
+
+# The same two release points as `dev-data`, but with **no network access at
+# all**: the inventory comes from a committed JSON instead of OLRC's HTML, and
+# Title 16 @ 119-99 from a committed zip instead of a download. CI must not hit
+# uscode.house.gov on every push — that violates the source-etiquette rule, and
+# ADR-0013 says every consumer pulls from the mirror rather than the origin.
+# Committing a 5 MB zip is the cheaper honest answer than wiring CI to S3.
+ci-data:
+	uv run alembic upgrade head
+	uv run python -m ingest inventory --from-file tests/fixtures/releasepoints.json
+	rm -rf .ci-data && mkdir -p .ci-data
+	unzip -o -q samples/uslm1/xml_usc16@119-99.zip -d .ci-data
+	uv run python -m ingest load .ci-data/usc16.xml --release 119-99 \
+		--source-zip samples/uslm1/xml_usc16@119-99.zip
+	uv run python -m ingest load samples/uslm1/usc16.xml --release 119-102not101
+	rm -rf .ci-data
 
 test:
 	uv run pytest

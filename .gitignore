@@ -224,3 +224,6 @@ __marimo__/
 # Provenance manifests under data/manifests/ ARE committed (PLAN 11.4).
 data/*
 !data/manifests/
+
+# `make ci-data` unzips the committed 119-99 fixture here, then removes it.
+/.ci-data/
