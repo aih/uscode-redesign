@@ -118,7 +118,7 @@ cat > "$OUT" <<JSON
   "requests_per_route": $N,
   "concurrency": $C,
   "release": "$RELEASE",
-  "note": "Laptop numbers against a partial corpus, through the dev stack (single uvicorn worker, --reload). Relative comparisons between rows are the point, not absolutes.",
+  "note": "Laptop numbers against a partial corpus, through the dev stack (single uvicorn worker, --reload). Relative comparisons between rows are the point, not absolutes. Check what else is running before trusting a throughput figure: the 2026-07-29 run shared the machine with an 'ingest load-all', which depresses every row.",
   "findings": [
     "The diff endpoint is CPU-bound and does not scale with concurrency: it holds ~0.45 rps at every concurrency from 1 to 10, while latency grows linearly (2.2 s, 4.5 s, 11.9 s, 22.0 s). Past about 10 concurrent it exceeds a 20 s client timeout and every request fails. It is unauthenticated, so one client can saturate it. Diff_Timeout=0 is ADR-0016's deliberate choice (a timed-out diff-match-patch silently returns a worse diff), so this is a known cost, not a regression - but it must be throttled or precomputed before public exposure.",
     "Roughly half the diff cost is guid churn rather than legal change: @id attributes regenerate at every release point by design (ADR-0003), so the two texts differ in every element. Diffing the guid-stripped text - what ADR-0007 already does for dedupe - took the same section from 2,220 ms and 51 ops to 1,172 ms and 20 ops. The extra 31 ops are regenerated guids presented to the reader as changes to the law.",

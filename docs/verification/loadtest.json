@@ -4,12 +4,156 @@
   "requests_per_route": 300,
   "concurrency": 10,
   "release": "119-102not101",
-  "note": "Laptop numbers against a partial corpus, through the dev stack (single uvicorn worker, --reload). Relative comparisons between rows are the point, not absolutes.",
+  "note": "Laptop numbers against a partial corpus, through the dev stack (single uvicorn worker, --reload). Relative comparisons between rows are the point, not absolutes. This run shared the machine with an `ingest load-all`, which depresses every throughput figure; the diff finding is unaffected because it is about scaling, not absolute speed.",
   "findings": [
     "The diff endpoint is CPU-bound and does not scale with concurrency: it holds ~0.45 rps at every concurrency from 1 to 10, while latency grows linearly (2.2 s, 4.5 s, 11.9 s, 22.0 s). Past about 10 concurrent it exceeds a 20 s client timeout and every request fails. It is unauthenticated, so one client can saturate it. Diff_Timeout=0 is ADR-0016's deliberate choice (a timed-out diff-match-patch silently returns a worse diff), so this is a known cost, not a regression - but it must be throttled or precomputed before public exposure.",
     "Roughly half the diff cost is guid churn rather than legal change: @id attributes regenerate at every release point by design (ADR-0003), so the two texts differ in every element. Diffing the guid-stripped text - what ADR-0007 already does for dedupe - took the same section from 2,220 ms and 51 ops to 1,172 ms and 20 ops. The extra 31 ops are regenerated guids presented to the reader as changes to the law.",
     "Revalidation works and is worth having, but it is not a latency win on loopback: 304s ran 183.7 rps against 159.1 for the full 200. What it actually saves is the body - 28,348 bytes per request - which matters over a real network and not at all here.",
     "HEAD is 405 on every /api/v1 route: FastAPI's APIRouter registers GET alone, where Starlette's own Route would add HEAD. Caches, CDNs and uptime monitors use HEAD, so this is worth fixing before a CDN goes in front."
   ],
-  "routes": [{"route":"section JSON, pinned","url":"/api/v1/us/usc/t16/s45f?release=119-102not101","requests":300,"rps":140.1,"mean_ms":70.0,"p50_ms":66.5,"p95_ms":111.6,"bytes_per_request":28348,"status_codes":"200:300"},{"route":"section JSON, unpinned","url":"/api/v1/us/usc/t16/s45f","requests":300,"rps":106.3,"mean_ms":92.3,"p50_ms":77.4,"p95_ms":179.8,"bytes_per_request":28348,"status_codes":"200:300"},{"route":"provision JSON (extracted at request time)","url":"/api/v1/us/usc/t16/s45f/c/5?release=119-102not101","requests":300,"rps":135.7,"mean_ms":71.9,"p50_ms":69.4,"p95_ms":99.0,"bytes_per_request":29020,"status_codes":"200:300"},{"route":"section XML, verbatim USLM","url":"/api/v1/us/usc/t16/s45f?release=119-102not101&format=xml","requests":300,"rps":146.4,"mean_ms":67.6,"p50_ms":64.2,"p95_ms":109.8,"bytes_per_request":25865,"status_codes":"200:300"},{"route":"parent TOC (was fetched per section page)","url":"/api/v1/us/usc/t16/ch1/schVI?release=119-102not101","requests":300,"rps":156.0,"mean_ms":62.8,"p50_ms":62.4,"p95_ms":83.2,"bytes_per_request":9794,"status_codes":"200:300"},{"route":"labels, batched","url":"/api/v1/labels?release=119-102not101&identifier=/us/usc/t16/s45f&identifier=/us/usc/t16/s1","requests":300,"rps":276.7,"mean_ms":35.3,"p50_ms":34.9,"p95_ms":49.7,"bytes_per_request":368,"status_codes":"200:300"},{"route":"neighbors","url":"/api/v1/sections/us/usc/t16/s45f/neighbors?release=119-102not101","requests":300,"rps":194.0,"mean_ms":50.5,"p50_ms":48.4,"p95_ms":83.6,"bytes_per_request":931,"status_codes":"200:300"},{"route":"versions timeline","url":"/api/v1/sections/us/usc/t16/s2201/versions","requests":300,"rps":271.4,"mean_ms":35.8,"p50_ms":34.2,"p95_ms":58.8,"bytes_per_request":3013,"status_codes":"200:300"},{"route":"releases","url":"/api/v1/releases?title=16","requests":300,"rps":143.8,"mean_ms":67.0,"p50_ms":60.3,"p95_ms":130.0,"bytes_per_request":38864,"status_codes":"200:300"},{"route":"reader section page (SSR)","url":"/app/us/usc/t16/s45f?release=119-102not101","requests":300,"rps":35.4,"mean_ms":278.8,"p50_ms":269.7,"p95_ms":418.8,"bytes_per_request":38366,"status_codes":"200:300"},{"route":"reader TOC page (SSR)","url":"/app/us/usc/t16/ch1?release=119-102not101","requests":300,"rps":53.6,"mean_ms":183.2,"p50_ms":181.3,"p95_ms":247.7,"bytes_per_request":48975,"status_codes":"200:300"},{"route":"section, revalidated (If-None-Match -> 304)","url":"/api/v1/us/usc/t16/s45f?release=119-102not101","requests":300,"rps":165.2,"mean_ms":58.6,"p50_ms":56.0,"p95_ms":91.1,"bytes_per_request":0,"status_codes":"304:300"},{"route":"diff between two release points","url":"/api/v1/sections/us/usc/t16/s2201/diff?from=119-99&to=119-102not101","requests":20,"rps":0.5,"mean_ms":20000.0,"p50_ms":20000.0,"p95_ms":20000.0,"bytes_per_request":12036,"status_codes":"20:Get"}]
+  "routes": [
+    {
+      "route": "section JSON, pinned",
+      "url": "/api/v1/us/usc/t16/s45f?release=119-102not101",
+      "requests": 300,
+      "rps": 140.1,
+      "mean_ms": 70.0,
+      "p50_ms": 66.5,
+      "p95_ms": 111.6,
+      "bytes_per_request": 28348,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "section JSON, unpinned",
+      "url": "/api/v1/us/usc/t16/s45f",
+      "requests": 300,
+      "rps": 106.3,
+      "mean_ms": 92.3,
+      "p50_ms": 77.4,
+      "p95_ms": 179.8,
+      "bytes_per_request": 28348,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "provision JSON (extracted at request time)",
+      "url": "/api/v1/us/usc/t16/s45f/c/5?release=119-102not101",
+      "requests": 300,
+      "rps": 135.7,
+      "mean_ms": 71.9,
+      "p50_ms": 69.4,
+      "p95_ms": 99.0,
+      "bytes_per_request": 29020,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "section XML, verbatim USLM",
+      "url": "/api/v1/us/usc/t16/s45f?release=119-102not101&format=xml",
+      "requests": 300,
+      "rps": 146.4,
+      "mean_ms": 67.6,
+      "p50_ms": 64.2,
+      "p95_ms": 109.8,
+      "bytes_per_request": 25865,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "parent TOC (was fetched per section page)",
+      "url": "/api/v1/us/usc/t16/ch1/schVI?release=119-102not101",
+      "requests": 300,
+      "rps": 156.0,
+      "mean_ms": 62.8,
+      "p50_ms": 62.4,
+      "p95_ms": 83.2,
+      "bytes_per_request": 9794,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "labels, batched",
+      "url": "/api/v1/labels?release=119-102not101&identifier=/us/usc/t16/s45f&identifier=/us/usc/t16/s1",
+      "requests": 300,
+      "rps": 276.7,
+      "mean_ms": 35.3,
+      "p50_ms": 34.9,
+      "p95_ms": 49.7,
+      "bytes_per_request": 368,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "neighbors",
+      "url": "/api/v1/sections/us/usc/t16/s45f/neighbors?release=119-102not101",
+      "requests": 300,
+      "rps": 194.0,
+      "mean_ms": 50.5,
+      "p50_ms": 48.4,
+      "p95_ms": 83.6,
+      "bytes_per_request": 931,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "versions timeline",
+      "url": "/api/v1/sections/us/usc/t16/s2201/versions",
+      "requests": 300,
+      "rps": 271.4,
+      "mean_ms": 35.8,
+      "p50_ms": 34.2,
+      "p95_ms": 58.8,
+      "bytes_per_request": 3013,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "releases",
+      "url": "/api/v1/releases?title=16",
+      "requests": 300,
+      "rps": 143.8,
+      "mean_ms": 67.0,
+      "p50_ms": 60.3,
+      "p95_ms": 130.0,
+      "bytes_per_request": 38864,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "reader section page (SSR)",
+      "url": "/app/us/usc/t16/s45f?release=119-102not101",
+      "requests": 300,
+      "rps": 35.4,
+      "mean_ms": 278.8,
+      "p50_ms": 269.7,
+      "p95_ms": 418.8,
+      "bytes_per_request": 38366,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "reader TOC page (SSR)",
+      "url": "/app/us/usc/t16/ch1?release=119-102not101",
+      "requests": 300,
+      "rps": 53.6,
+      "mean_ms": 183.2,
+      "p50_ms": 181.3,
+      "p95_ms": 247.7,
+      "bytes_per_request": 48975,
+      "status_codes": "200:300"
+    },
+    {
+      "route": "section, revalidated (If-None-Match -> 304)",
+      "url": "/api/v1/us/usc/t16/s45f?release=119-102not101",
+      "requests": 300,
+      "rps": 165.2,
+      "mean_ms": 58.6,
+      "p50_ms": 56.0,
+      "p95_ms": 91.1,
+      "bytes_per_request": 0,
+      "status_codes": "304:300"
+    },
+    {
+      "route": "diff between two release points",
+      "url": "/api/v1/sections/us/usc/t16/s2201/diff?from=119-99&to=119-102not101",
+      "requests": 20,
+      "rps": 0.5,
+      "mean_ms": 20000.0,
+      "p50_ms": 20000.0,
+      "p95_ms": 20000.0,
+      "bytes_per_request": 12036,
+      "status_codes": "20:Get"
+    }
+  ]
 }
