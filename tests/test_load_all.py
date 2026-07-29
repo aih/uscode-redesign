@@ -23,6 +23,7 @@ from ingest.load_all import (
     _file_form,
     plan_loads,
 )
+from tests.conftest import SLICE
 
 
 @pytest.fixture
@@ -226,3 +227,42 @@ def test_verify_reports_are_internally_consistent(session_factory):
     # corpus with millions of them.
     if report.release_map_rows:
         assert report.guid_rows > report.release_map_rows
+
+
+def test_deep_recount_keys_the_ledger_in_its_own_title_form(tmp_path):
+    """`Title.num` is the URL form (`5`); ledger keys use the file-naming form
+    (`05`). Looking one up with the other found nothing and returned silently, so
+    the deep recount skipped every single-digit title — 504 of 3,153 on the full
+    corpus, Title 5 included — while the report still read as if it had checked
+    everything."""
+    import zipfile
+
+    from ingest.verify import TitleCheck, _recount_from_source
+
+    zip_path = tmp_path / "xml_usc05@119-99.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.write(SLICE, arcname="usc05.xml")
+
+    ledger = DownloadLedger(path=tmp_path / "ledger.json")
+    ledger.entries["119-99/05"] = LedgerEntry(
+        release_label="119-99",
+        title_num="05",
+        status=FetchStatus.OK,
+        url="https://example.invalid/xml_usc05@119-99.zip",
+        path=zip_path.name,
+    )
+
+    # The database spells this title `5`; only the translation to `05` finds it.
+    check = TitleCheck(
+        release_label="119-99", title_num="5", sections_loaded=0, rows_in_release_map=0
+    )
+    assert _recount_from_source(check, ledger) is True
+    assert check.source_sections is not None and check.source_sections > 0
+
+    # And a title-version with no source file at all reports False, so the caller
+    # can name it as unchecked instead of passing over it in silence.
+    missing = TitleCheck(
+        release_label="119-99", title_num="99", sections_loaded=0, rows_in_release_map=0
+    )
+    assert _recount_from_source(missing, ledger) is False
+    assert missing.source_sections is None

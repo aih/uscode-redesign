@@ -44,7 +44,7 @@ from db.models import (
     TitleVersion,
 )
 from ingest.backfill import DownloadLedger
-from ingest.load_all import _extracted
+from ingest.load_all import _extracted, _file_form
 from ingest.parser import parser_for
 
 
@@ -100,12 +100,23 @@ class VerifyReport:
 
     count_mismatches: list[str] = field(default_factory=list)
     source_mismatches: list[str] = field(default_factory=list)
+    source_unavailable: list[str] = field(default_factory=list)
+    """Deep only: title-versions with no source file to recount from, so the
+    independent check could not run. Named rather than passed over — a deep run
+    that quietly recounted a subset is a weaker claim than it appears."""
+
     unstored_element_gaps: dict[str, int] = field(default_factory=dict)
     checks: list[TitleCheck] = field(default_factory=list)
 
     @property
     def sound(self) -> bool:
         return not self.count_mismatches and not self.source_mismatches
+
+    @property
+    def source_recounted(self) -> int:
+        """How many title-versions the independent recount actually covered — the
+        number that gives `source_mismatches: 0` its meaning."""
+        return sum(1 for check in self.checks if check.source_sections is not None)
 
     @property
     def dedupe_ratio(self) -> float:
@@ -118,6 +129,7 @@ class VerifyReport:
     def as_json(self) -> dict[str, object]:
         document = asdict(self)
         document["sound"] = self.sound
+        document["source_recounted"] = self.source_recounted
         document["dedupe_ratio"] = round(self.dedupe_ratio, 6)
         # Per-title detail is the evidence, but it is long; keep it last.
         document["checks"] = [asdict(c) for c in self.checks]
@@ -198,8 +210,8 @@ def verify_database(
             raw_section_elements=raw,
         )
 
-        if deep and ledger is not None:
-            _recount_from_source(check, ledger)
+        if deep and ledger is not None and not _recount_from_source(check, ledger):
+            report.source_unavailable.append(f"{label}/{num}")
 
         report.checks.append(check)
         report.title_versions_checked += 1
@@ -223,18 +235,29 @@ def verify_database(
     return report
 
 
-def _recount_from_source(check: TitleCheck, ledger: DownloadLedger) -> None:
-    """Re-parse this title's downloaded zip and count it again, independently."""
-    entry = ledger.entries.get(f"{check.release_label}/{check.title_num}")
+def _recount_from_source(check: TitleCheck, ledger: DownloadLedger) -> bool:
+    """Re-parse this title's downloaded zip and count it again, independently.
+
+    Returns False when there is no source file to recount from, so the caller can
+    say so. Silence here is worse than a mismatch: an unfindable file makes the
+    *independent* half of the check disappear while the report still reads clean.
+
+    The key needs the ledger's file-naming form (`01`, `05a`), not `Title.num`'s
+    URL form (`1`, `5a`) — the same translation `load_all.completed_pairs` makes,
+    and for the same reason. Skipping it silently dropped every single-digit
+    title from the deep recount: 504 of 3,153 title-versions, Title 5 included.
+    """
+    entry = ledger.entries.get(f"{check.release_label}/{_file_form(check.title_num)}")
     if entry is None:
-        return
+        return False
     path = ledger.resolve_path(entry)
     if path is None or not path.exists():
-        return
+        return False
     with _extracted(path) as xml_path:
         parser = parser_for(xml_path)
         check.source_sections = sum(1 for _ in parser.iter_sections(xml_path))
         check.source_raw_elements = parser.count_section_elements(xml_path)
+    return True
 
 
 def write_report(
@@ -256,6 +279,17 @@ def summarize(report: VerifyReport) -> str:
         f"dedupe ratio {report.dedupe_ratio:.1%} "
         f"(section_versions vs one row per section per release)",
     ]
+    if report.deep:
+        lines.append(
+            f"independently recounted from source: {report.source_recounted:,} "
+            f"of {report.title_versions_checked:,} title-versions"
+        )
+    if report.source_unavailable:
+        lines.append(
+            f"NO SOURCE FILE for {len(report.source_unavailable)} title-version(s) — "
+            "not independently checked: "
+            + ", ".join(report.source_unavailable[:5])
+        )
     if report.incomplete_loads:
         lines.append(
             f"{len(report.incomplete_loads)} incomplete load(s) — `load-all` will redo: "
