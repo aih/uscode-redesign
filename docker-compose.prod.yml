@@ -1,0 +1,102 @@
+# The deployed site (ADR-0020). A complete file, used *instead of*
+# docker-compose.yml, not layered over it:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Standalone deliberately. Compose merges `ports` by appending, so an overlay
+# cannot take a published port away — the base file's `5432:5432` would survive
+# into production and put the whole database on a public IP. A separate file
+# cannot make that mistake.
+#
+#   browser :443 ── proxy ─┬── /app/*  → frontend:4321   (Astro SSR on Node)
+#                          └── /*      → api:8001        (FastAPI)
+#
+# Required in .env beside this file:
+#   SITE_ADDRESS=uscode.example.org      the hostname Caddy answers on
+#   POSTGRES_PASSWORD=…                  openssl rand -base64 32
+#   DATA_ROOT=/var/lib/uscode            the mounted data volume
+#   USC_MIRROR_BUCKET=…                  the S3 corpus mirror (ADR-0013)
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: uscode
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: uscode
+    # No published ports: the database is reachable only from this network.
+    volumes:
+      - ${DATA_ROOT:-/var/lib/uscode}/pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    shm_size: 1gb # index builds during load-all outgrow the 64 MB default
+    command:
+      - postgres
+      - -c
+      - max_wal_size=4GB # the bulk load writes in long bursts
+      - -c
+      - checkpoint_timeout=15min
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - work_mem=32MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uscode"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://uscode:${POSTGRES_PASSWORD}@db:5432/uscode
+      # Not inferred from the proxied scheme — see ADR-0019. This is the setting
+      # that makes the Secure cookie independent of proxy configuration.
+      USC_COOKIE_SECURE: "true"
+      USC_MIRROR_BUCKET: ${USC_MIRROR_BUCKET:-}
+    expose:
+      - "8001"
+    volumes:
+      # The corpus, for `mirror pull` and `load-all`. Not the source tree: here
+      # the image is the source of truth, unlike the dev bind mount.
+      - ${DATA_ROOT:-/var/lib/uscode}/releases:/app/data/releases
+      - ${DATA_ROOT:-/var/lib/uscode}/manifests:/app/data/manifests
+    restart: unless-stopped
+    # No --reload: the image is what runs.
+    command:
+      [
+        "uv", "run", "python", "-m", "uvicorn",
+        "main:app", "--host", "0.0.0.0", "--port", "8001",
+        "--proxy-headers", "--forwarded-allow-ips", "*",
+      ]
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - api
+    environment:
+      API_BASE_URL: http://api:8001
+      HOST: 0.0.0.0
+      PORT: "4321"
+    expose:
+      - "4321"
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2-alpine
+    depends_on:
+      - api
+      - frontend
+    environment:
+      # Caddy reads this as the site address. A bare hostname means automatic
+      # HTTPS from Let's Encrypt; the Caddyfile's default of :8000 means plain
+      # HTTP, which is the dev stack.
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+    ports:
+      - "80:80" # required: the ACME HTTP challenge and the redirect to 443
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${DATA_ROOT:-/var/lib/uscode}/caddy:/data # certificates outlive the container
+    restart: unless-stopped
