@@ -5,6 +5,7 @@ description = "Versioned US Code retrieval site: any provision, at any release p
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.5",
+    "diff-match-patch>=20241021",
     "fastapi>=0.140.7",
     "lxml>=6.1.1",
     "psycopg[binary]>=3.3.4",

@@ -25,7 +25,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
+from api.diff import diff_ops
 from api.schemas import (
+    DiffOpOut,
+    DiffOut,
+    DiffSectionOut,
     ErrorOut,
     GuidOut,
     NeighborsOut,
@@ -170,6 +174,48 @@ def versions(identifier: str, repository: RepositoryDep) -> VersionsOut:
         raise HTTPException(status_code=404, detail=f"no section at {path}")
     return VersionsOut(
         identifier=path, versions=[VersionOut.of(version) for version in found]
+    )
+
+
+@api.get(
+    "/sections/{identifier:path}/diff",
+    response_model=DiffOut,
+    summary="A redline between two release points of a section",
+    responses={404: {"model": ErrorOut}},
+)
+def diff(
+    identifier: str,
+    repository: RepositoryDep,
+    from_: str = Query(
+        alias="from", description="Release point label to diff from.", examples=["119-99"]
+    ),
+    to: str = Query(description="Release point label to diff to.", examples=["119-102not101"]),
+) -> DiffOut:
+    """Diffs the two release points' verbatim XML (docs/adr/0016): a generic
+    text diff, computed here because it needs no USLM vocabulary at all —
+    presentation (wrapping `ops` in `<ins>`/`<del>`) is `frontend/src/lib`'s
+    job, same as the section renderer itself."""
+    path = normalize_identifier(identifier)
+    title_num = title_num_from_identifier(path)
+    from_resolved = resolve_release_or_404(
+        repository, release=from_, on_date=None, title_num=title_num
+    )
+    to_resolved = resolve_release_or_404(
+        repository, release=to, on_date=None, title_num=title_num
+    )
+
+    from_section = repository.get_section(path, from_resolved)
+    if from_section is None:
+        raise HTTPException(status_code=404, detail=not_found(path, from_resolved))
+    to_section = repository.get_section(path, to_resolved)
+    if to_section is None:
+        raise HTTPException(status_code=404, detail=not_found(path, to_resolved))
+
+    return DiffOut(
+        identifier=path,
+        from_=DiffSectionOut.of(from_section),
+        to=DiffSectionOut.of(to_section),
+        ops=[DiffOpOut.of(op) for op in diff_ops(from_section.xml, to_section.xml)],
     )
 
 

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from api.diff import DiffOp
 from storage import (
     GuidResolution,
     Neighbors,
@@ -219,6 +220,52 @@ class VersionsOut(BaseModel):
         description="One entry per distinct content, oldest first. Consecutive "
         "release points publishing identical text share an entry."
     )
+
+
+class DiffOpOut(BaseModel):
+    op: str = Field(description="equal | insert | delete")
+    text: str
+
+    @classmethod
+    def of(cls, op: DiffOp) -> "DiffOpOut":
+        return cls(op=op.op, text=op.text)
+
+
+class DiffSectionOut(BaseModel):
+    """One side of a diff: enough to label it, not the whole `SectionOut` —
+    the fragment itself only exists as `ops`, never duplicated here."""
+
+    release: ReleaseOut
+    num: str | None
+    heading: str | None
+    status: str | None
+    content_hash: str
+
+    @classmethod
+    def of(cls, section: SectionResult) -> "DiffSectionOut":
+        return cls(
+            release=ReleaseOut.of(section.release),
+            num=section.num,
+            heading=section.heading,
+            status=section.status,
+            content_hash=section.content_hash,
+        )
+
+
+class DiffOut(BaseModel):
+    """A redline between two release points of one section (Day 4).
+
+    Diffs the verbatim XML — a generic text diff, computed here because doing
+    so needs no USLM vocabulary at all (docs/adr/0016); wrapping `ops` in
+    `<ins>`/`<del>` for the reading column is `frontend/src/lib`'s job.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    identifier: str
+    from_: DiffSectionOut = Field(alias="from")
+    to: DiffSectionOut
+    ops: list[DiffOpOut]
 
 
 class GuidOut(BaseModel):
