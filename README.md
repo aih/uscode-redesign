@@ -40,17 +40,32 @@ The data source is the official [OLRC XML downloads](https://uscode.house.gov/do
 **The reader and the API are live locally, and now separate** (BUILDLOG 006–007, 014). The reader
 is an Astro 5 + TypeScript app styled with [USWDS](https://designsystem.digital.gov/) at
 `/app`, server-rendered with no JavaScript bundle; the API is machine-only at `/api/v1`; and a
-citation URL redirects to whichever one the caller can read. Title 16 is loaded at two release
-points — 119-99 (06/12/2026) and 119-102not101 (07/12/2026) — out of the 382 the release-point
-inventory knows about, with the full hierarchy and a working resolver. 209 Python tests and 27
-frontend tests.
+citation URL redirects to whichever one the caller can read. 271 Python tests and 42 frontend
+tests, both re-run by CI on every push.
 
-**The full corpus is mid-flight.** The resumable backfill
-([ADR-0012](docs/adr/0012-resumable-backfill-driven-by-titles-affected.md)) has fetched
-**~1,834 of 3,197 title-releases (~57%)**, 5.3 GB of a measured ~9 GB corpus, mirrored to S3
-([ADR-0013](docs/adr/0013-s3-mirror-of-record-disposable-downloader.md)); the ledger-driven bulk
-load ([ADR-0014](docs/adr/0014-bulk-load-resume-state-lives-in-the-database.md)) runs behind it,
-with `make verify` / `make verify-deep` checking recorded counts against the source XML.
+**The whole corpus is downloaded and loaded** (BUILDLOG 023). The resumable backfill
+([ADR-0012](docs/adr/0012-resumable-backfill-driven-by-titles-affected.md)) fetched **3,153 of
+3,197 planned title-releases** — 9.7 GB — with the other 44 recorded as unavailable and
+individually accounted for; all of it is mirrored to S3
+([ADR-0013](docs/adr/0013-s3-mirror-of-record-disposable-downloader.md)). The ledger-driven bulk
+load ([ADR-0014](docs/adr/0014-bulk-load-resume-state-lives-in-the-database.md)) then loaded every
+one of them, with no failures:
+
+| | |
+|---|---|
+| Title-releases loaded | **3,153** (58 titles × 381 release points, as published) |
+| Sections | 65,938 distinct; **5,466,652** (section, release) pairs |
+| Stored texts | **489,738** `section_versions` |
+| **Dedupe ratio** | **91.0%** — the same text is stored once however many release points publish it ([ADR-0007](docs/adr/0007-content-dedupe-on-guid-stripped-content-key.md)) |
+| Guid index | **96,185,732** rows — one per (provision, release), subsections included |
+| Database on disk | 27 GB |
+
+Every number above is reproduced by `make verify-deep`, which re-parses the source XML for an
+independent recount rather than trusting the loader's own bookkeeping, and writes
+[`docs/verification/database.json`](docs/verification/database.json). It reports six title-releases
+where the source publishes two or more elements under one `@identifier`; they are explained, not
+averaged away, in [ADR-0021](docs/adr/0021-repeated-identifiers-serve-every-occurrence.md) — the
+reader shows every occurrence with a note rather than silently picking one.
 
 ```bash
 docker compose up -d db
@@ -69,6 +84,6 @@ URL, and `Accept:` decides which surface serves it
 [ADR-0010](docs/adr/0010-reader-and-api-separated-behind-a-redirecting-citation-url.md)). `curl`
 needs `-L` because it now follows a redirect — or skip it and call `/api/v1` directly.
 
-Next: the bulk backfill of all titles and release points (PLAN Day 2), then reader polish —
-keyboard navigation, version timelines and diffs (Day 4). See BUILDLOG.md for what has been
-verified and how to re-check it.
+Next: deploy ([ADR-0020](docs/adr/0020-deploy-one-ec2-box-compose-caddy.md), `docs/deploy.md`) and
+Day 7 hardening — USLM 2.x parser parity, an accessibility pass, and the public "how it was built"
+page. See BUILDLOG.md for what has been verified and how to re-check it.
