@@ -81,3 +81,16 @@ def client(loaded_database):
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture()
+def fresh_client(loaded_database):
+    """A `TestClient` of its own, function-scoped — auth tests set cookies, and
+    the session-scoped `client` fixture is shared with every other test module,
+    so logging in on it would leak a session into unrelated tests."""
+    from fastapi.testclient import TestClient
+
+    from main import app
+
+    with TestClient(app) as test_client:
+        yield test_client

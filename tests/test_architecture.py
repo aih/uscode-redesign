@@ -106,6 +106,24 @@ def test_the_repository_protocol_and_the_postgres_implementation_agree():
     assert required <= set(dir(PostgresRepository))
 
 
+def test_the_accounts_protocol_and_the_postgres_implementation_agree():
+    """Same check as above, for the second storage module (docs/adr/0017):
+    users/sessions/watchlists are not version-resolution logic, so they get
+    their own protocol rather than new methods on `Repository` — but a missing
+    method here is exactly as invisible until request time."""
+    from storage.accounts import AccountsRepository
+    from storage.postgres_accounts import PostgresAccounts
+
+    required = {
+        name
+        for name, value in vars(AccountsRepository).items()
+        if callable(value) and not name.startswith("_")
+    }
+
+    assert required
+    assert required <= set(dir(PostgresAccounts))
+
+
 def test_uslm_element_names_stay_out_of_extraction_code():
     """Architecture rule 2: what a section *is* is decided only by a parser.
 
