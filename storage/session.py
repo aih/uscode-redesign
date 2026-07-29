@@ -10,7 +10,9 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from db.base import SessionLocal
+from storage.accounts import AccountsRepository
 from storage.postgres import PostgresRepository
+from storage.postgres_accounts import PostgresAccounts
 from storage.repository import Repository
 
 
@@ -18,3 +20,9 @@ def get_repository() -> Iterator[Repository]:
     """Request-scoped repository. Wired into FastAPI as a dependency."""
     with SessionLocal() as session:
         yield PostgresRepository(session)
+
+
+def get_accounts() -> Iterator[AccountsRepository]:
+    """Request-scoped accounts store — users, sessions, watchlists (PLAN §4)."""
+    with SessionLocal() as session:
+        yield PostgresAccounts(session)
