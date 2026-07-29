@@ -474,3 +474,76 @@ Session-by-session record of how this site was built. One entry per working sess
 - **Not done — the deploy itself.** Three blockers, none of them code: the mirror push was **denied by the sandbox permission classifier**, so the corpus is still only on this laptop and the mirror is still two-thirds empty; provisioning needs an IAM identity that can create EC2 and IAM resources, which the `uscode` profile cannot (it cannot even `s3:ListAllMyBuckets`); and Caddy needs a **domain name** to get a certificate. Everything that does not need those is built and committed — the production compose file, the HTTPS Caddyfile, the runbook with costed sizing, and the smoke tests to run against the URL once it exists.
 - **Caveat on the load-test absolutes:** the run shared the laptop with a `ingest load-all` that was in progress throughout (it took the database from 792 to 1,160 title-releases and 6.7 GB to 9.7 GB during this session), so every throughput figure is depressed. The findings survive it: the diff result is about *scaling* — flat ~0.45 rps from concurrency 1 to 10 — not about absolute speed, and the 304-vs-200 and breadcrumb comparisons are between rows measured under the same conditions.
 - **Verified:** `make test` 266 passed / 13 deselected; `make test-web` 42 passed; `npx astro check` 0 errors. Cache headers checked through the running Caddy stack at every layer — pinned section `immutable`, unpinned `max-age=300`, `/app/provisions` and `/app/login` `no-store` + `Vary: Cookie`, 401s from `/api/v1/auth/me` and `/api/v1/watchlist*` `no-store`. `Secure` cookie confirmed via a forwarded-proto request inside the stack. Load test re-runnable with `make dev-all` then `make loadtest`. Database and ledger figures come from `docker compose exec db psql` and `data/releases/ledger.json` directly; re-check with the queries in this entry.
+
+## 023 — 2026-07-29 — Session 9: the corpus, finished and independently recounted
+
+- **Tool/model:** Claude Code, Opus 5, run hands-off from a single prompt.
+- **Asked:** Session 9 from GETTING-STARTED §7 in full — confirm the backfill is done, re-run `make load-all` for everything that landed since the last pass, push the final corpus to the mirror, run `make verify-deep` over the whole corpus and commit the artifact, classify every count mismatch rather than averaging it away, report the headline numbers, update README's Status, BUILDLOG and commit. Mid-session direction from Ari on the one question that came up: **where the source publishes more than one version of a section at one release point, serve them both with an explanatory note** rather than picking one.
+- **Decided:** [ADR-0021](docs/adr/0021-repeated-identifiers-serve-every-occurrence.md) — repeated `@identifier`s serve every occurrence.
+
+### The corpus
+
+- **Backfill confirmed complete before loading anything:** 3,153 zips on disk exactly matching 3,153 `ok` ledger entries, 44 `unavailable`, 3,197 planned. `--plan-only` prints the whole plan rather than the remainder, so the file count against the ledger is the check that actually answers the question.
+- **All 44 unavailable downloads classified**, since "unavailable" on its own is not a finding. Every one is an HTTP **200** that is not a zip: OLRC 302-redirects a missing file to `docnotfound.xhtml` and serves that with a 200, so the backfill's zip-magic check — not the status code — is what catches them.
+  - **`113-21` ×8 — correct absence.** The baseline sweep asks for every title at the oldest release point; appendix titles `05a/11a/18a/28a/50a` and titles `34`, `52`, `54` did not exist in Aug 2013 (52 and 54 were enacted Sept 2014, 34 reestablished 2017).
+  - **`113-36` ×1 — source inconsistency.** `titlesAffected` lists `18a`; OLRC published no such file.
+  - **`114-219u1` ×35 — source inconsistency, whole release point.** The inventory gives it 35 affected titles and not one is downloadable. Not a URL-construction bug: 16 of the other 17 `u1` release points fetched fine.
+- **`make load-all` over the full corpus:** 3,153 planned, **2,355 loaded, 798 already complete, 0 failed, 0 title mismatches**, 8h48m. Resume state is the database, as ADR-0014 intended, so the 798 were skipped without touching a zip. Rate fell from ~6/min to ~2.7/min as `guid_map` grew past 80 M rows, then recovered.
+- **Mirror push finished and checked**, not assumed: 3,153 zips + ledger (9,697,559,134 bytes) and all 381 manifests on `s3://uscode-mirror-dreamproit/`, counted against the local corpus.
+
+### Verification — the numbers, and the thing that nearly wasn't checked
+
+`make verify-deep`, re-parsing every source file for a recount independent of the loader's own bookkeeping (`docs/verification/database.json`):
+
+| | |
+|---|---|
+| Title-versions checked | 3,153 across 381 release points, 58 titles |
+| **Independently recounted from source** | **3,153 of 3,153** |
+| **Source mismatches** | **0** |
+| Incomplete loads | 0 |
+| Raw `<section>` element disagreements | 0 |
+| Sections | 65,938 distinct |
+| `section_versions` | 489,738 |
+| `section_release_map` | 5,466,652 |
+| `guid_map` | 96,185,732 |
+| **Dedupe ratio** | **91.0%** |
+| Database on disk | 27 GB |
+| Deliberately unstored elements | 454,943 across 2,991 title-versions (ADR-0005) |
+
+- **The first deep run silently checked only 84% of the corpus.** It recounted 2,649 of 3,153 title-versions and reported clean. The 504 it skipped were every single-digit title, Title 5 included: `_recount_from_source` keyed the ledger with `Title.num`, which is the URL form (`5`), while ledger keys use OLRC's file-naming form (`05`) — the same translation `load_all.completed_pairs` already had to make. The miss then `return`ed silently. Fixed both halves: the key goes through `_file_form`, and the function reports whether it actually recounted, so `source_unavailable` and a "recounted N of M" line make the coverage visible. **The silence was the worse bug** — a deep run that quietly recounts a subset is a weaker claim wearing the same words. Re-ran to full coverage; the result held.
+- **`VerifyReport.guid_rows` was declared and never populated**, so every committed `database.json` had been claiming zero guids for a corpus with 96 M of them.
+
+### Six count mismatches, and what was behind them
+
+`sections_loaded` exceeded `section_release_map` rows on six title-releases: `113-296not287/54`, `114-329/10`, `115-8/10`, `117-80/19`, `117-110not103/19`, `117-111not103/19`.
+
+- **Classification: source inconsistency.** OLRC publishes more than one `<section>` element under the same `@identifier` in one title at one release point. Title 19 at 117-80 has **three** for `/us/usc/t19/s2502` — two empty stubs headed "Purposes", then the real section headed "Congressional statement of purposes". Title 54 at 113-296not287 repeats `s200308`, `s300314`, `s300315`, whose occurrences carry the same operative text with differing notes and whose `@id` prefixes differ (`d303-11e4` vs `a8a5-11e4`), suggesting two generation runs merged into one file.
+- **Not a parser gap:** these carry real `@identifier` and `@id`, so ADR-0005's quoted-statutory-text rule does not apply. **Not a loader bug:** ADR-0007's dedupe collapses byte-identical repeats into one `section_versions` row, which is exactly the arithmetic — the loader counts elements, the release map counts stored texts. The gap is **left reported**; suppressing it would weaken the check for a tidier artifact.
+- **What it exposed was retrieval, and it was worse than the counting.**
+  - `get_section` ended in an unordered `.first()`, so which occurrence a reader saw was whatever Postgres returned — for `/us/usc/t19/s2502`, a coin flip between a 360-byte empty stub and the 3,232-byte real section.
+  - `neighbors` asked for the section's single place in reading order with `scalar_one_or_none`, which **raises** on multiple rows. The reader fetches neighbours on every section render, so **every affected section page was a live HTTP 500** — invisible until the corpus was loaded.
+- **Decision (ADR-0021), per Ari's direction: serve every occurrence.** All occurrences come back in `seq_in_title` order; the reader prints a note at the top — "The official XML for this title at *RP* publishes *N* distinct texts under the identifier *X* … all *N* are shown below, in the order they appear in the source" — and renders each body under an "Occurrence *k* of *N*" caption. Neighbours bracket the group. Provision extraction searches across occurrences, so `/s2502/1` lands on text rather than on the stub that sorts first. The count is stated as **distinct texts**, not elements: Title 19's two identical stubs are stored once, so the page says two where the source has three, which is what the database can honestly claim.
+
+### Produced
+
+- `cdd8410` report guid_map rows in the verification artifact
+- `c83192e` serve every occurrence when the source repeats an identifier (ADR-0021)
+- `0b713ee` provenance manifests from the full-corpus load (271 files, PLAN §11.4)
+- `cc0808c` recount every title in `verify --deep`, and name what it cannot
+- `9c64fbb` the full-corpus deep verification artifact
+- `bbcbfa0` README Status → the finished corpus
+- `5e60107` CLAUDE.md status line
+
+### Verified
+
+- `make test` **273 passed** / 13 deselected; `make test-web` **42 passed**; `npx astro check` **0 errors**.
+- Re-check the corpus: `uv run python -m ingest verify --deep` (~35 min) reproduces `docs/verification/database.json`; `python -m ingest verify` alone (seconds) reproduces the six mismatches.
+- Re-check ADR-0021 end to end against the running stack: `curl -s "http://localhost:8000/app/us/usc/t19/s2502?release=117-80"` renders the note and **two** `section-body` articles; `/us/usc/t16/s45f` renders one and no note; `/api/v1/sections/us/usc/t19/s2502/neighbors?release=117-80` is 200 where it was 500.
+- New tests: five in `tests/test_api.py` covering occurrences served, source order, stability across repeated requests, deep-link provision extraction, and neighbours bracketing the group; two in `tests/test_load_all.py` covering the ledger key form and `guid_rows`.
+- **Two stale assertions corrected, both made wrong by the corpus rather than by code:** `test_ingested_titles_are_distinguished_from_affected_titles` asserted 119-100 had *no* ingested titles, which the full load made false (it now holds title 47, the one it affected) — rewritten as the absence it actually means. The architecture suite also caught a USLM element name in a docstring I had written in `storage/repository.py`, which is the rule working.
+
+### Open after this session
+
+- The six count mismatches stay in every `verify` run by design (ADR-0021).
+- `DuplicateOccurrence.guid` repeats the section's guid: `guid_map` holds one row per (identifier, release) and cannot tell the occurrences apart. The source's ambiguity, not ours to invent around.
+- Deploy is still the blocker for everything public (ADR-0020) — it needs an IAM identity that can create EC2/IAM, and a domain.
