@@ -36,9 +36,26 @@ interface Props {
   release?: string | null;
   picker?: { action: string; options: Release[]; selected: string } | null;
   bar?: Bar | null;
+  /** What the header's search box should already contain.
+   *
+   * The search and go-to pages used to render a second, larger copy of
+   * `SiteSearch` in the page body so the reader could see and edit the query
+   * that produced the results. That put two identical boxes on screen at once,
+   * the header's one sticky above the page's one — and left the sticky box
+   * empty while the page box held the query, so whichever one you reached for
+   * first was the wrong one. Prefilling the single box the site already has is
+   * the same affordance without the double. */
+  searchValue?: string | null;
 }
 
-const { title, crumbs = [], release = null, picker = null, bar = null } = Astro.props;
+const {
+  title,
+  crumbs = [],
+  release = null,
+  picker = null,
+  bar = null,
+  searchValue = null,
+} = Astro.props;
 const hasContext = crumbs.length > 0 || picker !== null;
 ---
 
@@ -69,7 +86,54 @@ const hasContext = crumbs.length > 0 || picker !== null;
         // No storage (private mode, blocked cookies) — the default stands.
       }
     </script>
-  </head>
+
+    <script is:inline>
+      {
+        /* Where links open.
+         *
+         * Cross references and search results ship with `target="_blank"`
+         * (`lib/uslm.ts`) because the HTML is shared by every reader — a page
+         * in a public cache cannot carry one reader's preference (ADR-0018,
+         * the same reasoning that keeps the theme out of a cookie in
+         * ADR-0027). So the markup states the default and this takes it back
+         * off for whoever asked for that.
+         *
+         * It only ever touches anchors carrying `data-newtab` — the ones the
+         * markup deliberately opted in. That is the safety property: a reader
+         * with scripting off, or with this script broken, gets the documented
+         * default, and no link anywhere else on the site is affected either
+         * way.
+         *
+         * It has to restore as well as remove. `AuthNav` can call this a second
+         * time with a *different* answer — the account said new-tab while this
+         * browser had been set to same-tab — and a remove-only version would
+         * leave that reader's links stripped until they reloaded.
+         *
+         * It runs on DOMContentLoaded rather than blocking in the head:
+         * `target` matters at click time, not at paint time, so there is no
+         * flash to prevent — unlike the theme, which does have to block. A
+         * signed-in reader's stored preference is written into `localStorage`
+         * by `AuthNav`, which is how the choice follows them to another
+         * browser. */
+        function applyLinkTarget() {
+          let sameTab = false;
+          try {
+            sameTab = localStorage.getItem("usc-linktarget") === "same";
+          } catch {
+            // No storage — the default in the markup stands.
+          }
+          for (const link of document.querySelectorAll("a[data-newtab]")) {
+            if (sameTab) link.removeAttribute("target");
+            else link.setAttribute("target", "_blank");
+          }
+        }
+
+        document.addEventListener("DOMContentLoaded", applyLinkTarget);
+        // `AuthNav` fires this once it has the signed-in reader's stored
+        // setting, which can disagree with what this browser had.
+        document.addEventListener("usc:linktarget", applyLinkTarget);
+      }
+    </script>
   <body>
     <a class="usa-skipnav" href="#main">Skip to main content</a>
 
@@ -80,7 +144,7 @@ const hasContext = crumbs.length > 0 || picker !== null;
         `--sticky-h`, which drives `scroll-margin-top` — otherwise a deep link
         to a provision lands *behind* this. */}
     <div class="topbar">
-      <SiteHeader />
+      <SiteHeader searchValue={searchValue} />
 
       {
         hasContext && (

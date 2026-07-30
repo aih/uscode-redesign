@@ -41,6 +41,8 @@
 @forward "usa-select";
 @forward "usa-label";
 @forward "usa-form";
+@forward "usa-radio";
+@forward "usa-checkbox";
 @forward "usa-tag";
 @forward "usa-link";
 @forward "usa-list";
@@ -490,25 +492,21 @@ main[id] {
   margin-top: 0;
 }
 
-/* The hint is for the page copies, where there is room to explain. In the
- * header the label and the placeholder already say everything — and a third
- * line here would be `--sticky-h` growing. */
-.sitesearch--header .sitesearch__hint {
+/* The hint explained the box back when a second, roomier copy of it sat in the
+ * page body. There is only the header one now, where the label and the
+ * placeholder already say everything — and a third line here would be
+ * `--sticky-h` growing. The syntax guide is where the explaining happens. */
+.navtools .sitesearch__hint {
   display: none;
-}
-
-/* The padding that used to live here now belongs to `.navtools`, which owns the
- * whole row. */
-.sitesearch--header {
-  padding: 0;
 }
 
 /* ------------------------------------------ the chrome's controls, on one row
  *
- * The citation box and the theme toggle, side by side. One row rather than two
- * stacked blocks, because between 40em and 64em the nav is still the forced-open
- * wrapping version and everything in it sticks: a second block here is 44px
- * added to `--sticky-h`, and that token is what `scroll-margin-top` spends. */
+ * The search box, the account control and the theme toggle, side by side. One
+ * row rather than stacked blocks, because between 40em and 64em the nav is
+ * still the forced-open wrapping version and everything in it sticks: a second
+ * block here is 44px added to `--sticky-h`, and that token is what
+ * `scroll-margin-top` spends. */
 .navtools {
   display: flex;
   align-items: center;
@@ -517,12 +515,14 @@ main[id] {
   padding: 0 1rem 0.75rem;
 }
 
-/* It grows into whatever the toggle does not need. The basis is what it asks
- * for before sharing: enough that the input is a usable width on a small phone
- * rather than the sliver the two-box layout left. */
+/* It grows into whatever the toggle and the account control do not need. The
+ * basis is what it asks for before sharing: enough that the input is a usable
+ * width on a small phone rather than a sliver. The padding is zero because
+ * `.navtools` owns the row's padding. */
 .navtools .sitesearch {
   flex: 1 1 14rem;
   min-width: 0;
+  padding: 0;
 }
 
 /* Below the tablet breakpoint the header is not sticky at all — `.topbar`
@@ -534,6 +534,108 @@ main[id] {
   .navtools .sitesearch {
     flex-basis: 100%;
   }
+}
+
+/* --------------------------------------------------------- the account control
+ *
+ * Quiet like the theme toggle, and for the same reason: it is chrome, not the
+ * thing anyone came here to read. It never wraps and never flexes, so it cannot
+ * be what pushes the search box down onto a second row and costs `--sticky-h`.
+ *
+ * Both states ship in the markup and the island un-hides one, so this must not
+ * reserve space for the state that is hidden — no min-width, no placeholder. */
+.authnav {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.authnav__link,
+.authnav__summary {
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.authnav__link:hover,
+.authnav__summary:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.authnav__sep {
+  margin: 0 0.35rem;
+  color: var(--muted);
+}
+
+.authnav__menu {
+  position: relative;
+}
+
+/* The default marker is a triangle that sits oddly against text at this size;
+ * the caret below is drawn where it can be positioned. */
+.authnav__summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.75rem; /* The 44px touch target the rest of the row keeps. */
+}
+
+.authnav__summary::-webkit-details-marker {
+  display: none;
+}
+
+.authnav__summary::after {
+  content: "▾";
+  font-size: 0.75rem;
+}
+
+/* An address is long and this row is not. Truncate rather than let the navbar
+ * reflow around whatever someone signed up with. */
+.authnav__email {
+  display: inline-block;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* Absolute, so an open menu does not add a band to the sticky header — the
+ * whole point of keeping this row to one line. */
+.authnav__panel {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+
+.authnav__item {
+  padding: 0.5rem 0.75rem;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.authnav__item:hover {
+  background: var(--rule);
+  text-decoration: none;
 }
 
 /* Reading comfort, not navigation — so it is quiet: muted, no fill, no border,
@@ -561,20 +663,6 @@ main[id] {
 .theme-toggle__icon {
   font-size: 1.1rem;
   line-height: 1;
-}
-
-.sitesearch--page {
-  margin: 0 0 2rem;
-}
-
-.sitesearch--page .sitesearch__label {
-  font-size: 0.9rem;
-}
-
-/* The page copies are the ones a reader came to in order to type something, so
- * they get real width rather than whatever the navbar had spare. */
-.sitesearch--page .sitesearch__row {
-  max-width: 34rem;
 }
 
 .sitesearch__hint {
@@ -647,7 +735,7 @@ main[id] {
 
   /* The label fits now that the box has a row of its own, and a visible label is
      better than a placeholder that vanishes the moment someone types. */
-  .sitesearch--header .sitesearch__label {
+  .navtools .sitesearch__label {
     position: static;
     left: auto;
   }
@@ -1492,4 +1580,126 @@ main[id] {
 .diff-view--source ins span,
 .diff-view--source del span {
   color: inherit;
+}
+
+/* ------------------------------------------------------- the API reference
+ *
+ * `/app/docs`, rendered from `/openapi.json` on the server (`lib/openapi.ts`).
+ * Reads as reference material rather than as statutory text: denser, monospace
+ * for anything literally typed into a URL, and a rule between endpoints so a
+ * long list stays scannable. */
+.apidocs__intro {
+  max-width: 44rem;
+}
+
+.apidocs__contents {
+  margin: 2rem 0;
+}
+
+.apidocs__group {
+  margin-top: 2.5rem;
+}
+
+.endpoint {
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* Method and path on one line, wrapping as a unit — a path that breaks away
+ * from its verb is unreadable, and these paths are long. */
+.endpoint__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+/* Colour is not the only signal — the verb is spelled out inside the badge.
+ * That is deliberate: GET and DELETE must not be distinguishable by hue alone
+ * (WCAG 1.4.1). */
+.endpoint__method {
+  flex: none;
+  padding: 0.15rem 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--panel);
+  background: var(--muted);
+  border-radius: 3px;
+}
+
+.endpoint__method--get {
+  background: var(--link);
+}
+
+.endpoint__method--post,
+.endpoint__method--put,
+.endpoint__method--patch {
+  background: #2e7d32;
+}
+
+.endpoint__method--delete {
+  background: #b3261e;
+}
+
+.endpoint__path {
+  font-size: 0.95rem;
+  word-break: break-all;
+}
+
+.endpoint__summary {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.endpoint__prose {
+  max-width: 44rem;
+}
+
+.endpoint__prose p {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+/* Parameters are genuinely tabular, so this is a table — and it scrolls inside
+ * itself rather than pushing the page sideways on a phone. */
+.endpoint__params {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.endpoint__params th,
+.endpoint__params td {
+  padding: 0.4rem 0.75rem 0.4rem 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+}
+
+.endpoint__params thead th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.endpoint__params tbody th {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.endpoint__required {
+  color: #b3261e;
+  font-weight: 700;
+}
+
+.endpoint__returns {
+  margin: 0.5rem 0 0;
 }

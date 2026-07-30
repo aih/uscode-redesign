@@ -8,9 +8,17 @@
  * a phone rather than a menu that has to be opened. A menu you must tap to see is
  * worse than four links you can already read.
  */
+import AuthNav from "./AuthNav.astro";
 import SiteSearch from "./SiteSearch.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import { APP } from "../lib/url";
+
+interface Props {
+  /** Prefills the one search box when a page is showing a query's results. */
+  searchValue?: string | null;
+}
+
+const { searchValue = null } = Astro.props;
 ---
 
 <header class="usa-header usa-header--basic" role="banner">
@@ -33,8 +41,12 @@ import { APP } from "../lib/url";
         <li class="usa-nav__primary-item">
           <a class="usa-nav__link" href={`${APP}/provisions`}><span>My Provisions</span></a>
         </li>
+        {/* `/app/docs`, not FastAPI's `/docs`. The bare Swagger page is a
+            different site — no navbar, no footer, no way back — so the reader
+            who clicks "API docs" from here has left. The reader page wraps the
+            same OpenAPI schema in this chrome. */}
         <li class="usa-nav__primary-item">
-          <a class="usa-nav__link" href="/docs"><span>API docs</span></a>
+          <a class="usa-nav__link" href={`${APP}/docs`}><span>API docs</span></a>
         </li>
       </ul>
       {/* The chrome's controls share one row at every width — which is also
@@ -51,7 +63,8 @@ import { APP } from "../lib/url";
           theme toggle is the only thing left here that is about reading comfort
           rather than navigation. */}
       <div class="navtools">
-        <SiteSearch />
+        <SiteSearch value={searchValue} />
+        <AuthNav />
         <ThemeToggle />
       </div>
     </nav>
