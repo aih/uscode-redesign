@@ -8,7 +8,7 @@
  * a phone rather than a menu that has to be opened. A menu you must tap to see is
  * worse than four links you can already read.
  */
-import CitationJump from "./CitationJump.astro";
+import SiteSearch from "./SiteSearch.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import { APP } from "../lib/url";
 ---
@@ -40,28 +40,18 @@ import { APP } from "../lib/url";
       {/* The chrome's controls share one row at every width — which is also
           what keeps them out of `--sticky-h`: a second block in the nav would
           add a whole 44px band to the sticky stack between 40em and 64em, and
-          that token is what `scroll-margin-top` spends. The search box joins
-          this row for the same reason rather than sitting under the nav.
+          that token is what `scroll-margin-top` spends.
 
-          Search and the citation box are both navigation, and they are not the
-          same one: the citation box goes straight to a provision you can
-          already name, search is for when you cannot. The theme toggle is the
-          only thing here that is purely about reading comfort. */}
+          There used to be two boxes here, a keyword search and a citation jump,
+          on the reasoning that they answer different questions: one goes to a
+          provision you can already name, the other is for when you cannot. True,
+          and still not worth two controls — the reader knows what they typed,
+          the server can tell which it is, and two boxes sharing this row meant
+          both were slivers below ~50em. `SiteSearch` is the merged one; the
+          theme toggle is the only thing left here that is about reading comfort
+          rather than navigation. */}
       <div class="navtools">
-        <form
-          class="usa-search usa-search--small"
-          role="search"
-          action={`${APP}/search`}
-          method="get"
-          style="flex: 1 1 12rem; min-width: 0; margin: 0;"
-        >
-          <label class="usa-sr-only" for="search-field">Search</label>
-          <input class="usa-input" id="search-field" type="search" name="q" placeholder="Search the Code..." />
-          <button class="usa-button" type="submit">
-            <span class="usa-sr-only">Search</span>
-          </button>
-        </form>
-        <CitationJump />
+        <SiteSearch />
         <ThemeToggle />
       </div>
     </nav>

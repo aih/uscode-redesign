@@ -1,14 +1,18 @@
 /**
- * The citation box, end to end.
+ * The site's one search box, end to end.
  *
  * The parser's accepted forms are unit-tested without a database
  * (`tests/test_citeparse.py`, 79 cases) — this is the wiring: that a form typed
  * into the header survives the query string, the API round trip, the existence
  * lookup and the redirect, and lands on the provision.
+ *
+ * Since the header's two boxes merged into one, it also covers the routing that
+ * merge required: a citation goes to the provision, `cites …` goes to a marked
+ * search, and anything else goes to a plain one.
  */
 import { expect, test } from "@playwright/test";
 
-const BOX = ".citejump--header .citejump__input";
+const BOX = ".sitesearch--header .sitesearch__input";
 
 /** One representative of each parser shape, all naming the same provision, so a
  * failure says which *form* broke rather than which section is missing. */
@@ -47,24 +51,34 @@ test("the box needs no JavaScript", async ({ browser }) => {
   await context.close();
 });
 
-test("text that is not a citation explains itself instead of 404ing blankly", async ({
-  page,
-}) => {
-  await page.goto("/app/goto?q=not%20a%20citation");
+test("text that is not a citation is searched instead of refused", async ({ page }) => {
+  // The header carries one box now, so `/app/goto` is a router: what it cannot
+  // read as a citation was words, and words get searched. This used to be an
+  // error page listing the citation forms, which was the right answer for a box
+  // labelled "go to a citation" and the wrong one for a box that also searches.
+  await page.goto("/app/goto?q=navigable%20waters");
 
-  await expect(page.locator(".usa-alert--error")).toContainText(
-    /not a citation this site can read/iu,
-  );
-  // The accepted forms are on the page, each one a working link.
-  await expect(page.locator(".citejump__examples a").first()).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/search\?q=navigable\+waters/u);
 });
 
-test("a bare section number is refused rather than guessed at", async ({ page }) => {
-  // `523` names a section of *some* title; picking one would be a guess
-  // presented as an answer.
+test("a bare section number is searched rather than guessed at", async ({ page }) => {
+  // `523` names a section of *some* title, and picking one would be a guess
+  // presented as an answer. It is still refused as a citation — it now falls
+  // through to a search rather than to an error.
   await page.goto("/app/goto?q=523");
 
-  await expect(page.locator(".usa-alert--error")).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/search\?q=523/u);
+});
+
+test("a cites query searches the subject and says that is what it did", async ({ page }) => {
+  // The reverse lookup does not exist yet (docs/citation-index-plan.md). The
+  // interim answer must not be mistaken for the real one.
+  await page.goto("/app/");
+  await page.fill(BOX, "cites 16 usc 45f");
+  await page.press(BOX, "Enter");
+
+  await expect(page).toHaveURL(/\/app\/search\?q=16\+usc\+45f&cites=1/u);
+  await expect(page.locator(".usa-alert--info").first()).toContainText(/keyword search/iu);
 });
 
 test("a citation naming nothing loaded says which part is missing", async ({ page }) => {

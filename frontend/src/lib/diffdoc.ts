@@ -59,6 +59,40 @@ export interface DocumentDiff {
   deleted: number;
 }
 
+/**
+ * What separates two source fragments whose *reading text* came out identical.
+ *
+ * "Nothing changed" and "nothing you can read changed" are different claims,
+ * and this view can only ever establish the second one. Reporting the first is
+ * how a reader concludes the source republished nothing, when in fact it
+ * republishes this section at every release point (gotcha 1) — so when the
+ * redline is empty, the page says which of these three it actually found.
+ *
+ *   - `identical` — the two fragments are byte-for-byte the same. Under
+ *     ADR-0007's dedupe this is the ordinary case: both release points resolve
+ *     to one stored `section_versions` row, guids included.
+ *   - `guids-only` — they differ, and stripping `@id` makes them equal. This is
+ *     the churn ADR-0026 moved the reader off: regenerated per release point by
+ *     design, and legally nothing.
+ *   - `beyond-guids` — they differ by something else. Whitespace, `@temporalId`,
+ *     an attribute, a structural change that carries no words. Worth saying,
+ *     because ADR-0026's named cost is that a whitespace-only change is exactly
+ *     what this reading view cannot see.
+ */
+export type SourceDelta = "identical" | "guids-only" | "beyond-guids";
+
+/** `@id` and nothing else: `\s` before it keeps this off `temporalId=` and
+ *  `xml:id=`, whose preceding characters are a letter and a colon. */
+const GUID_ATTR = /\sid=("[^"]*"|'[^']*')/gu;
+
+export function sourceDelta(before: string, after: string): SourceDelta {
+  if (before === after) return "identical";
+  if (before.replace(GUID_ATTR, "") === after.replace(GUID_ATTR, "")) {
+    return "guids-only";
+  }
+  return "beyond-guids";
+}
+
 const EQUAL = 0;
 const INSERT = 1;
 const DELETE = -1;

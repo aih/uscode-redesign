@@ -417,52 +417,76 @@ main[id] {
   color: var(--muted);
 }
 
-/* ------------------------------------------------------- the citation box */
+/* --------------------------------------------------------- the search box */
 
-/* A plain GET form in the header. `1rem` on the input is not a style choice —
- * iOS zooms the whole page when a focused control's text is smaller, and a
- * reader who types a citation should not end up zoomed into the navbar. */
-.citejump {
+/* One box for both jobs — go to a citation, or search the text (`SiteSearch`).
+ *
+ * The layout bug it replaced is worth recording, because it was invisible in
+ * the markup and obvious on a phone. There were two boxes here, and the
+ * citation one laid its label, input and button out as a single wrapping flex
+ * ROW: `label { flex: none }` took ~8rem of the ~12rem the box had been given,
+ * leaving the input its `min-width` and nothing else. Two controls, both a few
+ * pixels wide, at every width below about 50em.
+ *
+ * The fix is structural rather than a bigger number: the label goes on its own
+ * line (`column`), so the input's row contains only the input and its button.
+ *
+ * `1rem` on the input is not a style choice — iOS zooms the whole page when a
+ * focused control's text is smaller, and a reader who types a citation should
+ * not end up zoomed into the navbar. */
+.sitesearch {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.sitesearch__label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.sitesearch__row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.citejump__label {
-  font-size: 0.8rem;
-  color: var(--muted);
-  flex: none;
-}
-
-.citejump__input {
+.sitesearch__input {
   font-size: 1rem;
   min-height: 2.75rem;
   margin-top: 0;
-  max-width: 18rem;
-  flex: 1 1 10rem;
+  /* `min-width: 0` is what actually lets it shrink: a flex item's automatic
+   * minimum size is its content, and an `<input>`'s is its `size` attribute —
+   * about 20 characters — so without this the row overflows instead of the
+   * input narrowing. `max-width: none` overrides the USWDS default. */
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
 }
 
 /* `width: auto` because USWDS makes every `.usa-button` full-width below the
  * tablet breakpoint. That is right for a form's primary action and wrong for a
  * button that belongs beside its input — unchecked, "Go" wrapped onto its own
  * line and spanned the phone. */
-.citejump__go {
+.sitesearch__go {
   min-height: 2.75rem;
   flex: none;
   width: auto;
   margin-top: 0;
 }
 
-/* The hint is for the page copy, where there is room to explain. In the header
- * the label and the placeholder already say everything. */
-.citejump--header .citejump__hint {
+/* The hint is for the page copies, where there is room to explain. In the
+ * header the label and the placeholder already say everything — and a third
+ * line here would be `--sticky-h` growing. */
+.sitesearch--header .sitesearch__hint {
   display: none;
 }
 
 /* The padding that used to live here now belongs to `.navtools`, which owns the
  * whole row. */
-.citejump--header {
+.sitesearch--header {
   padding: 0;
 }
 
@@ -480,12 +504,23 @@ main[id] {
   padding: 0 1rem 0.75rem;
 }
 
-/* `12rem` rather than `auto`: the citation box is allowed to wrap internally on
- * a phone, and if it also claimed the full row the toggle would be pushed onto
- * a line of its own with nothing else on it. */
-.navtools .citejump {
-  flex: 1 1 12rem;
+/* It grows into whatever the toggle does not need. The basis is what it asks
+ * for before sharing: enough that the input is a usable width on a small phone
+ * rather than the sliver the two-box layout left. */
+.navtools .sitesearch {
+  flex: 1 1 14rem;
   min-width: 0;
+}
+
+/* Below the tablet breakpoint the header is not sticky at all — `.topbar`
+ * becomes `display: contents` and only `.sectionbar` pins — so a second row
+ * here is free, and the box takes the whole width. Above it, a wrapped row
+ * would be `--sticky-h` growing, which is why this is scoped rather than the
+ * default. */
+@media (max-width: 39.99em) {
+  .navtools .sitesearch {
+    flex-basis: 100%;
+  }
 }
 
 /* Reading comfort, not navigation — so it is quiet: muted, no fill, no border,
@@ -515,28 +550,27 @@ main[id] {
   line-height: 1;
 }
 
-.citejump--page {
+.sitesearch--page {
   margin: 0 0 2rem;
-  align-items: flex-end;
 }
 
-.citejump--page .citejump__label {
-  flex-basis: 100%;
+.sitesearch--page .sitesearch__label {
   font-size: 0.9rem;
 }
 
-.citejump--page .citejump__input {
-  max-width: 24rem;
+/* The page copies are the ones a reader came to in order to type something, so
+ * they get real width rather than whatever the navbar had spare. */
+.sitesearch--page .sitesearch__row {
+  max-width: 34rem;
 }
 
-.citejump__hint {
-  flex-basis: 100%;
+.sitesearch__hint {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
   color: var(--muted);
 }
 
-.citejump__examples code {
+.sitesearch__examples code {
   font-size: 0.95rem;
 }
 
@@ -545,7 +579,7 @@ main[id] {
 @media (min-width: 64em) {
   .navtools {
     padding: 0;
-    margin-left: 1.5rem;
+    margin-left: 1rem;
     flex-wrap: nowrap;
   }
 
@@ -556,7 +590,11 @@ main[id] {
     white-space: nowrap;
   }
 
-  .citejump--header .citejump__label {
+  /* The placeholder carries the meaning from here up, and the row beside the
+     nav is the one place a visible label costs a whole line of chrome. Moved
+     off-screen rather than removed, so it still names the field for a screen
+     reader. */
+  .sitesearch--header .sitesearch__label {
     position: absolute;
     left: -999em;
   }
@@ -564,12 +602,73 @@ main[id] {
   /* The box and its "Go" stay on one line here. Left to wrap, the button drops
      under the input and the whole navbar grows a row — and this is the band
      where the navbar is sticky, so a wrapped header is `--sticky-h` drifting. */
-  .navtools .citejump {
+  .navtools .sitesearch__row {
     flex-wrap: nowrap;
   }
 
-  .citejump--header .citejump__input {
-    max-width: 11rem;
+  /* It used to be capped at 11rem, which was the two-box compromise: two
+     controls splitting one row could not each be wide. With one box the cap can
+     be what the content wants — a full citation like
+     `11 U.S.C. § 523(a)(1)(B)(ii)` is legible at this width. */
+  .navtools .sitesearch {
+    flex: 1 1 20rem;
+    max-width: 26rem;
+  }
+
+  /* Who gets the leftover width in the navbar's one row.
+   *
+   * `.usa-nav-container` is USWDS's 1024px grid container, so the header is
+   * 1024px wide however wide the window is — the box cannot be enlarged by
+   * making the viewport bigger, only by taking a share of that. Measured at
+   * 1280: the logo takes 270px and the four nav links 425px, which left the
+   * search 193px and its input 116px, because `.navtools` was `flex: 0 1 auto`
+   * and therefore never grew into what was spare.
+   *
+   * So: the links ask for their content width and do not grow, and the search
+   * box takes everything left over. Measured at 1280 after all three rules
+   * below: links 377px, search 249px, input 172px.
+   *
+   * 158px is the honest ceiling for a box sharing one row with four links
+   * inside a 1024px container, and it is why the page-level copies on
+   * `/app/goto` and `/app/search` are 34rem — the header box is for starting a
+   * query, those are for working on one. The widths that actually mattered were
+   * the small ones, and those are the ones that were broken: 375px went from a
+   * sliver to a 234px input, 640px to 426px, 900px to 686px. */
+  /* `0 0 auto`, not `0 1 auto`: the links must not shrink below their content.
+   * They are `white-space: nowrap`, so a shrunk list does not reflow — it
+   * overflows, and the search box lands on top of "API docs". */
+  .usa-nav__primary {
+    flex: 0 0 auto;
+  }
+
+  /* And the actual reason the box stayed narrow: `.usa-nav` is sized to its own
+   * content, so `.navtools` growing inside it grows into nothing. The container
+   * is 1024px and the logo takes 238px; without this, the nav occupied only as
+   * much of the remaining 786px as its links happened to need, and the search
+   * box was capped by a width nobody had chosen. */
+  .usa-nav {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* With the nav filling the container, the only thing still standing between
+   * the search box and a usable width is the links' own padding: USWDS spends
+   * 16px a side, 128px across the four, inside a 1024px header already carrying
+   * a 238px logo. 10px a side reads identically and hands the difference over.
+   *
+   * The selector is this specific because it has to outrank USWDS's own — a
+   * plain `.usa-nav__primary > li > a` here loses and silently does nothing,
+   * which is exactly what it did until the computed padding was checked in the
+   * browser rather than assumed from the cascade order. */
+  .usa-nav .usa-nav__primary > li > a.usa-nav__link {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+
+  .navtools {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
   }
 }
 
@@ -1269,4 +1368,141 @@ main[id] {
   font-size: 1.05rem;
   color: var(--muted);
   max-width: none;
+}
+
+/* ------------------------------------------------------------- the footer
+ *
+ * USWDS's slim footer expects its nav list to carry the grid classes
+ * (`grid-row`, `grid-col-*`) on the `<li>`s. Ours are a plain
+ * `usa-list--unstyled`, so every link took a full-width line of its own — four
+ * stacked rows of one short phrase each, which on a laptop is a screenful of
+ * footer under every page.
+ *
+ * A flex row instead of adding the grid classes, because it wraps on its own at
+ * any width and needs nothing from USWDS's grid that `site.scss` would have to
+ * start forwarding. */
+.usa-footer__nav .usa-list--unstyled {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 2rem;
+  margin: 0;
+  padding: 0;
+}
+
+.usa-footer__nav .usa-list--unstyled > li {
+  margin: 0;
+  /* USWDS's `usa-footer__primary-link` is `display: block` with vertical
+   * padding sized for a stacked list; in a row it only needs a touch target. */
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------- search results */
+
+.searchresults {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+}
+
+.searchresult {
+  margin: 0 0 2rem;
+  padding: 0;
+}
+
+.searchresult__title {
+  font-family: var(--reading);
+  font-size: 1.15rem;
+  line-height: 1.3;
+  margin: 0 0 0.25rem;
+}
+
+.searchresult__meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Tokens, not literals. This page used to hardcode `#555` on the meta line —
+ * about 2.2:1 against the dark palette's `--page` — and `background: #f0f0f0`
+ * on the snippet with no `color`, so the text inherited `--ink` and rendered
+ * near-white on near-white. It was the only page in the app that did not use
+ * the ADR-0027 variables, and it was unreadable in dark mode as a result. */
+.searchresult__snippet {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  background: var(--panel);
+  color: var(--ink);
+  border-left: 4px solid var(--link);
+}
+
+/* The matched terms, which are the only markup the highlighter adds. */
+.searchresult__snippet em {
+  font-style: normal;
+  font-weight: 700;
+  background: transparent;
+  color: inherit;
+  box-shadow: inset 0 -0.5em 0 color-mix(in srgb, var(--link) 22%, transparent);
+}
+
+.searchpager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+/* ------------------------------------------------- the source XML redline
+ *
+ * ADR-0026 moved the reader's diff onto the reading text and left the verbatim
+ * comparison to the API — which serves JSON, so "prefer the source?" pointed at
+ * a wall of `{"op": "equal", …}`. It renders here now (`lib/xmlredline.ts`),
+ * opt-in behind `?source=1` because computing it is the expensive part. */
+.sourcepanel {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* Monospace and scrollable, because this is source: it must not be re-wrapped
+ * into something that reads like prose, and a long attribute value must not
+ * push the page sideways. `overflow-x` on the panel keeps the horizontal scroll
+ * inside the box rather than on the document. */
+.diff-view--source {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  max-height: 40rem;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+/* Markup, so it reads as markup rather than as text. Element names muted, so
+ * the *values* — where the guid churn is — are what the eye lands on. */
+.diff-view--source .xml-tag {
+  color: var(--muted);
+}
+
+.diff-view--source .xml-attr {
+  color: var(--link);
+}
+
+.diff-view--source .xml-val {
+  color: var(--ink);
+}
+
+/* Inside an insertion or deletion the marker colour has to win over the syntax
+ * colour, or a changed guid reads as an unchanged attribute value. */
+.diff-view--source ins span,
+.diff-view--source del span {
+  color: inherit;
 }

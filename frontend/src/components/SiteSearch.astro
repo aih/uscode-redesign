@@ -1,0 +1,53 @@
+---
+/**
+ * One box: go to a citation, or search the text.
+ *
+ * It replaced two — a `usa-search` form and `CitationJump` — which sat side by
+ * side in `.navtools` each asking for `flex: 1 1 12rem` of a row they shared
+ * with the theme toggle. Below about 50em neither got its basis and both
+ * collapsed to a few pixels, so the site's two primary navigation controls were
+ * simultaneously unusable at the widths most people read on. Merging them is
+ * the fix that also removes a decision the reader should never have been asked
+ * to make: you have a question about a provision, not a preference about which
+ * index answers it.
+ *
+ * Still a plain GET form, so it works with scripting off (ADR-0023). The
+ * routing happens on the server at `/app/goto`, which is where this lands and
+ * which is now a router rather than only a citation resolver.
+ */
+import { gotoHref } from "../lib/url";
+import { CITES_KEYWORD } from "../lib/query";
+
+interface Props {
+  /** Prefilled when a page is showing the result of a query. */
+  value?: string | null;
+  /** The goto and search pages render a larger copy of the same control. */
+  variant?: "header" | "page";
+}
+
+const { value = null, variant = "header" } = Astro.props;
+const id = variant === "header" ? "site-q" : "site-q-page";
+---
+
+<form class={`sitesearch sitesearch--${variant}`} method="get" action={gotoHref()} role="search">
+  <label class="sitesearch__label" for={id}>Search or go to a citation</label>
+  <div class="sitesearch__row">
+    <input
+      class="usa-input sitesearch__input"
+      id={id}
+      type="search"
+      name="q"
+      value={value ?? ""}
+      placeholder="11 usc 523(a)(1), or any words"
+      autocomplete="off"
+      spellcheck="false"
+      enterkeyhint="search"
+      aria-describedby={`${id}-hint`}
+    />
+    <button class="usa-button sitesearch__go" type="submit">Go</button>
+  </div>
+  <p class="sitesearch__hint" id={`${id}-hint`}>
+    A citation goes straight there; anything else searches the text. Prefix{" "}
+    <code>{CITES_KEYWORD}</code> to find provisions citing one.
+  </p>
+</form>
