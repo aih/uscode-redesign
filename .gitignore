@@ -232,3 +232,7 @@ data/*
 # evidence is docs/screenshots/, written by `make shots`.
 frontend/test-results/
 frontend/playwright-report/
+
+# Agent skills discovered from installed packages: symlinks into .venv, so this
+# directory is a view of the virtualenv and not source.
+/.agents/
