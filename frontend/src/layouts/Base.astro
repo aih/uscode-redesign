@@ -48,6 +48,27 @@ const hasContext = crumbs.length > 0 || picker !== null;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content="Any provision of the US Code, at any release point." />
+
+    {/* The theme, before first paint.
+
+        Light is the default for everyone (`site.scss`), so the common case
+        needs no script at all — this only matters for the reader who has
+        chosen dark, and for them it has to run *here*, blocking, in the head.
+        Anywhere later and they get a white flash on every navigation, which is
+        the one thing a dark theme exists to avoid.
+
+        Inline and tiny by necessity: an external module would be a network
+        round trip in front of the first paint of every page. */}
+    <script is:inline>
+      try {
+        const stored = localStorage.getItem("usc-theme");
+        if (stored === "dark" || stored === "light") {
+          document.documentElement.dataset.theme = stored;
+        }
+      } catch {
+        // No storage (private mode, blocked cookies) — the default stands.
+      }
+    </script>
   </head>
   <body>
     <a class="usa-skipnav" href="#main">Skip to main content</a>

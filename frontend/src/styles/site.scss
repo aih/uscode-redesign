@@ -55,7 +55,8 @@
 /* ------------------------------------------------------------------- tokens */
 
 :root {
-  color-scheme: light dark;
+  /* Light, always, until the reader says otherwise — see the dark block below. */
+  color-scheme: light;
 
   /* The one lever the BUILDLOG 008 review asked for by name: provision depth is
    * a variable, small enough on a phone that a four-deep paragraph still has a
@@ -81,6 +82,9 @@
   --rule: #dfe1e2;
   --page: #ffffff;
   --panel: #f0f0f0;
+  /* Form controls. USWDS already paints these white; the token exists so the
+   * dark theme has one place to move them to. */
+  --field: #ffffff;
   --link: #005ea2;
   --target: rgba(255, 190, 46, 0.28);
   --target-edge: #c05600;
@@ -111,33 +115,108 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e8e6e1;
-    --muted: #a9aeb1;
-    --rule: #3d4551;
-    --page: #16150f;
-    --panel: #1c1d1f;
-    --link: #73b3e7;
-    --target: rgba(255, 190, 46, 0.22);
-    --target-edge: #ffbe2e;
-    --danger: #f2938c;
-  }
+/* --------------------------------------------------------------- dark mode
+ *
+ * **Light is the default at every OS setting.** This used to key off
+ * `prefers-color-scheme`, which meant a reader whose laptop is dark — most of
+ * them — was handed the United States Code as light text on black without ever
+ * asking for it. Statutory text is a document; the page it is printed on is
+ * white unless someone says otherwise. So dark is now opt-in, and the opting
+ * is a control in the header (`ThemeToggle.astro`).
+ *
+ * The choice lives on `<html data-theme="dark">`, stamped before first paint by
+ * the inline bootstrap in `Base.astro` and remembered in `localStorage`.
+ * Deliberately *not* a cookie: every reader page carries a cache policy
+ * (ADR-0018), and a theme cookie would make the whole site `Vary: Cookie` —
+ * paying for a colour preference in cache misses on statutory text that never
+ * changes. The attribute is set by the client, after the bytes have been served.
+ *
+ * `color-scheme` moves with the attribute so the UA themes what CSS cannot
+ * reach: scrollbars, focus rings, and the dropdown a `<select>` opens.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #e8e6e1;
+  --muted: #a9aeb1;
+  --rule: #3d4551;
+  --page: #16150f;
+  --panel: #1c1d1f;
+  --field: #26282b;
+  --link: #73b3e7;
+  --target: rgba(255, 190, 46, 0.22);
+  --target-edge: #ffbe2e;
+  --danger: #f2938c;
 
   body {
     background: var(--page);
     color: var(--ink);
   }
 
+  /* The footer's colour is on its *sections*, not on `.usa-footer` — setting
+   * only the outer element left a white slab under every dark page. */
   .usa-header,
-  .usa-footer {
+  .usa-footer,
+  .usa-footer__primary-section,
+  .usa-footer__secondary-section {
     background: var(--panel);
+    background-color: var(--panel);
     color: var(--ink);
   }
 
   a,
   .usa-link {
     color: var(--link);
+  }
+
+  /* USWDS paints its controls, tables and boxes on white explicitly, so none of
+   * them follow the tokens above on their own — before this, the citation box
+   * and the release picker were the two brightest things on a dark page. */
+  .usa-input,
+  .usa-select,
+  .usa-textarea {
+    background-color: var(--field);
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+
+  /* The `<select>` chevron is a background SVG in USWDS's ink colour, which on
+   * a dark field is a dark arrow on a dark background. Same icon, repainted. */
+  .usa-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23e8e6e1'%3E%3Cpath d='M12 5.83 15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z'/%3E%3C/svg%3E");
+  }
+
+  .usa-table,
+  .usa-table td,
+  .usa-table th {
+    background-color: transparent;
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+
+  .usa-table thead th {
+    background-color: var(--panel);
+  }
+
+  .usa-summary-box {
+    background-color: var(--panel);
+    border-color: var(--rule);
+    color: var(--ink);
+  }
+
+  .usa-summary-box__heading,
+  .usa-summary-box__text {
+    color: var(--ink);
+  }
+
+  /* A redline is read by colour before it is read by word, so the two marks
+   * have to keep their contrast against the page they are actually on. */
+  .diff-view ins {
+    background: rgba(0, 166, 81, 0.3);
+  }
+
+  .diff-view del {
+    background: rgba(242, 147, 140, 0.24);
   }
 }
 
@@ -381,8 +460,59 @@ main[id] {
   display: none;
 }
 
+/* The padding that used to live here now belongs to `.navtools`, which owns the
+ * whole row. */
 .citejump--header {
+  padding: 0;
+}
+
+/* ------------------------------------------ the chrome's controls, on one row
+ *
+ * The citation box and the theme toggle, side by side. One row rather than two
+ * stacked blocks, because between 40em and 64em the nav is still the forced-open
+ * wrapping version and everything in it sticks: a second block here is 44px
+ * added to `--sticky-h`, and that token is what `scroll-margin-top` spends. */
+.navtools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   padding: 0 1rem 0.75rem;
+}
+
+/* `12rem` rather than `auto`: the citation box is allowed to wrap internally on
+ * a phone, and if it also claimed the full row the toggle would be pushed onto
+ * a line of its own with nothing else on it. */
+.navtools .citejump {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+/* Reading comfort, not navigation — so it is quiet: muted, no fill, no border,
+ * and it gives up its label before the citation box gives up any width. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  width: auto;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.theme-toggle__icon {
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .citejump--page {
@@ -413,9 +543,10 @@ main[id] {
 /* At the desktop breakpoint the nav is a horizontal row and the box can sit
  * beside it rather than under it. */
 @media (min-width: 64em) {
-  .citejump--header {
+  .navtools {
     padding: 0;
     margin-left: 1.5rem;
+    flex-wrap: nowrap;
   }
 
   /* The box shares the nav's row from here up, and a flex row will happily
@@ -430,8 +561,15 @@ main[id] {
     left: -999em;
   }
 
+  /* The box and its "Go" stay on one line here. Left to wrap, the button drops
+     under the input and the whole navbar grows a row — and this is the band
+     where the navbar is sticky, so a wrapped header is `--sticky-h` drifting. */
+  .navtools .citejump {
+    flex-wrap: nowrap;
+  }
+
   .citejump--header .citejump__input {
-    max-width: 13rem;
+    max-width: 11rem;
   }
 }
 

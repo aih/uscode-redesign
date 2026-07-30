@@ -1,0 +1,73 @@
+---
+/**
+ * Light or dark, chosen by the reader.
+ *
+ * The site is light by default at every OS setting (`site.scss`), because a
+ * statute is a document and a document's page is white until someone says
+ * otherwise. This is how they say otherwise: one button, one attribute
+ * (`<html data-theme>`), one `localStorage` key.
+ *
+ * Three things about it are deliberate.
+ *
+ *   * **No cookie, no server round trip.** The reader's pages are cached
+ *     (ADR-0018); a theme cookie would put `Vary: Cookie` on statutory text
+ *     that is identical for everyone. The preference is applied by the client
+ *     to bytes that stay shared.
+ *   * **The flash is handled in `Base.astro`, not here.** The `<head>`
+ *     bootstrap stamps the attribute before first paint; this island only
+ *     handles the click, and loads whenever it loads.
+ *   * **Hidden until scripted.** Without JavaScript the button cannot do
+ *     anything, and a dead control in the chrome is worse than no control. The
+ *     script un-hides it — which works only because `[hidden]` is forced to win
+ *     over `.usa-button { display: inline-block }` in `site.scss`.
+ *
+ * The accessible name says what the click will *do* ("Switch to dark mode"),
+ * which is unambiguous in a way that a name plus `aria-pressed` on a changing
+ * label is not.
+ */
+---
+
+<button
+  type="button"
+  class="usa-button usa-button--unstyled theme-toggle"
+  data-theme-toggle
+  hidden
+>
+  <span class="theme-toggle__icon" aria-hidden="true">☾</span>
+  <span class="theme-toggle__label">Dark</span>
+</button>
+
+<script is:inline>
+  {
+    const KEY = "usc-theme";
+    const root = document.documentElement;
+    const button = document.querySelector("[data-theme-toggle]");
+    const icon = button.querySelector(".theme-toggle__icon");
+    const label = button.querySelector(".theme-toggle__label");
+
+    function paint() {
+      const dark = root.dataset.theme === "dark";
+      // The label names the destination, not the current state: the button is
+      // the way *to* the other mode.
+      icon.textContent = dark ? "☀" : "☾";
+      label.textContent = dark ? "Light" : "Dark";
+      button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+      button.title = dark ? "Switch to light mode" : "Switch to dark mode";
+    }
+
+    button.addEventListener("click", () => {
+      const next = root.dataset.theme === "dark" ? "light" : "dark";
+      root.dataset.theme = next;
+      try {
+        localStorage.setItem(KEY, next);
+      } catch {
+        // Private mode, or storage full. The theme still applies to this page;
+        // it just will not be remembered, which is better than throwing.
+      }
+      paint();
+    });
+
+    paint();
+    button.hidden = false;
+  }
+</script>

@@ -9,6 +9,7 @@
  * worse than four links you can already read.
  */
 import CitationJump from "./CitationJump.astro";
+import ThemeToggle from "./ThemeToggle.astro";
 import { APP } from "../lib/url";
 ---
 
@@ -36,10 +37,18 @@ import { APP } from "../lib/url";
           <a class="usa-nav__link" href="/docs"><span>API docs</span></a>
         </li>
       </ul>
-      {/* The one control in the chrome: type a citation, land on it. Sits with
-          the nav because it is navigation — the fastest link on the page to a
-          provision whose number you already know. */}
-      <CitationJump />
+      {/* The chrome's two controls share one row at every width — which is also
+          what keeps them out of `--sticky-h`: a second block in the nav would
+          add a whole 44px band to the sticky stack between 40em and 64em, and
+          that token is what `scroll-margin-top` spends.
+
+          The citation box is navigation — the fastest link on the page to a
+          provision whose number you already know. The theme toggle is the only
+          thing here that is purely about reading comfort. */}
+      <div class="navtools">
+        <CitationJump />
+        <ThemeToggle />
+      </div>
     </nav>
   </div>
 </header>
