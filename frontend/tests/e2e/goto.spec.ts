@@ -86,8 +86,18 @@ test("a citation naming nothing loaded says which part is missing", async ({ pag
 
   const alert = page.locator(".usa-alert--warning");
   await expect(alert).toContainText("/us/usc/t99/s1");
-  // And offers the title as somewhere to go from.
-  await expect(alert.locator("a")).toHaveAttribute("href", /\/app\/us\/usc\/t99/u);
+  // And offers two ways on: the title to browse from, and the words to search
+  // for. The citation parsed, so it never reached the search fallback in
+  // `/app/goto` — a reader whose citation names nothing usually still wants the
+  // text, which is why the second link is there.
+  await expect(alert.getByRole("link", { name: /Open Title 99/u })).toHaveAttribute(
+    "href",
+    /\/app\/us\/usc\/t99/u,
+  );
+  await expect(alert.getByRole("link", { name: /Search the text/u })).toHaveAttribute(
+    "href",
+    /\/app\/search\?q=99\+usc\+1/u,
+  );
 });
 
 test("an appendix citation explains why it cannot resolve", async ({ page }) => {

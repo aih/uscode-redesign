@@ -40,11 +40,17 @@ services:
       - "9200:9200"
     volumes:
       - osdata:/usr/share/opensearch/data
+    # `-f` is load-bearing: without it curl exits 0 on an HTTP 401, so a cluster
+    # that rejects the credential reports *healthy* and `depends_on` lets the API
+    # start against it. Observed exactly that — OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    # is honoured only on FIRST boot, so changing it in .env leaves the security
+    # index in the volume holding the old one, and every search 401s behind a
+    # green healthcheck.
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "curl -sk -u admin:\"$$OPENSEARCH_INITIAL_ADMIN_PASSWORD\" https://localhost:9200/_cluster/health || exit 1",
+          "curl -skf -u admin:\"$$OPENSEARCH_INITIAL_ADMIN_PASSWORD\" https://localhost:9200/_cluster/health || exit 1",
         ]
       interval: 10s
       timeout: 5s

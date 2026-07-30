@@ -94,24 +94,37 @@
 @media (min-width: 40em) {
   :root {
     --indent-step: 1.6rem;
-    /* Navbar + citation box + contextual bar + section bar, all sticky from here
+    /* Navbar + search box + contextual bar + section bar, all sticky from here
      * up. The nav is still the forced-open wrapping row until 64em (see below)
-     * and the citation box sits under it, so this band is the tallest the stack
-     * ever gets: 280px measured, plus room for a deep breadcrumb trail to wrap
-     * one line further.
+     * and the search box sits under it, so this band is the tallest the stack
+     * ever gets.
      *
-     * This number drifts every time the chrome changes — adding the citation box
-     * moved it from 224px to 280px in one commit. It is held honest by the
-     * anchor-jump assertion in the e2e suite, not by anyone remembering. */
-    --sticky-h: 18rem;
+     * **337px measured** at 700px wide on `/us/usc/t16/s470a`, the deepest
+     * breadcrumb to hand — 22rem is 352px, so 15px of headroom. Erring high
+     * costs a little whitespace above an anchor; erring low hides the provision
+     * the reader asked for, which is the bug this token exists to prevent.
+     *
+     * This number drifts every time the chrome changes — the citation box moved
+     * it from 224px to 280px in one commit, and 18rem was already short of the
+     * worst case before the search box was merged. Measure it, do not estimate
+     * it: `getComputedStyle` over every `position: sticky` element *after
+     * scrolling*, because unscrolled they sit at their natural place and report
+     * a height that means nothing. Held honest by the anchor-jump assertion in
+     * the e2e suite, not by anyone remembering. */
+    --sticky-h: 22rem;
   }
 }
 
-/* At the desktop breakpoint USWDS's nav becomes a single horizontal row, the
- * citation box moves up beside it, and the stack shrinks back to ~198px. */
+/* At the desktop breakpoint USWDS's nav becomes a single horizontal row and the
+ * stack shrinks — but the search box takes a second row of its own from here up
+ * (see the `.navtools` rules further down), which is what that layout costs.
+ *
+ * **287px measured** at 1024 and 1280 on `/us/usc/t16/s470a`; 19rem is 304px,
+ * so 17px of headroom. It was 13rem/208px while the box shared the nav's row,
+ * and leaving it there would have put every anchor jump 39px behind the bar. */
 @media (min-width: 64em) {
   :root {
-    --sticky-h: 13rem;
+    --sticky-h: 19rem;
   }
 }
 
@@ -577,98 +590,72 @@ main[id] {
 /* At the desktop breakpoint the nav is a horizontal row and the box can sit
  * beside it rather than under it. */
 @media (min-width: 64em) {
-  .navtools {
-    padding: 0;
-    margin-left: 1rem;
-    flex-wrap: nowrap;
-  }
-
-  /* The box shares the nav's row from here up, and a flex row will happily
-     break "Release points" across two lines to make room. The links are short;
-     let the box give up width instead. */
-  .usa-nav__primary > li > a {
-    white-space: nowrap;
-  }
-
-  /* The placeholder carries the meaning from here up, and the row beside the
-     nav is the one place a visible label costs a whole line of chrome. Moved
-     off-screen rather than removed, so it still names the field for a screen
-     reader. */
-  .sitesearch--header .sitesearch__label {
-    position: absolute;
-    left: -999em;
-  }
-
-  /* The box and its "Go" stay on one line here. Left to wrap, the button drops
-     under the input and the whole navbar grows a row — and this is the band
-     where the navbar is sticky, so a wrapped header is `--sticky-h` drifting. */
-  .navtools .sitesearch__row {
-    flex-wrap: nowrap;
-  }
-
-  /* It used to be capped at 11rem, which was the two-box compromise: two
-     controls splitting one row could not each be wide. With one box the cap can
-     be what the content wants — a full citation like
-     `11 U.S.C. § 523(a)(1)(B)(ii)` is legible at this width. */
-  .navtools .sitesearch {
-    flex: 1 1 20rem;
-    max-width: 26rem;
-  }
-
-  /* Who gets the leftover width in the navbar's one row.
+  /* The search box gets its own row from here up.
    *
-   * `.usa-nav-container` is USWDS's 1024px grid container, so the header is
-   * 1024px wide however wide the window is — the box cannot be enlarged by
-   * making the viewport bigger, only by taking a share of that. Measured at
-   * 1280: the logo takes 270px and the four nav links 425px, which left the
-   * search 193px and its input 116px, because `.navtools` was `flex: 0 1 auto`
-   * and therefore never grew into what was spare.
+   * It shared the nav's row first, and the whole exercise showed why that was
+   * never going to work: `.usa-nav-container` is USWDS's 1024px grid container,
+   * so the header is 1024px wide however wide the window is. Of that, the logo
+   * takes 238px and the four nav links ~380px, and the box got whatever was
+   * left — 116px, then 172px after making `.usa-nav` fill its container and
+   * trimming the links' padding. Both numbers are a leftover rather than a
+   * decision, and neither is enough to read `11 U.S.C. § 523(a)(1)(B)(ii)` in.
    *
-   * So: the links ask for their content width and do not grow, and the search
-   * box takes everything left over. Measured at 1280 after all three rules
-   * below: links 377px, search 249px, input 172px.
+   * A second row costs one band of chrome and buys the box the container's full
+   * width. That trade is only available *here*: below 64em the nav is the
+   * forced-open wrapping version and the box is already on its own line, so
+   * this changes nothing there.
    *
-   * 158px is the honest ceiling for a box sharing one row with four links
-   * inside a 1024px container, and it is why the page-level copies on
-   * `/app/goto` and `/app/search` are 34rem — the header box is for starting a
-   * query, those are for working on one. The widths that actually mattered were
-   * the small ones, and those are the ones that were broken: 375px went from a
-   * sliver to a 234px input, 640px to 426px, 900px to 686px. */
-  /* `0 0 auto`, not `0 1 auto`: the links must not shrink below their content.
-   * They are `white-space: nowrap`, so a shrunk list does not reflow — it
-   * overflows, and the search box lands on top of "API docs". */
+   * The cost is real and is paid in `--sticky-h` at the top of this file — the
+   * navbar is sticky in this band, so a taller header is more of the viewport
+   * permanently spent and a larger `scroll-margin-top` above every anchor jump.
+   * Measured after this change rather than estimated, and the e2e anchor-jump
+   * assertion is what keeps that number honest. */
+  .usa-nav {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
   .usa-nav__primary {
     flex: 0 0 auto;
   }
 
-  /* And the actual reason the box stayed narrow: `.usa-nav` is sized to its own
-   * content, so `.navtools` growing inside it grows into nothing. The container
-   * is 1024px and the logo takes 238px; without this, the nav occupied only as
-   * much of the remaining 786px as its links happened to need, and the search
-   * box was capped by a width nobody had chosen. */
-  .usa-nav {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  /* With the nav filling the container, the only thing still standing between
-   * the search box and a usable width is the links' own padding: USWDS spends
-   * 16px a side, 128px across the four, inside a 1024px header already carrying
-   * a 238px logo. 10px a side reads identically and hands the difference over.
-   *
-   * The selector is this specific because it has to outrank USWDS's own — a
-   * plain `.usa-nav__primary > li > a` here loses and silently does nothing,
-   * which is exactly what it did until the computed padding was checked in the
-   * browser rather than assumed from the cascade order. */
-  .usa-nav .usa-nav__primary > li > a.usa-nav__link {
-    padding-left: 0.625rem;
-    padding-right: 0.625rem;
+  /* A flex row will happily break "Release points" across two lines to make
+     room; the links are short, so let them keep their own width. */
+  .usa-nav__primary > li > a {
+    white-space: nowrap;
   }
 
   .navtools {
-    flex: 1 1 auto;
-    min-width: 0;
+    /* Its own line, full width, and no longer competing with anything. */
+    flex: 0 0 100%;
+    padding: 0;
+    margin-left: 0;
+    margin-top: 0.5rem;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+  }
+
+  /* Right-aligned under the nav it belongs to, and capped rather than stretched:
+     a text input spanning 1024px is harder to read than one that ends where the
+     eye expects. 34rem matches the page-level copies on `/app/goto` and
+     `/app/search`, so the control is one width across the whole site. */
+  .navtools .sitesearch {
+    flex: 1 1 auto;
+    max-width: 34rem;
+  }
+
+  /* The label fits now that the box has a row of its own, and a visible label is
+     better than a placeholder that vanishes the moment someone types. */
+  .sitesearch--header .sitesearch__label {
+    position: static;
+    left: auto;
+  }
+
+  /* The box and its "Go" stay on one line. Left to wrap, the button drops under
+     the input and the header grows another band. */
+  .navtools .sitesearch__row {
+    flex-wrap: nowrap;
   }
 }
 
