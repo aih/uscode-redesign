@@ -14,17 +14,31 @@ import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
+import SectionBar from "../components/SectionBar.astro";
 import type { Entry, Release } from "../lib/types";
 import "../styles/site.scss";
+
+/** What the compact sticky row shows — the section's identity and its exits.
+ * Supplied only by pages that *are* a place in the Code; the front page and the
+ * auth pages pass nothing and get no bar. */
+export interface Bar {
+  num?: string | null;
+  heading?: string | null;
+  status?: string | null;
+  previous?: Entry | null;
+  next?: Entry | null;
+  up?: Entry | null;
+}
 
 interface Props {
   title: string;
   crumbs?: Entry[];
   release?: string | null;
   picker?: { action: string; options: Release[]; selected: string } | null;
+  bar?: Bar | null;
 }
 
-const { title, crumbs = [], release = null, picker = null } = Astro.props;
+const { title, crumbs = [], release = null, picker = null, bar = null } = Astro.props;
 const hasContext = crumbs.length > 0 || picker !== null;
 ---
 
@@ -38,18 +52,28 @@ const hasContext = crumbs.length > 0 || picker !== null;
   <body>
     <a class="usa-skipnav" href="#main">Skip to main content</a>
 
-    <SiteHeader />
+    {/* One sticky stack, so scrolling statutory text never costs you the answer
+        to "where am I" or "as of when". Desktop keeps the whole thing; below
+        40em only `.sectionbar` inside it stays put and the rest scrolls away
+        (`site.scss`). Anything that sticks has to be paid for in
+        `--sticky-h`, which drives `scroll-margin-top` — otherwise a deep link
+        to a provision lands *behind* this. */}
+    <div class="topbar">
+      <SiteHeader />
 
-    {
-      hasContext && (
-        <div class="contextbar">
-          <div class="contextbar__inner">
-            <Breadcrumbs crumbs={crumbs} release={release} />
-            {picker && <ReleasePicker {...picker} />}
+      {
+        hasContext && (
+          <div class="contextbar">
+            <div class="contextbar__inner">
+              <Breadcrumbs crumbs={crumbs} release={release} />
+              {picker && <ReleasePicker {...picker} />}
+            </div>
           </div>
-        </div>
-      )
-    }
+        )
+      }
+
+      {bar && <SectionBar {...bar} release={release} />}
+    </div>
 
     <main id="main" class="reader-wrap">
       <slot />

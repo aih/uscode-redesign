@@ -62,6 +62,19 @@
    * column to be read in, and wide enough on a desktop to show structure. */
   --indent-step: 0.75rem;
 
+  /* How much of the viewport the sticky stack occupies. Not decoration: this
+   * feeds `scroll-margin-top`, so every value here is a promise that an anchor
+   * jump lands *under* the bar rather than behind it.
+   *
+   * Measured, not guessed — `scripts/_sticky-check.mjs`-style geometry against
+   * the running site, then rounded up. Erring high costs a little whitespace
+   * above the target; erring low hides the provision the reader asked for,
+   * which is the bug this whole token exists to prevent. Kept honest by the
+   * anchor-jump assertion in the e2e suite.
+   *
+   * Below 40em only `.sectionbar` sticks: one 45px row. */
+  --sticky-h: 3.25rem;
+
   --reading: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --ink: #1b1b1b;
   --muted: #565c65;
@@ -77,6 +90,19 @@
 @media (min-width: 40em) {
   :root {
     --indent-step: 1.6rem;
+    /* Navbar + contextual bar + section bar, all sticky from here up. The nav is
+     * still the forced-open wrapping row until 64em (see below), so this band is
+     * the tallest the stack ever gets: 224px measured, and a deep breadcrumb
+     * trail can wrap one line further. */
+    --sticky-h: 16rem;
+  }
+}
+
+/* At the desktop breakpoint USWDS's nav becomes a single horizontal row and the
+ * stack shrinks back to ~198px. */
+@media (min-width: 64em) {
+  :root {
+    --sticky-h: 13rem;
   }
 }
 
@@ -149,6 +175,75 @@
 body {
   background: var(--page);
   color: var(--ink);
+}
+
+/* ------------------------------------------------------------ the sticky stack
+ *
+ * Scrolling a long section used to cost you the navbar, the breadcrumb trail,
+ * the release you were reading at, the section number, and prev/next — all of
+ * it, permanently, until you scrolled back. In a versioned reader those are the
+ * answers to "where am I" and "as of when", which is the whole product.
+ *
+ * Two rules keep this from breaking:
+ *
+ *   1. `position: sticky` silently does nothing if ANY ancestor has
+ *      `overflow` other than `visible`. `body`, `.topbar` and `.contextbar` are
+ *      clean; if a wrapper is ever added around `.topbar`, this is the first
+ *      thing to check when the bar stops sticking.
+ *   2. Whatever sticks must be counted in `--sticky-h`, because that is what
+ *      `scroll-margin-top` below spends. Change a height here, change the token.
+ */
+.topbar {
+  position: sticky;
+  top: 0;
+  /* Above the page, below the top layer the citation preview renders into —
+   * `popover` always paints above `z-index`, so there is nothing to out-bid. */
+  z-index: 500;
+  background: var(--page);
+}
+
+/* Below the desktop breakpoint the navbar is ~110px on its own (the nav is
+ * forced open — see above — and four links wrap), and the breadcrumb trail
+ * wraps to two or three lines. Sticking all of that would leave a 375px phone
+ * reading statutory law through a slot. So the stack scrolls away and only the
+ * one compact row stays.
+ *
+ * `display: contents` rather than `position: static`, and the difference is the
+ * whole fix: a sticky element is confined to its PARENT's box, so a
+ * `.sectionbar` nested inside a static `.topbar` scrolls off with it and never
+ * pins (measured: it sat at y = -1706 after a 2000px scroll). Dissolving the
+ * wrapper's box makes `.sectionbar` a child of the body flow, where its sticky
+ * containing block is the page. Nothing semantic is lost — `.topbar` is a plain
+ * `<div>` with no role — and the desktop nesting above is untouched. */
+@media (max-width: 39.99em) {
+  .topbar {
+    display: contents;
+  }
+
+  .sectionbar {
+    position: sticky;
+    top: 0;
+    z-index: 500;
+  }
+}
+
+/* Paper has no viewport to pin things to, and a bar reprinted on page one of a
+ * forty-page section is just noise. */
+@media print {
+  .topbar,
+  .sectionbar {
+    position: static;
+  }
+}
+
+/* The reason `--sticky-h` exists. Without this, `/us/usc/t16/s45f/c/5` scrolls
+ * the highlighted provision to the top of the *document* — which is underneath
+ * the bar. Applies to every addressable element in the text, not just the
+ * highlighted one, because any `<ref>` may link to a fragment. */
+.section-body [id],
+.section-body .target,
+main[id] {
+  scroll-margin-top: calc(var(--sticky-h) + 0.5rem);
 }
 
 .reader-wrap {
@@ -296,27 +391,91 @@ body {
 
 /* ------------------------------------------------------------ navigation */
 
-/* Item 4: a compact strip under the title, and the full block at the bottom —
- * so a reader who has finished a section never has to scroll back up to move on. */
-.navstrip {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  font-size: 0.85rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--rule);
+/* The sticky row: identity on the left, exits on both edges. One line, always,
+ * at every width — it is what remains on a phone once everything else has
+ * scrolled away, so it cannot be allowed to wrap. */
+.sectionbar {
+  background: var(--page);
   border-bottom: 1px solid var(--rule);
 }
 
-.navstrip a {
-  min-height: 2.75rem;
-  display: inline-flex;
+.sectionbar__inner {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 0.5rem;
+  display: flex;
   align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem; /* the 44px tap target, BUILDLOG 008 */
 }
 
-.navstrip__spacer {
+.sectionbar__step,
+.sectionbar__up {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  flex: none;
+  text-decoration: none;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* A missing neighbour keeps its slot rather than collapsing it: the section
+ * number should not jump sideways as you page through a chapter. */
+.sectionbar__step--off {
+  color: var(--rule);
+}
+
+.sectionbar__up {
+  font-size: 0.85rem;
+  padding: 0 0.35rem;
+}
+
+/* Wide enough for `SUBCHAPTER VI`, which is the longest thing that lands here in
+ * practice; anything longer elides rather than pushing the section number off. */
+.sectionbar__up-label {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `min-width: 0` is what actually lets the heading truncate: a flex item's
+ * default `min-width: auto` refuses to shrink below its content, so without it
+ * the row overflows instead of eliding. */
+.sectionbar__id {
   flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sectionbar__num {
+  font-family: var(--reading);
+  font-weight: 700;
+  flex: none;
+}
+
+/* The heading gives up its tail first; `§ 523` never does. */
+.sectionbar__heading {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 39.99em) {
+  .sectionbar__heading,
+  .sectionbar__up-label {
+    display: none;
+  }
 }
 
 .neighbors {
