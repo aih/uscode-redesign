@@ -2,13 +2,23 @@
 /**
  * `/app/releases` — every release point the inventory knows, newest first.
  *
- * Two columns that must never be conflated: what OLRC says a release point
- * changed (`titles_affected`), and what this database actually holds for it
- * (`ingested_titles`). While the backfill runs they differ, and presenting one as
- * the other would make an incomplete corpus look like missing law.
+ * The "Titles changed" column names the titles rather than counting them, and
+ * each one is a link into that title *at that release point* — which is the
+ * question this page exists to answer ("what moved on 07/12/2026, and can I go
+ * read it?"), and one a bare count could not.
+ *
+ * It used to sit beside a second column counting what this database holds
+ * (`ingested_titles`), because during the backfill the two genuinely differed
+ * and presenting one as the other would have made an incomplete corpus look
+ * like missing law. The backfill is finished (BUILDLOG 022/023: 3,153 of 3,153
+ * title-releases), so the column had become a second copy of the same number.
+ * The distinction it protected is kept where it still matters: a title OLRC
+ * says changed but this database does not hold is marked, per row, instead of
+ * being inferred by comparing two counts.
  */
 import Base from "../layouts/Base.astro";
 import type { Release } from "../lib/types";
+import { appHref, compareTitles, unpadTitle } from "../lib/url";
 
 const response = await fetch(
   `${process.env.API_BASE_URL ?? "http://localhost:8000"}/api/v1/releases`,
@@ -20,6 +30,16 @@ function usDate(iso: string): string {
   const [year, month, day] = iso.split("-");
   return `${month}/${day}/${year}`;
 }
+
+/** The titles a release point changed, in the Code's own order, each with
+ * whether this database can serve it. */
+function changedTitles(release: Release): { num: string; held: boolean }[] {
+  const held = new Set(release.ingested_titles.map(unpadTitle));
+  return release.titles_affected
+    .map(unpadTitle)
+    .sort(compareTitles)
+    .map((num) => ({ num, held: held.has(num) }));
+}
 ---
 
 <Base title="Release points · U.S. Code">
@@ -27,7 +47,9 @@ function usDate(iso: string): string {
   <p class="lede">
     {releases.length} published release points. A label names the last public law incorporated;
     <code>not</code> marks a law that was skipped, so the text is current through the date
-    <em>except</em> for that law.
+    <em>except</em> for that law. Every title listed under "Titles changed" links to that title as
+    it stood at that release point; one shown in grey with a <span aria-hidden="true">†</span> is a
+    title OLRC republished that this database does not hold.
   </p>
 
   <table class="usa-table usa-table--striped">
@@ -37,7 +59,6 @@ function usDate(iso: string): string {
         <th scope="col">Release point</th>
         <th scope="col">Current through</th>
         <th scope="col">Titles changed</th>
-        <th scope="col">Titles held here</th>
       </tr>
     </thead>
     <tbody>
@@ -49,8 +70,22 @@ function usDate(iso: string): string {
               {usDate(release.currency_date)}
               {release.is_partial && <span class="doc-meta"> — {release.caveat}</span>}
             </td>
-            <td>{release.titles_affected.length}</td>
-            <td>{release.ingested_titles.length}</td>
+            <td>
+              <ul class="titles-affected">
+                {changedTitles(release).map(({ num, held }) => (
+                  <li>
+                    {held ? (
+                      <a href={appHref(`/us/usc/t${num}`, release.label)}>{num}</a>
+                    ) : (
+                      <span class="titles-affected__missing" title="Not loaded in this database">
+                        {num}†
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {release.titles_affected.length === 0 && <span class="doc-meta">—</span>}
+            </td>
           </tr>
         ))
       }

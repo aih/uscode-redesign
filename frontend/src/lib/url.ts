@@ -105,6 +105,30 @@ export function trimNum(num: string | null | undefined): string {
   return num.trim().replace(/\.$/u, "");
 }
 
+/** `05` → `5`, `05a` → `5a`. OLRC's `titlesAffected` carries the *file-naming*
+ * form of a title number — zero-padded, because that is how the zips are named
+ * — and no URL in this reader uses it: the identifier scheme is `/us/usc/t5a`
+ * (CLAUDE.md gotcha 16). */
+export function unpadTitle(num: string): string {
+  return num.replace(/^0+(?=\d)/u, "");
+}
+
+/** Sort key for a title number, the TypeScript half of
+ * `storage.postgres.title_sort_key`: `5a` sorts after `5` and before `6`, and
+ * `10` after `9`. A title number is a string and must never be compared as one
+ * — sorted as text, the Code reads `1, 10, 11, 11a, 12, … 2, 20`, which is what
+ * the front page listed for eight sessions (ADR-0025). */
+export function titleSortKey(num: string): [number, string] {
+  const match = /^(\d+)(.*)$/u.exec(unpadTitle(num));
+  return match ? [Number(match[1]), match[2]] : [Number.MAX_SAFE_INTEGER, num];
+}
+
+export function compareTitles(a: string, b: string): number {
+  const [an, as] = titleSortKey(a);
+  const [bn, bs] = titleSortKey(b);
+  return an - bn || as.localeCompare(bs);
+}
+
 /** `/c/5` → `(c)(5)`. USLM's short-form vocabulary is empty below section
  * (`docs/prior-art.md` §1), so a provision path is bare designators with no
  * level name attached — "(c)(5)" is the honest reading, not "paragraph (c)(5)",

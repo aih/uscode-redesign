@@ -1152,6 +1152,28 @@ main[id] {
   color: var(--muted);
 }
 
+/* The titles a release point changed: a wrapping row of numbers, not a bulleted
+ * column. A list element because it is a list — twenty title numbers separated
+ * by commas is a screen-reader's run-on sentence — with the marker removed and
+ * the separator supplied by spacing. */
+.titles-affected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 22rem;
+}
+
+.titles-affected li {
+  margin: 0;
+}
+
+.titles-affected__missing {
+  color: var(--muted);
+}
+
 .uslm-quotedContent,
 .uslm-quotedText {
   border-left: 4px solid var(--rule);

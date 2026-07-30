@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  apiDiffHref,
   apiHref,
   appHref,
+  compareTitles,
   citationHref,
   diffHref,
   gotoHref,
@@ -11,6 +13,7 @@ import {
   provisionsHref,
   signupHref,
   trimNum,
+  unpadTitle,
   versionsHref,
 } from "../src/lib/url";
 
@@ -138,5 +141,46 @@ describe("en-dash identifiers (the ones OLRC actually publishes)", () => {
 
   it("leaves an ordinary identifier byte-for-byte unchanged", () => {
     expect(appHref("/us/usc/t16/s45f/c/5")).toBe("/app/us/usc/t16/s45f/c/5");
+  });
+});
+
+describe("title numbers (gotcha 16: a title number is a string, never an integer)", () => {
+  it("unpads OLRC's file-naming form, which is not the identifier form", () => {
+    expect(unpadTitle("05")).toBe("5");
+    expect(unpadTitle("05a")).toBe("5a");
+    expect(unpadTitle("16")).toBe("16");
+    expect(unpadTitle("5")).toBe("5");
+  });
+
+  it("sorts the way the Code is bound, not the way strings compare", () => {
+    const titles = ["11", "2", "05a", "10", "5", "50a", "1", "50", "54"];
+
+    expect([...titles].sort(compareTitles)).toEqual([
+      "1",
+      "2",
+      "5",
+      "05a",
+      "10",
+      "11",
+      "50",
+      "50a",
+      "54",
+    ]);
+    // The bug this exists to prevent: plain text sort puts 10 before 2.
+    expect([...titles].sort()).not.toEqual([...titles].sort(compareTitles));
+  });
+});
+
+describe("apiDiffHref", () => {
+  it("points at the API's source-level redline, not the reader's", () => {
+    expect(apiDiffHref("/us/usc/t16/s45f", "119-99", "119-102not101")).toBe(
+      "/api/v1/sections/us/usc/t16/s45f/diff?from=119-99&to=119-102not101",
+    );
+  });
+
+  it("percent-encodes an en-dash section number, like every other builder", () => {
+    expect(apiDiffHref("/us/usc/t16/s45a\u20131", "119-99", "119-100")).toContain(
+      "/sections/us/usc/t16/s45a%E2%80%931/diff",
+    );
   });
 });
