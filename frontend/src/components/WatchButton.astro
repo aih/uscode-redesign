@@ -12,8 +12,14 @@
  * be (ADR-0011's presentation layer stays server-side). A same-origin fetch
  * from the browser sends the session cookie on its own; nothing here forwards
  * one by hand the way `provisions.astro`'s SSR fetch has to.
+ *
+ * A logged-out reader is shown *nothing* here. This used to render a third
+ * control — "Log in to track this section" — which put the site's only sign-in
+ * prompt inside a feature box on one kind of page, and put a call to action
+ * about accounts in the middle of statutory text. Signing in is site state and
+ * now lives in the navbar (`AuthNav`), where it is reachable from every page
+ * rather than only from a section.
  */
-import { loginHref } from "../lib/url";
 
 interface Props {
   identifier: string;
@@ -21,8 +27,6 @@ interface Props {
 }
 
 const { identifier, release = null } = Astro.props;
-const next = `${Astro.url.pathname}${Astro.url.search}`;
-const loginTo = loginHref(next);
 ---
 
 <div class="watch-widget">
@@ -37,9 +41,6 @@ const loginTo = loginHref(next);
   >
     ★ Remove from My Provisions
   </button>
-  <a class="usa-button usa-button--outline" data-role="login" href={loginTo} hidden>
-    Log in to track this section
-  </a>
   <span class="doc-meta watch-status" data-role="status" hidden></span>
 
   <script
@@ -55,7 +56,6 @@ const loginTo = loginHref(next);
 
       const addBtn = widget.querySelector('[data-role="add"]');
       const removeBtn = widget.querySelector('[data-role="remove"]');
-      const loginHint = widget.querySelector('[data-role="login"]');
       const statusEl = widget.querySelector('[data-role="status"]');
 
       function csrfToken() {
@@ -63,8 +63,9 @@ const loginTo = loginHref(next);
         return match ? decodeURIComponent(match[1]) : "";
       }
 
+      /** `null` hides every control — the logged-out state, which shows nothing. */
       function showOnly(el) {
-        for (const candidate of [addBtn, removeBtn, loginHint]) {
+        for (const candidate of [addBtn, removeBtn]) {
           candidate.hidden = candidate !== el;
         }
       }
@@ -79,7 +80,8 @@ const loginTo = loginHref(next);
       async function init() {
         const me = await fetch("/api/v1/auth/me", { headers: { accept: "application/json" } });
         if (me.status === 401) {
-          showOnly(loginHint);
+          // Nothing to offer: the navbar carries the sign-in prompt now.
+          showOnly(null);
           return;
         }
         if (!me.ok) return;

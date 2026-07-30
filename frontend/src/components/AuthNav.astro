@@ -1,0 +1,136 @@
+---
+/**
+ * Log in / account, in the navbar.
+ *
+ * Until now the site's only visible sign-in prompt was a button on section
+ * pages reading "Log in to track this section" — which meant that whether you
+ * could log in at all depended on what page you happened to be reading, and
+ * that a reader on the front page, the releases list or the search results had
+ * no way in short of guessing the URL. Sign-in is site state, so it belongs in
+ * the site chrome; `WatchButton` now shows the reader nothing when they are
+ * logged out and this is the one place that offers the door.
+ *
+ * Why an island rather than SSR: reader pages are served from a *shared* cache
+ * (ADR-0018), so the HTML cannot depend on who asked for it. Rendering "Log in"
+ * versus "you are logged in as …" on the server would mean `Vary: Cookie` on
+ * every page carrying this header — which is all of them — and that is the
+ * whole reader cache gone to decorate a navbar. So the markup ships with both
+ * states present and `hidden`, and the browser asks `/api/v1/auth/me` who it
+ * is. `[hidden] { display: none !important }` in `site.scss` is what makes that
+ * safe next to USWDS's `display: inline-block` on buttons.
+ *
+ * Same reason as `WatchButton` for the bare relative `fetch`: `lib/api.ts` is
+ * Node-only (`process.env`) and cannot be bundled into a browser script.
+ */
+import { APP, loginHref, settingsHref, signupHref } from "../lib/url";
+
+/** Where to come back to after signing in — the page the reader is on. */
+const next = `${Astro.url.pathname}${Astro.url.search}`;
+---
+
+<div class="authnav" data-authnav>
+  {/* Logged out. Both doors, because "log in" alone strands anyone who has
+      never signed up, and this site's accounts are free and throwaway. */}
+  <span class="authnav__out" data-role="anon" hidden>
+    <a class="authnav__link" href={loginHref(next)}>Log in</a>
+    <span class="authnav__sep" aria-hidden="true">·</span>
+    <a class="authnav__link" href={signupHref(next)}>Sign up</a>
+  </span>
+
+  {/* Logged in. `<details>` rather than a scripted dropdown: the menu opens and
+      closes with no JavaScript of its own, so the only thing the island does
+      here is decide which of the two states is shown. */}
+  <details class="authnav__menu" data-role="user" hidden>
+    <summary class="authnav__summary">
+      <span class="authnav__email" data-role="email"></span>
+    </summary>
+    <div class="authnav__panel">
+      <a class="authnav__item" href={`${APP}/provisions`}>My Provisions</a>
+      <a class="authnav__item" href={settingsHref()}>Settings</a>
+      <button class="authnav__item authnav__signout" type="button" data-role="logout">
+        Log out
+      </button>
+    </div>
+  </details>
+
+  <script is:inline>
+    {
+      const root = document.currentScript.parentElement;
+      const anon = root.querySelector('[data-role="anon"]');
+      const user = root.querySelector('[data-role="user"]');
+      const emailEl = root.querySelector('[data-role="email"]');
+      const logoutBtn = root.querySelector('[data-role="logout"]');
+
+      function csrfToken() {
+        const match = document.cookie.match(/(?:^|; )usc_csrf=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function show(which) {
+        anon.hidden = which !== "anon";
+        user.hidden = which !== "user";
+      }
+
+      logoutBtn.addEventListener("click", async () => {
+        logoutBtn.disabled = true;
+        try {
+          const response = await fetch("/api/v1/auth/logout", {
+            method: "POST",
+            headers: { "x-csrf-token": csrfToken() },
+          });
+          if (!response.ok) return;
+          // A hard reload, not `show("anon")`. Logging out has to invalidate
+          // anything the page is showing *because* you were logged in — a
+          // watchlist, a settings form — and re-requesting the page is the
+          // only thing that reliably clears all of it. `location.reload()`
+          // would re-post on a form page; `replace` gets a clean GET.
+          window.location.replace(window.location.pathname + window.location.search);
+        } finally {
+          logoutBtn.disabled = false;
+        }
+      });
+
+      (async () => {
+        try {
+          const me = await fetch("/api/v1/auth/me", {
+            headers: { accept: "application/json" },
+          });
+          if (me.status === 401) {
+            show("anon");
+            return;
+          }
+          if (!me.ok) return; // Server trouble: offer nothing rather than a wrong state.
+          const body = await me.json();
+          emailEl.textContent = body.email;
+          show("user");
+
+          // The signed-in reader's preferences live on the account so they
+          // follow them between browsers, but they are *applied* client-side —
+          // reader pages are shared by everyone and cannot be rendered per
+          // user. Mirroring the stored value into `localStorage` here is what
+          // joins the two: the server is the record, `localStorage` is what the
+          // page actually reads, and the event tells `Base.astro` to re-apply
+          // now that this browser may have learned something new.
+          const settings = await fetch("/api/v1/settings", {
+            headers: { accept: "application/json" },
+          });
+          if (!settings.ok) return;
+          const prefs = await settings.json();
+          try {
+            localStorage.setItem(
+              "usc-linktarget",
+              prefs.open_links_in_new_tab ? "new" : "same",
+            );
+          } catch {
+            // No storage. The setting still applied on the server; this browser
+            // just cannot remember it between pages.
+          }
+          document.dispatchEvent(new CustomEvent("usc:linktarget"));
+        } catch {
+          // Offline or blocked. Leaving both hidden is deliberate: a "Log in"
+          // link that cannot reach the API is worse than no link.
+        }
+      })();
+    }
+  </script>
+</div>
