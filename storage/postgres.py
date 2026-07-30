@@ -60,6 +60,30 @@ def title_num_from_identifier(identifier: str) -> str | None:
     return match.group("num") if match else None
 
 
+_TITLE_NUM = re.compile(r"^(?P<digits>\d+)(?P<suffix>[a-zA-Z]*)$")
+
+
+def title_sort_key(num: str) -> tuple[int, str]:
+    """`'16'` → `(16, '')`, `'5a'` → `(5, 'a')` — the Code's own order.
+
+    `Title.num` is a *string* (`db/models.py`), because `5a` is a title number and
+    `5` is a different one. Sorting that column is therefore a trap: Postgres
+    collates `1, 10, 11, 11a, 12, … 2, 20, …`, which is what the front page showed
+    until this existed. Splitting into (number, suffix) puts each appendix title
+    directly after its parent — `5, 5a, 6` — which is where the Code puts it.
+
+    Not to be confused with `_padded`: that is OLRC's *file-naming* form (`05`,
+    `18a`) used to match `titles_affected`, and is wrong for ordering because it
+    would still be a string comparison, just one that happens to work below 100.
+    """
+    match = _TITLE_NUM.match(num.strip())
+    if not match:
+        # An unparseable title number sorts last rather than raising: ordering a
+        # list is not the place to discover that ingest wrote something strange.
+        return (10**9, num)
+    return (int(match.group("digits")), match.group("suffix").lower())
+
+
 class PostgresRepository:
     """`Repository` over the Day-1 Postgres schema."""
 
@@ -183,6 +207,9 @@ class PostgresRepository:
             )
         ).all():
             releases.setdefault(title_id, []).append((seq, label))
+        # Ordered here, not in SQL: `Title.num` is a string, so `ORDER BY` gives
+        # `1, 10, 11, 11a, 12, … 2, 20` (see `title_sort_key`). Fifty-eight rows
+        # is not a sort worth pushing into Postgres to get wrong.
         return [
             TitleInfo(
                 num=title.num,
@@ -192,7 +219,9 @@ class PostgresRepository:
                     label for _seq, label in sorted(releases.get(title.id, []))
                 ),
             )
-            for title in self._session.scalars(select(Title).order_by(Title.num))
+            for title in sorted(
+                self._session.scalars(select(Title)), key=lambda t: title_sort_key(t.num)
+            )
         ]
 
     # ------------------------------------------------------------------ sections
@@ -687,8 +716,14 @@ class PostgresRepository:
             law_num=release.law_num,
             excluded_laws=tuple(release.excluded_laws or ()),
             update_num=release.update_num,
+            # `titles_affected` is OLRC's zero-padded file-naming form (`05`,
+            # `18a`), which happens to sort correctly as a string below title 100
+            # — and is published in the inventory's own order anyway, so it is
+            # left exactly as the source gave it.
             titles_affected=tuple(release.titles_affected or ()),
-            ingested_titles=tuple(sorted(ingested_titles or ())),
+            # `ingested_titles` is the *unpadded* form (`5`, `5a`) and does not:
+            # sorting it as a string is the same bug `list_titles` had.
+            ingested_titles=tuple(sorted(ingested_titles or (), key=title_sort_key)),
         )
 
 

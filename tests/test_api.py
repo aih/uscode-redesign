@@ -11,6 +11,8 @@ Fixture facts they rely on (BUILDLOG 006):
   * /us/usc/t16/s2201 and /us/usc/t16/s2206 are the only two sections that differ.
 """
 
+import re
+
 import pytest
 
 pytestmark = pytest.mark.integration
@@ -512,6 +514,59 @@ def test_versions_of_a_provision_path_resolve_to_its_section(client):
 
     assert body["identifier"] == DEMO
     assert len(_fixture_versions(body)) == 1
+
+
+# ------------------------------------------------------------------------ titles
+
+
+def _in_code_order(nums: list[str]) -> bool:
+    """Deliberately *not* `storage.postgres.title_sort_key`.
+
+    This file is the contract the XCiteDB repository will have to satisfy too, and
+    a test that imports the implementation's own comparator passes whenever the
+    two share a bug. Spelled out here, it is an independent check — and short
+    enough that being independent costs nothing.
+    """
+    keyed = [(int(re.match(r"\d+", n).group()), n.lstrip("0123456789")) for n in nums]
+    return keyed == sorted(keyed)
+
+
+def test_titles_are_listed_in_the_codes_own_order(client):
+    """Not string order. `Title.num` is a string, so the obvious `ORDER BY` gives
+    `1, 10, 11, 11a, 12, … 2, 20` — the first thing a visitor saw on the front
+    page. Asserted as a property rather than a fixed list, because which titles
+    are loaded changes as the corpus grows.
+    """
+    nums = [t["num"] for t in client.get(f"{API}/titles").json()]
+
+    assert nums, "no titles loaded"
+    assert _in_code_order(nums)
+    assert nums[0] == "1"
+    # The one comparison string order gets wrong at the very top of the list.
+    if "2" in nums:
+        assert nums.index("2") < nums.index("10")
+
+
+def test_an_appendix_title_follows_its_parent(client):
+    """Gotcha 7: `5a` is a separate title, and it belongs between `5` and `6` —
+    not at the end of the list, which is where a string sort puts it."""
+    nums = [t["num"] for t in client.get(f"{API}/titles").json()]
+    appendices = [n for n in nums if not n.isdigit()]
+    if not appendices:
+        pytest.skip("no appendix titles loaded")
+
+    for appendix in appendices:
+        parent = appendix.rstrip("abcdefghijklmnopqrstuvwxyz")
+        if parent in nums:
+            assert nums.index(parent) == nums.index(appendix) - 1, appendix
+
+
+def test_ingested_titles_are_ordered_too(client):
+    """The same list, reached by a different route (`/app/releases` renders it),
+    and so the same bug — `ingested_titles` is the unpadded form."""
+    for release in client.get(f"{API}/releases").json():
+        held = release["ingested_titles"]
+        assert _in_code_order(held), release["label"]
 
 
 # ---------------------------------------------------------------------- releases

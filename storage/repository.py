@@ -305,6 +305,14 @@ class Repository(Protocol):
         ...
 
     def list_titles(self) -> list[TitleInfo]:
+        """Every ingested title, **in the Code's own order**: `1, 2, … 5, 5a, 6,
+        … 11, 11a, 12, …`, each appendix title directly after its parent.
+
+        The ordering is part of the contract, not the caller's problem. A title
+        number is a *string* (`5a` is a title and so is `5`), so any
+        implementation that sorts it as one produces `1, 10, 11, 11a, 12, … 2,
+        20` — which is what this interface shipped until it said otherwise.
+        """
         ...
 
     def get_section(

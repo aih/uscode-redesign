@@ -99,6 +99,13 @@ A guid is never a cross-release identity — that is `@identifier`'s job, and on
     real name (`CONSERVATION`) comes from the root structural element, not `<meta>`.
 15. **Facts that can change while the text does not** — reading order, parent chapter — belong on
     `section_release_map`, never on the content-deduped `section_versions` row (ADR-0008).
+16. **A title number is a string; never `ORDER BY` one.** `5a` is a title and `5` is a different
+    one, so `Title.num` cannot be an integer — and sorting it as text gives
+    `1, 10, 11, 11a, 12, … 2, 20`, which is what the front page listed for eight sessions. Sort
+    through `storage.postgres.title_sort_key` (`'5a'` → `(5, 'a')`), which is also the documented
+    contract on `Repository.list_titles` (ADR-0025). Do **not** reach for `_padded()` instead: that
+    is OLRC's file-naming form (`05`, `18a`) for matching `titles_affected`, and it is still a
+    string comparison — one that merely happens to work below title 100.
 
 ## Fixtures
 
