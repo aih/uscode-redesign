@@ -230,6 +230,28 @@ class WatchlistItem(Base):
     )
 
 
+class UserSettings(Base):
+    """One row per user, created lazily on first write (`storage/accounts.py`'s
+    `get_settings`/`update_settings`) — a user who never changes anything costs
+    no row, so `user_id` is both the primary key and the foreign key rather than
+    a separate surrogate id that would only ever have one value per user anyway.
+
+    `ondelete="CASCADE"` because a settings row with no user to belong to is not
+    a fact worth keeping — deleting an account should not leave orphaned
+    preference rows for `verify`/`test_architecture.py`-style audits to explain.
+    """
+
+    __tablename__ = "user_settings"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    open_links_in_new_tab: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class LoginAttempt(Base):
     """One failed login, kept just long enough to slow the next one down.
 

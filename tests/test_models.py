@@ -14,6 +14,7 @@ EXPECTED_TABLES = {
     "watchlist_items",
     "auth_sessions",
     "login_attempts",
+    "user_settings",
 }
 
 

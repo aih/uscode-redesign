@@ -181,8 +181,13 @@ test.describe("citation hover preview", () => {
     await expect(page.locator(CARD)).toBeHidden();
     expect(errors).toEqual([]);
 
-    await link.click();
-    await expect(page).toHaveURL(new RegExp(href!.split("?")[0].replace(/\//gu, "\\/")));
+    // The citation opens a new tab (ADR-0031), so the assertion is about the
+    // popup rather than this page's URL — and this page staying put is now
+    // part of the point: a preview that failed must not have cost the reader
+    // the provision they were reading either.
+    const [opened] = await Promise.all([page.waitForEvent("popup"), link.click()]);
+    await expect(opened).toHaveURL(new RegExp(href!.split("?")[0].replace(/\//gu, "\\/")));
+    await expect(page).toHaveURL(new RegExp(SECTION.replace(/\//gu, "\\/")));
   });
 
   test("it layers above the sticky bar and never overflows the viewport", async ({
@@ -237,9 +242,13 @@ test.describe("citation hover preview on touch", () => {
     const link = page.locator(`${REF}:visible`).first();
     const href = await link.getAttribute("href");
 
-    await link.tap();
+    // A tap follows the link into a new tab, same as a click — the preference
+    // is about where links open, not about which pointer opened them. What
+    // matters on touch is the other half: no card, ever, because the island is
+    // gated on `(hover: hover) and (pointer: fine)`.
+    const [opened] = await Promise.all([page.waitForEvent("popup"), link.tap()]);
 
-    await expect(page).toHaveURL(new RegExp(href!.split("?")[0].replace(/\//gu, "\\/")));
+    await expect(opened).toHaveURL(new RegExp(href!.split("?")[0].replace(/\//gu, "\\/")));
     await expect(page.locator(CARD)).toBeHidden();
   });
 });
