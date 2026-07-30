@@ -245,6 +245,81 @@ def test_an_unknown_email_is_throttled_too(fresh_client):
     )
 
 
+def test_a_forged_x_forwarded_for_does_not_open_a_fresh_throttle_bucket(
+    fresh_client, monkeypatch
+):
+    """ADR-0029. The per-IP limit exists to stop credential stuffing across many
+    accounts from one host; a caller who can pick their own bucket by sending a
+    header defeats exactly that case and nothing else.
+
+    Each attempt uses a *different* address so the per-email limit (5) cannot be
+    what fires, and `MAX_FAILURES_PER_IP` is lowered rather than met 50 times so
+    the test costs three argon2 verifies instead of fifty.
+    """
+    import api.auth
+
+    monkeypatch.setattr(api.auth, "MAX_FAILURES_PER_IP", 3)
+
+    for _ in range(3):
+        assert (
+            fresh_client.post(
+                f"{AUTH}/login", json={"email": _email(), "password": PASSWORD}
+            ).status_code
+            == 401
+        )
+
+    # A rotating header, which is the whole attack: one per attempt, all forged.
+    throttled = fresh_client.post(
+        f"{AUTH}/login",
+        json={"email": _email(), "password": PASSWORD},
+        headers={"X-Forwarded-For": "203.0.113.7"},
+    )
+
+    assert throttled.status_code == 429
+    assert int(throttled.headers["retry-after"]) > 0
+
+
+def test_the_recorded_address_never_comes_from_a_request_header(fresh_client):
+    """The narrower statement behind the test above, asserted directly: nothing
+    a caller sends reaches `login_attempts.ip`.
+
+    In production Caddy overwrites X-Forwarded-For with the real peer
+    (`deploy/Caddyfile`), and uvicorn's proxy-headers middleware — which is
+    server-side, not part of the ASGI app — is what turns that into
+    `request.client`. Neither is in the loop here, so what this pins is the
+    application's own half: `api.auth._client_ip` reads `request.client` and
+    never the raw header, so a forged value cannot become a bucket key or a
+    stored row no matter how the proxy is configured.
+    """
+    from db.base import SessionLocal
+    from db.models import LoginAttempt
+    from sqlalchemy import select
+
+    email = _email()
+    forged = "198.51.100.4, evil.example, " + "A" * 200
+    assert (
+        fresh_client.post(
+            f"{AUTH}/login",
+            json={"email": email, "password": PASSWORD},
+            headers={"X-Forwarded-For": forged},
+        ).status_code
+        == 401
+    )
+
+    with SessionLocal() as session:
+        recorded = session.scalars(
+            select(LoginAttempt.ip).where(LoginAttempt.email == email)
+        ).all()
+
+    assert recorded, "the failure was not recorded at all"
+    for value in recorded:
+        assert value != forged
+        assert "evil.example" not in (value or "")
+        # Whatever the address is, it is bounded — `LoginAttempt.ip` is an
+        # unbounded String, so the clip is the storage boundary's job.
+        assert len(value or "") <= 45
+
+
 def test_an_unknown_email_and_a_wrong_password_are_indistinguishable(fresh_client):
     """Same status, same body — and the unknown-email path now runs argon2
     against a dummy hash so it is not measurably faster either."""

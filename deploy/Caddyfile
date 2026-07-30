@@ -29,14 +29,34 @@
 {$SITE_ADDRESS::8000} {
 	encode gzip zstd
 
+	# `header_up X-Forwarded-For {remote_host}` *overwrites* rather than appends,
+	# so the header the backends read is always the real peer of this hop.
+	#
+	# It has to be done here, and it is not a belt-and-braces measure. Both
+	# compose files start uvicorn with `--forwarded-allow-ips "*"`, and in that
+	# mode uvicorn's proxy-headers middleware returns
+	# `x_forwarded_for_hosts[0]` — the *leftmost*, entirely client-supplied
+	# value; the reverse scan that finds the first untrusted hop only runs when
+	# trust is not `*`. Caddy's default is to append, so a caller who sends their
+	# own X-Forwarded-For lands leftmost and wins. That made the per-IP login
+	# throttle (api/auth.py, ADR-0019) bypassable with one header, and made
+	# `login_attempts.ip` an attacker-controlled write. Overwriting closes both
+	# regardless of the trust setting.
+	#
+	# Narrowing `--forwarded-allow-ips` to a literal range instead was rejected:
+	# the compose network's CIDR is assigned by Docker and changes. See ADR-0029.
 	handle /app* {
-		reverse_proxy frontend:4321
+		reverse_proxy frontend:4321 {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 
 	# Everything else is FastAPI: /api/v1, the citation redirector at /us/usc,
 	# /health, and the OpenAPI docs.
 	handle {
-		reverse_proxy api:8001
+		reverse_proxy api:8001 {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 
 	# Cache-Control is the origin's decision, never this file's: whether a

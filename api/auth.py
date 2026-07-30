@@ -83,14 +83,26 @@ def _hash_token(token: str) -> str:
 
 
 def _client_ip(request: Request) -> str | None:
-    """The caller's address, trusting the proxy only as far as it is configured.
+    """The caller's address, as far as the deployment can be made to tell it.
 
-    Behind Caddy every request arrives from the proxy, so `request.client` is
-    the same address for everyone and useless as a rate-limit key. Uvicorn is
-    started with `--proxy-headers`, which rewrites `request.client` from
-    `X-Forwarded-For` *for trusted proxies only* — so reading it here is right,
-    and reading the raw header ourselves would not be: a client can send that
-    header and would then choose its own rate-limit bucket.
+    Behind Caddy every request arrives from the proxy, so the socket peer is the
+    same address for everyone and useless as a rate-limit key. Uvicorn is started
+    with `--proxy-headers`, which rewrites `request.client` from
+    `X-Forwarded-For`, so `request.client` is the value to read.
+
+    What makes that value trustworthy is *not* uvicorn. Both compose files pass
+    `--forwarded-allow-ips "*"`, and in that mode uvicorn takes the header's
+    leftmost entry — which the client wrote. The guarantee comes from Caddy
+    instead: `deploy/Caddyfile` sets `header_up X-Forwarded-For {remote_host}`,
+    which *overwrites* the header with the real peer of that hop, so nothing a
+    caller sends survives to be read here. Until that line existed this throttle
+    was bypassable by sending one header (ADR-0029).
+
+    Reading the raw header directly would be wrong for the same reason, and
+    would not be improved by the Caddy change: it is right only because a proxy
+    is guaranteed in front, and a direct `uv run uvicorn` for development has no
+    such proxy. `request.client` degrades to the socket peer there, which is
+    correct for that case.
     """
     return request.client.host if request.client else None
 
