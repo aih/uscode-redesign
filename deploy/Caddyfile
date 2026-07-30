@@ -37,14 +37,38 @@
 	# mode uvicorn's proxy-headers middleware returns
 	# `x_forwarded_for_hosts[0]` — the *leftmost*, entirely client-supplied
 	# value; the reverse scan that finds the first untrusted hop only runs when
-	# trust is not `*`. Caddy's default is to append, so a caller who sends their
-	# own X-Forwarded-For lands leftmost and wins. That made the per-IP login
-	# throttle (api/auth.py, ADR-0019) bypassable with one header, and made
-	# `login_attempts.ip` an attacker-controlled write. Overwriting closes both
-	# regardless of the trust setting.
+	# trust is not `*`. Astro's Node adapter reads the leftmost value too
+	# (`astro/dist/core/app/node.js:121`), so both surfaces have the same shape.
 	#
-	# Narrowing `--forwarded-allow-ips` to a literal range instead was rejected:
-	# the compose network's CIDR is assigned by Docker and changes. See ADR-0029.
+	# The precondition is the `trusted_proxies` setting above, and it is worth
+	# stating exactly, because the mechanism is not "Caddy always appends":
+	# Caddy preserves an inbound X-Forwarded-For only when the peer is a trusted
+	# proxy, and replaces it otherwise. `static private_ranges` therefore means
+	# **any peer on a private network is trusted to name its own client**.
+	#
+	# Measured, with a Caddy 2 container and an echo upstream
+	# (docs/verification/xff.md):
+	#
+	#   trusted_proxies private_ranges, no header_up:
+	#       curl -H 'X-Forwarded-For: 1.2.3.4'  ->  "1.2.3.4, 192.168.65.1"
+	#   the same, with header_up:
+	#       curl -H 'X-Forwarded-For: 1.2.3.4'  ->  "192.168.65.1"
+	#
+	# So the forged value really does land leftmost and win, and uvicorn really
+	# does read it — but only from a peer inside a private range. Facing the
+	# internet directly, as ADR-0020 deploys it, client peers are public and
+	# Caddy already discards what they send. What was exposed is the dev stack,
+	# and any future shape with a CDN, load balancer or sidecar in front — which
+	# ADR-0018 explicitly anticipates. That made the per-IP login throttle
+	# (api/auth.py, ADR-0019) bypassable with one header and `login_attempts.ip`
+	# an attacker-controlled write, in exactly the deployment shape most likely
+	# to come next.
+	#
+	# Overwriting closes it unconditionally, and independently of the trust
+	# setting — which is the property worth having, since the setting is remote
+	# from the code that relies on it. Narrowing `--forwarded-allow-ips` to a
+	# literal range instead was rejected: the compose network's CIDR is assigned
+	# by Docker and changes. See ADR-0029.
 	handle /app* {
 		reverse_proxy frontend:4321 {
 			header_up X-Forwarded-For {remote_host}
@@ -65,14 +89,45 @@
 	# those headers through untouched and adds no cache of its own — it has no
 	# built-in one, and the immutable headers are what a CDN in front would read
 	# if one is ever added.
+	# Browser security headers (ADR-0030). `?` sets a header only if the origin
+	# did not, so a route can still speak for itself; none currently does.
 	header {
 		# Sent always; browsers are required to ignore it when it arrives over
 		# plain HTTP (RFC 6797 §8.1), so the dev stack on :8000 is unaffected.
-		?Strict-Transport-Security "max-age=31536000"
+		#
+		# `includeSubDomains` is a real commitment rather than a free upgrade:
+		# every subdomain of $SITE_ADDRESS must then be HTTPS for as long as the
+		# max-age, including ones that do not exist yet. Accepted because this is
+		# a single-host deployment (ADR-0020), and a plain-HTTP sibling of a site
+		# serving law is not something to leave room for.
+		?Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		# The reader renders statutory XML into HTML; these cost nothing and
 		# close the obvious own-goals.
 		?X-Content-Type-Options "nosniff"
 		?Referrer-Policy "strict-origin-when-cross-origin"
+
+		# Nothing here has any reason to be framed, and being framed is how a
+		# reader gets clickjacked into a watchlist change or a logout. Both
+		# spellings: `frame-ancestors` below is the one that counts,
+		# X-Frame-Options is for anything predating it.
+		?X-Frame-Options "DENY"
+
+		# The site loads no third-party anything — no CDN, no web font, no
+		# analytics, which is downstream of ADR-0011's no-bundle choice. So
+		# `default-src 'self'` is not a restriction that had to be negotiated,
+		# it is a description of what the site already does, and that makes it
+		# worth enforcing as the backstop under the reader's `set:html` sinks.
+		#
+		# `script-src` must carry 'unsafe-inline' for now, and saying so plainly
+		# is better than implying the policy is tighter than it is: every island
+		# is `<script is:inline>` — eight of them — which is ADR-0022's
+		# deliberate no-framework choice, and the theme toggle in particular has
+		# to run inline before first paint or the page flashes light before going
+		# dark (ADR-0027). Nonces are the fix, and they need the Astro middleware
+		# ADR-0029 has just added, so that is a follow-up with somewhere to go
+		# rather than a wish. `style-src` is the same story: USWDS ships bundled
+		# CSS, but a handful of components still carry `style="…"` attributes.
+		?Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
 	}
 
 	log {

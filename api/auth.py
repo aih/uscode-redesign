@@ -33,7 +33,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
-from params import cookies_are_secure, no_store
+from params import cookies_are_secure, no_store, rate_limit
 from storage import DuplicateEmailError, SessionRef, UserRef, get_accounts
 from storage.accounts import AccountsRepository
 
@@ -76,6 +76,20 @@ auth = APIRouter(
 )
 
 AccountsDep = Annotated[AccountsRepository, Depends(get_accounts)]
+
+_limit_signup = rate_limit("signup", capacity=10, per_second=30 / 3600)
+"""ADR-0029. Signup is the most expensive unauthenticated route in the project
+and the login throttle does not cover it: `PasswordHasher()` at argon2id
+defaults costs **64 MiB and 4 threads per call**, and every call that succeeds
+also writes a durable `users` row. Ten in a burst, then thirty an hour.
+
+A browser reaches this directly rather than through the reader's server-side
+render, so unlike `/labels` and `/search` the address here really is one
+person's (`params.py`). "One person" still overstates it, for the reason
+`MAX_FAILURES_PER_IP` is set so much higher than the per-email limit: an
+office or a campus is one address and many people. Thirty an hour is chosen to
+be well clear of a room full of people signing up and nowhere near a budget
+worth spending 64 MiB a time against."""
 
 
 def _hash_token(token: str) -> str:
@@ -224,7 +238,12 @@ RequireCsrfDep = Annotated[None, Depends(require_csrf)]
 # --------------------------------------------------------------------- routes
 
 
-@auth.post("/signup", response_model=UserOut, status_code=201)
+@auth.post(
+    "/signup",
+    response_model=UserOut,
+    status_code=201,
+    dependencies=[Depends(_limit_signup)],
+)
 def signup(
     body: SignupIn, request: Request, response: Response, accounts: AccountsDep
 ) -> UserOut:

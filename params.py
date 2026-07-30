@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import Annotated, Literal
+import threading
+import time
+from typing import Annotated, Callable, Literal
 
 from fastapi import Depends, HTTPException, Query, Request, Response
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -201,6 +203,155 @@ def no_store(response: Response) -> None:
     """
     response.headers["Cache-Control"] = NO_STORE
     response.headers["Vary"] = "Cookie"
+
+
+# -------------------------------------------------------------- rate limiting
+#
+# ADR-0029. Four ADRs (0016, 0020, 0024, 0028), docs/deploy.md and
+# docs/verification/loadtest.json each say an expensive unauthenticated route
+# must be limited before the URL is advertised. This is that limit.
+#
+# It lives here rather than in `api/` because `api/`, `citation.py` and the
+# reader's own surface all need the same thing and none of them may import each
+# other (ADR-0010) — the same reason `public_cache` and `no_store` are here.
+#
+# The amplifier that makes this urgent: every handler under `api/` is a sync
+# `def`, so all of them share Starlette's 40-slot threadpool. Saturating it with
+# one CPU-bound route stalls `/health` and every read route with it, which turns
+# "an expensive endpoint" into "an outage".
+#
+# Two costs, stated rather than hidden:
+#
+#  1. **The state is per process.** That is honest for ADR-0020's single box and
+#     wrong for a second instance, which would need shared state (Redis, or the
+#     proxy doing it). Recorded in ADR-0029 rather than discovered later.
+#
+#  2. **The reader's server-side calls share one bucket.** `frontend/` renders on
+#     the server and calls `/api/v1` over HTTP, so every reader's page view
+#     arrives at `/labels`, `/search` and `/citation` from the *frontend
+#     container's* address — one key for the whole readership. Those three limits
+#     are therefore sized for a server, not a person, and the per-person limit
+#     for the reader lives in `frontend/src/middleware.ts` where the browser's
+#     own address is visible. The routes a browser calls directly (signup) and
+#     the routes the reader does not call at all (diff, since ADR-0026 moved the
+#     reader onto its own text redline) are sized for a person and are the tight
+#     ones.
+
+
+class _Bucket:
+    __slots__ = ("tokens", "updated")
+
+    def __init__(self, tokens: float, updated: float) -> None:
+        self.tokens = tokens
+        self.updated = updated
+
+
+class RateLimiter:
+    """A token bucket per client address.
+
+    `capacity` is the burst a caller may spend at once; `per_second` is the rate
+    it refills at, which is the sustained limit. A bucket that is full is
+    indistinguishable from one that never existed, which is what makes the sweep
+    below safe.
+    """
+
+    #: How often to walk the whole table looking for buckets to forget. The table
+    #: is keyed on a client-supplied-adjacent value (an address), so it has to be
+    #: bounded by something; sweeping on write costs one pass per interval rather
+    #: than a background thread.
+    SWEEP_INTERVAL = 600.0
+
+    def __init__(self, *, name: str, capacity: int, per_second: float) -> None:
+        self.name = name
+        self.capacity = float(capacity)
+        self.per_second = per_second
+        self._buckets: dict[str, _Bucket] = {}
+        self._lock = threading.Lock()
+        self._swept = time.monotonic()
+
+    def check(self, key: str) -> float | None:
+        """None if the request may proceed; otherwise seconds until it may.
+
+        Under a threadpool this is called concurrently, so the whole
+        read-modify-write is inside the lock. It is a few microseconds of
+        arithmetic — the thing it is protecting takes milliseconds to seconds.
+        """
+        now = time.monotonic()
+        with self._lock:
+            if now - self._swept > self.SWEEP_INTERVAL:
+                self._sweep(now)
+            bucket = self._buckets.get(key)
+            if bucket is None:
+                bucket = _Bucket(self.capacity, now)
+                self._buckets[key] = bucket
+            bucket.tokens = min(
+                self.capacity, bucket.tokens + (now - bucket.updated) * self.per_second
+            )
+            bucket.updated = now
+            if bucket.tokens < 1.0:
+                # Ceil, so a client that obeys the header comes back with a whole
+                # token rather than a fraction of one and a second 429.
+                return max(1.0, (1.0 - bucket.tokens) / self.per_second)
+            bucket.tokens -= 1.0
+            return None
+
+    def _sweep(self, now: float) -> None:
+        """Forget buckets that have refilled: they hold no information."""
+        full_after = self.capacity / self.per_second
+        self._buckets = {
+            key: bucket
+            for key, bucket in self._buckets.items()
+            if now - bucket.updated < full_after
+        }
+        self._swept = now
+
+    def reset(self) -> None:
+        """For tests. Nothing in the running app calls this."""
+        with self._lock:
+            self._buckets.clear()
+            self._swept = time.monotonic()
+
+
+def client_key(request: Request) -> str:
+    """The rate-limit bucket key: the caller's address.
+
+    `request.client` and not the raw `X-Forwarded-For`, for the reason spelled
+    out at `api.auth._client_ip` — uvicorn's proxy-headers middleware fills it
+    in, and `deploy/Caddyfile` overwrites the header with the real peer so that
+    what it fills it in *with* cannot be chosen by the caller (ADR-0029). A
+    request with no client at all (an ASGI transport with no peer, which is what
+    a test client is) falls into one shared bucket, which is the safe direction.
+    """
+    return request.client.host if request.client else "-"
+
+
+#: Every limiter, by name, so tests and `/health`-adjacent tooling can find them
+#: without importing each route module.
+LIMITERS: dict[str, RateLimiter] = {}
+
+
+def rate_limit(
+    name: str, *, capacity: int, per_second: float
+) -> Callable[[Request], None]:
+    """Build a FastAPI dependency that limits one route family.
+
+    Returns 429 with `Retry-After`, reusing the shape `api/auth.py`'s login
+    throttle already established (ADR-0019), so a caller meets one error surface
+    rather than two.
+    """
+    limiter = RateLimiter(name=name, capacity=capacity, per_second=per_second)
+    LIMITERS[name] = limiter
+
+    def dependency(request: Request) -> None:
+        retry_after = limiter.check(client_key(request))
+        if retry_after is not None:
+            raise HTTPException(
+                status_code=429,
+                detail="too many requests; try again shortly",
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+
+    return dependency
 
 
 # ------------------------------------------------------------------- cookies

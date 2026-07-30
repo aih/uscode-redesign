@@ -57,6 +57,7 @@ from params import (
     not_found,
     parse_date_param,
     public_cache,
+    rate_limit,
     resolve_release_or_404,
     served_note,
 )
@@ -75,6 +76,30 @@ api = APIRouter(
     # overrides this with `immutable` when the release point was pinned.
     dependencies=[Depends(public_cache)],
 )
+
+# Rate limits (ADR-0029). Sized by what a route costs and by who calls it — the
+# reasoning is in `params.py`'s rate-limiting section, and the short version is
+# that anything the reader's server-side render calls arrives from one address
+# for the whole readership, so it is sized for a server.
+
+_limit_citation = rate_limit("citation", capacity=120, per_second=10.0)
+"""Called by `/app/goto` on the server, so it is a server's budget. The parse
+itself is pure and cheap (`citeparse`); the `labels()` existence check behind it
+is not free."""
+
+_limit_labels = rate_limit("labels", capacity=300, per_second=30.0)
+"""One call per section page rendered, server-side, for the whole readership —
+so this is the most generous of the three. What it bounds is the fan-out: the
+`identifier` list is now capped at 100, and this caps how often a caller may
+send a full one."""
+
+_limit_diff = rate_limit("diff", capacity=5, per_second=0.2)
+"""The tight one, and the reason this work exists. `api/diff.py` sets
+`Diff_Timeout = 0`, deliberately removing diff-match-patch's only runtime bound,
+and `docs/verification/loadtest.json` measured ~0.45 rps failing entirely past
+~10 concurrent. Nothing calls this server-side any more — ADR-0026 moved the
+reader onto its own text redline — so this budget is a person's, and 12/minute
+after a burst of 5 is more than a person reading redlines will ever want."""
 
 
 @api.get("/releases", response_model=list[ReleaseOut], summary="All release points")
@@ -114,8 +139,9 @@ def list_titles(repository: RepositoryDep) -> list[TitleOut]:
 @api.get(
     "/citation",
     response_model=CitationOut,
-    responses={422: {"model": ErrorOut}},
+    responses={422: {"model": ErrorOut}, 429: {"model": ErrorOut}},
     summary="A typed citation, resolved to an identifier",
+    dependencies=[Depends(_limit_citation)],
 )
 def citation_lookup(
     repository: RepositoryDep,
@@ -244,7 +270,9 @@ def neighbors(
 @api.get(
     "/labels",
     response_model=dict[str, TocEntryOut],
+    responses={429: {"model": ErrorOut}},
     summary="Num and heading for many identifiers at once",
+    dependencies=[Depends(_limit_labels)],
 )
 def labels(
     repository: RepositoryDep,
@@ -254,6 +282,11 @@ def labels(
             description="Repeat once per identifier. Unknown ones are absent from "
             "the answer rather than an error.",
             examples=[["/us/usc/t16/s45f", "/us/usc/t16/s1"]],
+            # The list fans into one `IN (...)`, so an unbounded one is an
+            # unbounded query. The densest section in the corpus carries a few
+            # dozen cross references; 100 is well clear of that and still a
+            # bound (ADR-0029).
+            max_length=100,
         ),
     ],
     release: ReleaseParam = None,
@@ -306,7 +339,8 @@ def versions(identifier: str, repository: RepositoryDep) -> VersionsOut:
     "/sections/{identifier:path}/diff",
     response_model=DiffOut,
     summary="A redline between two release points of a section",
-    responses={404: {"model": ErrorOut}},
+    responses={404: {"model": ErrorOut}, 429: {"model": ErrorOut}},
+    dependencies=[Depends(_limit_diff)],
 )
 def diff(
     identifier: str,
