@@ -21,7 +21,12 @@ import os
 from typing import Any, Iterable
 import re
 from opensearchpy import helpers
-from storage.search import SECTIONS_INDEX, STRUCTURE_INDEX, get_search_client
+from storage.search import (
+    SECTIONS_INDEX,
+    STRUCTURE_INDEX,
+    SearchNotConfigured,
+    get_search_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +36,35 @@ def _disabled() -> bool:
     ingest tests all load without one. A load that cannot reach OpenSearch is a
     successful load with a stale index, never a failed load."""
     return os.environ.get("DISABLE_SEARCH_SYNC") == "1"
+
+
+_warned_unconfigured = False
+
+
+def _client():
+    """The search client, or None if this environment has no cluster configured.
+
+    Every call below already treats a *failing* cluster as a warning rather than
+    an error, per this module's contract. An *unconfigured* one has to be
+    treated the same way, and it did not used to need saying: `storage.search`
+    defaulted the password, so the client always constructed and the failure
+    surfaced later as a connection error inside the try. Now that the default is
+    gone (it was a committed credential — ADR-0029) construction itself can
+    raise, and it raises outside those try blocks. Without this, forgetting
+    SEARCH_PASSWORD would turn a stale index into a failed corpus load.
+    """
+    global _warned_unconfigured
+    try:
+        return get_search_client()
+    except SearchNotConfigured as exc:
+        if not _warned_unconfigured:
+            logger.warning(
+                "search indexing is skipped: %s "
+                "(set DISABLE_SEARCH_SYNC=1 to make this deliberate)",
+                exc,
+            )
+            _warned_unconfigured = True
+        return None
 
 
 def strip_xml_tags(xml_str: str) -> str:
@@ -103,7 +137,9 @@ def create_indices():
     if _disabled():
         return
 
-    client = get_search_client()
+    client = _client()
+    if client is None:
+        return
     try:
         if not client.indices.exists(index=SECTIONS_INDEX):
             client.indices.create(index=SECTIONS_INDEX, body=SECTIONS_MAPPING)
@@ -119,7 +155,9 @@ def recreate_indices():
     creates-if-absent would leave the old mapping in place forever."""
     if _disabled():
         return
-    client = get_search_client()
+    client = _client()
+    if client is None:
+        return
     for index in (SECTIONS_INDEX, STRUCTURE_INDEX):
         try:
             if client.indices.exists(index=index):
@@ -139,7 +177,9 @@ def sync_sections(versions: list[dict[str, Any]]):
     if _disabled():
         return
 
-    client = get_search_client()
+    client = _client()
+    if client is None:
+        return
     actions = []
     for v in versions:
         first_release_id = v["first_release_id"]
@@ -177,7 +217,9 @@ def retire_versions(keys: Iterable[tuple[str, int]]):
     if _disabled():
         return
 
-    client = get_search_client()
+    client = _client()
+    if client is None:
+        return
     actions = [
         {
             "_op_type": "update",
@@ -201,7 +243,9 @@ def sync_structure_nodes(nodes: list[dict[str, Any]]):
     if _disabled():
         return
 
-    client = get_search_client()
+    client = _client()
+    if client is None:
+        return
     actions = []
     for n in nodes:
         actions.append({
