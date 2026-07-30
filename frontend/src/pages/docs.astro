@@ -1,0 +1,196 @@
+---
+/**
+ * `/app/docs` — the API reference, inside the site.
+ *
+ * The header's "API docs" link used to go to `/docs`, FastAPI's Swagger UI:
+ * a different-looking page with no navbar, no footer and no route back. This
+ * renders the same OpenAPI schema in this site's chrome instead, server-side
+ * and with no client JavaScript — see `lib/openapi.ts` for why Swagger UI and
+ * an iframe are both out (the CSP names no CDN, and `X-Frame-Options: DENY`
+ * blocks framing `/docs` even from the same origin).
+ *
+ * FastAPI's `/docs` and `/redoc` are left mounted and are still linked from
+ * here. This page is the readable reference; Swagger UI is the one with a
+ * "Try it" button, and losing that would be a real subtraction.
+ */
+import Base from "../layouts/Base.astro";
+import ErrorPage from "../components/ErrorPage.astro";
+import { ApiError, fetchOpenApi } from "../lib/api";
+import { setPublicCache } from "../lib/cache";
+import {
+  endpointSlug,
+  groupByTag,
+  requestBodyType,
+  sortedParameters,
+  successSchema,
+  typeName,
+} from "../lib/openapi";
+import type { OpenApiSchema } from "../lib/types";
+
+let schema: OpenApiSchema | null = null;
+let failure: { status: number; detail: string } | null = null;
+
+try {
+  schema = await fetchOpenApi();
+} catch (error) {
+  if (error instanceof ApiError) {
+    failure = { status: error.status, detail: error.detail };
+  } else {
+    console.error("openapi fetch failed", error);
+    failure = {
+      status: 503,
+      detail: "The API reference is unavailable right now. Please try again shortly.",
+    };
+  }
+  Astro.response.status = failure.status;
+}
+
+/** The schema only changes when the routes do — a deploy. `null, false` is the
+ * revalidate policy rather than `immutable`: there is no release point this
+ * page could be pinned against, so it must never be cached as permanent. */
+if (schema) setPublicCache(Astro.response.headers, null, false);
+
+const groups = schema ? groupByTag(schema) : [];
+---
+
+<Base title="API reference · U.S. Code">
+  <h1 class="doc-title">API reference</h1>
+
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    schema && (
+      <>
+        <p class="lede">
+          Every provision of the Code, at every release point, as JSON or as the source
+          USLM XML. Version <code>{schema.info.version}</code>.
+        </p>
+
+        <p class="doc-meta">
+          Also available as <a href="/docs">Swagger UI</a>, which can send requests from the
+          browser, as <a href="/redoc">ReDoc</a>, or as the raw{" "}
+          <a href="/openapi.json">OpenAPI schema</a> this page is built from.
+        </p>
+
+        {schema.info.description && (
+          <div class="apidocs__intro">
+            {schema.info.description
+              .split(/\n{2,}/u)
+              .map((paragraph) => paragraph.trim())
+              .filter(Boolean)
+              .map((paragraph) => (
+                <p>{paragraph}</p>
+              ))}
+          </div>
+        )}
+
+        <nav class="apidocs__contents" aria-label="API contents">
+          <h2 class="toc-group">Contents</h2>
+          <ul class="toc">
+            {groups.map((group) => (
+              <li>
+                <a href={`#${group.slug}`}>{group.tag}</a>{" "}
+                <span class="doc-meta">
+                  · {group.endpoints.length} endpoint
+                  {group.endpoints.length === 1 ? "" : "s"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {groups.map((group) => (
+          <section class="apidocs__group">
+            <h2 class="toc-group" id={group.slug}>
+              {group.tag}
+            </h2>
+
+            {group.endpoints.map((endpoint) => {
+              const params = sortedParameters(endpoint.operation);
+              const success = successSchema(endpoint.operation);
+              const body = requestBodyType(endpoint.operation);
+              const description = endpoint.operation.description;
+              return (
+                <article class="endpoint" id={endpointSlug(endpoint.method, endpoint.path)}>
+                  <h3 class="endpoint__head">
+                    <span class={`endpoint__method endpoint__method--${endpoint.method}`}>
+                      {endpoint.method.toUpperCase()}
+                    </span>
+                    <code class="endpoint__path">{endpoint.path}</code>
+                  </h3>
+
+                  {endpoint.operation.summary && (
+                    <p class="endpoint__summary">{endpoint.operation.summary}</p>
+                  )}
+
+                  {description && description !== endpoint.operation.summary && (
+                    <div class="endpoint__prose">
+                      {description
+                        .split(/\n{2,}/u)
+                        .map((paragraph) => paragraph.trim())
+                        .filter(Boolean)
+                        .map((paragraph) => (
+                          <p>{paragraph}</p>
+                        ))}
+                    </div>
+                  )}
+
+                  {params.length > 0 && (
+                    <table class="endpoint__params">
+                      <caption class="usa-sr-only">
+                        Parameters for {endpoint.method.toUpperCase()} {endpoint.path}
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Parameter</th>
+                          <th scope="col">In</th>
+                          <th scope="col">Type</th>
+                          <th scope="col">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {params.map((param) => (
+                          <tr>
+                            <th scope="row">
+                              <code>{param.name}</code>
+                              {param.required && (
+                                <span class="endpoint__required" title="Required">
+                                  {" "}
+                                  *
+                                </span>
+                              )}
+                            </th>
+                            <td>{param.in}</td>
+                            <td>
+                              <code>{typeName(param.schema)}</code>
+                            </td>
+                            <td>{param.description ?? param.schema?.description ?? ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  <p class="endpoint__returns doc-meta">
+                    {body && (
+                      <>
+                        Accepts <code>{body}</code>.{" "}
+                      </>
+                    )}
+                    {success ? (
+                      <>
+                        Returns <code>{success.status}</code> <code>{success.type}</code>.
+                      </>
+                    ) : (
+                      <>No documented success response.</>
+                    )}
+                  </p>
+                </article>
+              );
+            })}
+          </section>
+        ))}
+      </>
+    )
+  }
+</Base>

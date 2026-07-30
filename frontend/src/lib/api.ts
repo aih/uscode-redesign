@@ -12,6 +12,7 @@ import type {
   Entry,
   Labels,
   Neighbors,
+  OpenApiSchema,
   Release,
   SearchResponse,
   Section,
@@ -159,6 +160,16 @@ export async function fetchSearch(
   return getJson<SearchResponse>(
     `${API}/search${qs({ q: query, offset, limit, ...release })}`,
   );
+}
+
+/** The OpenAPI schema FastAPI generates, for `/app/docs` to render.
+ *
+ * Not under `/api/v1` — `/openapi.json` is where FastAPI publishes it and
+ * `main.py` does not move it, so this is the one path here that is not built
+ * from `API`. Everything the docs page shows is derived from this: there is no
+ * second, hand-written description of the API to drift out of date. */
+export async function fetchOpenApi(): Promise<OpenApiSchema> {
+  return getJson<OpenApiSchema>("/openapi.json");
 }
 
 /** The section's change timeline — the version page's own data (Day 4). */
