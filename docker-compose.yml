@@ -23,13 +23,26 @@ services:
       timeout: 5s
       retries: 5
 
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Uscode_Search_Admin_123!
+    ports:
+      - "9200:9200"
+    volumes:
+      - osdata:/usr/share/opensearch/data
+
   api:
     build: .
     depends_on:
       db:
         condition: service_healthy
+      opensearch:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+psycopg://uscode:uscode@db:5432/uscode
+      SEARCH_URL: https://opensearch:9200
     expose:
       - "8001"
     volumes:
@@ -73,3 +86,4 @@ services:
 volumes:
   pgdata:
   caddydata:
+  osdata:

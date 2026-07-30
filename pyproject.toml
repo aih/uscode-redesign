@@ -9,6 +9,7 @@ dependencies = [
     "diff-match-patch>=20241021",
     "fastapi>=0.140.7",
     "lxml>=6.1.1",
+    "opensearch-py>=3.2.0",
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.14.2",
     "sqlalchemy>=2.0.51",

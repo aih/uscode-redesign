@@ -40,6 +40,7 @@ from ingest import inventory as inventory_mod
 from ingest.parser import parser_for
 from ingest.records import DocumentMeta
 from ingest.release_label import parse_label
+from ingest import search_sync
 
 GUID_BATCH_SIZE = 500
 
@@ -80,6 +81,8 @@ def load_release(
     if not meta.doc_number:
         raise ValueError(f"{xml_path}: <docNumber> missing, cannot determine title")
 
+    search_sync.create_indices()
+
     release = _get_or_create_release(session, release_label, currency_date)
     title = _get_or_create_title(session, meta)
     title_version = _get_or_create_title_version(
@@ -108,6 +111,7 @@ def load_release(
     deduped = 0
     sections_ingested = 0
     guid_rows: list[dict[str, object]] = []
+    versions_to_sync: list[dict[str, Any]] = []
 
     for record in parser.iter_sections(xml_path):
         section = existing_sections.get(record.identifier)
@@ -137,6 +141,15 @@ def load_release(
             session.flush()
             existing_versions.setdefault(section.id, {})[content_hash] = version
             new_versions += 1
+            
+            versions_to_sync.append({
+                "identifier": record.identifier,
+                "num": record.num,
+                "heading": record.heading,
+                "xml": record.xml,
+                "status": record.status,
+                "release_id": release.id
+            })
         else:
             deduped += 1
 
@@ -161,6 +174,9 @@ def load_release(
         if len(guid_rows) >= GUID_BATCH_SIZE:
             _flush_guid_rows(session, guid_rows)
             guid_rows.clear()
+            if versions_to_sync:
+                search_sync.sync_sections(versions_to_sync)
+                versions_to_sync.clear()
             session.commit()
 
         if record.status:
@@ -169,6 +185,8 @@ def load_release(
 
     if guid_rows:
         _flush_guid_rows(session, guid_rows)
+    if versions_to_sync:
+        search_sync.sync_sections(versions_to_sync)
 
     raw_count = parser.count_section_elements(xml_path)
 
@@ -230,6 +248,7 @@ def _load_structure(
     }
     ids_by_identifier = {identifier: node.id for identifier, node in existing.items()}
     guid_rows: list[dict[str, object]] = []
+    nodes_to_sync: list[dict[str, Any]] = []
     count = 0
 
     for record in parser.iter_structure(xml_path):
@@ -267,6 +286,14 @@ def _load_structure(
             node.parent_id = parent_id
             node.seq = record.seq
             node.depth = record.depth
+            
+            nodes_to_sync.append({
+                "identifier": record.identifier,
+                "level": record.level,
+                "num_value": record.num_value,
+                "heading": record.heading,
+            })
+            
         if record.depth == 0 and record.heading and title.name == _fallback_title_name(title.num):
             # USLM 1.0.15 has no <dc:title>, so ingest names titles "Title 16" and
             # the real name — CONSERVATION — is only on the root structural element.
@@ -288,6 +315,8 @@ def _load_structure(
         # Chapter guids belong in guid_map too: `?id=` must resolve any @id in the
         # file, not only the ones inside sections (ADR-0003).
         _flush_guid_rows(session, guid_rows)
+    if nodes_to_sync:
+        search_sync.sync_structure_nodes(nodes_to_sync)
     return count
 
 

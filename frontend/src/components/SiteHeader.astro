@@ -37,15 +37,30 @@ import { APP } from "../lib/url";
           <a class="usa-nav__link" href="/docs"><span>API docs</span></a>
         </li>
       </ul>
-      {/* The chrome's two controls share one row at every width — which is also
+      {/* The chrome's controls share one row at every width — which is also
           what keeps them out of `--sticky-h`: a second block in the nav would
           add a whole 44px band to the sticky stack between 40em and 64em, and
-          that token is what `scroll-margin-top` spends.
+          that token is what `scroll-margin-top` spends. The search box joins
+          this row for the same reason rather than sitting under the nav.
 
-          The citation box is navigation — the fastest link on the page to a
-          provision whose number you already know. The theme toggle is the only
-          thing here that is purely about reading comfort. */}
+          Search and the citation box are both navigation, and they are not the
+          same one: the citation box goes straight to a provision you can
+          already name, search is for when you cannot. The theme toggle is the
+          only thing here that is purely about reading comfort. */}
       <div class="navtools">
+        <form
+          class="usa-search usa-search--small"
+          role="search"
+          action={`${APP}/search`}
+          method="get"
+          style="flex: 1 1 12rem; min-width: 0; margin: 0;"
+        >
+          <label class="usa-sr-only" for="search-field">Search</label>
+          <input class="usa-input" id="search-field" type="search" name="q" placeholder="Search the Code..." />
+          <button class="usa-button" type="submit">
+            <span class="usa-sr-only">Search</span>
+          </button>
+        </form>
         <CitationJump />
         <ThemeToggle />
       </div>

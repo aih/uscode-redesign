@@ -58,6 +58,8 @@ app.include_router(auth)  # /api/v1/auth: signup, login, logout, me (PLAN §4)
 app.include_router(watchlists)  # /api/v1/watchlists CRUD
 app.include_router(default_watchlist)  # /api/v1/watchlist: the reader's default list
 app.include_router(citation_router)  # the citation URL, redirecting to a surface
+from api.search import router as search_router
+app.include_router(search_router)
 
 
 @app.get("/health", tags=["ops"])
