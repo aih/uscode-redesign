@@ -114,6 +114,23 @@ def fresh_client(loaded_database):
 
 
 @pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """Empty every token bucket between tests (ADR-0029).
+
+    The limiters are per-process state — that is the design, and its cost is
+    recorded in `params.py` — and the whole suite runs in one process from one
+    apparent address, so without this every test after the fifth signup gets a
+    429. `tests/test_rate_limit.py` is the one place the limits are asserted
+    rather than got out of the way of.
+    """
+    from params import LIMITERS
+
+    for limiter in LIMITERS.values():
+        limiter.reset()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def mock_search_sync():
     """Mock search_sync functions for all tests so they don't hang trying to connect to OpenSearch."""
     with patch("ingest.search_sync.create_indices"), \

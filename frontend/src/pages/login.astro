@@ -9,12 +9,17 @@
  */
 import Base from "../layouts/Base.astro";
 import { setNoStore } from "../lib/cache";
-import { signupHref } from "../lib/url";
+import { safeNext, signupHref } from "../lib/url";
 
 // A credential form is not something a cache should be holding or replaying.
 setNoStore(Astro.response.headers);
 
-const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
+// Validated here, on the server, so the only value that ever reaches the island
+// is one this origin is willing to navigate to. Taken at face value — which is
+// what this page used to do — `?next=` was an open redirect off the trusted
+// origin and a `javascript:` sink in it, both at the moment a password is being
+// typed. `safeNext` falls back to the watchlist page.
+const next = safeNext(Astro.url.searchParams.get("next"));
 ---
 
 <Base title="Log in · U.S. Code">
@@ -68,7 +73,9 @@ const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
       });
 
       if (response.ok) {
-        window.location.assign(form.dataset.next || "/app/provisions");
+        // Already validated server-side by `safeNext`, so this is a known-good
+        // path on this origin rather than whatever the query string carried.
+        window.location.assign(form.dataset.next);
         return;
       }
 

@@ -24,9 +24,10 @@ import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { IMMUTABLE, REVALIDATE } from "../../lib/cache";
-import { documentDiff, diffLinesHtml } from "../../lib/diffdoc";
-import type { DocumentDiff } from "../../lib/diffdoc";
-import { apiDiffHref, appHref, trimNum, versionsHref } from "../../lib/url";
+import { documentDiff, diffLinesHtml, sourceDelta } from "../../lib/diffdoc";
+import type { DocumentDiff, SourceDelta } from "../../lib/diffdoc";
+import { apiDiffHref, appHref, diffHref, trimNum, versionsHref } from "../../lib/url";
+import { sourceRedline } from "../../lib/xmlredline";
 import { parseFragment, readingBlocks } from "../../lib/uslm";
 import type { Section } from "../../lib/types";
 import { isToc } from "../../lib/types";
@@ -92,6 +93,56 @@ const entries = versions?.versions ?? [];
 
 const unchanged = diff !== null && diff.changed === 0 && diff.inserted === 0 && diff.deleted === 0;
 
+// An empty redline establishes that nothing *readable* changed — never that the
+// source republished nothing, which it does at every release point (gotcha 1).
+// So when there is nothing to show, say which of the three cases this is rather
+// than letting "identical" stand for all of them.
+const delta: SourceDelta | null =
+  unchanged && before && after ? sourceDelta(before.xml, after.xml) : null;
+
+/** What the source did to this section while saying the same thing. */
+const UNCHANGED_NOTE: Record<SourceDelta, string> = {
+  identical:
+    "Both release points serve the same stored text, so nothing in the " +
+    "section's words or its markup differs.",
+  "guids-only":
+    "The stored XML differs only in its @id guids, which are a pin on " +
+    "(provision, release point) rather than anything the law says.",
+  "beyond-guids":
+    "The stored XML does differ by more than guids — whitespace, @temporalId, " +
+    "or another attribute that carries no words. This view diffs what the " +
+    "section says, so it cannot show what that was:",
+};
+
+// The guids, which are the metadata most likely to have moved. `guid` is
+// resolved per (identifier, release) from `guid_map`, so it is release-specific
+// even when the *stored fragment* is shared — under ADR-0007's dedupe two
+// release points with the same content resolve to one row, and that row carries
+// the guids of the release the text first appeared at. So an unchanged section
+// can, and normally does, have two different guids and one set of @id
+// attributes. That is worth saying outright rather than leaving a reader to
+// conclude the source republished nothing.
+const guidsDiffer = Boolean(
+  before && after && before.guid && after.guid && before.guid !== after.guid,
+);
+const fragmentFrom =
+  delta === "identical" && after ? after.content_first_seen.label : null;
+
+// The source-level redline, in the page rather than linked away to JSON.
+// Computed only when asked (`?source=1`): it is the expensive one, and Node has
+// one event loop. See `lib/xmlredline.ts` for why it is not an API call.
+const showSource = Astro.url.searchParams.get("source") === "1";
+const source = showSource && before && after ? sourceRedline(before.xml, after.xml) : null;
+
+/** The same page with the source panel toggled. Built by hand rather than
+ *  through `diffHref` because it carries a third parameter that only this page
+ *  knows about. */
+function sourceToggleHref(on: boolean): string {
+  const params = new URLSearchParams({ from: from ?? "", to: to ?? "" });
+  if (on) params.set("source", "1");
+  return `${diffHref(identifier, from ?? "", to ?? "").split("?")[0]}?${params.toString()}`;
+}
+
 /** "3 lines changed, 1 added" — the shape of the amendment, before the reader
  * starts reading it. */
 function summary(d: DocumentDiff): string {
@@ -127,10 +178,42 @@ const title = after
         <p class="lede">
           Comparing <strong>{before.release.label}</strong> to{" "}
           <strong>{after.release.label}</strong>.{" "}
-          {unchanged
-            ? "The text of this section is identical at both release points."
+          {unchanged && delta
+            ? "The text of this section is identical at both release points. " +
+              UNCHANGED_NOTE[delta]
             : summary(diff) + "."}
+          {unchanged && delta === "beyond-guids" && (
+            <>
+              {" "}
+              <a href={apiDiffHref(identifier, from ?? "", to ?? "")}>
+                the source-level redline
+              </a>{" "}
+              shows it.
+            </>
+          )}
         </p>
+
+        {unchanged && (guidsDiffer || fragmentFrom) && (
+          <p class="doc-meta">
+            {guidsDiffer && (
+              <>
+                Its <abbr title="The USLM @id attribute: a pin on this provision at
+                this release point, regenerated at every one by design. Never a
+                cross-release identity — that is @identifier's job.">guid</abbr>{" "}
+                did change, as it does at every release point:{" "}
+                <code>{before?.guid}</code> → <code>{after?.guid}</code>.{" "}
+              </>
+            )}
+            {fragmentFrom && (
+              <>
+                The <code>@id</code> attributes inside the XML above are those of{" "}
+                <strong>{fragmentFrom}</strong>, where this text first appeared —
+                identical content is stored once, so the fragment carries the
+                guids of that release rather than of either one being compared.
+              </>
+            )}
+          </p>
+        )}
 
         {entries.length > 1 && (
           <form class="diff-picker" method="get" action={`/app/diff${identifier}`}>
@@ -167,11 +250,40 @@ const title = after
         <div class="diff-view diff-view--text" set:html={diffLinesHtml(diff.lines)} />
 
         {/* The XML is still there for whoever wants it — this page just no
-            longer makes everyone else read it. */}
-        <p class="doc-meta">
-          Prefer the source? The API serves the same comparison as a{" "}
-          <a href={apiDiffHref(identifier, from ?? "", to ?? "")}>redline of the verbatim XML</a>.
-        </p>
+            longer makes everyone else read it (ADR-0026). It renders here now
+            rather than only as a link to JSON, and it is a link rather than a
+            `<details>` because the cost is in *computing* it: not rendering it
+            is the saving, so the toggle has to be a round trip. */}
+        <section class="sourcepanel">
+          <h2 class="toc-group" id="source">Source XML</h2>
+
+          {!source && (
+            <p class="doc-meta">
+              This redline is of what the section <em>says</em>. The same comparison of the
+              verbatim USLM — every attribute, including the <code>@id</code> guids that
+              regenerate at every release point — is{" "}
+              <a href={`${sourceToggleHref(true)}#source`} rel="nofollow">
+                available as a source redline
+              </a>
+              . It is computed on request because it is the expensive one.
+            </p>
+          )}
+
+          {source && (
+            <>
+              <p class="doc-meta">
+                The verbatim USLM, redlined.{" "}
+                {source.inserted === 0 && source.deleted === 0
+                  ? "The two fragments are byte-for-byte identical."
+                  : `${source.inserted.toLocaleString()} characters added, ${source.deleted.toLocaleString()} removed — most of which is usually @id churn rather than legal change.`}{" "}
+                <a href={`${sourceToggleHref(false)}#source`} rel="nofollow">Hide it</a>, or take
+                it as{" "}
+                <a href={apiDiffHref(identifier, from ?? "", to ?? "")}>JSON from the API</a>.
+              </p>
+              <div class="diff-view diff-view--source" set:html={source.html} />
+            </>
+          )}
+        </section>
       </>
     )
   }

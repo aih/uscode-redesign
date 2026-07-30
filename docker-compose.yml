@@ -27,19 +27,30 @@ services:
     image: opensearchproject/opensearch:2.14.0
     environment:
       - discovery.type=single-node
+      # From .env (copy .env.example), never a literal in this file — the same
+      # value used to appear three times here and once as a default in
+      # storage/search.py, which made it a committed credential rather than a
+      # dev convenience.
+      #
       # The security plugin rejects a password that resembles the username, so
-      # this one must not contain "admin" — the container exits 1 at boot if it
-      # does, and the only sign is a line in its log.
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Usc0deSearch!Str0ng#2026
+      # it must not contain "admin" — the container exits 1 at boot if it does,
+      # and the only sign is a line in its log.
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
     ports:
       - "9200:9200"
     volumes:
       - osdata:/usr/share/opensearch/data
+    # `-f` is load-bearing: without it curl exits 0 on an HTTP 401, so a cluster
+    # that rejects the credential reports *healthy* and `depends_on` lets the API
+    # start against it. Observed exactly that — OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    # is honoured only on FIRST boot, so changing it in .env leaves the security
+    # index in the volume holding the old one, and every search 401s behind a
+    # green healthcheck.
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "curl -sk -u admin:'Usc0deSearch!Str0ng#2026' https://localhost:9200/_cluster/health || exit 1",
+          "curl -skf -u admin:\"$$OPENSEARCH_INITIAL_ADMIN_PASSWORD\" https://localhost:9200/_cluster/health || exit 1",
         ]
       interval: 10s
       timeout: 5s
@@ -56,7 +67,11 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://uscode:uscode@db:5432/uscode
       SEARCH_URL: https://opensearch:9200
-      SEARCH_PASSWORD: Usc0deSearch!Str0ng#2026
+      SEARCH_PASSWORD: ${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
+      # False *only here*. The image generates a self-signed certificate at
+      # first boot, so verification cannot succeed against the dev stack. Every
+      # other environment leaves this at its default of true.
+      SEARCH_VERIFY_CERTS: "false"
     expose:
       - "8001"
     volumes:

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hrefs, parseFragment, render } from "../src/lib/uslm";
+import { highlightHtml, hrefs, parseFragment, render } from "../src/lib/uslm";
 import type { Labels } from "../src/lib/types";
 
 const NS = 'xmlns="http://xml.house.gov/schemas/uslm/1.0"';
@@ -169,5 +169,36 @@ describe("hrefs", () => {
   it("collects every ref href in document order", () => {
     const xml = `<section ${NS}><p><ref href="/us/usc/t16/s1">a</ref></p><sourceCredit><ref href="/us/stat/123/1764">b</ref></sourceCredit></section>`;
     expect(hrefs(parseFragment(xml))).toEqual(["/us/usc/t16/s1", "/us/stat/123/1764"]);
+  });
+});
+
+describe("highlightHtml", () => {
+  // OpenSearch does not escape field content — it returns the stored text with
+  // `<em>` around the matched terms. So a highlight fragment is untrusted text
+  // with two known tags in it, and this is the only thing that may reach
+  // `set:html` on the search page.
+
+  it("keeps the highlighter's own em wrappers", () => {
+    expect(highlightHtml("the <em>navigable</em> waters")).toBe(
+      "the <em>navigable</em> waters",
+    );
+  });
+
+  it("escapes markup that came from the indexed text", () => {
+    expect(highlightHtml('<script>alert(1)</script>')).toBe(
+      "&lt;script&gt;alert(1)&lt;/script&gt;",
+    );
+    expect(highlightHtml('<img src=x onerror="alert(1)">')).not.toContain("<img");
+  });
+
+  it("escapes a tag that merely looks like the highlighter's", () => {
+    // `<embed>` starts with the same three letters; only the exact tag survives.
+    expect(highlightHtml("<embed src=evil>")).toBe("&lt;embed src=evil&gt;");
+    expect(highlightHtml("<em class=x>hi</em>")).toContain("&lt;em class=x&gt;");
+  });
+
+  it("escapes ampersands without double-escaping the ones it just made", () => {
+    expect(highlightHtml("Fish & Wildlife")).toBe("Fish &amp; Wildlife");
+    expect(highlightHtml("&lt;")).toBe("&amp;lt;");
   });
 });

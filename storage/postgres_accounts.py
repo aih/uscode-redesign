@@ -82,9 +82,23 @@ class PostgresAccounts:
 
     # ------------------------------------------------------- login attempts
 
+    #: Longest address this table will store. An IPv6 address is at most 45
+    #: characters (`::ffff:255.255.255.255` and friends), and nothing legitimate
+    #: is longer. `LoginAttempt.ip` is an unbounded `String`, so without this a
+    #: caller who could influence the value could write rows of any size. Caddy
+    #: now overwrites X-Forwarded-For (ADR-0029), so nothing should reach here
+    #: that needs truncating — this is the boundary check that makes that a
+    #: belt-and-braces claim rather than the only thing standing in the way.
+    #: Truncating rather than widening the column keeps it migration-free.
+    _MAX_IP_LEN = 45
+
     def record_login_failure(self, *, email: str, ip: str | None) -> None:
-        self._session.add(LoginAttempt(email=email, ip=ip))
+        self._session.add(LoginAttempt(email=email, ip=self._clip_ip(ip)))
         self._session.commit()
+
+    @classmethod
+    def _clip_ip(cls, ip: str | None) -> str | None:
+        return ip[: cls._MAX_IP_LEN] if ip else ip
 
     def count_recent_login_failures(
         self, *, email: str, ip: str | None, since: datetime.datetime
@@ -95,6 +109,10 @@ class PostgresAccounts:
             .where(LoginAttempt.email == email, LoginAttempt.created_at >= since)
         )
         by_ip = 0
+        # Clipped on the way in and on the way out, or a long value would be
+        # stored truncated and then never counted again — a throttle that
+        # silently stops throttling.
+        ip = self._clip_ip(ip)
         if ip:
             by_ip = self._session.scalar(
                 select(func.count())
@@ -107,6 +125,7 @@ class PostgresAccounts:
         # The address is cleared too: a shared address (an office, a campus) is
         # otherwise locked out by whoever fumbled their password before you.
         criteria = [LoginAttempt.email == email]
+        ip = self._clip_ip(ip)
         if ip:
             criteria.append(LoginAttempt.ip == ip)
         for criterion in criteria:

@@ -13,6 +13,7 @@ import type {
   Labels,
   Neighbors,
   Release,
+  SearchResponse,
   Section,
   Title,
   Toc,
@@ -137,6 +138,27 @@ export async function lookupCitation(
   params: ReleaseParams = {},
 ): Promise<Citation> {
   return getJson<Citation>(`${API}/citation${qs({ q: query, ...params })}`);
+}
+
+/**
+ * Keyword search (ADR-0028).
+ *
+ * The default searches the text in force; `release`/`date` swap that for the
+ * newest text at or before the release asked for, and the response names the
+ * release it actually searched. Going through here rather than a bare `fetch`
+ * is the point of this module: `search.astro` used to call the API directly
+ * with its own `API_BASE_URL` default of `http://api:8001`, which is the
+ * compose service name — so under `npm run dev` search alone silently failed
+ * while every other page worked.
+ */
+export async function fetchSearch(
+  query: string,
+  opts: { offset?: number; limit?: number } & ReleaseParams = {},
+): Promise<SearchResponse> {
+  const { offset, limit, ...release } = opts;
+  return getJson<SearchResponse>(
+    `${API}/search${qs({ q: query, offset, limit, ...release })}`,
+  );
 }
 
 /** The section's change timeline — the version page's own data (Day 4). */

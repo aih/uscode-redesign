@@ -401,3 +401,24 @@ function escapeText(value: string): string {
 function escapeAttr(value: string): string {
   return escapeText(value).replace(/"/gu, "&quot;");
 }
+
+/**
+ * A search highlight fragment, made safe to put in `set:html`.
+ *
+ * OpenSearch's highlighter wraps matched terms in `<em>` and **does not escape
+ * the field content around them** — it returns the stored text as it was
+ * indexed. So the fragment is not trusted markup, it is untrusted text with two
+ * known tags in it, and the safe reading is exactly that: escape everything,
+ * then put back the one pair of tags the highlighter is documented to add.
+ *
+ * Not currently exploitable, and that is a property of the indexer rather than
+ * of this page: `ingest/search_sync.strip_xml_tags` removes markup before
+ * indexing and never decodes entities, so no raw `<` reaches the index today.
+ * One change to that function and it would — which is the whole reason this
+ * escapes at the boundary rather than trusting the pipeline to stay as it is.
+ */
+export function highlightHtml(fragment: string): string {
+  return escapeHtml(fragment)
+    .replace(/&lt;em&gt;/gu, "<em>")
+    .replace(/&lt;\/em&gt;/gu, "</em>");
+}

@@ -191,3 +191,38 @@ export interface Watchlist {
   name: string;
   items: WatchlistItem[];
 }
+
+/** Mirrors `SearchSnippet` — one highlighted fragment from one field.
+ *
+ * `text` carries OpenSearch's `<em>` wrappers around the matched terms and
+ * nothing else it escaped: the cluster does not escape field content, so this
+ * is rendered through `highlightHtml` rather than `set:html` directly. */
+export interface SearchSnippet {
+  field: string;
+  text: string;
+}
+
+/** Mirrors `SearchResultItem`. The index unit is the deduped section *version*
+ * (ADR-0028), so `first_release` is where this exact text first appeared —
+ * which is why an unchanged section can report a release far older than the one
+ * searched. `type` distinguishes the two indices a query spans: a section, or a
+ * structural node (a chapter or subchapter heading). */
+export interface SearchResultItem {
+  identifier: string;
+  heading: string | null;
+  num: string | null;
+  level: string | null;
+  type: "section" | "structure";
+  snippets: SearchSnippet[];
+  first_release: string | null;
+  is_current: boolean;
+}
+
+/** Mirrors `SearchResponse`. `release` names the release point actually
+ * searched — absent means the text in force, which is the default (ADR-0028). */
+export interface SearchResponse {
+  results: SearchResultItem[];
+  total: number;
+  release: string | null;
+  note: string | null;
+}

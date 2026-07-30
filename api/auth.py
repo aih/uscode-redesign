@@ -33,7 +33,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
-from params import cookies_are_secure, no_store
+from params import cookies_are_secure, no_store, rate_limit
 from storage import DuplicateEmailError, SessionRef, UserRef, get_accounts
 from storage.accounts import AccountsRepository
 
@@ -77,20 +77,46 @@ auth = APIRouter(
 
 AccountsDep = Annotated[AccountsRepository, Depends(get_accounts)]
 
+_limit_signup = rate_limit("signup", capacity=10, per_second=30 / 3600)
+"""ADR-0029. Signup is the most expensive unauthenticated route in the project
+and the login throttle does not cover it: `PasswordHasher()` at argon2id
+defaults costs **64 MiB and 4 threads per call**, and every call that succeeds
+also writes a durable `users` row. Ten in a burst, then thirty an hour.
+
+A browser reaches this directly rather than through the reader's server-side
+render, so unlike `/labels` and `/search` the address here really is one
+person's (`params.py`). "One person" still overstates it, for the reason
+`MAX_FAILURES_PER_IP` is set so much higher than the per-email limit: an
+office or a campus is one address and many people. Thirty an hour is chosen to
+be well clear of a room full of people signing up and nowhere near a budget
+worth spending 64 MiB a time against."""
+
 
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _client_ip(request: Request) -> str | None:
-    """The caller's address, trusting the proxy only as far as it is configured.
+    """The caller's address, as far as the deployment can be made to tell it.
 
-    Behind Caddy every request arrives from the proxy, so `request.client` is
-    the same address for everyone and useless as a rate-limit key. Uvicorn is
-    started with `--proxy-headers`, which rewrites `request.client` from
-    `X-Forwarded-For` *for trusted proxies only* — so reading it here is right,
-    and reading the raw header ourselves would not be: a client can send that
-    header and would then choose its own rate-limit bucket.
+    Behind Caddy every request arrives from the proxy, so the socket peer is the
+    same address for everyone and useless as a rate-limit key. Uvicorn is started
+    with `--proxy-headers`, which rewrites `request.client` from
+    `X-Forwarded-For`, so `request.client` is the value to read.
+
+    What makes that value trustworthy is *not* uvicorn. Both compose files pass
+    `--forwarded-allow-ips "*"`, and in that mode uvicorn takes the header's
+    leftmost entry — which the client wrote. The guarantee comes from Caddy
+    instead: `deploy/Caddyfile` sets `header_up X-Forwarded-For {remote_host}`,
+    which *overwrites* the header with the real peer of that hop, so nothing a
+    caller sends survives to be read here. Until that line existed this throttle
+    was bypassable by sending one header (ADR-0029).
+
+    Reading the raw header directly would be wrong for the same reason, and
+    would not be improved by the Caddy change: it is right only because a proxy
+    is guaranteed in front, and a direct `uv run uvicorn` for development has no
+    such proxy. `request.client` degrades to the socket peer there, which is
+    correct for that case.
     """
     return request.client.host if request.client else None
 
@@ -212,7 +238,12 @@ RequireCsrfDep = Annotated[None, Depends(require_csrf)]
 # --------------------------------------------------------------------- routes
 
 
-@auth.post("/signup", response_model=UserOut, status_code=201)
+@auth.post(
+    "/signup",
+    response_model=UserOut,
+    status_code=201,
+    dependencies=[Depends(_limit_signup)],
+)
 def signup(
     body: SignupIn, request: Request, response: Response, accounts: AccountsDep
 ) -> UserOut:

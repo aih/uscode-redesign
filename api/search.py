@@ -13,6 +13,8 @@ asking the repository, never by querying, so `119-102` resolving to
 `119-102not101` behaves here exactly as it does on a section page.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional
@@ -23,11 +25,27 @@ from params import (
     RepositoryDep,
     parse_date_param,
     public_cache,
+    rate_limit,
     resolve_release_or_404,
 )
 from storage.search import SECTIONS_INDEX, STRUCTURE_INDEX, get_search_client
 
+log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1", tags=["search"], dependencies=[Depends(public_cache)])
+
+_limit_search = rate_limit("search", capacity=120, per_second=10.0)
+"""ADR-0029. Sized for a server, not a person: `/app/search` renders on the
+server and calls this over HTTP, so the whole readership's searches arrive from
+the frontend container's one address. The per-person limit for readers is in
+`frontend/src/middleware.ts`; this bounds what a caller hitting `/api/v1`
+directly can spend."""
+
+MAX_OFFSET = 1000
+"""Deep paging is bounded here rather than left to OpenSearch. Past
+`max_result_window` (10,000 by default) the cluster throws — an unbounded
+`offset` is therefore both a 500 and heap pressure, from a query string. A
+thousand results deep is far past where a keyword search is useful anyway."""
 
 
 class SearchSnippet(BaseModel):
@@ -56,14 +74,26 @@ class SearchResponse(BaseModel):
     note: Optional[str] = None
 
 
-@router.get("/search", response_model=SearchResponse, summary="Search US Code sections and structure")
+@router.get(
+    "/search",
+    response_model=SearchResponse,
+    summary="Search US Code sections and structure",
+    dependencies=[Depends(_limit_search)],
+)
 def search(
     repository: RepositoryDep,
-    q: str = Query(..., description="The keyword or phrase to search for."),
+    q: str = Query(
+        ...,
+        description="The keyword or phrase to search for.",
+        min_length=1,
+        max_length=500,
+    ),
     release: ReleaseParam = None,
     date: DateParam = None,
     limit: int = Query(20, description="Max number of results to return.", ge=1, le=100),
-    offset: int = Query(0, description="Pagination offset.", ge=0),
+    offset: int = Query(
+        0, description="Pagination offset.", ge=0, le=MAX_OFFSET
+    ),
 ):
     resolved = None
     note = None
@@ -125,8 +155,15 @@ def search(
         res = get_search_client().search(
             index=f"{SECTIONS_INDEX},{STRUCTURE_INDEX}", body=body
         )
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Search failed: {e}")
+    except Exception:
+        # The exception goes to the log, not to the caller. An opensearch-py
+        # error stringifies to the cluster's internal hostname, port and index
+        # names, and a 503 body is a page a stranger can read — the operator
+        # needs the detail and the caller needs a status.
+        log.exception("search query failed")
+        raise HTTPException(
+            status_code=503, detail="search is unavailable; try again shortly"
+        ) from None
 
     hits = res["hits"]["hits"]
     total = res["hits"]["total"]["value"] if isinstance(res["hits"]["total"], dict) else res["hits"]["total"]

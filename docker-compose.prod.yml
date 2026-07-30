@@ -14,6 +14,7 @@
 # Required in .env beside this file:
 #   SITE_ADDRESS=uscode.example.org      the hostname Caddy answers on
 #   POSTGRES_PASSWORD=…                  openssl rand -base64 32
+#   SEARCH_PASSWORD=…                    openssl rand -base64 24, no "admin" in it
 #   DATA_ROOT=/var/lib/uscode            the mounted data volume
 #   USC_MIRROR_BUCKET=…                  the S3 corpus mirror (ADR-0013)
 services:
@@ -44,10 +45,52 @@ services:
       timeout: 5s
       retries: 5
 
+  # Keyword search (ADR-0028). This service was missing from this file entirely
+  # while `docker-compose.yml` had it, so a deploy set neither SEARCH_URL nor
+  # SEARCH_PASSWORD and `storage/search.py` fell back to https://localhost:9200
+  # with the password committed to the repository — search was simply broken in
+  # production, and would have been broken insecurely.
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    environment:
+      - discovery.type=single-node
+      # The security plugin rejects a password resembling the username: no
+      # "admin" in it, or the container exits 1 at boot with only a log line.
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
+      # The index is the corpus, not a smoke slice; the 512 MB default heap is
+      # not enough to build it.
+      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
+    # No published ports, same rule as the database: reachable only from this
+    # network. It holds no certificate a browser would trust and needs none.
+    volumes:
+      - ${DATA_ROOT:-/var/lib/uscode}/opensearch:/usr/share/opensearch/data
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    restart: unless-stopped
+    # `-f` is load-bearing: without it curl exits 0 on an HTTP 401, so a cluster
+    # that rejects the credential reports *healthy* and `depends_on` lets the API
+    # start against it. Observed exactly that — OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    # is honoured only on FIRST boot, so changing it in .env leaves the security
+    # index in the volume holding the old one, and every search 401s behind a
+    # green healthcheck.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -skf -u admin:\"$$OPENSEARCH_INITIAL_ADMIN_PASSWORD\" https://localhost:9200/_cluster/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
   api:
     build: .
     depends_on:
       db:
+        condition: service_healthy
+      opensearch:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://uscode:${POSTGRES_PASSWORD}@db:5432/uscode
@@ -55,6 +98,23 @@ services:
       # that makes the Secure cookie independent of proxy configuration.
       USC_COOKIE_SECURE: "true"
       USC_MIRROR_BUCKET: ${USC_MIRROR_BUCKET:-}
+      SEARCH_URL: https://opensearch:9200
+      SEARCH_PASSWORD: ${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
+      # An explicit, overridable decision rather than a library default.
+      #
+      # The image generates its own self-signed certificate at first boot, so a
+      # stack brought up from this file as written cannot verify it — and a
+      # `SEARCH_VERIFY_CERTS` that defaults to true would mean production search
+      # fails closed on day one. The connection is between two containers on a
+      # private compose network with no published port, so the residual risk is
+      # an attacker who is already inside the host.
+      #
+      # That is a real cost, and it is accepted *here*, in this file, for this
+      # deployment — not in `storage/search.py`, where `verify_certs=False` used
+      # to be hardcoded and therefore applied to every environment forever.
+      # Mount a CA-issued certificate into the opensearch service and set this
+      # to true to close it. ADR-0029.
+      SEARCH_VERIFY_CERTS: ${SEARCH_VERIFY_CERTS:-false}
     expose:
       - "8001"
     volumes:

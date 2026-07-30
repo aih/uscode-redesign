@@ -1,48 +1,68 @@
 ---
 /**
- * `/app/goto?q=11+usc+523(a)(1)` — where the citation box lands.
+ * `/app/goto?q=…` — where the site's one search box lands, and the router that
+ * decides what the box was asked for.
  *
- * On a hit it redirects rather than rendering, for the same reason the `?id=`
- * guid page does: what you end up looking at and what is in the address bar
- * should agree, and the reader's URLs stay identifier-shaped. A 307 keeps the
- * method and is not cached as permanent by a browser that saw one query once.
+ * There used to be two boxes in the header, and therefore two landing pages:
+ * this one for citations and `/app/search` for words. That asked the reader to
+ * classify their own question before typing it. Now there is one box, and the
+ * classification happens here, in this order:
  *
- * On a miss it renders, because there are three different misses and a reader
- * deserves to know which one they hit:
+ *   1. **`cites …`** — an explicit reverse-citation request. Answered for now
+ *      by a keyword search over the subject, and marked as such on the results
+ *      page so the answer is not mistaken for the real thing.
+ *      `docs/citation-index-plan.md` is the index that makes it real.
+ *   2. **Parses as a citation** — the original behaviour, unchanged. Redirect
+ *      rather than render, for the same reason the `?id=` guid page does: what
+ *      you end up looking at and what is in the address bar should agree, and
+ *      the reader's URLs stay identifier-shaped. A 307 keeps the method and is
+ *      not cached as permanent by a browser that saw one query once.
+ *   3. **Does not parse** — words, so search them. This is the case that used
+ *      to be a 404 with a list of accepted citation forms, which was the right
+ *      answer for a box labelled "go to a citation" and the wrong one for a box
+ *      that also searches.
  *
- *   1. Not a citation at all — 422 from the API. Show the accepted forms.
- *   2. A citation naming something this database does not hold. Say which part
- *      is missing, and offer the title.
- *   3. A citation this site structurally cannot resolve — the appendix titles,
- *      which OLRC publishes under the enacting law rather than a section
- *      number. The API sends the explanation; this page shows it verbatim
- *      rather than flattening it into "not found".
+ * What still renders here is the *middle* failure, and it is the one worth
+ * keeping a page for: a citation that parsed cleanly and names something this
+ * database does not hold — including the appendix titles, which OLRC publishes
+ * under the enacting law rather than a section number, and which the API
+ * explains rather than 404s.
  */
 import Base from "../layouts/Base.astro";
-import CitationJump from "../components/CitationJump.astro";
+import SiteSearch from "../components/SiteSearch.astro";
 import { ApiError, lookupCitation, releaseParams } from "../lib/api";
 import { setNoStore } from "../lib/cache";
+import { parseCites } from "../lib/query";
 import type { Citation } from "../lib/types";
-import { appHref } from "../lib/url";
+import { appHref, gotoHref, searchHref } from "../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
 const params = releaseParams(Astro.url);
 
+// 1. An explicit "what cites this" — never a citation lookup, even though the
+//    subject is written as one.
+const cites = query ? parseCites(query) : null;
+if (cites) {
+  return Astro.redirect(searchHref(cites.subject, { cites: true }), 307);
+}
+
 let found: Citation | null = null;
-let unparseable: string | null = null;
 
 if (query) {
   try {
     found = await lookupCitation(query, params);
   } catch (error) {
+    // 3. Not a citation, so it was words. `citeparse` is the only thing that
+    //    decides this (ADR-0023), which is why the fallback lives after the
+    //    call rather than in a guess before it.
     if (error instanceof ApiError && error.status === 422) {
-      unparseable = error.detail;
-    } else {
-      throw error;
+      return Astro.redirect(searchHref(query), 307);
     }
+    throw error;
   }
 }
 
+// 2. A citation that resolves.
 if (found?.exists) {
   return Astro.redirect(appHref(found.identifier, params.release ?? null), 307);
 }
@@ -61,31 +81,21 @@ const EXAMPLES = [
   "/us/usc/t11/s523",
   "11 usc ch. 5",
   "title 11",
+  "cites 26 usc 501",
 ];
 ---
 
-<Base title={query ? `No match for ${query} · U.S. Code` : "Go to a citation · U.S. Code"}>
-  <h1 class="doc-title">Go to a citation</h1>
+<Base title={query ? `No match for ${query} · U.S. Code` : "Search the U.S. Code"}>
+  <h1 class="doc-title">Search or go to a citation</h1>
 
-  <CitationJump value={query} variant="page" />
+  <SiteSearch value={query} variant="page" />
 
   {
     !query && (
       <p class="lede">
-        Type a citation in more or less any written form — this page exists to turn it into
-        a provision.
+        Type a citation in more or less any written form and this lands on the provision.
+        Type anything else and it searches the text.
       </p>
-    )
-  }
-
-  {
-    unparseable && (
-      <div class="usa-alert usa-alert--error" role="alert">
-        <div class="usa-alert__body">
-          <h2 class="usa-alert__heading">That is not a citation this site can read</h2>
-          <p class="usa-alert__text">{unparseable}</p>
-        </div>
-      </div>
     )
   }
 
@@ -107,17 +117,22 @@ const EXAMPLES = [
               Open Title {found.title_num} and look from there
             </a>
           </p>
+          {/* It parsed, so it never reached the search fallback — but a reader
+              whose citation names nothing usually still wants the words. */}
+          <p class="usa-alert__text">
+            <a href={searchHref(query)}>Search the text for “{query}” instead</a>
+          </p>
         </div>
       </div>
     )
   }
 
   <p class="toc-group">Forms that work</p>
-  <ul class="toc citejump__examples">
+  <ul class="toc sitesearch__examples">
     {
       EXAMPLES.map((example) => (
         <li>
-          <a href={`/app/goto?q=${encodeURIComponent(example)}`}>
+          <a href={gotoHref(example)}>
             <code>{example}</code>
           </a>
         </li>

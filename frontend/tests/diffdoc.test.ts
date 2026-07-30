@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { diffLinesHtml, documentDiff } from "../src/lib/diffdoc";
+import { diffLinesHtml, documentDiff, sourceDelta } from "../src/lib/diffdoc";
 import { parseFragment, readingBlocks } from "../src/lib/uslm";
 
 const NS = 'xmlns="http://xml.house.gov/schemas/uslm/1.0"';
@@ -162,5 +162,50 @@ describe("diffLinesHtml", () => {
 
     expect(html).toContain('style="--depth: 1"');
     expect(html).toContain("diff-line--note");
+  });
+});
+
+describe("sourceDelta", () => {
+  // An empty redline means "nothing you can read changed", which is a weaker
+  // claim than "nothing changed". These are the three things it can mean.
+
+  it("calls two byte-identical fragments identical", () => {
+    const xml = '<section identifier="/us/usc/t16/s45f" id="idAAA"><p>Text.</p></section>';
+    expect(sourceDelta(xml, xml)).toBe("identical");
+  });
+
+  it("recognises regenerated guids as the only difference", () => {
+    // Guids regenerate at every release point by design (gotcha 1) — this is
+    // the churn ADR-0026 moved the reader off, and it is not a legal change.
+    const before = '<section identifier="/us/usc/t16/s45f" id="idAAA"><p id="idBBB">Text.</p></section>';
+    const after = '<section identifier="/us/usc/t16/s45f" id="idCCC"><p id="idDDD">Text.</p></section>';
+    expect(sourceDelta(before, after)).toBe("guids-only");
+  });
+
+  it("does not mistake temporalId or xml:id for the guid attribute", () => {
+    // `\s` before `id=` is what keeps those two out; if it stopped working,
+    // a real @temporalId change would be reported as guid churn.
+    const before = '<section temporalId="s45f_a" id="idAAA">Text.</section>';
+    const after = '<section temporalId="s45f_b" id="idCCC">Text.</section>';
+    expect(sourceDelta(before, after)).toBe("beyond-guids");
+  });
+
+  it("reports a whitespace-only change, which the reading redline cannot see", () => {
+    // ADR-0026's named cost, stated as a test so the page can name it too.
+    const before = '<section id="idAAA"><p>Text.</p></section>';
+    const after = '<section id="idAAA"><p>Text.</p>\n</section>';
+    expect(sourceDelta(before, after)).toBe("beyond-guids");
+  });
+
+  it("reports a changed attribute that carries no words", () => {
+    const before = '<section id="idAAA" status="operational">Text.</section>';
+    const after = '<section id="idAAA" status="repealed">Text.</section>';
+    expect(sourceDelta(before, after)).toBe("beyond-guids");
+  });
+
+  it("handles single-quoted attributes", () => {
+    expect(sourceDelta("<section id='idAAA'>T.</section>", "<section id='idCCC'>T.</section>")).toBe(
+      "guids-only",
+    );
   });
 });

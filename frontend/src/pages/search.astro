@@ -1,98 +1,184 @@
 ---
-import Layout from "../layouts/Base.astro";
-import { APP, appHref } from "../lib/url";
+/**
+ * `/app/search?q=…` — keyword results (ADR-0028).
+ *
+ * Reached from the header's one box by way of `/app/goto`, which routes here
+ * whatever it cannot read as a citation, and directly by anyone who pastes the
+ * URL. `?cites=1` marks a query that arrived as `cites <citation>`: a request
+ * for the provisions that *cite* one, which this site cannot answer yet and
+ * answers as a keyword search over the subject — said plainly on the page
+ * rather than quietly substituted. `docs/citation-index-plan.md` is the index
+ * that makes it real.
+ *
+ * The page used to call the API with a bare `fetch` and its own base URL, print
+ * `e.message` from a failed Node fetch straight to the reader, and hardcode
+ * colours that were unreadable in dark mode. All three are why it now goes
+ * through `lib/api` and the ADR-0027 tokens like every other page.
+ */
+import Base from "../layouts/Base.astro";
+import ErrorPage from "../components/ErrorPage.astro";
+import SiteSearch from "../components/SiteSearch.astro";
+import { ApiError, fetchSearch, releaseParams } from "../lib/api";
+import { CITES_KEYWORD } from "../lib/query";
+import type { SearchResponse } from "../lib/types";
+import { appHref, gotoHref, searchHref } from "../lib/url";
+import { highlightHtml } from "../lib/uslm";
 
-const query = Astro.url.searchParams.get("q");
-const offset = Number(Astro.url.searchParams.get("offset") || "0");
-// Absent means the default the API applies: the text in force now (ADR-0028).
-const release = Astro.url.searchParams.get("release");
+const query = (Astro.url.searchParams.get("q") ?? "").trim();
+const offset = Math.max(0, Number(Astro.url.searchParams.get("offset") ?? "0") || 0);
+const params = releaseParams(Astro.url);
+/** Set when the query arrived as `cites <citation>`. */
+const asCites = Astro.url.searchParams.get("cites") === "1";
 
-let data = { results: [], total: 0, release: null, note: null };
-let error = null;
+/** One number, not the three hardcoded copies this page used to keep. It has to
+ *  match what the API was asked for, since the pager does the arithmetic. */
+const PAGE_SIZE = 20;
+
+let data: SearchResponse | null = null;
+let failure: { status: number; detail: string } | null = null;
 
 if (query) {
   try {
-    // SSR calls the API by service name
-    const apiBase = process.env.API_BASE_URL || "http://api:8001";
-    const params = new URLSearchParams({ q: query, offset: String(offset) });
-    if (release) params.set("release", release);
-    const res = await fetch(`${apiBase}/api/v1/search?${params}`);
-    if (res.ok) {
-      data = await res.json();
+    data = await fetchSearch(query, { offset, limit: PAGE_SIZE, ...params });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      failure = { status: error.status, detail: error.detail };
+      Astro.response.status = error.status;
     } else {
-      error = "Search service unavailable.";
+      // A transport failure stringifies to `connect ECONNREFUSED api:8001`,
+      // which is this site's internals and not a reader's business.
+      console.error("search request failed", error);
+      failure = { status: 503, detail: "Search is unavailable right now. Please try again shortly." };
+      Astro.response.status = 503;
     }
-  } catch (e: any) {
-    error = e.message;
   }
 }
 
-/** Paging keeps whatever release the search was made at. */
+/** Paging keeps the release the search was made at, and the `cites` framing. */
 function pageHref(nextOffset: number): string {
-  const params = new URLSearchParams({ q: query!, offset: String(nextOffset) });
-  if (release) params.set("release", release);
-  return `?${params}`;
+  const base = searchHref(query, { cites: asCites, release: params.release });
+  return nextOffset ? `${base}&offset=${nextOffset}` : base;
 }
+
+const total = data?.total ?? 0;
+const results = data?.results ?? [];
+const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
 ---
 
-<Layout title={query ? `Search: ${query}` : "Search"}>
-  <div class="usa-prose">
-    <h1>Search Results</h1>
-    <form class="usa-search" role="search" action={`${APP}/search`} method="get" style="margin-bottom: 2rem;">
-      <label class="usa-sr-only" for="search-field-main">Search</label>
-      <input class="usa-input" id="search-field-main" type="search" name="q" value={query || ""} />
-      {release && <input type="hidden" name="release" value={release} />}
-      <button class="usa-button" type="submit">
-        <span class="usa-search-submit-text">Search</span>
-      </button>
-    </form>
-    
-    {error && <div class="usa-alert usa-alert--error"><div class="usa-alert__body"><p class="usa-alert__text">{error}</p></div></div>}
-    
-    {query && !error && (
-      <Fragment>
-      <p>
-        Found {data.total} results for <strong>{query}</strong>
-        {data.release
-          ? <> in the text as of release point <strong>{data.release}</strong>.</>
-          : <>, searching the law currently in force.</>}
-      </p>
+<Base title={title}>
+  <h1 class="doc-title">Search</h1>
 
-      {data.note && (
-        <div class="usa-alert usa-alert--info usa-alert--slim">
-          <div class="usa-alert__body"><p class="usa-alert__text">{data.note}</p></div>
+  <SiteSearch value={asCites ? `${CITES_KEYWORD} ${query}` : query} variant="page" />
+
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    asCites && (
+      <div class="usa-alert usa-alert--info usa-alert--slim" role="status">
+        <div class="usa-alert__body">
+          <p class="usa-alert__text">
+            Showing a <strong>keyword search</strong> for <code>{query}</code>. Finding the
+            provisions that <em>cite</em> it needs an index of every cross reference in the
+            Code, which this site does not have yet — so this searches for the words
+            instead, which finds a citation written out in text but not one written as a
+            link.
+          </p>
         </div>
-      )}
-
-      <ul class="usa-list--unstyled">
-        {data.results.map((result: any) => (
-          <li style="margin-bottom: 2rem;">
-            <h3>
-              <a href={appHref(result.identifier)}>
-                {result.num ? `${result.num} ` : ""}{result.heading || result.identifier}
-              </a>
-            </h3>
-            <p style="font-size: 0.9em; color: #555; margin-top: 0; margin-bottom: 0.5rem;">
-              {result.identifier}
-              {result.first_release && <> · unchanged since {result.first_release}</>}
-            </p>
-            {result.snippets.map((snippet: any) => (
-              <blockquote style="font-size: 0.95em; border-left: 4px solid #005ea2; padding-left: 1rem; margin-top: 0.5rem; background-color: #f0f0f0; padding: 0.5rem 1rem;" set:html={snippet.text}>
-              </blockquote>
-            ))}
-          </li>
-        ))}
-      </ul>
-      
-      <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-        {offset > 0 && (
-           <a href={pageHref(Math.max(0, offset - 20))} class="usa-button usa-button--outline">Previous Page</a>
-        )}
-        {data.total > offset + 20 && (
-           <a href={pageHref(offset + 20)} class="usa-button usa-button--outline">Next Page</a>
-        )}
       </div>
-      </Fragment>
-    )}
-  </div>
-</Layout>
+    )
+  }
+
+  {
+    !query && !failure && (
+      <p class="lede">
+        Search the text of the Code. A citation typed into the box above goes straight to
+        the provision instead — <a href={gotoHref()}>the forms it accepts</a> are listed on
+        the go-to page.
+      </p>
+    )
+  }
+
+  {
+    query && !failure && (
+      <>
+        <h2 class="toc-group">
+          {total === 0
+            ? "No results"
+            : `${total.toLocaleString()} result${total === 1 ? "" : "s"}`}{" "}
+          for “{query}”
+        </h2>
+
+        <p class="doc-meta">
+          {data?.release ? (
+            <>
+              In the text as of release point <strong>{data.release}</strong>.
+            </>
+          ) : (
+            <>Searching the law currently in force.</>
+          )}
+        </p>
+
+        {data?.note && (
+          <div class="usa-alert usa-alert--info usa-alert--slim" role="status">
+            <div class="usa-alert__body">
+              <p class="usa-alert__text">{data.note}</p>
+            </div>
+          </div>
+        )}
+
+        {total === 0 && (
+          <div class="usa-alert usa-alert--info">
+            <div class="usa-alert__body">
+              <h3 class="usa-alert__heading">Nothing matched those words</h3>
+              <p class="usa-alert__text">
+                The search covers the text of sections and the headings above them. If you
+                already know the citation — <code>11 usc 523</code>,{" "}
+                <code>16 usc 45f(c)(5)</code> — type it into the box and it will go straight
+                there rather than searching for it.
+              </p>
+              <p class="usa-alert__text">
+                <a href={gotoHref(query)}>Try “{query}” as a citation</a>
+              </p>
+            </div>
+          </div>
+        )}
+
+        <ul class="toc searchresults">
+          {results.map((result) => (
+            <li class="searchresult">
+              <h3 class="searchresult__title">
+                <a href={appHref(result.identifier, params.release)}>
+                  {result.num ? `${result.num} ` : ""}
+                  {result.heading || result.identifier}
+                </a>
+              </h3>
+              <p class="searchresult__meta">
+                <code>{result.identifier}</code>
+                {result.type === "structure" && result.level && <> · {result.level}</>}
+                {result.first_release && <> · unchanged since {result.first_release}</>}
+              </p>
+              {result.snippets.map((snippet) => (
+                <blockquote class="searchresult__snippet" set:html={highlightHtml(snippet.text)} />
+              ))}
+            </li>
+          ))}
+        </ul>
+
+        {(offset > 0 || total > offset + PAGE_SIZE) && (
+          <nav class="searchpager" aria-label="Search results pages">
+            {offset > 0 && (
+              <a class="usa-button usa-button--outline" href={pageHref(Math.max(0, offset - PAGE_SIZE))}>
+                ← Previous
+              </a>
+            )}
+            {total > offset + PAGE_SIZE && (
+              <a class="usa-button usa-button--outline" href={pageHref(offset + PAGE_SIZE)}>
+                Next →
+              </a>
+            )}
+          </nav>
+        )}
+      </>
+    )
+  }
+</Base>
