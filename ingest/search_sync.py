@@ -1,4 +1,4 @@
-"""Keeping OpenSearch in step with Postgres (ADR-0022).
+"""Keeping OpenSearch in step with Postgres (ADR-0028).
 
 The index unit is a *section version* — the deduped text (ADR-0007), not the
 (section, release) pair. 5.4M pairs collapse to 490k versions, and a section's

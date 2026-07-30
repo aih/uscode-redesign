@@ -4,7 +4,7 @@ import { APP, appHref } from "../lib/url";
 
 const query = Astro.url.searchParams.get("q");
 const offset = Number(Astro.url.searchParams.get("offset") || "0");
-// Absent means the default the API applies: the text in force now (ADR-0022).
+// Absent means the default the API applies: the text in force now (ADR-0028).
 const release = Astro.url.searchParams.get("release");
 
 let data = { results: [], total: 0, release: null, note: null };

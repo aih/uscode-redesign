@@ -1,4 +1,4 @@
-"""Full rebuild of the search indices from Postgres (ADR-0022).
+"""Full rebuild of the search indices from Postgres (ADR-0028).
 
 `ingest.load` keeps the index in step release by release; this is the "start
 over" path — after a mapping change, or to build the index over a corpus that

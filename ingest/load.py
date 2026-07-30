@@ -194,7 +194,7 @@ def load_release(
         else:
             # A release republishing this text unchanged needs no index write at
             # all: the document already exists and is already current. This is
-            # why sync stays cheap at 91% dedupe (ADR-0022).
+            # why sync stays cheap at 91% dedupe (ADR-0028).
             deduped += 1
 
         # Reading order and parent are this release point's, even when the text

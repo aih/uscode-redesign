@@ -1,8 +1,8 @@
-# ADR-0022 — Keyword search on OpenSearch, indexed by version, current by default
+# ADR-0028 — Keyword search on OpenSearch, indexed by version, current by default
 
 - **Status:** Accepted
 - **Date:** 2026-07-30
-- **Context:** Session 10 (search)
+- **Context:** Session 12 (search)
 - **Supersedes:** the draft filed as `0018-keyword-and-vector-search.md`, which
   collided with ADR-0018 (caching). Renumbered rather than filed as "18a": a
   suffix reads as an amendment to the decision it hangs off, and search amends

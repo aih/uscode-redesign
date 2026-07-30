@@ -1,4 +1,4 @@
-"""What ingest writes to the index, and what it deliberately does not (ADR-0022).
+"""What ingest writes to the index, and what it deliberately does not (ADR-0028).
 
 These bind the module-level functions before `conftest.mock_search_sync` patches
 the module attributes, so the real implementations are under test. The OpenSearch

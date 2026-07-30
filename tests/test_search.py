@@ -1,4 +1,4 @@
-"""Search endpoint contract (ADR-0022).
+"""Search endpoint contract (ADR-0028).
 
 These run without OpenSearch and without Postgres: the search client is mocked
 and the Repository is overridden, so what is under test is the *query* the

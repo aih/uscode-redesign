@@ -1,4 +1,4 @@
-"""Keyword search over the corpus (ADR-0022).
+"""Keyword search over the corpus (ADR-0028).
 
 Versioning is the whole difficulty here. The index holds one document per
 deduped section *version*, so a section that has been amended four times has
