@@ -2,8 +2,11 @@
 # session's own claim ("test counts remain the sessions' claims until CI
 # exists"). This is the independent machine that re-runs them.
 #
-# Two suites, both required (ADR-0015): `make test` covers Python, and since the
-# Jinja reader retired, reader coverage lives entirely in `make test-web`.
+# Three suites, all required. `make test` covers Python; since the Jinja reader
+# retired, reader coverage lives in `make test-web` (ADR-0015); and since
+# Session 10 `make test-e2e` covers what only a browser can answer — hover
+# timing, the top layer, sticky geometry, and the WCAG 1.4.13 clauses of the
+# citation preview (ADR-0024).
 #
 # Nothing here touches uscode.house.gov. The fixture data is committed and
 # loaded by `make ci-data` — see the comment on that target.
@@ -82,6 +85,73 @@ jobs:
       - name: Test
         working-directory: frontend
         run: npm test
+
+  e2e:
+    name: make test-e2e (Playwright)
+    runs-on: ubuntu-latest
+
+    # What only a browser can answer (Session 10): the citation preview's three
+    # WCAG 1.4.13 clauses, `position: sticky` geometry, the `scroll-margin-top`
+    # that keeps a deep-linked provision out from behind the sticky bar, and the
+    # citation box end to end. Vitest cannot see any of it.
+    #
+    # This runs the real shape — two processes behind Caddy (ADR-0015) — via
+    # docker compose, rather than a second and lying copy of the deployment.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: uv sync --frozen
+
+      - name: Start Postgres
+        run: docker compose up -d db
+
+      - name: Load the fixture corpus (offline)
+        env:
+          DATABASE_URL: postgresql+psycopg://uscode:uscode@localhost:5432/uscode
+        run: make ci-data
+
+      - name: Bring the site up as deployed
+        run: docker compose up -d --build
+
+      - name: Wait for the reader
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/app/us/usc/t16/s45f > /dev/null; then
+              echo "up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "the site never came up"; docker compose logs --tail 50; exit 1
+
+      - name: Install the browser
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Test
+        working-directory: frontend
+        run: npx playwright test
+
+      - if: failure()
+        run: docker compose logs --tail 100
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          retention-days: 7
 
   slow:
     name: make test-slow (full samples)

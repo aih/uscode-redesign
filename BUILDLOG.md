@@ -547,3 +547,44 @@ Session-by-session record of how this site was built. One entry per working sess
 - The six count mismatches stay in every `verify` run by design (ADR-0021).
 - `DuplicateOccurrence.guid` repeats the section's guid: `guid_map` holds one row per (identifier, release) and cannot tell the occurrences apart. The source's ambiguity, not ours to invent around.
 - Deploy is still the blocker for everything public (ADR-0020) — it needs an IAM identity that can create EC2/IAM, and a domain.
+
+---
+
+## 024 — 2026-07-29/30 — Session 10: the UI refresh before the deploy
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Review the repo before deploying to AWS and prepare a UI update. Evaluate **Appica**, a React component library the owner was leaning toward, plus reasonable alternatives that are mobile-first, accessible by default, and strong on text display. Then plan and build four things: (1) order the Titles numerically — the front page listed `1, 10, 11, … 2, 20`; (2) let a reader reach any provision by typing a citation (`11/523`, `11 usc 523`, `11 usc 523(1)(B)(ii)`), using parsing rules from the `versions` directory or GovTrack-style prior art; (3) a scrollable hover tooltip showing the text of any referenced provision, with testing planned so it is robust; (4) stop the menu, breadcrumbs, section number and navigation scrolling away.
+
+- **Decided:**
+  - **Keep USWDS; add no client framework (ADR-0022).** Appica was measured, not impressioned: `@appica/ui-react` is **v1.0.0, the only version ever published** (2026-07-09), its GitHub repo's last push was 61 minutes after its creation, and it gets **1,124 weekly downloads** against Base UI's 7.65M and USWDS's 68K. It requires React 19 + Tailwind 4 and pins pre-release deps inside a 1.0.0. Its components are genuinely apt — Preview Card is exactly requirement 3 — but the blocker is local: `lib/uslm.ts` renders statutory text to an **HTML string** consumed by `set:html`, so a React card cannot wrap a `<ref>` without rewriting the one module architecture rule 5 designates as the sole presentation layer. Its ideas were adopted and its code was not; the whole refresh cost one ~3 KB island. (Dark mode, the feature on the Appica page that prompted the evaluation, already existed in `site.scss`.)
+  - **Titles order numerically, and the ordering is the Repository's contract (ADR-0025).** `Title.num` is a `String` and has to be — `5a` is a title and `5` is a different one — so `ORDER BY` collated it as text. Sorting moved to an explicit `title_sort_key`, and the guarantee is documented on the protocol so the XCiteDB port inherits it rather than rediscovering the bug.
+  - **Citations parse server-side, in a pure module (ADR-0023).** `citeparse.py` imports no storage, db, fastapi or sqlalchemy — enforced by `test_architecture.py` — which is what lets its 84-case accepted-forms table run in `make test` with no corpus. `GET /api/v1/citation` adds existence via the batched `labels()` already built for hover text: no new `Repository` method. Three failures get three answers — 422 for "not a citation", 200 + `exists:false` for "names nothing here", and a specific `message` for what this site structurally cannot resolve. The reader's box is a plain GET form; an e2e test runs it with JavaScript disabled.
+  - **Previews render server-side as HTML fragments (ADR-0024).** `/app/preview/…` is an Astro *endpoint* — a page would get a `<!DOCTYPE>` prepended — rendered by the same `lib/uslm.ts` as the section page, so **no USLM renderer reaches the browser**. The card is `popover` + CSS anchor positioning with a measured fallback for Safari 18.2–18.3. WCAG 2.1 SC 1.4.13's three clauses are three named mechanisms with three named tests. The card is `aria-hidden` (it duplicates the link's `title`; the rejected `aria-describedby` alternative is recorded). Touch navigates — the feature is gated on `(hover: hover) and (pointer: fine)`.
+  - **The sticky stack is one `.topbar`**, whole on desktop and one 44px row on a phone, where the forced-open nav plus wrapping breadcrumbs would otherwise eat ~280px of a 660px viewport.
+
+- **Produced:** `58c0f26` (title order), `d35f562` (sticky chrome), `4a3c957` (citation jump), `aeab9c5` (hover preview), plus this entry, ADR-0022/0023/0024/0025, a CI `e2e` job, and regenerated `docs/screenshots/`. New: `citeparse.py`, `frontend/src/lib/preview.ts`, `SectionBar.astro`, `CitationJump.astro`, `CitePreview.astro`, `pages/goto.astro`, `pages/preview/[...identifier].ts`, `frontend/tests/e2e/`. Deleted: `NavStrip.astro`, folded into `SectionBar`.
+
+- **Verified:** `make test` **384** (was 273) · `make test-web` **60** (was 42) · `make test-e2e` **40** (new) · `astro check` 0 errors · `make shots` regenerated at 375px and 1280px.
+  - Title order live: `curl -s localhost:8000/api/v1/titles | jq -r '.[].num'` → `1 2 3 4 5 5a 6 … 11 11a 12 … 50 50a 51 52 54`.
+  - Sticky geometry measured at 375/700/1000/1280: the bar pins, and both a deep link and an in-page anchor jump land clear of it.
+  - Citation box: `curl -sI 'localhost:8000/app/goto?q=16+USC+45f(c)(5)'` → 307 to `/app/us/usc/t16/s45f/c/5`.
+
+### Seven bugs found by building it — four of them already live
+
+1. **A typed hyphen matched nothing.** OLRC writes section numbers with an **EN DASH** — `/us/usc/t16/s45a–1`, U+2013 — and **5,697 of the 65,938 loaded sections contain one while not a single section contains a plain hyphen**. No keyboard has that key, so `42 USC 2000e-2` was unresolvable. The parse now carries dash variants and the batched lookup tries all of them for the price of one.
+2. **A raw en dash in a `Location:` header is a crash**, not a wobble: a header value is a ByteString and Node throws. Both redirects in the app 500'd on those ~8.6% of sections — including the **pre-existing `?id=` guid lookup**, which had been broken for them since Session 7. Fixed in `url.ts`, so every href builder encodes.
+3. **Every section page drew all three Watch buttons at once** — "Add", "Remove" and "Log in" together, for every visitor, since Day 5. USWDS's `.usa-button { display: inline-block }` is an author rule and beats the UA stylesheet's `[hidden] { display: none }`. The island had been correct all along.
+4. **`title="§ § 688."`** on every citation's hover text: `num` arrives from the source as `§ 688.`, symbol included, and `refs.ts` added another. The same mistake appeared independently in the new section bar.
+5. **`make shots` had silently stopped working.** Since the Day-5 islands landed the reader never goes network-idle, so `waitUntil: "networkidle"` timed out on every page — which is why `docs/screenshots/` still showed the pre-Day-5 layout.
+6. `11 USC ch. 5` and `title 11` reported `exists: false` while sitting in the database: `labels()` answers about sections, so structure now goes to `get_toc`.
+7. **Previews never scrolled.** The 1,400-character budget was smaller than the card's own 22rem, making the scroll area decoration and cutting every preview off mid-thought. Raised to 4,000.
+
+`--sticky-h` drifted twice in one session — 224px → 280px when the citation box added a row — and each time the symptom was a deep-linked provision rendering *behind* the bar. It is now asserted against the measured stack in the e2e suite rather than trusted to memory.
+
+### Open after this session
+
+- **Appendix titles remain unreachable by citation.** `5 U.S.C. App. 3` parses to `/us/usc/t5a/s3` and OLRC publishes nothing there: **0 of 461 appendix sections** use the flat form — they are `/us/usc/t5a/pl/92/463/s1` (public law) or `/us/usc/t50a/act/1917-05-18/ch15/s212` (act by date). The API says so specifically rather than returning a bare "not found". Closing it needs a citation-to-enacting-instrument table this project does not have; inventing one silently would be worse than the gap.
+- **The preview endpoint is unauthenticated and fans out per hovered citation.** Hover intent, a per-page cache and `AbortController` hold it down, and it is far cheaper than the diff — but the standing "rate-limit before advertising the URL" debt now covers two routes, not one.
+- **A pre-existing rendering defect, untouched:** USLM `<date>` renders as a block, so "November 10, 1978" breaks onto its own line mid-sentence throughout the notes. One entry in `uslm.ts`'s inline-tag set, deliberately left out of a scoped refresh.
+- `docs/ui-improvements-plan-unapproved.md` is untracked and not this session's work.
+- Deploy is still the blocker for everything public (ADR-0020) — it needs an IAM identity that can create EC2/IAM, and a domain.

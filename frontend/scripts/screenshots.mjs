@@ -38,10 +38,19 @@ try {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
     const page = await context.newPage();
     for (const [name, path] of PAGES) {
-      const response = await page.goto(`${SITE}${path}`, { waitUntil: "networkidle" });
+      // `load`, not `networkidle`. Since the Day-5 islands landed, the reader
+      // never goes network-idle on its own — `WatchButton` fires `/auth/me`
+      // after paint and the citation preview keeps a listener alive — so
+      // `networkidle` waited out its 30 s timeout on every page and `make shots`
+      // had silently stopped working. The islands are not what these images are
+      // of; the server-rendered page is, and that is complete at `load`.
+      const response = await page.goto(`${SITE}${path}`, { waitUntil: "load" });
       if (!response?.ok()) {
         throw new Error(`${path} answered ${response?.status()}`);
       }
+      // Give the one deferred thing that *does* change the picture — the watch
+      // widget resolving to a single button — a moment to settle.
+      await page.waitForTimeout(500);
       // The page must not scroll sideways at any width — the one failure mode a
       // full-page screenshot would otherwise hide.
       const overflow = await page.evaluate(
