@@ -21,6 +21,7 @@ import hashlib
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -112,6 +113,31 @@ def load_release(
     sections_ingested = 0
     guid_rows: list[dict[str, object]] = []
     versions_to_sync: list[dict[str, Any]] = []
+    retire_keys: list[tuple[str, int]] = []
+
+    # Only text from the newest release this title has reached is "in force", and
+    # loads do not have to arrive in order — `load-all` walks the inventory's seq,
+    # but a single `python -m ingest load` of an old release point can follow a
+    # newer one. Loading backwards must not relabel superseded text as current, so
+    # the comparison is against the newest *completed* load of this title
+    # (`sections_loaded` is stamped last, so this load itself is still NULL here).
+    newest_loaded_seq = session.scalar(
+        select(func.max(ReleasePoint.seq))
+        .select_from(TitleVersion)
+        .join(ReleasePoint, ReleasePoint.id == TitleVersion.release_id)
+        .where(
+            TitleVersion.title_id == title.id,
+            TitleVersion.sections_loaded.is_not(None),
+        )
+    )
+    is_newest_for_title = newest_loaded_seq is None or release.seq >= newest_loaded_seq
+
+    # Captured before the loop: `session.commit()` expires the instance, and
+    # re-reading these off `release` per section would re-SELECT it after every
+    # batch commit.
+    release_id = release.id
+    release_seq = release.seq
+    release_label = release.label
 
     for record in parser.iter_sections(xml_path):
         section = existing_sections.get(record.identifier)
@@ -125,8 +151,19 @@ def load_release(
         # release point, so raw XML never repeats and dedupe would collapse nothing
         # (ADR-0007). `record.xml` is still what gets stored, verbatim.
         content_hash = hashlib.sha256(record.content_key.encode("utf-8")).digest()
-        version = existing_versions.get(section.id, {}).get(content_hash)
+        siblings = existing_versions.get(section.id, {})
+        version = siblings.get(content_hash)
         if version is None:
+            # Everything this section said before is now superseded. Collected
+            # before the new row joins `siblings`, and only when this release is
+            # the title's newest — a backfill of an older release point creates
+            # versions that were never current and retires nothing.
+            if is_newest_for_title:
+                retire_keys.extend(
+                    (record.identifier, sibling.first_release_id)
+                    for sibling in siblings.values()
+                    if sibling.first_release_id != release.id
+                )
             version = SectionVersion(
                 section_id=section.id,
                 first_release_id=release.id,
@@ -148,9 +185,16 @@ def load_release(
                 "heading": record.heading,
                 "xml": record.xml,
                 "status": record.status,
-                "release_id": release.id
+                "version_id": version.id,
+                "first_release_id": release_id,
+                "first_release_seq": release_seq,
+                "first_release_label": release_label,
+                "is_current": is_newest_for_title,
             })
         else:
+            # A release republishing this text unchanged needs no index write at
+            # all: the document already exists and is already current. This is
+            # why sync stays cheap at 91% dedupe (ADR-0022).
             deduped += 1
 
         # Reading order and parent are this release point's, even when the text
@@ -174,10 +218,10 @@ def load_release(
         if len(guid_rows) >= GUID_BATCH_SIZE:
             _flush_guid_rows(session, guid_rows)
             guid_rows.clear()
-            if versions_to_sync:
-                search_sync.sync_sections(versions_to_sync)
-                versions_to_sync.clear()
             session.commit()
+            # After the commit, never before: indexing text whose transaction
+            # then rolled back would advertise a section the database has not got.
+            _flush_search(versions_to_sync, retire_keys)
 
         if record.status:
             status_counts[record.status] = status_counts.get(record.status, 0) + 1
@@ -185,8 +229,6 @@ def load_release(
 
     if guid_rows:
         _flush_guid_rows(session, guid_rows)
-    if versions_to_sync:
-        search_sync.sync_sections(versions_to_sync)
 
     raw_count = parser.count_section_elements(xml_path)
 
@@ -196,6 +238,7 @@ def load_release(
     title_version.sections_loaded = sections_ingested
     title_version.raw_section_elements = raw_count
     session.commit()
+    _flush_search(versions_to_sync, retire_keys)
 
     return LoadStats(
         release_label=release_label,
@@ -318,6 +361,22 @@ def _load_structure(
     if nodes_to_sync:
         search_sync.sync_structure_nodes(nodes_to_sync)
     return count
+
+
+def _flush_search(
+    versions_to_sync: list[dict[str, Any]], retire_keys: list[tuple[str, int]]
+) -> None:
+    """Push one batch of index changes and empty the buffers.
+
+    Retire first, so a reader mid-load sees no text at all for a changed section
+    rather than two competing "current" versions of it.
+    """
+    if retire_keys:
+        search_sync.retire_versions(retire_keys)
+        retire_keys.clear()
+    if versions_to_sync:
+        search_sync.sync_sections(versions_to_sync)
+        versions_to_sync.clear()
 
 
 def _flush_guid_rows(session: Session, rows: list[dict[str, object]]) -> None:

@@ -118,6 +118,7 @@ def mock_search_sync():
     """Mock search_sync functions for all tests so they don't hang trying to connect to OpenSearch."""
     with patch("ingest.search_sync.create_indices"), \
          patch("ingest.search_sync.sync_sections"), \
+         patch("ingest.search_sync.retire_versions"), \
          patch("ingest.search_sync.sync_structure_nodes"):
         yield
 
