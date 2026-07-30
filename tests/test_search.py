@@ -193,3 +193,68 @@ def test_an_unreachable_cluster_is_503_not_500(client, search_client):
     search_client.search.side_effect = RuntimeError("connection refused")
     response = client.get("/api/v1/search?q=National")
     assert response.status_code == 503
+
+
+# ------------------------------------------------- strictness (ADR-0031)
+
+
+def test_search_matches_the_words_as_typed(client, search_client):
+    """No fuzziness unless the reader writes some.
+
+    This endpoint used to run every query through `multi_match` with
+    `fuzziness: "AUTO"`, which spends two character edits on any term of six
+    letters or more without being asked. A search for `compare` therefore
+    returned `compact` and `company` — each exactly two edits away — and in a
+    body of law a different word is a different rule.
+    """
+    client.get("/api/v1/search?q=compare")
+
+    query = _body(search_client)["query"]["bool"]["must"][0]
+    assert "multi_match" not in query
+    assert "fuzziness" not in query.get("simple_query_string", {})
+
+
+def test_search_requires_every_word(client, search_client):
+    """`default_operator` is AND.
+
+    The old default was OR, so a two-word search ranked "matched either" above
+    nothing and buried the provisions matching both.
+    """
+    client.get("/api/v1/search?q=national+park")
+
+    assert _body(search_client)["query"]["bool"]["must"][0]["simple_query_string"][
+        "default_operator"
+    ] == "and"
+
+
+def test_search_passes_the_query_through_unaltered(client, search_client):
+    """Operators reach the parser as the reader wrote them.
+
+    Nothing escapes, quotes or rewrites `q` on the way — that is what makes
+    `~2`, `-`, `|` and `"…"` available at all.
+    """
+    client.get('/api/v1/search?q=%22national+park%22+-historic')
+
+    assert (
+        _body(search_client)["query"]["bool"]["must"][0]["simple_query_string"]["query"]
+        == '"national park" -historic'
+    )
+
+
+def test_search_enables_the_operators_the_guide_documents(client, search_client):
+    """The flags, at the point they are actually sent to the cluster.
+
+    `tests/test_search_syntax.py` checks the constant against the guide; this
+    checks that the constant is what the query carries. WHITESPACE is asserted
+    by name because it is the one that looks removable and is not: without it
+    the parser never splits on spaces, and `water -pollution` silently parses
+    to `water AND pollution`.
+    """
+    from api.search import QUERY_SYNTAX_FLAGS
+
+    client.get("/api/v1/search?q=water+-pollution")
+    flags = _body(search_client)["query"]["bool"]["must"][0]["simple_query_string"]["flags"]
+
+    assert flags == QUERY_SYNTAX_FLAGS
+    assert "WHITESPACE" in flags.split("|")
+    assert "FUZZY" in flags.split("|")

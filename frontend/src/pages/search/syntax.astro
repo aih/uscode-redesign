@@ -1,0 +1,120 @@
+---
+/**
+ * `/app/search/syntax` — what you can type into the search box.
+ *
+ * This page exists because the search became *strict* (ADR-0031). It used to
+ * run every query with `fuzziness: AUTO`, which spent two character edits on
+ * every word without being asked: searching for `compare` returned `compact`
+ * and `company`, each exactly two edits away. That is a bad trade in a legal
+ * corpus, where a different word is a different rule — so the default now
+ * matches the words as typed.
+ *
+ * The cost of that is real and this page is how it is paid: a reader who *was*
+ * relying on the looseness — because they are unsure of a spelling — needs to
+ * be told how to ask for it back. Hence `~1`, and hence a guide rather than a
+ * silent behaviour change.
+ *
+ * Every operator listed comes from `lib/searchsyntax.ts`, which
+ * `tests/test_search_syntax.py` checks against the flags `api/search.py`
+ * actually enables.
+ */
+import Base from "../../layouts/Base.astro";
+import { SEARCH_OPERATORS } from "../../lib/searchsyntax";
+import { setPublicCache } from "../../lib/cache";
+import { searchHref } from "../../lib/url";
+
+/** Static prose about a parser — it changes when the code does, not per
+ * request, and never per reader. Revalidate rather than pin: there is no
+ * release point to make it immutable against. */
+setPublicCache(Astro.response.headers, null, false);
+---
+
+<Base title="Search syntax · U.S. Code">
+  <h1 class="doc-title">Search syntax</h1>
+
+  <p class="lede">
+    By default a search matches the words you typed, and every one of them has to
+    appear. The operators below are how you loosen that deliberately — including
+    asking for near-spellings when you are not sure how a word is written.
+  </p>
+
+  <div class="usa-summary-box" role="region" aria-labelledby="strict-heading">
+    <div class="usa-summary-box__body">
+      <h2 class="usa-summary-box__heading" id="strict-heading">Strict by default</h2>
+      <div class="usa-summary-box__text">
+        <p>
+          Searching for <code>compare</code> finds provisions containing the word
+          <em>compare</em> — not <em>compact</em> or <em>company</em>. This site used to
+          return all three, because it ran every search with a two-character-edit
+          tolerance nobody asked for. In a body of law a different word is a different
+          rule, so that tolerance is now something you request.
+        </p>
+        <p>
+          If you are unsure of a spelling, add <code>~1</code> to the word:{" "}
+          <a href={searchHref("conservation~1")}>
+            <code>conservation~1</code>
+          </a>{" "}
+          finds provisions containing anything within one character edit of it.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="toc-group">Operators</h2>
+
+  <table class="usa-table usa-table--borderless syntax-table">
+    <caption class="usa-sr-only">
+      Search operators, what each one does, and a worked example
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col">Write</th>
+        <th scope="col">To</th>
+        <th scope="col">Example</th>
+        <th scope="col">What it does</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        SEARCH_OPERATORS.map((operator) => (
+          <tr>
+            <th scope="row">
+              <code>{operator.syntax}</code>
+            </th>
+            <td>{operator.name}</td>
+            <td>
+              <a href={searchHref(operator.example)}>
+                <code>{operator.example}</code>
+              </a>
+            </td>
+            <td>{operator.explanation}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+
+  <h2 class="toc-group">What is searched</h2>
+
+  <p>
+    The text of sections and the headings above them — chapters, subchapters, parts. A
+    search covers the law <strong>currently in force</strong> unless you name a release
+    point, in which case it covers the text as it stood then.
+  </p>
+
+  <p class="doc-meta">
+    Operators combine, and grouping works the way it does in arithmetic:{" "}
+    <a href={searchHref("(forest | grassland) -timber")}>
+      <code>(forest | grassland) -timber</code>
+    </a>
+    .
+  </p>
+
+  <h2 class="toc-group">Going to a provision instead</h2>
+
+  <p>
+    If you already know the citation, type it — <code>16 usc 45f(c)(5)</code>,{" "}
+    <code>11 U.S.C. § 523</code> — and the box goes straight there rather than searching
+    for the words. <a href="/app/goto">The forms it accepts</a> are listed separately.
+  </p>
+</Base>
