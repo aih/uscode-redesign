@@ -12,8 +12,8 @@
  */
 import Base from "../../../layouts/Base.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
+import CitePreview from "../../../components/CitePreview.astro";
 import KeyboardNav from "../../../components/KeyboardNav.astro";
-import NavStrip from "../../../components/NavStrip.astro";
 import Neighbors from "../../../components/Neighbors.astro";
 import Provenance from "../../../components/Provenance.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
@@ -150,9 +150,22 @@ const picker =
     ? { action: appHref(section ? section.identifier : toc!.node.identifier), options: releases, selected }
     : null;
 const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
+/** The sticky row's contents (Day 7). Only a section gets one: a table of
+ * contents has no reading order to step through, and its own breadcrumbs
+ * already say where it is. */
+const bar = section
+  ? {
+      num: section.num,
+      heading: section.heading,
+      status: section.status,
+      previous: neighbors?.previous,
+      next: neighbors?.next,
+      up: upNode,
+    }
+  : null;
 ---
 
-<Base title={title} crumbs={crumbs} release={selected} picker={picker}>
+<Base title={title} crumbs={crumbs} release={selected} picker={picker} bar={bar}>
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
   {
@@ -174,12 +187,10 @@ const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
 
         <WatchButton identifier={section.identifier} release={selected} />
 
-        <NavStrip
-          previous={neighbors?.previous}
-          next={neighbors?.next}
-          up={upNode}
-          release={selected}
-        />
+        {/* `NavStrip` used to sit here. Its prev/up/next moved into the sticky
+            `SectionBar`, which carries them at every scroll position rather than
+            only at the top — rendering both would show the same two links twice,
+            a few pixels apart. `Neighbors` still closes the page. */}
 
         {remainder &&
           (section.provision?.found ? (
@@ -241,6 +252,11 @@ const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
           up={upNode}
           release={selected}
         />
+
+        {/* One card for every citation in the text above (ADR-0024). Mounted
+            only on a section page, because that is the only page that renders
+            statutory text with references in it. */}
+        <CitePreview />
 
         <p class="formats">
           <a href={apiHref(section.identifier, { release: selected, format: "xml" })}>

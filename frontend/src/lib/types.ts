@@ -139,6 +139,28 @@ export interface Title {
   ingested_releases: string[];
 }
 
+/** Mirrors `CitationOut` — what `/api/v1/citation?q=` answers.
+ *
+ * `exists` is the field that matters: a citation can parse perfectly and name
+ * nothing this database holds, and those are different failures to put in front
+ * of a reader. `message` carries the explanation when there is a specific one. */
+export interface Citation {
+  query: string;
+  identifier: string;
+  section_identifier: string;
+  title_num: string;
+  section_num: string | null;
+  subdivisions: string[];
+  kind: "section" | "structure" | "title";
+  note: boolean;
+  et_seq: boolean;
+  exists: boolean;
+  heading: string | null;
+  num: string | null;
+  release: Release | null;
+  message: string | null;
+}
+
 /** Mirrors `UserOut` (Day 5) — the whole shape `/api/v1/auth/me` returns. */
 export interface User {
   id: string;

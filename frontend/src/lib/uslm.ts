@@ -234,7 +234,158 @@ function renderRef(el: UslmElement, opts: RenderOptions): string {
   const title = resolved.title ? ` title="${escapeAttr(resolved.title)}"` : "";
   const external = /^https?:\/\//u.test(resolved.href);
   const rel = external ? ' rel="noopener" class="usa-link usa-link--external"' : "";
-  return `<a href="${escapeAttr(resolved.href)}"${title}${rel}>${text}</a>`;
+  // `data-cite` is the hover-preview island's only hook, and it carries the
+  // *identifier* rather than the href so the island never has to un-prefix
+  // `/app` to build a preview URL. Internal references only: there is nothing
+  // to preview at govinfo, and an unresolvable ref is not a link at all.
+  //
+  // `title` stays. It is what a reader with no JavaScript gets, what a screen
+  // reader announces (the card is `aria-hidden` — see `CitePreview.astro`), and
+  // what shows on a touch device, where the card never opens by design.
+  // The release rides along so a preview is read at the same release point as
+  // the page quoting it. Without it, a section being read at 119-99 would show
+  // its cross references as they stand today — quietly mixing two vintages of
+  // the law, which is the one thing this whole project exists to avoid.
+  const cite = resolved.identifier
+    ? ` data-cite="${escapeAttr(resolved.identifier)}"` +
+      (opts.release ? ` data-cite-release="${escapeAttr(opts.release)}"` : "")
+    : "";
+  return `<a href="${escapeAttr(resolved.href)}"${title}${rel}${cite}>${text}</a>`;
+}
+
+/* ----------------------------------------------------------- reading text
+ *
+ * The same document, as lines of text rather than HTML — what the diff view
+ * needs (ADR-0026). A redline of raw XML shows a reader `<ref href="…">` churn
+ * and regenerated `@id`s; a redline of *this* shows what the law now says.
+ *
+ * It lives here because deciding where one line of statutory text ends is a
+ * USLM question — `<num>` and its `<chapeau>` are one line to a reader, a
+ * `<paragraph>` under them is another — and this module is the only place
+ * outside the parsers allowed to ask one (architecture rule 5).
+ */
+
+/** Elements that end the line being accumulated. Every level, plus the
+ * apparatus that is visibly its own block but is not a level: notes, source
+ * credit, quoted statutory text, table rows. Everything else — `<num>`,
+ * `<heading>`, `<content>`, `<chapeau>`, `<ref>`, `<i>` — flows into the
+ * current line, which is what makes "(a) In general.—The Secretary shall…"
+ * come out as one line instead of four. */
+const LINE_BREAK_TAGS = new Set([
+  ...LEVEL_TAGS,
+  // `<p>` is how a note's own paragraphs are marked up, and a note can be an
+  // entire Executive Order. Without this, one of them is a single "line" and a
+  // three-word amendment inside it redlines as a wall of text.
+  "p",
+  "notes",
+  "note",
+  "sourceCredit",
+  "quotedContent",
+  "quotedText",
+  "table",
+  "tr",
+  "toc",
+]);
+
+const NOTE_TAGS = new Set(["notes", "note", "sourceCredit"]);
+
+export type ReadingKind = "text" | "note";
+
+export interface ReadingBlock {
+  /** Outline depth, counted in levels — the diff view spends it as indentation
+   * so a changed clause still reads at the depth it lives at. */
+  depth: number;
+  /** Statutory text, or the apparatus around it. The two are worth telling
+   * apart in a redline: a changed note is not a changed law. */
+  kind: ReadingKind;
+  /** Whitespace-normalized. Two release points differ in indentation of the
+   * source constantly and in meaning rarely; normalizing here is what keeps
+   * reformatting out of the redline. */
+  text: string;
+}
+
+/** The fragment as the lines a reader reads, in document order. */
+export function readingBlocks(fragment: UslmElement): ReadingBlock[] {
+  const blocks: ReadingBlock[] = [];
+  collectBlocks(fragment, 1, "text", blocks);
+  return blocks;
+}
+
+function collectBlocks(
+  el: UslmElement,
+  depth: number,
+  kind: ReadingKind,
+  out: ReadingBlock[],
+): void {
+  let line = "";
+
+  const flush = (): void => {
+    const text = normalizeSpace(line);
+    line = "";
+    if (text) out.push({ depth, kind, text });
+  };
+
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const node = el.childNodes[i];
+    if (node.nodeType === TEXT_NODE) {
+      line += node.nodeValue ?? "";
+      continue;
+    }
+    if (node.nodeType !== ELEMENT_NODE) continue;
+
+    const child = node as UslmElement;
+    const tag = tagOf(child);
+    if (tag.includes(":") || SKIP_TAGS.has(tag)) continue;
+
+    if (LINE_BREAK_TAGS.has(tag)) {
+      // Flush *before* descending, and keep accumulating after: a
+      // `<continuation>` that follows a nested paragraph belongs after that
+      // paragraph, not merged into the line that introduced it.
+      flush();
+      collectBlocks(
+        child,
+        LEVEL_TAGS.has(tag) ? depth + 1 : depth,
+        NOTE_TAGS.has(tag) ? "note" : kind,
+        out,
+      );
+    } else if (tag in INLINE_TAGS || tag === "ref") {
+      // Inline formatting is part of the word it sits in — `10<sup>3</sup>` is
+      // one token, not two.
+      line += inlineText(child);
+    } else {
+      // A `<num>`, a `<heading>`, a `<content>`: separate blocks in the render,
+      // one line here, and the source is free to put no whitespace between
+      // them — so `(a)` and its chapeau must not run together as `(a)Whoever`.
+      line = join(line, inlineText(child));
+    }
+  }
+
+  flush();
+}
+
+function join(left: string, right: string): string {
+  if (!left || !right) return left + right;
+  return /\s$/u.test(left) || /^\s/u.test(right) ? left + right : `${left} ${right}`;
+}
+
+function inlineText(el: UslmElement): string {
+  let out = "";
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const node = el.childNodes[i];
+    if (node.nodeType === TEXT_NODE) {
+      out += node.nodeValue ?? "";
+    } else if (node.nodeType === ELEMENT_NODE) {
+      const child = node as UslmElement;
+      const tag = tagOf(child);
+      if (tag.includes(":") || SKIP_TAGS.has(tag)) continue;
+      out += inlineText(child);
+    }
+  }
+  return out;
+}
+
+function normalizeSpace(value: string): string {
+  return value.replace(/\s+/gu, " ").trim();
 }
 
 /** Exported for the diff view (Day 4): a redline of raw XML source has to

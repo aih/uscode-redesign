@@ -55,12 +55,26 @@
 /* ------------------------------------------------------------------- tokens */
 
 :root {
-  color-scheme: light dark;
+  /* Light, always, until the reader says otherwise — see the dark block below. */
+  color-scheme: light;
 
   /* The one lever the BUILDLOG 008 review asked for by name: provision depth is
    * a variable, small enough on a phone that a four-deep paragraph still has a
    * column to be read in, and wide enough on a desktop to show structure. */
   --indent-step: 0.75rem;
+
+  /* How much of the viewport the sticky stack occupies. Not decoration: this
+   * feeds `scroll-margin-top`, so every value here is a promise that an anchor
+   * jump lands *under* the bar rather than behind it.
+   *
+   * Measured, not guessed — `scripts/_sticky-check.mjs`-style geometry against
+   * the running site, then rounded up. Erring high costs a little whitespace
+   * above the target; erring low hides the provision the reader asked for,
+   * which is the bug this whole token exists to prevent. Kept honest by the
+   * anchor-jump assertion in the e2e suite.
+   *
+   * Below 40em only `.sectionbar` sticks: one 45px row. */
+  --sticky-h: 3.25rem;
 
   --reading: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --ink: #1b1b1b;
@@ -68,6 +82,9 @@
   --rule: #dfe1e2;
   --page: #ffffff;
   --panel: #f0f0f0;
+  /* Form controls. USWDS already paints these white; the token exists so the
+   * dark theme has one place to move them to. */
+  --field: #ffffff;
   --link: #005ea2;
   --target: rgba(255, 190, 46, 0.28);
   --target-edge: #c05600;
@@ -77,36 +94,129 @@
 @media (min-width: 40em) {
   :root {
     --indent-step: 1.6rem;
+    /* Navbar + citation box + contextual bar + section bar, all sticky from here
+     * up. The nav is still the forced-open wrapping row until 64em (see below)
+     * and the citation box sits under it, so this band is the tallest the stack
+     * ever gets: 280px measured, plus room for a deep breadcrumb trail to wrap
+     * one line further.
+     *
+     * This number drifts every time the chrome changes — adding the citation box
+     * moved it from 224px to 280px in one commit. It is held honest by the
+     * anchor-jump assertion in the e2e suite, not by anyone remembering. */
+    --sticky-h: 18rem;
   }
 }
 
-@media (prefers-color-scheme: dark) {
+/* At the desktop breakpoint USWDS's nav becomes a single horizontal row, the
+ * citation box moves up beside it, and the stack shrinks back to ~198px. */
+@media (min-width: 64em) {
   :root {
-    --ink: #e8e6e1;
-    --muted: #a9aeb1;
-    --rule: #3d4551;
-    --page: #16150f;
-    --panel: #1c1d1f;
-    --link: #73b3e7;
-    --target: rgba(255, 190, 46, 0.22);
-    --target-edge: #ffbe2e;
-    --danger: #f2938c;
+    --sticky-h: 13rem;
   }
+}
+
+/* --------------------------------------------------------------- dark mode
+ *
+ * **Light is the default at every OS setting.** This used to key off
+ * `prefers-color-scheme`, which meant a reader whose laptop is dark — most of
+ * them — was handed the United States Code as light text on black without ever
+ * asking for it. Statutory text is a document; the page it is printed on is
+ * white unless someone says otherwise. So dark is now opt-in, and the opting
+ * is a control in the header (`ThemeToggle.astro`).
+ *
+ * The choice lives on `<html data-theme="dark">`, stamped before first paint by
+ * the inline bootstrap in `Base.astro` and remembered in `localStorage`.
+ * Deliberately *not* a cookie: every reader page carries a cache policy
+ * (ADR-0018), and a theme cookie would make the whole site `Vary: Cookie` —
+ * paying for a colour preference in cache misses on statutory text that never
+ * changes. The attribute is set by the client, after the bytes have been served.
+ *
+ * `color-scheme` moves with the attribute so the UA themes what CSS cannot
+ * reach: scrollbars, focus rings, and the dropdown a `<select>` opens.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #e8e6e1;
+  --muted: #a9aeb1;
+  --rule: #3d4551;
+  --page: #16150f;
+  --panel: #1c1d1f;
+  --field: #26282b;
+  --link: #73b3e7;
+  --target: rgba(255, 190, 46, 0.22);
+  --target-edge: #ffbe2e;
+  --danger: #f2938c;
 
   body {
     background: var(--page);
     color: var(--ink);
   }
 
+  /* The footer's colour is on its *sections*, not on `.usa-footer` — setting
+   * only the outer element left a white slab under every dark page. */
   .usa-header,
-  .usa-footer {
+  .usa-footer,
+  .usa-footer__primary-section,
+  .usa-footer__secondary-section {
     background: var(--panel);
+    background-color: var(--panel);
     color: var(--ink);
   }
 
   a,
   .usa-link {
     color: var(--link);
+  }
+
+  /* USWDS paints its controls, tables and boxes on white explicitly, so none of
+   * them follow the tokens above on their own — before this, the citation box
+   * and the release picker were the two brightest things on a dark page. */
+  .usa-input,
+  .usa-select,
+  .usa-textarea {
+    background-color: var(--field);
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+
+  /* The `<select>` chevron is a background SVG in USWDS's ink colour, which on
+   * a dark field is a dark arrow on a dark background. Same icon, repainted. */
+  .usa-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23e8e6e1'%3E%3Cpath d='M12 5.83 15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z'/%3E%3C/svg%3E");
+  }
+
+  .usa-table,
+  .usa-table td,
+  .usa-table th {
+    background-color: transparent;
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+
+  .usa-table thead th {
+    background-color: var(--panel);
+  }
+
+  .usa-summary-box {
+    background-color: var(--panel);
+    border-color: var(--rule);
+    color: var(--ink);
+  }
+
+  .usa-summary-box__heading,
+  .usa-summary-box__text {
+    color: var(--ink);
+  }
+
+  /* A redline is read by colour before it is read by word, so the two marks
+   * have to keep their contrast against the page they are actually on. */
+  .diff-view ins {
+    background: rgba(0, 166, 81, 0.3);
+  }
+
+  .diff-view del {
+    background: rgba(242, 147, 140, 0.24);
   }
 }
 
@@ -149,6 +259,92 @@
 body {
   background: var(--page);
   color: var(--ink);
+}
+
+/* `hidden` must actually hide.
+ *
+ * The UA stylesheet's `[hidden] { display: none }` is the weakest rule there is,
+ * and USWDS's `.usa-button { display: inline-block }` is an author rule, so it
+ * wins. The result was on every section page: `WatchButton` correctly left
+ * "Add" and "Remove" marked `hidden` and un-hid only "Log in", and the browser
+ * drew all three anyway. The island was right; the attribute was being ignored.
+ *
+ * `!important` is the right tool and the conventional one — an author rule has
+ * to out-rank another author rule, and there is no honest specificity contest
+ * to win here. Applied globally rather than to `.watch-widget`, because every
+ * future component that hides a `.usa-button` from script would meet this again.
+ */
+[hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ the sticky stack
+ *
+ * Scrolling a long section used to cost you the navbar, the breadcrumb trail,
+ * the release you were reading at, the section number, and prev/next — all of
+ * it, permanently, until you scrolled back. In a versioned reader those are the
+ * answers to "where am I" and "as of when", which is the whole product.
+ *
+ * Two rules keep this from breaking:
+ *
+ *   1. `position: sticky` silently does nothing if ANY ancestor has
+ *      `overflow` other than `visible`. `body`, `.topbar` and `.contextbar` are
+ *      clean; if a wrapper is ever added around `.topbar`, this is the first
+ *      thing to check when the bar stops sticking.
+ *   2. Whatever sticks must be counted in `--sticky-h`, because that is what
+ *      `scroll-margin-top` below spends. Change a height here, change the token.
+ */
+.topbar {
+  position: sticky;
+  top: 0;
+  /* Above the page, below the top layer the citation preview renders into —
+   * `popover` always paints above `z-index`, so there is nothing to out-bid. */
+  z-index: 500;
+  background: var(--page);
+}
+
+/* Below the desktop breakpoint the navbar is ~110px on its own (the nav is
+ * forced open — see above — and four links wrap), and the breadcrumb trail
+ * wraps to two or three lines. Sticking all of that would leave a 375px phone
+ * reading statutory law through a slot. So the stack scrolls away and only the
+ * one compact row stays.
+ *
+ * `display: contents` rather than `position: static`, and the difference is the
+ * whole fix: a sticky element is confined to its PARENT's box, so a
+ * `.sectionbar` nested inside a static `.topbar` scrolls off with it and never
+ * pins (measured: it sat at y = -1706 after a 2000px scroll). Dissolving the
+ * wrapper's box makes `.sectionbar` a child of the body flow, where its sticky
+ * containing block is the page. Nothing semantic is lost — `.topbar` is a plain
+ * `<div>` with no role — and the desktop nesting above is untouched. */
+@media (max-width: 39.99em) {
+  .topbar {
+    display: contents;
+  }
+
+  .sectionbar {
+    position: sticky;
+    top: 0;
+    z-index: 500;
+  }
+}
+
+/* Paper has no viewport to pin things to, and a bar reprinted on page one of a
+ * forty-page section is just noise. */
+@media print {
+  .topbar,
+  .sectionbar {
+    position: static;
+  }
+}
+
+/* The reason `--sticky-h` exists. Without this, `/us/usc/t16/s45f/c/5` scrolls
+ * the highlighted provision to the top of the *document* — which is underneath
+ * the bar. Applies to every addressable element in the text, not just the
+ * highlighted one, because any `<ref>` may link to a fragment. */
+.section-body [id],
+.section-body .target,
+main[id] {
+  scroll-margin-top: calc(var(--sticky-h) + 0.5rem);
 }
 
 .reader-wrap {
@@ -219,6 +415,162 @@ body {
   margin: 0;
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+/* ------------------------------------------------------- the citation box */
+
+/* A plain GET form in the header. `1rem` on the input is not a style choice —
+ * iOS zooms the whole page when a focused control's text is smaller, and a
+ * reader who types a citation should not end up zoomed into the navbar. */
+.citejump {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.citejump__label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex: none;
+}
+
+.citejump__input {
+  font-size: 1rem;
+  min-height: 2.75rem;
+  margin-top: 0;
+  max-width: 18rem;
+  flex: 1 1 10rem;
+}
+
+/* `width: auto` because USWDS makes every `.usa-button` full-width below the
+ * tablet breakpoint. That is right for a form's primary action and wrong for a
+ * button that belongs beside its input — unchecked, "Go" wrapped onto its own
+ * line and spanned the phone. */
+.citejump__go {
+  min-height: 2.75rem;
+  flex: none;
+  width: auto;
+  margin-top: 0;
+}
+
+/* The hint is for the page copy, where there is room to explain. In the header
+ * the label and the placeholder already say everything. */
+.citejump--header .citejump__hint {
+  display: none;
+}
+
+/* The padding that used to live here now belongs to `.navtools`, which owns the
+ * whole row. */
+.citejump--header {
+  padding: 0;
+}
+
+/* ------------------------------------------ the chrome's controls, on one row
+ *
+ * The citation box and the theme toggle, side by side. One row rather than two
+ * stacked blocks, because between 40em and 64em the nav is still the forced-open
+ * wrapping version and everything in it sticks: a second block here is 44px
+ * added to `--sticky-h`, and that token is what `scroll-margin-top` spends. */
+.navtools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0 1rem 0.75rem;
+}
+
+/* `12rem` rather than `auto`: the citation box is allowed to wrap internally on
+ * a phone, and if it also claimed the full row the toggle would be pushed onto
+ * a line of its own with nothing else on it. */
+.navtools .citejump {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+/* Reading comfort, not navigation — so it is quiet: muted, no fill, no border,
+ * and it gives up its label before the citation box gives up any width. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  width: auto;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.theme-toggle__icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.citejump--page {
+  margin: 0 0 2rem;
+  align-items: flex-end;
+}
+
+.citejump--page .citejump__label {
+  flex-basis: 100%;
+  font-size: 0.9rem;
+}
+
+.citejump--page .citejump__input {
+  max-width: 24rem;
+}
+
+.citejump__hint {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.citejump__examples code {
+  font-size: 0.95rem;
+}
+
+/* At the desktop breakpoint the nav is a horizontal row and the box can sit
+ * beside it rather than under it. */
+@media (min-width: 64em) {
+  .navtools {
+    padding: 0;
+    margin-left: 1.5rem;
+    flex-wrap: nowrap;
+  }
+
+  /* The box shares the nav's row from here up, and a flex row will happily
+     break "Release points" across two lines to make room. The links are short;
+     let the box give up width instead. */
+  .usa-nav__primary > li > a {
+    white-space: nowrap;
+  }
+
+  .citejump--header .citejump__label {
+    position: absolute;
+    left: -999em;
+  }
+
+  /* The box and its "Go" stay on one line here. Left to wrap, the button drops
+     under the input and the whole navbar grows a row — and this is the band
+     where the navbar is sticky, so a wrapped header is `--sticky-h` drifting. */
+  .navtools .citejump {
+    flex-wrap: nowrap;
+  }
+
+  .citejump--header .citejump__input {
+    max-width: 11rem;
+  }
 }
 
 /* --------------------------------------------------------- the section head */
@@ -296,27 +648,91 @@ body {
 
 /* ------------------------------------------------------------ navigation */
 
-/* Item 4: a compact strip under the title, and the full block at the bottom —
- * so a reader who has finished a section never has to scroll back up to move on. */
-.navstrip {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  font-size: 0.85rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--rule);
+/* The sticky row: identity on the left, exits on both edges. One line, always,
+ * at every width — it is what remains on a phone once everything else has
+ * scrolled away, so it cannot be allowed to wrap. */
+.sectionbar {
+  background: var(--page);
   border-bottom: 1px solid var(--rule);
 }
 
-.navstrip a {
-  min-height: 2.75rem;
-  display: inline-flex;
+.sectionbar__inner {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 0.5rem;
+  display: flex;
   align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem; /* the 44px tap target, BUILDLOG 008 */
 }
 
-.navstrip__spacer {
+.sectionbar__step,
+.sectionbar__up {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  flex: none;
+  text-decoration: none;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* A missing neighbour keeps its slot rather than collapsing it: the section
+ * number should not jump sideways as you page through a chapter. */
+.sectionbar__step--off {
+  color: var(--rule);
+}
+
+.sectionbar__up {
+  font-size: 0.85rem;
+  padding: 0 0.35rem;
+}
+
+/* Wide enough for `SUBCHAPTER VI`, which is the longest thing that lands here in
+ * practice; anything longer elides rather than pushing the section number off. */
+.sectionbar__up-label {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `min-width: 0` is what actually lets the heading truncate: a flex item's
+ * default `min-width: auto` refuses to shrink below its content, so without it
+ * the row overflows instead of eliding. */
+.sectionbar__id {
   flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sectionbar__num {
+  font-family: var(--reading);
+  font-weight: 700;
+  flex: none;
+}
+
+/* The heading gives up its tail first; `§ 523` never does. */
+.sectionbar__heading {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 39.99em) {
+  .sectionbar__heading,
+  .sectionbar__up-label {
+    display: none;
+  }
 }
 
 .neighbors {
@@ -492,6 +908,127 @@ body {
   background: var(--panel);
 }
 
+/* ------------------------------------------------------- the citation preview */
+
+/* The hover card (ADR-0024). A `popover`, so it renders in the browser's top
+ * layer — always above the sticky bar, with no z-index contest to lose.
+ *
+ * Scrollable is the point: a preview you cannot read past the first paragraph
+ * is a tooltip with extra steps. `overscroll-behavior: contain` stops a wheel
+ * gesture that reaches the bottom from scrolling the page underneath, which
+ * would throw away the reading position the card exists to protect. */
+.cite-preview {
+  position: fixed;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 18%);
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: 22rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 0.9rem;
+}
+
+/* The anchor-positioned path, when the browser has it. `flip-block` moves the
+ * card above the link when there is no room below; Safari 18.2–18.3 ignores
+ * this and gets the measured fallback in the island instead. */
+@supports (anchor-name: --x) {
+  .cite-preview {
+    position-anchor: --cite-anchor;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block;
+    margin-block-start: 0.35rem;
+    inset: auto;
+  }
+}
+
+.cite-preview:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: 1px;
+}
+
+.cite-preview__head {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+  font-family: var(--reading);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.4rem;
+}
+
+.cite-preview__status {
+  margin-left: 0.4rem;
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--danger);
+  text-transform: uppercase;
+}
+
+.cite-preview__note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The section body inside a card is the same markup as the page, one size down
+ * and without the reading measure — it is a glance, not a reading surface.
+ *
+ * The rules below are `.section-body`'s, restated for this container rather
+ * than shared with it: the two need the same treatment of USLM's markup but
+ * not the same sizes, and a comma-joined selector would make every future
+ * change to the reading surface silently a change to the card too. */
+.cite-preview__body {
+  font-family: var(--reading);
+  line-height: 1.5;
+}
+
+.cite-preview__body p {
+  margin: 0 0 0.6rem;
+}
+
+/* USLM writes `<num>(a)</num><heading>Purpose</heading>` — two elements, one
+ * line of the printed Code. */
+.cite-preview__body .uslm-heading {
+  display: inline;
+  font-size: 1em;
+  font-weight: 700;
+  font-family: var(--reading);
+  margin: 0;
+}
+
+.cite-preview__body .uslm-num {
+  font-weight: 700;
+  margin-right: 0.4em;
+}
+
+/* The card's own header already says `§ 45a–1 Addition of lands authorized`.
+ * Without this the section repeats its number and heading underneath, the
+ * heading at page-title size — three titles for one provision, which is what
+ * the first rendered card actually looked like. */
+.cite-preview__body > .uslm-section > .uslm-num,
+.cite-preview__body > .uslm-section > .uslm-heading {
+  display: none;
+}
+
+/* Provision depth still reads inside a card, at half the page's step: the
+ * structure matters, and 1.6rem of indent inside a 28rem box does not. */
+.cite-preview__body [class*="indent"] {
+  margin-left: calc(var(--indent-step) / 2);
+}
+
+.cite-preview__foot {
+  margin: 0.75rem 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.85rem;
+  position: sticky;
+  bottom: -0.75rem;
+  background: var(--page);
+}
+
 /* -------------------------------------------------------- versions and diffs */
 
 .timeline {
@@ -542,6 +1079,68 @@ body {
   margin-top: 1.5rem;
 }
 
+/* The reading-text redline (ADR-0026). It is a document, not a stream of
+ * source, so it wraps like one: `pre-wrap` is right for raw XML and wrong here,
+ * where the text was whitespace-normalized before it was ever diffed. */
+.diff-view--text {
+  white-space: normal;
+}
+
+/* Struck for deleted, underlined for inserted — the convention every redline of
+ * a statute has used since they were drawn by hand, and the reason this does
+ * not rely on colour alone (WCAG 1.4.1). The padding matters more than it
+ * looks: a deletion butted against an insertion (`14` → `1013`) otherwise reads
+ * as one impossible word. */
+.diff-view--text ins,
+.diff-view--text del {
+  padding: 0 0.15em;
+  border-radius: 2px;
+}
+
+.diff-view--text ins {
+  text-decoration: underline;
+}
+
+/* Indentation carries the outline, exactly as it does on the section page: a
+ * changed clause should sit at the depth it lives at, not flush left. `--depth`
+ * is set per line by `diffdoc.diffLinesHtml`. */
+.diff-line {
+  margin: 0 0 0.6rem;
+  padding-left: calc(var(--indent-step) * var(--depth, 0));
+  border-left: 3px solid transparent;
+}
+
+/* A whole line added or removed is marked in the gutter as well as in colour —
+ * colour alone is not a way to convey information (WCAG 1.4.1), and at a
+ * glance the gutter is what shows the shape of the amendment. */
+.diff-line--insert,
+.diff-line--delete,
+.diff-line--changed {
+  padding-left: calc(var(--indent-step) * var(--depth, 0) + 0.6rem);
+  margin-left: -0.6rem;
+}
+
+.diff-line--insert {
+  border-left-color: #00a651;
+}
+
+.diff-line--delete {
+  border-left-color: var(--danger);
+}
+
+.diff-line--changed {
+  border-left-color: var(--target-edge);
+}
+
+/* Notes and source credit are the apparatus around the law. They belong in the
+ * redline — they change, and readers ask why — but they should not read as
+ * loudly as statutory text. */
+.diff-line--note {
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
 .diff-view ins {
   background: rgba(0, 166, 81, 0.18);
   text-decoration: none;
@@ -550,6 +1149,28 @@ body {
 
 .diff-view del {
   background: rgba(181, 9, 9, 0.14);
+  color: var(--muted);
+}
+
+/* The titles a release point changed: a wrapping row of numbers, not a bulleted
+ * column. A list element because it is a list — twenty title numbers separated
+ * by commas is a screen-reader's run-on sentence — with the marker removed and
+ * the separator supplied by spacing. */
+.titles-affected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 22rem;
+}
+
+.titles-affected li {
+  margin: 0;
+}
+
+.titles-affected__missing {
   color: var(--muted);
 }
 

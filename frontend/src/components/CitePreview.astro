@@ -1,0 +1,222 @@
+---
+/**
+ * Hover a citation, read what it says, without losing your place. Island #4.
+ *
+ * A section of the Code can carry forty cross references, and following one to
+ * find out whether it matters costs a page load and your scroll position. The
+ * `title=""` attribute already on every reference gives the heading; this gives
+ * the text.
+ *
+ * ## Why it is built out of the platform
+ *
+ * `popover` supplies the top layer, `Escape`, and light dismiss for free.
+ * CSS anchor positioning supplies placement — Baseline 2026, ~91% of traffic —
+ * with a `getBoundingClientRect` path for the rest. Total cost is a couple of
+ * kilobytes against the ~120 KB a React hover-card library would have added to
+ * a site that ships no framework at all (ADR-0022).
+ *
+ * ## WCAG 2.1 SC 1.4.13, clause by clause
+ *
+ * This is the criterion that governs anything appearing on hover, and each of
+ * its three requirements is a specific mechanism here, each with a test in
+ * `frontend/tests/e2e/preview.spec.ts`:
+ *
+ *   * **Dismissible** — `Escape` closes the card without moving the pointer.
+ *   * **Hoverable** — the close is delayed and cancelled when the pointer
+ *     enters the card, so you can move onto it and scroll. This is the clause
+ *     most hover previews fail.
+ *   * **Persistent** — it stays until dismissed, until the pointer leaves both
+ *     the link and the card, or until focus moves.
+ *
+ * ## Two decisions worth arguing with
+ *
+ * **`aria-hidden` on the card.** Its content duplicates the link's own `title`,
+ * one click away in full. A screen reader announcing a paragraph of statutory
+ * text on every reference in a forty-reference section would be worse than
+ * useless. The alternative — `aria-describedby` pointing at the live card — is
+ * defensible and was rejected for that reason; recorded in ADR-0024.
+ *
+ * **Touch navigates.** The whole feature is behind
+ * `(hover: hover) and (pointer: fine)`. Hover does not exist on a phone, and
+ * every workaround (first-tap-opens, long-press) fights either the OS or the
+ * reader's expectation that a link is a link.
+ */
+---
+
+{/* One card, reused for every reference on the page. `manual` rather than
+    `auto` because `auto` light-dismisses on any outside pointerdown, which
+    includes the scrollbar of the card's own scroll area. */}
+<div
+  id="cite-preview"
+  class="cite-preview"
+  popover="manual"
+  aria-hidden="true"
+  tabindex="0"
+></div>
+
+<script is:inline>
+  {
+    // Hover is a pointer capability, not a screen size. A phone in landscape is
+    // still a phone; a touchscreen laptop with a mouse still hovers.
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      const card = document.getElementById("cite-preview");
+
+      // Long enough that dragging the pointer across a paragraph of citations
+      // does not fire four requests; short enough to feel like a hover.
+      const OPEN_DELAY = 300;
+      // The "hoverable" clause of SC 1.4.13 lives in this number: the gap the
+      // pointer has to cross from link to card without the card vanishing.
+      const CLOSE_DELAY = 250;
+
+      const cache = new Map();
+      let openTimer = null;
+      let closeTimer = null;
+      let inFlight = null;
+      let anchor = null;
+
+      const cancelTimers = () => {
+        clearTimeout(openTimer);
+        clearTimeout(closeTimer);
+      };
+
+      function hide() {
+        cancelTimers();
+        if (anchor) anchor.style.removeProperty("anchor-name");
+        anchor = null;
+        try {
+          card.hidePopover();
+        } catch {
+          /* already closed */
+        }
+      }
+
+      function scheduleHide() {
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(hide, CLOSE_DELAY);
+      }
+
+      function place(link) {
+        const supportsAnchor = CSS.supports("anchor-name: --x");
+        if (supportsAnchor) {
+          link.style.setProperty("anchor-name", "--cite-anchor");
+          card.style.removeProperty("top");
+          card.style.removeProperty("left");
+          return;
+        }
+        // Safari 18.2–18.3 has `anchor()` but not `@position-try`, and older
+        // browsers have neither. Placement is the one thing that cannot degrade
+        // to nothing, so it is measured by hand.
+        const box = link.getBoundingClientRect();
+        const width = Math.min(28 * 16, window.innerWidth - 24);
+        const left = Math.max(12, Math.min(box.left, window.innerWidth - width - 12));
+        const below = window.innerHeight - box.bottom;
+        card.style.left = `${left}px`;
+        if (below < 260 && box.top > below) {
+          card.style.top = `${Math.max(12, box.top - Math.min(352, box.top - 12))}px`;
+        } else {
+          card.style.top = `${box.bottom + 6}px`;
+        }
+      }
+
+      async function load(identifier, release) {
+        const key = `${identifier}|${release ?? ""}`;
+        if (cache.has(key)) return cache.get(key);
+
+        // Cancel whatever the last hover started: the pointer has moved on and
+        // that answer is no longer wanted.
+        inFlight?.abort();
+        const controller = new AbortController();
+        inFlight = controller;
+
+        const url =
+          `/app/preview${identifier}` + (release ? `?release=${encodeURIComponent(release)}` : "");
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(String(response.status));
+        const html = await response.text();
+        cache.set(key, html);
+        return html;
+      }
+
+      async function show(link) {
+        const identifier = link.dataset.cite;
+        if (!identifier) return;
+        const release = link.dataset.citeRelease || null;
+
+        let html;
+        try {
+          html = await load(identifier, release);
+        } catch {
+          // A failed preview is not an error the reader needs to see: the link
+          // still works, which is the whole fallback.
+          return;
+        }
+        // The pointer may have left while that was in flight.
+        if (!link.matches(":hover") && document.activeElement !== link) return;
+
+        card.innerHTML = html;
+        anchor = link;
+        place(link);
+        try {
+          card.showPopover();
+        } catch {
+          /* already open */
+        }
+      }
+
+      function scheduleShow(link) {
+        cancelTimers();
+        openTimer = setTimeout(() => show(link), OPEN_DELAY);
+      }
+
+      /** A reference on the page, or `null`.
+       *
+       * References *inside* the card are excluded deliberately. The card's body
+       * is rendered by the same `uslm.ts` as the page, so it carries
+       * `data-cite` links of its own, and the delegated listener below would
+       * happily match them — replacing the card's contents while anchored to a
+       * link inside itself. One level of preview; the links in it navigate. */
+      const referenceFrom = (event) => {
+        const link = event.target.closest?.("a[data-cite]");
+        return link && !card.contains(link) ? link : null;
+      };
+
+      // Delegated, because the statutory text is inserted with `set:html` and
+      // may hold hundreds of references — one listener, not one per link.
+      document.addEventListener("mouseover", (event) => {
+        const link = referenceFrom(event);
+        if (link) scheduleShow(link);
+      });
+
+      document.addEventListener("mouseout", (event) => {
+        if (referenceFrom(event)) scheduleHide();
+      });
+
+      // Keyboard parity: focusing a reference opens the same card. SC 1.4.13
+      // covers focus as well as hover, and a keyboard reader has the same
+      // question about a cross reference that a mouse reader does.
+      document.addEventListener("focusin", (event) => {
+        const link = referenceFrom(event);
+        if (link) scheduleShow(link);
+        else if (!card.contains(event.target)) hide();
+      });
+
+      document.addEventListener("focusout", (event) => {
+        if (referenceFrom(event)) scheduleHide();
+      });
+
+      // Hoverable: moving onto the card keeps it open, which is what makes a
+      // scrollable preview usable at all.
+      card.addEventListener("mouseenter", cancelTimers);
+      card.addEventListener("mouseleave", scheduleHide);
+      card.addEventListener("focusin", cancelTimers);
+
+      // Dismissible, without moving the pointer.
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") hide();
+      });
+
+      // A card anchored to a link that has scrolled away is worse than no card.
+      window.addEventListener("scroll", () => anchor && hide(), { passive: true });
+    }
+  }
+</script>

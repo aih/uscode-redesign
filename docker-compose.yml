@@ -27,11 +27,24 @@ services:
     image: opensearchproject/opensearch:2.14.0
     environment:
       - discovery.type=single-node
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Uscode_Search_Admin_123!
+      # The security plugin rejects a password that resembles the username, so
+      # this one must not contain "admin" — the container exits 1 at boot if it
+      # does, and the only sign is a line in its log.
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Usc0deSearch!Str0ng#2026
     ports:
       - "9200:9200"
     volumes:
       - osdata:/usr/share/opensearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sk -u admin:'Usc0deSearch!Str0ng#2026' https://localhost:9200/_cluster/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
 
   api:
     build: .
@@ -39,10 +52,11 @@ services:
       db:
         condition: service_healthy
       opensearch:
-        condition: service_started
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://uscode:uscode@db:5432/uscode
       SEARCH_URL: https://opensearch:9200
+      SEARCH_PASSWORD: Usc0deSearch!Str0ng#2026
     expose:
       - "8001"
     volumes:

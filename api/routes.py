@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.diff import diff_ops
 from api.schemas import (
+    CitationOut,
     DiffOpOut,
     DiffOut,
     DiffSectionOut,
@@ -41,6 +42,7 @@ from api.schemas import (
     VersionOut,
     VersionsOut,
 )
+from citeparse import ParsedCitation, parse_citation
 from params import (
     IMMUTABLE,
     MACHINE_FORMATS,
@@ -62,6 +64,7 @@ from storage import (
     Repository,
     ResolvedRelease,
     SectionResult,
+    TocEntry,
     title_num_from_identifier,
 )
 
@@ -102,7 +105,119 @@ def list_releases(
 
 @api.get("/titles", response_model=list[TitleOut], summary="Ingested titles")
 def list_titles(repository: RepositoryDep) -> list[TitleOut]:
+    """Every ingested title, in the Code's own order — `1, 2, … 5, 5a, 6, … 11,
+    11a, 12, …` (ADR-0025). The ordering is the Repository's contract, not this
+    handler's, so the same list arrives sorted from any implementation."""
     return [TitleOut.of(t) for t in repository.list_titles()]
+
+
+@api.get(
+    "/citation",
+    response_model=CitationOut,
+    responses={422: {"model": ErrorOut}},
+    summary="A typed citation, resolved to an identifier",
+)
+def citation_lookup(
+    repository: RepositoryDep,
+    q: Annotated[
+        str,
+        Query(
+            description="A citation in more or less any written form.",
+            examples=["11 usc 523(a)(1)", "16 U.S.C. § 45f(c)(5)", "5 USC App. 3"],
+        ),
+    ],
+    release: ReleaseParam = None,
+    date: DateParam = None,
+) -> CitationOut:
+    """`11 usc 523(a)(1)` → `/us/usc/t11/s523/a/1`, and whether it is there.
+
+    Parsing is `citeparse.parse_citation`, which is pure — it knows what string
+    a citation names and nothing about what exists. Existence is answered here,
+    with the batched `labels()` lookup already built for citation hover text, so
+    this costs one query and needs no new `Repository` method (architecture
+    rule 1).
+
+    A string that cannot be parsed is a 422: the request was malformed. A string
+    that parses but names nothing loaded is a **200 with `exists: false`** — it
+    is a well-formed question with the answer "not here", and telling the reader
+    which part was wrong beats an error page.
+    """
+    parsed = parse_citation(q)
+    if parsed is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{q!r} is not a citation this site can read. Try "
+                "'11 usc 523', '11 U.S.C. § 523(a)(1)', 'section 523 of title 11', "
+                "'11/523', or '/us/usc/t11/s523'."
+            ),
+        )
+
+    resolved = resolve_release_or_404(
+        repository,
+        release=release,
+        on_date=parse_date_param(date),
+        title_num=parsed.title_num,
+    )
+    entry, actual = _locate(repository, parsed, resolved)
+    return CitationOut.of(
+        parsed,
+        q,
+        entry=entry,
+        actual=actual,
+        release=resolved.release,
+        message=None if entry else _why_not(parsed),
+    )
+
+
+def _locate(
+    repository: Repository, parsed: ParsedCitation, resolved: ResolvedRelease
+) -> tuple[TocEntry | None, str | None]:
+    """Find what the citation named, and under which spelling.
+
+    Two wrinkles, both discovered by typing citations at it rather than by
+    reading the schema:
+
+    **Dashes.** OLRC writes section numbers with an EN DASH — `/us/usc/t16/s45a–1`
+    — and 5,697 of 65,938 loaded sections contain one while *none* contains a
+    plain hyphen. A reader typing `42 USC 2000e-2` on an ordinary keyboard would
+    otherwise match nothing. `parsed.section_variants` supplies the spellings and
+    they all go into the one batched `labels()` call, so trying three costs what
+    trying one did.
+
+    **Structure and titles are not sections.** `labels()` answers about sections,
+    so `11 USC ch. 5` and `title 11` came back `exists: false` while sitting in
+    the database. Those go to `get_toc`, which is what they are.
+    """
+    if parsed.kind == "section":
+        found = repository.labels(list(parsed.section_variants), resolved)
+        for candidate in parsed.section_variants:
+            if candidate in found:
+                return found[candidate], candidate
+        return None, None
+
+    for candidate in parsed.section_variants:
+        toc = repository.get_toc(candidate, resolved)
+        if toc is not None:
+            return toc.node, candidate
+    return None, None
+
+
+def _why_not(parsed: ParsedCitation) -> str | None:
+    """Something specific to say when a well-formed citation resolves to nothing.
+
+    Only the case this site can actually diagnose. Everything else gets no
+    message, because "not found" with a confident-sounding invented reason is
+    worse than "not found".
+    """
+    if parsed.appendix and parsed.kind != "title":
+        return (
+            f"Title {parsed.title_num.rstrip('a')} Appendix is published under the "
+            "law that enacted each provision, not under a flat section number — "
+            "its identifiers look like /us/usc/t5a/pl/92/463/s1. This site cannot "
+            f"yet translate {parsed.identifier!r} into one of those."
+        )
+    return None
 
 
 @api.get(

@@ -11,6 +11,8 @@ Fixture facts they rely on (BUILDLOG 006):
   * /us/usc/t16/s2201 and /us/usc/t16/s2206 are the only two sections that differ.
 """
 
+import re
+
 import pytest
 
 pytestmark = pytest.mark.integration
@@ -514,6 +516,59 @@ def test_versions_of_a_provision_path_resolve_to_its_section(client):
     assert len(_fixture_versions(body)) == 1
 
 
+# ------------------------------------------------------------------------ titles
+
+
+def _in_code_order(nums: list[str]) -> bool:
+    """Deliberately *not* `storage.postgres.title_sort_key`.
+
+    This file is the contract the XCiteDB repository will have to satisfy too, and
+    a test that imports the implementation's own comparator passes whenever the
+    two share a bug. Spelled out here, it is an independent check — and short
+    enough that being independent costs nothing.
+    """
+    keyed = [(int(re.match(r"\d+", n).group()), n.lstrip("0123456789")) for n in nums]
+    return keyed == sorted(keyed)
+
+
+def test_titles_are_listed_in_the_codes_own_order(client):
+    """Not string order. `Title.num` is a string, so the obvious `ORDER BY` gives
+    `1, 10, 11, 11a, 12, … 2, 20` — the first thing a visitor saw on the front
+    page. Asserted as a property rather than a fixed list, because which titles
+    are loaded changes as the corpus grows.
+    """
+    nums = [t["num"] for t in client.get(f"{API}/titles").json()]
+
+    assert nums, "no titles loaded"
+    assert _in_code_order(nums)
+    assert nums[0] == "1"
+    # The one comparison string order gets wrong at the very top of the list.
+    if "2" in nums:
+        assert nums.index("2") < nums.index("10")
+
+
+def test_an_appendix_title_follows_its_parent(client):
+    """Gotcha 7: `5a` is a separate title, and it belongs between `5` and `6` —
+    not at the end of the list, which is where a string sort puts it."""
+    nums = [t["num"] for t in client.get(f"{API}/titles").json()]
+    appendices = [n for n in nums if not n.isdigit()]
+    if not appendices:
+        pytest.skip("no appendix titles loaded")
+
+    for appendix in appendices:
+        parent = appendix.rstrip("abcdefghijklmnopqrstuvwxyz")
+        if parent in nums:
+            assert nums.index(parent) == nums.index(appendix) - 1, appendix
+
+
+def test_ingested_titles_are_ordered_too(client):
+    """The same list, reached by a different route (`/app/releases` renders it),
+    and so the same bug — `ingested_titles` is the unpadded form."""
+    for release in client.get(f"{API}/releases").json():
+        held = release["ingested_titles"]
+        assert _in_code_order(held), release["label"]
+
+
 # ---------------------------------------------------------------------- releases
 
 
@@ -669,3 +724,106 @@ def test_an_ordinary_section_has_no_duplicates(client):
     body = client.get(f"{API}{SECTION}?release={CURRENT}").json()
 
     assert body["duplicates"] == []
+
+
+# --------------------------------------------------------------------- citation
+
+
+def test_a_typed_citation_resolves_to_its_identifier(client):
+    body = client.get(f"{API}/citation", params={"q": "16 usc 45f(c)(5)"}).json()
+
+    assert body["identifier"] == DEMO
+    assert body["section_identifier"] == SECTION
+    assert body["subdivisions"] == ["c", "5"]
+    assert body["exists"] is True
+    assert body["heading"] == "Mineral King Valley addition authorized"
+
+
+def test_the_written_forms_all_reach_the_same_place(client):
+    """The parser's own table is unit-tested without a database
+    (`tests/test_citeparse.py`); this checks the wiring — that each form
+    survives the query string, the route and the existence lookup."""
+    for form in (
+        "16 usc 45f",
+        "16 U.S.C. § 45f",
+        "section 45f of title 16",
+        "16/45f",
+        "/us/usc/t16/s45f",
+    ):
+        body = client.get(f"{API}/citation", params={"q": form}).json()
+        assert body["section_identifier"] == SECTION, form
+        assert body["exists"] is True, form
+
+
+def test_a_citation_honours_the_release_point(client):
+    body = client.get(
+        f"{API}/citation", params={"q": "16 usc 45f", "release": PRIOR}
+    ).json()
+
+    assert body["release"]["label"] == PRIOR
+    assert body["exists"] is True
+
+
+def test_text_that_is_not_a_citation_is_a_422(client):
+    """Malformed request, not a missing resource — and the detail names the
+    forms that would have worked."""
+    response = client.get(f"{API}/citation", params={"q": "not a citation"})
+
+    assert response.status_code == 422
+    assert "11 usc 523" in response.json()["detail"]
+
+
+def test_a_bare_section_number_is_refused_rather_than_guessed(client):
+    """`523` names a section of *some* title. Picking one would be a guess
+    presented as an answer."""
+    assert client.get(f"{API}/citation", params={"q": "523"}).status_code == 422
+
+
+def test_a_citation_naming_nothing_is_an_answer_not_an_error(client):
+    """Title 99 does not exist and never will, but "no such thing" is a
+    well-formed reply — the reader gets told which part was wrong."""
+    response = client.get(f"{API}/citation", params={"q": "99 usc 1"})
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["identifier"] == "/us/usc/t99/s1"
+    assert body["exists"] is False
+
+
+def test_an_appendix_citation_explains_why_it_cannot_resolve(client):
+    """OLRC publishes appendix titles under the enacting instrument, so
+    `/us/usc/t5a/s3` is a well-formed identifier that nothing is stored at
+    (`tests/test_citeparse.py` counts it: 0 of 461). A bare "not found" would
+    read as a bug in the parser; the message says what actually happened."""
+    body = client.get(f"{API}/citation", params={"q": "5 U.S.C. App. 3"}).json()
+
+    assert body["identifier"] == "/us/usc/t5a/s3"
+    assert body["exists"] is False
+    assert body["message"] is not None
+    assert "enacted" in body["message"]
+
+
+def test_a_typed_hyphen_finds_the_en_dash_identifier(client):
+    """OLRC writes section numbers with an EN DASH (`/us/usc/t16/s45a–1`) and no
+    keyboard has that key. 5,697 of the corpus's 65,938 sections contain one;
+    none contains a plain hyphen. Typing the citation the ordinary way has to
+    work, and the reader has to be redirected to the identifier that exists —
+    not the one they typed, which would 404 on arrival."""
+    body = client.get(f"{API}/citation", params={"q": "16 usc 45a-1"}).json()
+
+    assert body["exists"] is True
+    assert body["identifier"] == "/us/usc/t16/s45a–1"
+
+
+def test_a_structural_node_is_found_rather_than_reported_missing(client):
+    """`labels()` answers about sections, so a chapter came back `exists: false`
+    while sitting in the database. Structure goes to `get_toc`."""
+    chapter = client.get(f"{API}/citation", params={"q": "16 usc ch. 1"}).json()
+    title = client.get(f"{API}/citation", params={"q": "title 16"}).json()
+
+    assert chapter["identifier"] == "/us/usc/t16/ch1"
+    assert chapter["kind"] == "structure"
+    assert chapter["exists"] is True
+    assert title["identifier"] == "/us/usc/t16"
+    assert title["kind"] == "title"
+    assert title["exists"] is True

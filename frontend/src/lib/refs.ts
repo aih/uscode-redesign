@@ -26,6 +26,11 @@ export interface ResolvedRef {
   href: string | null;
   /** Hover text from the batched label lookup; `null` when there is none. */
   title: string | null;
+  /** The US Code identifier this reference names, for internal refs only.
+   * `null` for govinfo links and for anything that did not resolve — the
+   * preview island keys off this, and there is nothing here to preview of a
+   * provision published somewhere else. */
+  identifier: string | null;
 }
 
 const STATUTE = /^\/us\/stat\/(\d+)\/(\d+)/u;
@@ -39,13 +44,21 @@ export function resolveRef(href: string, release: string | null, labels: Labels)
   if (href.startsWith("/us/usc/")) {
     const identifier = href.split(/[?#]/u)[0];
     const entry: Entry | undefined = labels[identifier];
-    return { href: appHref(identifier, release), title: entry ? labelText(entry) : null };
+    return {
+      href: appHref(identifier, release),
+      title: entry ? labelText(entry) : null,
+      identifier,
+    };
   }
 
   const statute = STATUTE.exec(href);
   if (statute) {
     const [, volume, page] = statute;
-    return { href: `https://www.govinfo.gov/link/statute/${volume}/${page}`, title: null };
+    return {
+      href: `https://www.govinfo.gov/link/statute/${volume}/${page}`,
+      title: null,
+      identifier: null,
+    };
   }
 
   const publicLaw = PUBLIC_LAW.exec(href);
@@ -55,18 +68,23 @@ export function resolveRef(href: string, release: string | null, labels: Labels)
       return {
         href: `https://www.govinfo.gov/link/plaw/${congress}/public/${num}`,
         title: null,
+        identifier: null,
       };
     }
   }
 
   // Pre-104th-Congress public laws, `/us/act/…`, and anything else this site
   // does not serve: a link this site cannot resolve is text, not a 404.
-  return { href: null, title: null };
+  return { href: null, title: null, identifier: null };
 }
 
 function labelText(entry: Entry): string {
+  // `num` arrives from the source as `§ 688.`, section symbol included — so
+  // adding one produced `§ § 688.` on every citation's hover text. Add the
+  // symbol only when the source did not.
   const num = trimNum(entry.num);
-  return [num ? `§ ${num}.` : null, entry.heading]
+  const labelled = num && !num.startsWith("§") ? `§ ${num}` : num;
+  return [labelled ? `${labelled}.` : null, entry.heading]
     .filter((part): part is string => Boolean(part))
     .join(" ");
 }

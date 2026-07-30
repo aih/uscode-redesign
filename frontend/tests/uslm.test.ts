@@ -71,6 +71,70 @@ describe("references (ADR-0015 decision 3)", () => {
   });
 });
 
+describe("preview hooks (ADR-0024)", () => {
+  const internal = `<section ${NS}><p><ref href="/us/usc/t16/s1">section 1</ref></p></section>`;
+
+  it("marks an internal reference with the identifier the card should fetch", () => {
+    const html = render(parseFragment(internal), {
+      target: null,
+      release: "119-99",
+      labels: {},
+    });
+
+    // The identifier, not the href: the island never has to un-prefix `/app`.
+    expect(html).toContain('data-cite="/us/usc/t16/s1"');
+    expect(html).toContain('data-cite-release="119-99"');
+  });
+
+  it("keeps title= alongside it", () => {
+    // `title` is the no-JavaScript fallback, what a screen reader announces
+    // (the card is aria-hidden), and what a touch device shows — the card never
+    // opens there by design. Removing it would be a regression on three fronts.
+    const labels: Labels = {
+      "/us/usc/t16/s1": {
+        identifier: "/us/usc/t16/s1",
+        level: "section",
+        num: "1",
+        heading: "Short title",
+      },
+    };
+    const html = render(parseFragment(internal), {
+      target: null,
+      release: "119-99",
+      labels,
+    });
+
+    expect(html).toContain('title="§ 1. Short title"');
+    expect(html).toContain("data-cite=");
+  });
+
+  it("omits the release when the page is not pinned to one", () => {
+    const html = render(parseFragment(internal), {
+      target: null,
+      release: null,
+      labels: {},
+    });
+
+    expect(html).toContain('data-cite="/us/usc/t16/s1"');
+    expect(html).not.toContain("data-cite-release");
+  });
+
+  it("never marks a govinfo link — there is nothing here to preview", () => {
+    const xml = `<section ${NS}><p><ref href="/us/stat/100/1">100 Stat. 1</ref></p></section>`;
+    const html = render(parseFragment(xml), { target: null, release: "119-99", labels: {} });
+
+    expect(html).toContain("govinfo.gov");
+    expect(html).not.toContain("data-cite");
+  });
+
+  it("never marks an unresolvable reference, which is not a link at all", () => {
+    const xml = `<section ${NS}><p><ref href="/us/act/1917-05-18">the Act</ref></p></section>`;
+    const html = render(parseFragment(xml), { target: null, release: "119-99", labels: {} });
+
+    expect(html).not.toContain("data-cite");
+  });
+});
+
 describe("structure", () => {
   it("highlights the requested provision with the .target class", () => {
     const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><subsection identifier="/us/usc/t16/s45f/a"><content>text</content></subsection></section>`;

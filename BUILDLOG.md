@@ -547,3 +547,108 @@ Session-by-session record of how this site was built. One entry per working sess
 - The six count mismatches stay in every `verify` run by design (ADR-0021).
 - `DuplicateOccurrence.guid` repeats the section's guid: `guid_map` holds one row per (identifier, release) and cannot tell the occurrences apart. The source's ambiguity, not ours to invent around.
 - Deploy is still the blocker for everything public (ADR-0020) — it needs an IAM identity that can create EC2/IAM, and a domain.
+
+---
+
+## 024 — 2026-07-29/30 — Session 10: the UI refresh before the deploy
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Review the repo before deploying to AWS and prepare a UI update. Evaluate **Appica**, a React component library the owner was leaning toward, plus reasonable alternatives that are mobile-first, accessible by default, and strong on text display. Then plan and build four things: (1) order the Titles numerically — the front page listed `1, 10, 11, … 2, 20`; (2) let a reader reach any provision by typing a citation (`11/523`, `11 usc 523`, `11 usc 523(1)(B)(ii)`), using parsing rules from the `versions` directory or GovTrack-style prior art; (3) a scrollable hover tooltip showing the text of any referenced provision, with testing planned so it is robust; (4) stop the menu, breadcrumbs, section number and navigation scrolling away.
+
+- **Decided:**
+  - **Keep USWDS; add no client framework (ADR-0022).** Appica was measured, not impressioned: `@appica/ui-react` is **v1.0.0, the only version ever published** (2026-07-09), its GitHub repo's last push was 61 minutes after its creation, and it gets **1,124 weekly downloads** against Base UI's 7.65M and USWDS's 68K. It requires React 19 + Tailwind 4 and pins pre-release deps inside a 1.0.0. Its components are genuinely apt — Preview Card is exactly requirement 3 — but the blocker is local: `lib/uslm.ts` renders statutory text to an **HTML string** consumed by `set:html`, so a React card cannot wrap a `<ref>` without rewriting the one module architecture rule 5 designates as the sole presentation layer. Its ideas were adopted and its code was not; the whole refresh cost one ~3 KB island. (Dark mode, the feature on the Appica page that prompted the evaluation, already existed in `site.scss`.)
+  - **Titles order numerically, and the ordering is the Repository's contract (ADR-0025).** `Title.num` is a `String` and has to be — `5a` is a title and `5` is a different one — so `ORDER BY` collated it as text. Sorting moved to an explicit `title_sort_key`, and the guarantee is documented on the protocol so the XCiteDB port inherits it rather than rediscovering the bug.
+  - **Citations parse server-side, in a pure module (ADR-0023).** `citeparse.py` imports no storage, db, fastapi or sqlalchemy — enforced by `test_architecture.py` — which is what lets its 84-case accepted-forms table run in `make test` with no corpus. `GET /api/v1/citation` adds existence via the batched `labels()` already built for hover text: no new `Repository` method. Three failures get three answers — 422 for "not a citation", 200 + `exists:false` for "names nothing here", and a specific `message` for what this site structurally cannot resolve. The reader's box is a plain GET form; an e2e test runs it with JavaScript disabled.
+  - **Previews render server-side as HTML fragments (ADR-0024).** `/app/preview/…` is an Astro *endpoint* — a page would get a `<!DOCTYPE>` prepended — rendered by the same `lib/uslm.ts` as the section page, so **no USLM renderer reaches the browser**. The card is `popover` + CSS anchor positioning with a measured fallback for Safari 18.2–18.3. WCAG 2.1 SC 1.4.13's three clauses are three named mechanisms with three named tests. The card is `aria-hidden` (it duplicates the link's `title`; the rejected `aria-describedby` alternative is recorded). Touch navigates — the feature is gated on `(hover: hover) and (pointer: fine)`.
+  - **The sticky stack is one `.topbar`**, whole on desktop and one 44px row on a phone, where the forced-open nav plus wrapping breadcrumbs would otherwise eat ~280px of a 660px viewport.
+
+- **Produced:** `58c0f26` (title order), `d35f562` (sticky chrome), `4a3c957` (citation jump), `aeab9c5` (hover preview), plus this entry, ADR-0022/0023/0024/0025, a CI `e2e` job, and regenerated `docs/screenshots/`. New: `citeparse.py`, `frontend/src/lib/preview.ts`, `SectionBar.astro`, `CitationJump.astro`, `CitePreview.astro`, `pages/goto.astro`, `pages/preview/[...identifier].ts`, `frontend/tests/e2e/`. Deleted: `NavStrip.astro`, folded into `SectionBar`.
+
+- **Verified:** `make test` **384** (was 273) · `make test-web` **60** (was 42) · `make test-e2e` **40** (new) · `astro check` 0 errors · `make shots` regenerated at 375px and 1280px.
+  - Title order live: `curl -s localhost:8000/api/v1/titles | jq -r '.[].num'` → `1 2 3 4 5 5a 6 … 11 11a 12 … 50 50a 51 52 54`.
+  - Sticky geometry measured at 375/700/1000/1280: the bar pins, and both a deep link and an in-page anchor jump land clear of it.
+  - Citation box: `curl -sI 'localhost:8000/app/goto?q=16+USC+45f(c)(5)'` → 307 to `/app/us/usc/t16/s45f/c/5`.
+
+### Seven bugs found by building it — four of them already live
+
+1. **A typed hyphen matched nothing.** OLRC writes section numbers with an **EN DASH** — `/us/usc/t16/s45a–1`, U+2013 — and **5,697 of the 65,938 loaded sections contain one while not a single section contains a plain hyphen**. No keyboard has that key, so `42 USC 2000e-2` was unresolvable. The parse now carries dash variants and the batched lookup tries all of them for the price of one.
+2. **A raw en dash in a `Location:` header is a crash**, not a wobble: a header value is a ByteString and Node throws. Both redirects in the app 500'd on those ~8.6% of sections — including the **pre-existing `?id=` guid lookup**, which had been broken for them since Session 7. Fixed in `url.ts`, so every href builder encodes.
+3. **Every section page drew all three Watch buttons at once** — "Add", "Remove" and "Log in" together, for every visitor, since Day 5. USWDS's `.usa-button { display: inline-block }` is an author rule and beats the UA stylesheet's `[hidden] { display: none }`. The island had been correct all along.
+4. **`title="§ § 688."`** on every citation's hover text: `num` arrives from the source as `§ 688.`, symbol included, and `refs.ts` added another. The same mistake appeared independently in the new section bar.
+5. **`make shots` had silently stopped working.** Since the Day-5 islands landed the reader never goes network-idle, so `waitUntil: "networkidle"` timed out on every page — which is why `docs/screenshots/` still showed the pre-Day-5 layout.
+6. `11 USC ch. 5` and `title 11` reported `exists: false` while sitting in the database: `labels()` answers about sections, so structure now goes to `get_toc`.
+7. **Previews never scrolled.** The 1,400-character budget was smaller than the card's own 22rem, making the scroll area decoration and cutting every preview off mid-thought. Raised to 4,000.
+
+`--sticky-h` drifted twice in one session — 224px → 280px when the citation box added a row — and each time the symptom was a deep-linked provision rendering *behind* the bar. It is now asserted against the measured stack in the e2e suite rather than trusted to memory.
+
+### Open after this session
+
+- **Appendix titles remain unreachable by citation.** `5 U.S.C. App. 3` parses to `/us/usc/t5a/s3` and OLRC publishes nothing there: **0 of 461 appendix sections** use the flat form — they are `/us/usc/t5a/pl/92/463/s1` (public law) or `/us/usc/t50a/act/1917-05-18/ch15/s212` (act by date). The API says so specifically rather than returning a bare "not found". Closing it needs a citation-to-enacting-instrument table this project does not have; inventing one silently would be worse than the gap.
+- **The preview endpoint is unauthenticated and fans out per hovered citation.** Hover intent, a per-page cache and `AbortController` hold it down, and it is far cheaper than the diff — but the standing "rate-limit before advertising the URL" debt now covers two routes, not one.
+- **A pre-existing rendering defect, untouched:** USLM `<date>` renders as a block, so "November 10, 1978" breaks onto its own line mid-sentence throughout the notes. One entry in `uslm.ts`'s inline-tag set, deliberately left out of a scoped refresh.
+- `docs/ui-improvements-plan-unapproved.md` is untracked and not this session's work.
+- Deploy is still the blocker for everything public (ADR-0020) — it needs an IAM identity that can create EC2/IAM, and a domain.
+
+## 025 — 2026-07-30 — Session 11: light by default, a readable redline, and what a release point changed
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Three things, in the order they arrived: (1) *why is the app in dark mode?* — make light the default and let the reader toggle to dark; (2) render diffs in XML/HTML, don't show the markup; (3) on the Release Points page, list the titles affected in a column, and drop "Titles held here" as redundant with "Titles changed".
+
+- **Decided:**
+  - **Light at every OS setting; dark is a control, not a media query (ADR-0027).** The palette was gated on `prefers-color-scheme`, and most laptops say dark — so most visitors got the United States Code light-on-black without asking, with no way out. Dark now hangs off `<html data-theme="dark">`, set by a ~700-byte island and remembered in `localStorage`. **Not a cookie:** every reader response is cached (ADR-0018) and identical for everyone; a theme cookie would put `Vary: Cookie` on the whole site to record a colour preference. A blocking inline `<head>` script stamps the attribute before first paint, so a dark reader never sees a white flash — and light, the default, pays for no script at all.
+  - **The reader's diff shows the reading text; the API keeps the XML (ADR-0026, amending ADR-0016).** The old page printed the source redline, which for two release points of an *untouched* section is hundreds of struck-and-reinserted `@id`s — guids regenerate at every RP by design (gotcha 1). Now both versions are turned into lines a reader reads (`uslm.readingBlocks`) and those are diffed (`lib/diffdoc.ts`): lines aligned first (each distinct line encoded as one character), then a deleted line paired with an inserted one and diffed **word by word**, because a character diff of `$5,000,000` → `$7,500,000` strikes `5,0` and inserts `7,5`. A pair that shares less than 40% of the longer line is *not* merged — showing an edit that never happened is worse than showing both texts. It is computed in the frontend because deciding where a line of statutory text ends is a USLM question, and `lib/uslm.ts` is the only module outside the parsers allowed to ask one (architecture rule 5).
+  - **"Titles changed" names the titles and links each one** to that title *at that release point* — the question the page exists to answer. The old second column counted `ingested_titles`, which mattered while the backfill ran and became a second copy of the same number when it finished (3,153 of 3,153). The distinction it protected is kept where it still bites: a title OLRC republished that this database does not hold is marked per row (grey, `†`), instead of being inferred by comparing two totals.
+  - **The toggle shares a flex row with the citation box** (`.navtools`), which is geometry rather than taste: a second block in the navbar adds ~44px to the sticky stack between 40em and 64em, and `--sticky-h` is what `scroll-margin-top` spends. Measured before and after at 700px: top bar 280px, token 288px, unchanged.
+
+- **Produced:** ADR-0026, ADR-0027, this entry. New: `frontend/src/lib/diffdoc.ts`, `frontend/src/components/ThemeToggle.astro`, `frontend/tests/diffdoc.test.ts`, `frontend/tests/e2e/theme.spec.ts`. Changed: `site.scss` (light default + a dark block that covers what USWDS actually paints), `uslm.ts` (`readingBlocks`), `url.ts` (`unpadTitle`, `compareTitles`, `apiDiffHref`), `Base.astro`, `SiteHeader.astro`, `pages/diff/[...identifier].astro`, `pages/releases.astro`. One dependency: `diff-match-patch` (npm), server-side only — the same algorithm as the Python side, so the two redlines stay comparable.
+
+- **Verified:** `make test` **384**, unchanged (nothing Python moved) · `make test-web` **78** (was 60) · `make test-e2e` **44** (was 40) · `astro check` 0 errors.
+  - The headline diff case, live against the loaded corpus: `/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101` → *"The text of this section is identical at both release points."* The same URL previously rendered a wall of guid churn.
+  - A real amendment reads as one: `/app/diff/us/usc/t16/s1531?from=117-327not263&to=119-99` → "2 lines changed", one of them `…note under section ~~14~~1013 of ~~the Federal Advisory Committee Act in the Appendix to~~ Title 5`.
+  - Theme, in a browser with the OS set to dark for every assertion: body background `rgb(255,255,255)` on first load; the toggle goes both ways; the choice survives a navigation and is stamped by the head script; the top bar still fits inside `--sticky-h`.
+  - Screenshots taken at 375/700/1280 in both themes before and after each fix.
+
+### Found while building it
+
+1. **The dark palette only ever coloured four things.** `body`, the header, the footer element and links — while USWDS paints its inputs, selects, tables and summary boxes white *explicitly*, and puts the footer's colour on `.usa-footer__primary-section`/`__secondary-section` rather than on `.usa-footer`. So dark mode had a white slab for a footer and a glowing citation box. The `<select>` chevron is a background SVG drawn in ink: on a dark field it was a dark arrow on a dark background, so it is repainted rather than hidden.
+2. **A note can be an entire Executive Order**, and USLM marks its paragraphs with `<p>` — which was not in the line-breaking set, so E.O. 13648 came out as *one* line and a three-word amendment inside it redlined as a wall of text. Fixed and tested.
+3. **The source is free to put no whitespace between `<num>` and its `<chapeau>`**, which turned `(a)` + `Whoever—` into `(a)Whoever—`. Text extraction now joins block-level children with a space and inline ones (`<i>`, `<ref>`, `<sup>`) without, so `10<sup>3</sup>` stays one token.
+4. **The citation box wrapped its own "Go" button onto a second line** once the toggle joined its row at 1280px — the navbar silently grew a row, which in the sticky band is `--sticky-h` drifting again. Held to one line at ≥64em.
+
+### Open after this session
+
+- **The rendered redline drops `<ref>` links**, so a changed cross-reference is text rather than a link with a hover preview. The section pages either side of the diff still have both.
+- **A whitespace-only change is now invisible** in the reader's diff, because the text is normalized before diffing. Between two release points of a statute that is the right trade; it is still a deliberate blind spot.
+- **The API's diff endpoint is still unauthenticated and CPU-bound** (`docs/verification/loadtest.json`) and still must be rate-limited before the URL is advertised. The reader no longer calls it, which moves the reader's cost off it but changes nothing about the endpoint.
+- **`docs/verification/loadtest.json` is now stale for `/app/diff`**, which does two section fetches and a text diff instead of one API call. Worth re-running before deploy.
+- The `<date>`-renders-as-a-block defect from Session 10 is still open, still one line in `uslm.ts`'s inline set.
+
+## 026 — 2026-07-30 — Session 12: search, made to run and made to know about versions
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** *The app is not showing. Another agent made changes to add search. Please review the deployment status and get the app running locally.* Then, once it ran: hold off on a full index; make partial indexing happen as the database is updated; fix the ADR number collision; fix search's versioning so the **current** text of a provision is what a search returns by default; commit and rebase onto the frontend branch.
+
+- **Why nothing was showing.** Three independent breakages in one commit, only the last of which was about search:
+  - `main.py` imports `api.search` → `storage.search` → `opensearchpy`. The dependency was in `pyproject.toml` and `uv.lock` but not in the built image, so **uvicorn died at import before binding a port**. Every route that wasn't `/app/*` returned nothing — the site was down, not search.
+  - The `opensearch` service was added to compose and **never started**; started, it **exited 1 at every boot**. OpenSearch's security plugin rejects `Uscode_Search_Admin_123!` as *"Password is similar to user name"* because it contains "admin". The single line saying so was in a container log.
+  - The frontend image predated `search.astro`, so `/app/search` was a 404.
+
+- **Decided:**
+  - **The index unit is the deduped section version, and the default search returns only the text in force (ADR-0028).** A section amended four times has four documents, all matching the same query; the first cut had nothing to tell them apart, so a search for "conservation" returned the same provision several times over, ranked against itself. Every document now carries `is_current` and the default filters on it. `?release=`/`?date=` swap that for `first_release_seq <= seq` plus a `collapse` on `identifier` — the newest text at or before the release asked for, which is the rule the Repository already applies to a release point that was never ingested (gotcha 10). Labels resolve through `Repository.resolve_release`, so `119-102` disambiguates here exactly as on a section page, and no SQL entered a handler.
+  - **Ordering is `release_points.seq`, never a row id.** The draft filtered on `release_id`, a primary key — insertion order, which orders nothing, and release labels do not sort lexically either (gotcha 4).
+  - **The index is maintained incrementally.** A new version is indexed current; the section's previous versions are retired with a partial update that does not resend the text; **text a release republished unchanged writes nothing at all** — 91% of the corpus (ADR-0007). So a release point costs an index write per section it actually changed, not per section in the title. Writes happen *after* the transaction commits, so a rollback cannot leave the index advertising a section the database has not got, and current-ness is decided against the newest **completed** load of that title — the same `seq` gate `structure_nodes` uses, so loading an old release point after a newer one does not relabel superseded text as in force.
+  - **Renumbered to ADR-0028, not "0018a".** A letter suffix reads as an amendment to the ADR it hangs off, and search amends nothing about cache policy. 0022–0027 went to the UI refresh while this was in flight, so it landed at 0028.
+
+- **Two bugs the draft would have shipped:**
+  - `reindex_search` read `SectionVersion.section` behind a `hasattr` guard, but **`db/models.py` declares no ORM relationships at all** — so the guard was always false, every section would have indexed as `identifier="unknown"`, and since `_id` was `f"{identifier}_{release_id}"` they would have collapsed into **one document per release**. It also called `.all()` over 490k rows and 3.5 GB of XML before indexing anything. Both passes now stream.
+  - Every search result linked to `/us/usc/${identifier}` — but the identifier already *is* `/us/usc/…`, so every link on the page pointed at `/us/usc//us/usc/t16/s3831`. **The test fixture is why this passed CI:** it asserted an identifier of `"t16/s1"`, a shape the index never holds.
+
+- **Produced:** ADR-0028, this entry, and commits `7235afe` (opensearch boots), `ce6268a` (versioned index, current by default), `365de5c` (result links + release context in the page), `87a01a7` (renumber). New: `tests/test_search_sync.py`. Rebased onto `feature/ui-refresh-title-order`; the one conflict was `SiteHeader.astro`, where search's new nav block met Session 11's `.navtools` row — resolved **into** that row, because a second block in the nav is ~44px on `--sticky-h` and that token is what `scroll-margin-top` spends.
+
+- **Verified:** `make test` 401 passed (384 + 17 new), `make test-web` 78 passed, full stack up under `docker compose` with all five services healthy. Search checked end to end at both surfaces: default reports *"searching the law currently in force"*, `?release=119-99` reports the release and marks each result *"unchanged since"*, an unknown label is 404, an unreachable cluster is 503.
+
+- **Open, and deliberately so:**
+  - **The index is a 4,000-document smoke slice**, not the corpus — a full build was explicitly deferred. `python -m ingest.reindex_search --recreate` builds the 66k current-text index the default query reads; `--all-versions` adds the 490k superseded ones that `?release=` needs to reach back. Until that runs, a point-in-time search answers from current text alone. The response names the release it searched, so this is visible rather than silent.
+  - **The search endpoint is unauthenticated and unthrottled**, now the third such route alongside `/diff` and `/preview`.
+  - **A section the source publishes twice under one identifier at one release (ADR-0021) shares a `_id`**, so the index keeps one of the two. Six title-releases are affected.
+  - `docs/adr/0018-keyword-and-vector-search.md`'s original text claimed a `release_id` filter that never worked; it is superseded rather than deleted, and ADR-0028 says why.

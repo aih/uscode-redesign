@@ -1,0 +1,128 @@
+---
+/**
+ * The compact row that stays put while the text scrolls — where you are and
+ * where you can go, in one line.
+ *
+ * This is `NavStrip`'s job plus the section's identity, folded together because
+ * they now live in the same sticky stack: rendering the prev/next strip *and* a
+ * sticky bar carrying prev/next would put the same two links on screen twice,
+ * a few pixels apart. `Neighbors` still sits at the bottom, where a reader who
+ * has finished a section is actually looking.
+ *
+ * Always rendered, never toggled on scroll. An IntersectionObserver that reveals
+ * this once the `h1` leaves the viewport would be slightly tidier and would cost
+ * the reader a script; the bar is one line either way, so it is simply always
+ * there. Nothing here is client-side.
+ *
+ * On a phone this is the *only* thing that sticks (see `site.scss`): the navbar
+ * and the breadcrumb trail scroll away, because at 375px they are ~110px of a
+ * ~660px viewport and the point of the exercise is reading.
+ *
+ * The arrows are labelled with `aria-label` rather than visually-hidden spans:
+ * USWDS's `.usa-sr-only` lives in `uswds-utilities`, which `site.scss`
+ * deliberately does not forward, and an icon link's accessible name is exactly
+ * what `aria-label` is for.
+ */
+import StatusBadge from "./StatusBadge.astro";
+import type { Entry } from "../lib/types";
+import { appHref, trimNum } from "../lib/url";
+
+interface Props {
+  /** The section this page is showing — its own num/heading/status. */
+  num?: string | null;
+  heading?: string | null;
+  status?: string | null;
+  previous?: Entry | null;
+  next?: Entry | null;
+  up?: Entry | null;
+  release?: string | null;
+}
+
+const {
+  num = null,
+  heading = null,
+  status = null,
+  previous = null,
+  next = null,
+  up = null,
+  release = null,
+} = Astro.props;
+
+/** `'§ 45f.'` → `'§ 45f'`. The section symbol comes from the source — `num` is
+ * literally `§ 45f.` — so this must not add one of its own; `§ § 45f` was the
+ * first thing the rendered page showed. */
+const label = trimNum(num);
+
+/** `'SUBCHAPTER VI—'` → `'SUBCHAPTER VI'`. USLM carries the trailing dash that
+ * separates a heading from its number in print, and the breadcrumb trail keeps
+ * it deliberately. Here there is one line for everything, so the dash is the
+ * first thing to go — it is punctuation joining this label to a heading that
+ * this row does not show. */
+function shortNum(entry: Entry | null): string {
+  return trimNum(entry?.num).replace(/[—–-]\s*$/u, "").trim();
+}
+
+const upLabel = shortNum(up);
+---
+
+<nav class="sectionbar" aria-label="Section">
+  <div class="sectionbar__inner">
+    {
+      previous ? (
+        <a
+          class="sectionbar__step"
+          href={appHref(previous.identifier, release)}
+          rel="prev"
+          aria-label={`Previous section, ${shortNum(previous)}`}
+        >
+          ←
+        </a>
+      ) : (
+        <span class="sectionbar__step sectionbar__step--off" aria-hidden="true">
+          ←
+        </span>
+      )
+    }
+
+    {/* The identity. `§ 523` never truncates; the heading gives up its tail
+        first, because a reader who has scrolled this far already knows what
+        they are reading and needs the number to stay legible. */}
+    <p class="sectionbar__id">
+      {label && <span class="sectionbar__num">{label}</span>}
+      {heading && <span class="sectionbar__heading">{heading}</span>}
+      {status && <StatusBadge status={status} />}
+    </p>
+
+    {
+      up && (
+        <a
+          class="sectionbar__up"
+          href={appHref(up.identifier, release)}
+          aria-label={`Up one level, to ${upLabel}`}
+        >
+          <span aria-hidden="true">↑</span>
+          <span class="sectionbar__up-label" aria-hidden="true">
+            {upLabel}
+          </span>
+        </a>
+      )
+    }
+
+    {
+      next ? (
+        <a
+          class="sectionbar__step"
+          href={appHref(next.identifier, release)}
+          rel="next"
+          aria-label={`Next section, ${shortNum(next)}`}
+        >
+          →
+        </a>
+      ) : (
+        <span class="sectionbar__step sectionbar__step--off" aria-hidden="true">
+          →
+        </span>
+      )
+    }
+  </div>
+</nav>

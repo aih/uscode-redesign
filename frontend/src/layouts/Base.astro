@@ -14,17 +14,31 @@ import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
+import SectionBar from "../components/SectionBar.astro";
 import type { Entry, Release } from "../lib/types";
 import "../styles/site.scss";
+
+/** What the compact sticky row shows — the section's identity and its exits.
+ * Supplied only by pages that *are* a place in the Code; the front page and the
+ * auth pages pass nothing and get no bar. */
+export interface Bar {
+  num?: string | null;
+  heading?: string | null;
+  status?: string | null;
+  previous?: Entry | null;
+  next?: Entry | null;
+  up?: Entry | null;
+}
 
 interface Props {
   title: string;
   crumbs?: Entry[];
   release?: string | null;
   picker?: { action: string; options: Release[]; selected: string } | null;
+  bar?: Bar | null;
 }
 
-const { title, crumbs = [], release = null, picker = null } = Astro.props;
+const { title, crumbs = [], release = null, picker = null, bar = null } = Astro.props;
 const hasContext = crumbs.length > 0 || picker !== null;
 ---
 
@@ -34,22 +48,53 @@ const hasContext = crumbs.length > 0 || picker !== null;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content="Any provision of the US Code, at any release point." />
+
+    {/* The theme, before first paint.
+
+        Light is the default for everyone (`site.scss`), so the common case
+        needs no script at all — this only matters for the reader who has
+        chosen dark, and for them it has to run *here*, blocking, in the head.
+        Anywhere later and they get a white flash on every navigation, which is
+        the one thing a dark theme exists to avoid.
+
+        Inline and tiny by necessity: an external module would be a network
+        round trip in front of the first paint of every page. */}
+    <script is:inline>
+      try {
+        const stored = localStorage.getItem("usc-theme");
+        if (stored === "dark" || stored === "light") {
+          document.documentElement.dataset.theme = stored;
+        }
+      } catch {
+        // No storage (private mode, blocked cookies) — the default stands.
+      }
+    </script>
   </head>
   <body>
     <a class="usa-skipnav" href="#main">Skip to main content</a>
 
-    <SiteHeader />
+    {/* One sticky stack, so scrolling statutory text never costs you the answer
+        to "where am I" or "as of when". Desktop keeps the whole thing; below
+        40em only `.sectionbar` inside it stays put and the rest scrolls away
+        (`site.scss`). Anything that sticks has to be paid for in
+        `--sticky-h`, which drives `scroll-margin-top` — otherwise a deep link
+        to a provision lands *behind* this. */}
+    <div class="topbar">
+      <SiteHeader />
 
-    {
-      hasContext && (
-        <div class="contextbar">
-          <div class="contextbar__inner">
-            <Breadcrumbs crumbs={crumbs} release={release} />
-            {picker && <ReleasePicker {...picker} />}
+      {
+        hasContext && (
+          <div class="contextbar">
+            <div class="contextbar__inner">
+              <Breadcrumbs crumbs={crumbs} release={release} />
+              {picker && <ReleasePicker {...picker} />}
+            </div>
           </div>
-        </div>
-      )
-    }
+        )
+      }
+
+      {bar && <SectionBar {...bar} release={release} />}
+    </div>
 
     <main id="main" class="reader-wrap">
       <slot />

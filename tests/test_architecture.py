@@ -13,7 +13,12 @@ from tests.conftest import REPO_ROOT
 
 API = REPO_ROOT / "api"
 STORAGE = REPO_ROOT / "storage"
-SHARED = [REPO_ROOT / "main.py", REPO_ROOT / "citation.py", REPO_ROOT / "params.py"]
+SHARED = [
+    REPO_ROOT / "main.py",
+    REPO_ROOT / "citation.py",
+    REPO_ROOT / "citeparse.py",
+    REPO_ROOT / "params.py",
+]
 
 
 def _imports(path: Path) -> set[str]:
@@ -143,4 +148,24 @@ def test_uslm_element_names_stay_out_of_extraction_code():
         if "quotedContent" in path.read_text()
         and str(path.relative_to(REPO_ROOT)) not in parsers
     ]
+    assert offenders == []
+
+
+def test_the_citation_parser_stays_pure():
+    """`citeparse` turns text into an identifier and answers nothing else.
+
+    It cannot tell you whether Title 11 § 523 exists — only what string names it
+    — and keeping it that way is what lets its whole accepted-forms table
+    (`tests/test_citeparse.py`, 79 cases) run in `make test` with no database,
+    no fixtures and no HTTP. The moment it imports `storage` to "just check",
+    that table needs a loaded corpus and stops being run.
+    """
+    forbidden = ("storage", "db", "fastapi", "sqlalchemy")
+    imports = _imports(REPO_ROOT / "citeparse.py")
+
+    offenders = sorted(
+        name
+        for name in imports
+        if any(name == bad or name.startswith(f"{bad}.") for bad in forbidden)
+    )
     assert offenders == []

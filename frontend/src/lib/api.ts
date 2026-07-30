@@ -7,6 +7,7 @@
 
 import { API } from "./url";
 import type {
+  Citation,
   Diff,
   Entry,
   Labels,
@@ -126,12 +127,32 @@ export async function fetchTitles(): Promise<Title[]> {
   return getJson<Title[]>("/api/v1/titles");
 }
 
+/** `11 usc 523(a)(1)` → the identifier it names, and whether it is there.
+ *
+ * Throws `ApiError(422)` when the text is not a citation at all; returns a body
+ * with `exists: false` when it is a citation naming something absent. The two
+ * are different answers and `/app/goto` shows them differently. */
+export async function lookupCitation(
+  query: string,
+  params: ReleaseParams = {},
+): Promise<Citation> {
+  return getJson<Citation>(`${API}/citation${qs({ q: query, ...params })}`);
+}
+
 /** The section's change timeline — the version page's own data (Day 4). */
 export async function fetchVersions(identifier: string): Promise<Versions> {
   return getJson<Versions>(`/api/v1/sections${identifier}/versions`);
 }
 
-/** A redline between two release points of the same section (Day 4). */
+/**
+ * The API's source-level redline: two release points diffed as verbatim XML
+ * (ADR-0016).
+ *
+ * The reader no longer renders this. `/app/diff` diffs the *reading text*
+ * instead (ADR-0026) and links to this endpoint for anyone who wants the
+ * bytes — so the client stays here, matching the API's surface, even though
+ * the page it was written for stopped calling it.
+ */
 export async function fetchDiff(identifier: string, from: string, to: string): Promise<Diff> {
   return getJson<Diff>(`/api/v1/sections${identifier}/diff${qs({ from, to })}`);
 }

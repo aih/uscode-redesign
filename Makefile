@@ -1,5 +1,5 @@
 .PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
-        verify verify-deep load-all shots loadtest
+        verify verify-deep load-all shots loadtest test-e2e
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -54,6 +54,15 @@ test:
 # this is where reader coverage lives — CI must run both.
 test-web:
 	cd frontend && npm install && npm test
+
+# What only a browser can answer (Session 10): hover timers and the three WCAG
+# 1.4.13 clauses of the citation preview, `position: sticky` geometry, the
+# `scroll-margin-top` that keeps a deep-linked provision out from behind the
+# sticky bar, and the citation box end to end. Needs the site running
+# (`make dev-all`) — it tests the deployed shape, two processes behind Caddy,
+# rather than a second and lying copy of it.
+test-e2e:
+	cd frontend && npm install && npx playwright test
 
 test-slow:
 	uv run pytest -m slow

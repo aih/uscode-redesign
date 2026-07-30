@@ -12,6 +12,7 @@ import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from api.diff import DiffOp
+from citeparse import ParsedCitation
 from storage import (
     GuidResolution,
     Neighbors,
@@ -350,6 +351,73 @@ class TitleOut(BaseModel):
             name=title.name,
             is_positive_law=title.is_positive_law,
             ingested_releases=list(title.ingested_releases),
+        )
+
+
+class CitationOut(BaseModel):
+    """What a typed citation resolved to — the parse, plus whether it is there.
+
+    `identifier` is the deepest thing the citation named; `section_identifier` is
+    the section containing it, and the one `exists` is about — a provision path
+    is extracted from the section's XML at request time (ADR-0001), so
+    `/us/usc/t11/s523/a/1` is never a row and could not be looked up directly.
+
+    `exists` is `False`, not a 404: "Title 99 has no section 1" is an *answer*,
+    and the reader that asked deserves to be told which part was wrong rather
+    than handed an error page.
+    """
+
+    query: str
+    identifier: str
+    section_identifier: str
+    title_num: str
+    section_num: str | None = None
+    subdivisions: list[str] = Field(default_factory=list)
+    kind: str
+    note: bool = False
+    et_seq: bool = False
+    exists: bool = False
+    #: Present when the target exists — what to show for it.
+    heading: str | None = None
+    num: str | None = None
+    release: ReleaseOut | None = None
+    #: Why a well-formed citation resolved to nothing, when there is something
+    #: specific to say. `None` when the answer needs no explaining.
+    message: str | None = None
+
+    @classmethod
+    def of(
+        cls,
+        parsed: ParsedCitation,
+        query: str,
+        *,
+        entry: TocEntry | None = None,
+        actual: str | None = None,
+        release: ReleaseRef | None = None,
+        message: str | None = None,
+    ) -> "CitationOut":
+        # `actual` is the spelling that was found, which need not be the one
+        # typed: OLRC writes section numbers with an EN DASH, so `2000e-2`
+        # resolves to `/us/usc/t42/s2000e–2`. The reader must be sent to the
+        # identifier that exists, not the one they typed, or the redirect 404s.
+        section = actual or parsed.section_identifier
+        identifier = section + "".join(f"/{part}" for part in parsed.subdivisions)
+
+        return cls(
+            message=message,
+            query=query,
+            identifier=identifier,
+            section_identifier=section,
+            title_num=parsed.title_num,
+            section_num=parsed.section_num,
+            subdivisions=list(parsed.subdivisions),
+            kind=parsed.kind,
+            note=parsed.note,
+            et_seq=parsed.et_seq,
+            exists=entry is not None,
+            heading=entry.heading if entry else None,
+            num=entry.num if entry else None,
+            release=ReleaseOut.of(release) if release else None,
         )
 
 
