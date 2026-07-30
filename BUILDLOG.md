@@ -622,3 +622,33 @@ Session-by-session record of how this site was built. One entry per working sess
 - **The API's diff endpoint is still unauthenticated and CPU-bound** (`docs/verification/loadtest.json`) and still must be rate-limited before the URL is advertised. The reader no longer calls it, which moves the reader's cost off it but changes nothing about the endpoint.
 - **`docs/verification/loadtest.json` is now stale for `/app/diff`**, which does two section fetches and a text diff instead of one API call. Worth re-running before deploy.
 - The `<date>`-renders-as-a-block defect from Session 10 is still open, still one line in `uslm.ts`'s inline set.
+
+## 026 — 2026-07-30 — Session 12: search, made to run and made to know about versions
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** *The app is not showing. Another agent made changes to add search. Please review the deployment status and get the app running locally.* Then, once it ran: hold off on a full index; make partial indexing happen as the database is updated; fix the ADR number collision; fix search's versioning so the **current** text of a provision is what a search returns by default; commit and rebase onto the frontend branch.
+
+- **Why nothing was showing.** Three independent breakages in one commit, only the last of which was about search:
+  - `main.py` imports `api.search` → `storage.search` → `opensearchpy`. The dependency was in `pyproject.toml` and `uv.lock` but not in the built image, so **uvicorn died at import before binding a port**. Every route that wasn't `/app/*` returned nothing — the site was down, not search.
+  - The `opensearch` service was added to compose and **never started**; started, it **exited 1 at every boot**. OpenSearch's security plugin rejects `Uscode_Search_Admin_123!` as *"Password is similar to user name"* because it contains "admin". The single line saying so was in a container log.
+  - The frontend image predated `search.astro`, so `/app/search` was a 404.
+
+- **Decided:**
+  - **The index unit is the deduped section version, and the default search returns only the text in force (ADR-0028).** A section amended four times has four documents, all matching the same query; the first cut had nothing to tell them apart, so a search for "conservation" returned the same provision several times over, ranked against itself. Every document now carries `is_current` and the default filters on it. `?release=`/`?date=` swap that for `first_release_seq <= seq` plus a `collapse` on `identifier` — the newest text at or before the release asked for, which is the rule the Repository already applies to a release point that was never ingested (gotcha 10). Labels resolve through `Repository.resolve_release`, so `119-102` disambiguates here exactly as on a section page, and no SQL entered a handler.
+  - **Ordering is `release_points.seq`, never a row id.** The draft filtered on `release_id`, a primary key — insertion order, which orders nothing, and release labels do not sort lexically either (gotcha 4).
+  - **The index is maintained incrementally.** A new version is indexed current; the section's previous versions are retired with a partial update that does not resend the text; **text a release republished unchanged writes nothing at all** — 91% of the corpus (ADR-0007). So a release point costs an index write per section it actually changed, not per section in the title. Writes happen *after* the transaction commits, so a rollback cannot leave the index advertising a section the database has not got, and current-ness is decided against the newest **completed** load of that title — the same `seq` gate `structure_nodes` uses, so loading an old release point after a newer one does not relabel superseded text as in force.
+  - **Renumbered to ADR-0028, not "0018a".** A letter suffix reads as an amendment to the ADR it hangs off, and search amends nothing about cache policy. 0022–0027 went to the UI refresh while this was in flight, so it landed at 0028.
+
+- **Two bugs the draft would have shipped:**
+  - `reindex_search` read `SectionVersion.section` behind a `hasattr` guard, but **`db/models.py` declares no ORM relationships at all** — so the guard was always false, every section would have indexed as `identifier="unknown"`, and since `_id` was `f"{identifier}_{release_id}"` they would have collapsed into **one document per release**. It also called `.all()` over 490k rows and 3.5 GB of XML before indexing anything. Both passes now stream.
+  - Every search result linked to `/us/usc/${identifier}` — but the identifier already *is* `/us/usc/…`, so every link on the page pointed at `/us/usc//us/usc/t16/s3831`. **The test fixture is why this passed CI:** it asserted an identifier of `"t16/s1"`, a shape the index never holds.
+
+- **Produced:** ADR-0028, this entry, and commits `7235afe` (opensearch boots), `ce6268a` (versioned index, current by default), `365de5c` (result links + release context in the page), `87a01a7` (renumber). New: `tests/test_search_sync.py`. Rebased onto `feature/ui-refresh-title-order`; the one conflict was `SiteHeader.astro`, where search's new nav block met Session 11's `.navtools` row — resolved **into** that row, because a second block in the nav is ~44px on `--sticky-h` and that token is what `scroll-margin-top` spends.
+
+- **Verified:** `make test` 401 passed (384 + 17 new), `make test-web` 78 passed, full stack up under `docker compose` with all five services healthy. Search checked end to end at both surfaces: default reports *"searching the law currently in force"*, `?release=119-99` reports the release and marks each result *"unchanged since"*, an unknown label is 404, an unreachable cluster is 503.
+
+- **Open, and deliberately so:**
+  - **The index is a 4,000-document smoke slice**, not the corpus — a full build was explicitly deferred. `python -m ingest.reindex_search --recreate` builds the 66k current-text index the default query reads; `--all-versions` adds the 490k superseded ones that `?release=` needs to reach back. Until that runs, a point-in-time search answers from current text alone. The response names the release it searched, so this is visible rather than silent.
+  - **The search endpoint is unauthenticated and unthrottled**, now the third such route alongside `/diff` and `/preview`.
+  - **A section the source publishes twice under one identifier at one release (ADR-0021) shares a `_id`**, so the index keeps one of the two. Six title-releases are affected.
+  - `docs/adr/0018-keyword-and-vector-search.md`'s original text claimed a `release_id` filter that never worked; it is superseded rather than deleted, and ADR-0028 says why.
