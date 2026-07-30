@@ -11,6 +11,9 @@ it against a loaded database (`docker compose up -d db && make dev-data`).
 
 import os
 from pathlib import Path
+from unittest.mock import patch
+
+os.environ["DISABLE_SEARCH_SYNC"] = "1"
 
 import pytest
 
@@ -108,3 +111,13 @@ def fresh_client(loaded_database):
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def mock_search_sync():
+    """Mock search_sync functions for all tests so they don't hang trying to connect to OpenSearch."""
+    with patch("ingest.search_sync.create_indices"), \
+         patch("ingest.search_sync.sync_sections"), \
+         patch("ingest.search_sync.sync_structure_nodes"):
+        yield
+

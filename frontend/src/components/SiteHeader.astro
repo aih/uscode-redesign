@@ -35,6 +35,13 @@ import { APP } from "../lib/url";
           <a class="usa-nav__link" href="/docs"><span>API docs</span></a>
         </li>
       </ul>
+      <form class="usa-search usa-search--small" role="search" action={`${APP}/search`} method="get" style="margin-left: 1rem; margin-top: 0.5rem;">
+        <label class="usa-sr-only" for="search-field">Search</label>
+        <input class="usa-input" id="search-field" type="search" name="q" placeholder="Search the Code..." />
+        <button class="usa-button" type="submit">
+          <span class="usa-sr-only">Search</span>
+        </button>
+      </form>
     </nav>
   </div>
 </header>
