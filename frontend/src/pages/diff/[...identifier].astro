@@ -1,22 +1,35 @@
 ---
 /**
  * `/app/diff/…?from=&to=` — a redline between two release points of a section
- * (Day 4, docs/adr/0016).
+ * (Day 4, ADR-0016; rewritten in ADR-0026).
  *
- * The API diffs the verbatim XML — a generic text diff, no USLM vocabulary
- * involved (`api/diff.py`). This page's only job is presentation: wrap each
- * `insert`/`delete` chunk in `<ins>`/`<del>` and escape the rest, same as any
- * text node the section renderer emits. It is a source-level diff, like the
- * "Source XML" link already on every section page — not a word-level diff of
- * the rendered reading text (ADR-0016 names this simplification directly).
+ * **It used to show the XML.** The API diffs the two verbatim fragments, and
+ * this page escaped those ops and printed them — so a reader who asked what
+ * changed in § 45f got `<section identifier="…" id="id0b32…">` struck through
+ * and an identical element with a fresh guid inserted, because guids regenerate
+ * at every release point by design. The markup was the loudest thing on the
+ * page and the least informative.
+ *
+ * Now the page renders both versions as reading text (`uslm.readingBlocks`) and
+ * diffs *those* (`lib/diffdoc.ts`): the redline is of what the section says.
+ * The source-level redline has not gone anywhere — it is what the API serves,
+ * and it is linked at the foot of this page for anyone who wants the bytes.
+ *
+ * Two fetches rather than one call to `/sections/{id}/diff`, because the text
+ * diff is computed here: the USLM vocabulary needed to turn a fragment into
+ * lines a reader reads lives in `lib/uslm.ts` and nowhere else (architecture
+ * rule 5), which puts it on this side of the HTTP boundary.
  */
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
-import { ApiError, fetchDiff, fetchVersions } from "../../lib/api";
+import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { IMMUTABLE, REVALIDATE } from "../../lib/cache";
-import { appHref, trimNum, versionsHref } from "../../lib/url";
-import { escapeHtml } from "../../lib/uslm";
-import type { Diff } from "../../lib/types";
+import { documentDiff, diffLinesHtml } from "../../lib/diffdoc";
+import type { DocumentDiff } from "../../lib/diffdoc";
+import { apiDiffHref, appHref, trimNum, versionsHref } from "../../lib/url";
+import { parseFragment, readingBlocks } from "../../lib/uslm";
+import type { Section } from "../../lib/types";
+import { isToc } from "../../lib/types";
 
 // The route's own static prefix is "diff", not "us/usc" (unlike the
 // identifier catch-all page) — the captured param already carries "us/usc/…".
@@ -24,7 +37,8 @@ const identifier = `/${Astro.params.identifier ?? ""}`.replace(/\/+$/u, "");
 const from = Astro.url.searchParams.get("from");
 const to = Astro.url.searchParams.get("to");
 
-let diff: Diff | null = null;
+let before: Section | null = null;
+let after: Section | null = null;
 let failure: { status: number; detail: string } | null = null;
 
 if (!from || !to) {
@@ -32,7 +46,20 @@ if (!from || !to) {
   Astro.response.status = 400;
 } else {
   try {
-    diff = await fetchDiff(identifier, from, to);
+    const [a, b] = await Promise.all([
+      fetchIdentifier(identifier, { release: from }),
+      fetchIdentifier(identifier, { release: to }),
+    ]);
+    if (isToc(a) || isToc(b)) {
+      failure = {
+        status: 400,
+        detail: "That identifier is a table of contents, not a section. Diffs are per section.",
+      };
+      Astro.response.status = 400;
+    } else {
+      before = a;
+      after = b;
+    }
   } catch (error) {
     if (error instanceof ApiError) {
       failure = { status: error.status, detail: error.detail };
@@ -43,32 +70,40 @@ if (!from || !to) {
   }
 }
 
+let diff: DocumentDiff | null = null;
+if (before && after) {
+  diff = documentDiff(readingBlocks(parseFragment(before.xml)), readingBlocks(parseFragment(after.xml)));
+}
+
 // Both endpoints are named in the URL, so this redline is as fixed as the two
 // published texts it is drawn from — but only if each label resolved to itself.
 // A bare `119-102` resolving to `119-102not101` is a different release point
 // than the URL asked for, and the URL's meaning would change once `119-102`
 // existed, so those revalidate instead.
-const pinned = Boolean(diff && diff.from.release.label === from && diff.to.release.label === to);
+const pinned = Boolean(
+  before && after && before.release.label === from && after.release.label === to,
+);
 Astro.response.headers.set("Cache-Control", pinned ? IMMUTABLE : REVALIDATE);
 
 // The picker on this page reuses the section's own version list, so a reader
 // can pivot to a different pair without going back to the timeline page.
-const versions = diff ? await fetchVersions(identifier).catch(() => null) : null;
+const versions = after ? await fetchVersions(identifier).catch(() => null) : null;
 const entries = versions?.versions ?? [];
 
-function diffHtml(d: Diff): string {
-  return d.ops
-    .map((op) => {
-      const text = escapeHtml(op.text);
-      if (op.op === "insert") return `<ins>${text}</ins>`;
-      if (op.op === "delete") return `<del>${text}</del>`;
-      return text;
-    })
-    .join("");
+const unchanged = diff !== null && diff.changed === 0 && diff.inserted === 0 && diff.deleted === 0;
+
+/** "3 lines changed, 1 added" — the shape of the amendment, before the reader
+ * starts reading it. */
+function summary(d: DocumentDiff): string {
+  const parts: string[] = [];
+  if (d.changed) parts.push(`${d.changed} line${d.changed === 1 ? "" : "s"} changed`);
+  if (d.inserted) parts.push(`${d.inserted} added`);
+  if (d.deleted) parts.push(`${d.deleted} removed`);
+  return parts.join(", ");
 }
 
-const title = diff
-  ? `Diff ${diff.from.release.label} → ${diff.to.release.label} · ${trimNum(diff.to.num)} · U.S. Code`
+const title = after
+  ? `Diff ${before?.release.label} → ${after.release.label} · ${trimNum(after.num)} · U.S. Code`
   : "Diff · U.S. Code";
 ---
 
@@ -76,23 +111,25 @@ const title = diff
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
   {
-    diff && (
+    before && after && diff && (
       <>
         <h1 class="doc-title">
-          <span class="doc-title__num">{trimNum(diff.to.num)}</span>
-          {diff.to.heading}
+          <span class="doc-title__num">{trimNum(after.num)}</span>
+          {after.heading}
         </h1>
 
         <p class="doc-meta">
-          <a href={appHref(identifier, diff.to.release.label)}>← Back to the current text</a>
+          <a href={appHref(identifier, after.release.label)}>← Back to the current text</a>
           {" · "}
           <a href={versionsHref(identifier)}>Version history</a>
         </p>
 
         <p class="lede">
-          Comparing <strong>{diff.from.release.label}</strong> to{" "}
-          <strong>{diff.to.release.label}</strong>.
-          {diff.from.content_hash === diff.to.content_hash && " The text is unchanged."}
+          Comparing <strong>{before.release.label}</strong> to{" "}
+          <strong>{after.release.label}</strong>.{" "}
+          {unchanged
+            ? "The text of this section is identical at both release points."
+            : summary(diff) + "."}
         </p>
 
         {entries.length > 1 && (
@@ -127,7 +164,14 @@ const title = diff
           </form>
         )}
 
-        <div class="diff-view" set:html={diffHtml(diff)} />
+        <div class="diff-view diff-view--text" set:html={diffLinesHtml(diff.lines)} />
+
+        {/* The XML is still there for whoever wants it — this page just no
+            longer makes everyone else read it. */}
+        <p class="doc-meta">
+          Prefer the source? The API serves the same comparison as a{" "}
+          <a href={apiDiffHref(identifier, from ?? "", to ?? "")}>redline of the verbatim XML</a>.
+        </p>
       </>
     )
   }

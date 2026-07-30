@@ -144,7 +144,15 @@ export async function fetchVersions(identifier: string): Promise<Versions> {
   return getJson<Versions>(`/api/v1/sections${identifier}/versions`);
 }
 
-/** A redline between two release points of the same section (Day 4). */
+/**
+ * The API's source-level redline: two release points diffed as verbatim XML
+ * (ADR-0016).
+ *
+ * The reader no longer renders this. `/app/diff` diffs the *reading text*
+ * instead (ADR-0026) and links to this endpoint for anyone who wants the
+ * bytes — so the client stays here, matching the API's surface, even though
+ * the page it was written for stopped calling it.
+ */
 export async function fetchDiff(identifier: string, from: string, to: string): Promise<Diff> {
   return getJson<Diff>(`/api/v1/sections${identifier}/diff${qs({ from, to })}`);
 }

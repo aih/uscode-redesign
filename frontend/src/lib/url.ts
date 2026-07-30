@@ -68,6 +68,14 @@ export function diffHref(identifier: string, from: string, to: string): string {
   return `${APP}/diff${encodePath(identifier)}?${new URLSearchParams({ from, to }).toString()}`;
 }
 
+/** `/api/v1/sections/…/diff?from=&to=` — the *source-level* redline: the same
+ * two release points, diffed as verbatim XML (ADR-0016). The reader's own diff
+ * page shows the reading text instead (ADR-0026) and links here for the bytes,
+ * which is the one place the two views are named side by side. */
+export function apiDiffHref(identifier: string, from: string, to: string): string {
+  return `${API}/sections${encodePath(identifier)}/diff?${new URLSearchParams({ from, to }).toString()}`;
+}
+
 /** `/app/provisions` — the reader's one watchlist page (Day 5). */
 export function provisionsHref(): string {
   return `${APP}/provisions`;

@@ -17,6 +17,7 @@
     "@uswds/uswds": "^3.13.0",
     "@xmldom/xmldom": "^0.9.10",
     "astro": "^5.18.2",
+    "diff-match-patch": "^1.0.5",
     "sass": "^1.102.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@playwright/test": "^1.62.0",
+    "@types/diff-match-patch": "^1.0.36",
     "@types/node": "^26.1.2",
     "playwright": "^1.62.0"
   }

@@ -1079,6 +1079,68 @@ main[id] {
   margin-top: 1.5rem;
 }
 
+/* The reading-text redline (ADR-0026). It is a document, not a stream of
+ * source, so it wraps like one: `pre-wrap` is right for raw XML and wrong here,
+ * where the text was whitespace-normalized before it was ever diffed. */
+.diff-view--text {
+  white-space: normal;
+}
+
+/* Struck for deleted, underlined for inserted — the convention every redline of
+ * a statute has used since they were drawn by hand, and the reason this does
+ * not rely on colour alone (WCAG 1.4.1). The padding matters more than it
+ * looks: a deletion butted against an insertion (`14` → `1013`) otherwise reads
+ * as one impossible word. */
+.diff-view--text ins,
+.diff-view--text del {
+  padding: 0 0.15em;
+  border-radius: 2px;
+}
+
+.diff-view--text ins {
+  text-decoration: underline;
+}
+
+/* Indentation carries the outline, exactly as it does on the section page: a
+ * changed clause should sit at the depth it lives at, not flush left. `--depth`
+ * is set per line by `diffdoc.diffLinesHtml`. */
+.diff-line {
+  margin: 0 0 0.6rem;
+  padding-left: calc(var(--indent-step) * var(--depth, 0));
+  border-left: 3px solid transparent;
+}
+
+/* A whole line added or removed is marked in the gutter as well as in colour —
+ * colour alone is not a way to convey information (WCAG 1.4.1), and at a
+ * glance the gutter is what shows the shape of the amendment. */
+.diff-line--insert,
+.diff-line--delete,
+.diff-line--changed {
+  padding-left: calc(var(--indent-step) * var(--depth, 0) + 0.6rem);
+  margin-left: -0.6rem;
+}
+
+.diff-line--insert {
+  border-left-color: #00a651;
+}
+
+.diff-line--delete {
+  border-left-color: var(--danger);
+}
+
+.diff-line--changed {
+  border-left-color: var(--target-edge);
+}
+
+/* Notes and source credit are the apparatus around the law. They belong in the
+ * redline — they change, and readers ask why — but they should not read as
+ * loudly as statutory text. */
+.diff-line--note {
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
 .diff-view ins {
   background: rgba(0, 166, 81, 0.18);
   text-decoration: none;
