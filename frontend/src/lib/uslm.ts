@@ -234,7 +234,23 @@ function renderRef(el: UslmElement, opts: RenderOptions): string {
   const title = resolved.title ? ` title="${escapeAttr(resolved.title)}"` : "";
   const external = /^https?:\/\//u.test(resolved.href);
   const rel = external ? ' rel="noopener" class="usa-link usa-link--external"' : "";
-  return `<a href="${escapeAttr(resolved.href)}"${title}${rel}>${text}</a>`;
+  // `data-cite` is the hover-preview island's only hook, and it carries the
+  // *identifier* rather than the href so the island never has to un-prefix
+  // `/app` to build a preview URL. Internal references only: there is nothing
+  // to preview at govinfo, and an unresolvable ref is not a link at all.
+  //
+  // `title` stays. It is what a reader with no JavaScript gets, what a screen
+  // reader announces (the card is `aria-hidden` — see `CitePreview.astro`), and
+  // what shows on a touch device, where the card never opens by design.
+  // The release rides along so a preview is read at the same release point as
+  // the page quoting it. Without it, a section being read at 119-99 would show
+  // its cross references as they stand today — quietly mixing two vintages of
+  // the law, which is the one thing this whole project exists to avoid.
+  const cite = resolved.identifier
+    ? ` data-cite="${escapeAttr(resolved.identifier)}"` +
+      (opts.release ? ` data-cite-release="${escapeAttr(opts.release)}"` : "")
+    : "";
+  return `<a href="${escapeAttr(resolved.href)}"${title}${rel}${cite}>${text}</a>`;
 }
 
 /** Exported for the diff view (Day 4): a redline of raw XML source has to

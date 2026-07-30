@@ -801,3 +801,29 @@ def test_an_appendix_citation_explains_why_it_cannot_resolve(client):
     assert body["exists"] is False
     assert body["message"] is not None
     assert "enacted" in body["message"]
+
+
+def test_a_typed_hyphen_finds_the_en_dash_identifier(client):
+    """OLRC writes section numbers with an EN DASH (`/us/usc/t16/s45a–1`) and no
+    keyboard has that key. 5,697 of the corpus's 65,938 sections contain one;
+    none contains a plain hyphen. Typing the citation the ordinary way has to
+    work, and the reader has to be redirected to the identifier that exists —
+    not the one they typed, which would 404 on arrival."""
+    body = client.get(f"{API}/citation", params={"q": "16 usc 45a-1"}).json()
+
+    assert body["exists"] is True
+    assert body["identifier"] == "/us/usc/t16/s45a–1"
+
+
+def test_a_structural_node_is_found_rather_than_reported_missing(client):
+    """`labels()` answers about sections, so a chapter came back `exists: false`
+    while sitting in the database. Structure goes to `get_toc`."""
+    chapter = client.get(f"{API}/citation", params={"q": "16 usc ch. 1"}).json()
+    title = client.get(f"{API}/citation", params={"q": "title 16"}).json()
+
+    assert chapter["identifier"] == "/us/usc/t16/ch1"
+    assert chapter["kind"] == "structure"
+    assert chapter["exists"] is True
+    assert title["identifier"] == "/us/usc/t16"
+    assert title["kind"] == "title"
+    assert title["exists"] is True

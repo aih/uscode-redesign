@@ -12,6 +12,7 @@
  */
 import Base from "../../../layouts/Base.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
+import CitePreview from "../../../components/CitePreview.astro";
 import KeyboardNav from "../../../components/KeyboardNav.astro";
 import Neighbors from "../../../components/Neighbors.astro";
 import Provenance from "../../../components/Provenance.astro";
@@ -251,6 +252,11 @@ const bar = section
           up={upNode}
           release={selected}
         />
+
+        {/* One card for every citation in the text above (ADR-0024). Mounted
+            only on a section page, because that is the only page that renders
+            statutory text with references in it. */}
+        <CitePreview />
 
         <p class="formats">
           <a href={apiHref(section.identifier, { release: selected, format: "xml" })}>

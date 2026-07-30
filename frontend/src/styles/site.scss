@@ -770,6 +770,127 @@ main[id] {
   background: var(--panel);
 }
 
+/* ------------------------------------------------------- the citation preview */
+
+/* The hover card (ADR-0024). A `popover`, so it renders in the browser's top
+ * layer — always above the sticky bar, with no z-index contest to lose.
+ *
+ * Scrollable is the point: a preview you cannot read past the first paragraph
+ * is a tooltip with extra steps. `overscroll-behavior: contain` stops a wheel
+ * gesture that reaches the bottom from scrolling the page underneath, which
+ * would throw away the reading position the card exists to protect. */
+.cite-preview {
+  position: fixed;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 18%);
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: 22rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 0.9rem;
+}
+
+/* The anchor-positioned path, when the browser has it. `flip-block` moves the
+ * card above the link when there is no room below; Safari 18.2–18.3 ignores
+ * this and gets the measured fallback in the island instead. */
+@supports (anchor-name: --x) {
+  .cite-preview {
+    position-anchor: --cite-anchor;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block;
+    margin-block-start: 0.35rem;
+    inset: auto;
+  }
+}
+
+.cite-preview:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: 1px;
+}
+
+.cite-preview__head {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+  font-family: var(--reading);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.4rem;
+}
+
+.cite-preview__status {
+  margin-left: 0.4rem;
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--danger);
+  text-transform: uppercase;
+}
+
+.cite-preview__note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The section body inside a card is the same markup as the page, one size down
+ * and without the reading measure — it is a glance, not a reading surface.
+ *
+ * The rules below are `.section-body`'s, restated for this container rather
+ * than shared with it: the two need the same treatment of USLM's markup but
+ * not the same sizes, and a comma-joined selector would make every future
+ * change to the reading surface silently a change to the card too. */
+.cite-preview__body {
+  font-family: var(--reading);
+  line-height: 1.5;
+}
+
+.cite-preview__body p {
+  margin: 0 0 0.6rem;
+}
+
+/* USLM writes `<num>(a)</num><heading>Purpose</heading>` — two elements, one
+ * line of the printed Code. */
+.cite-preview__body .uslm-heading {
+  display: inline;
+  font-size: 1em;
+  font-weight: 700;
+  font-family: var(--reading);
+  margin: 0;
+}
+
+.cite-preview__body .uslm-num {
+  font-weight: 700;
+  margin-right: 0.4em;
+}
+
+/* The card's own header already says `§ 45a–1 Addition of lands authorized`.
+ * Without this the section repeats its number and heading underneath, the
+ * heading at page-title size — three titles for one provision, which is what
+ * the first rendered card actually looked like. */
+.cite-preview__body > .uslm-section > .uslm-num,
+.cite-preview__body > .uslm-section > .uslm-heading {
+  display: none;
+}
+
+/* Provision depth still reads inside a card, at half the page's step: the
+ * structure matters, and 1.6rem of indent inside a 28rem box does not. */
+.cite-preview__body [class*="indent"] {
+  margin-left: calc(var(--indent-step) / 2);
+}
+
+.cite-preview__foot {
+  margin: 0.75rem 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.85rem;
+  position: sticky;
+  bottom: -0.75rem;
+  background: var(--page);
+}
+
 /* -------------------------------------------------------- versions and diffs */
 
 .timeline {

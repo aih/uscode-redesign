@@ -24,30 +24,48 @@ function query(params: ApiParams): string {
   return `?${new URLSearchParams(pairs).toString()}`;
 }
 
+/**
+ * Percent-encode an identifier for use in a URL, leaving `/` as `/`.
+ *
+ * Not cosmetic. **OLRC writes section numbers with an EN DASH** —
+ * `/us/usc/t16/s45a–1`, U+2013 — and 5,697 of the corpus's 65,938 sections
+ * contain one. A raw en dash in a `Location:` header is a crash, not a wobble:
+ * a header value is a ByteString, and Node throws
+ * `Cannot convert argument to a ByteString because the character at index 20
+ * has a value of 8211`. Both places this app redirects — the citation box and
+ * the `?id=` guid lookup — 500 on those sections without this.
+ *
+ * `encodeURI` rather than `encodeURIComponent` because the identifier's slashes
+ * are path structure, not data.
+ */
+function encodePath(identifier: string): string {
+  return encodeURI(identifier);
+}
+
 /** A page under `/app` — always HTML, no negotiation. */
 export function appHref(identifier: string, release?: string | null): string {
-  return `${APP}${identifier}${query({ release })}`;
+  return `${APP}${encodePath(identifier)}${query({ release })}`;
 }
 
 /** `/api/v1/us/usc/…` — the machine surface. */
 export function apiHref(identifier: string, params: ApiParams = {}): string {
-  return `${API}${identifier}${query(params)}`;
+  return `${API}${encodePath(identifier)}${query(params)}`;
 }
 
 /** The bare citation URL (ADR-0009/0010): what a citation *is*, unprefixed by
  * either surface, and the form worth pasting or printing. */
 export function citationHref(identifier: string, release?: string | null): string {
-  return `${identifier}${query({ release })}`;
+  return `${encodePath(identifier)}${query({ release })}`;
 }
 
 /** `/app/versions/…` — the change timeline for a section (Day 4). */
 export function versionsHref(identifier: string): string {
-  return `${APP}/versions${identifier}`;
+  return `${APP}/versions${encodePath(identifier)}`;
 }
 
 /** `/app/diff/…?from=&to=` — a redline between two release points (Day 4). */
 export function diffHref(identifier: string, from: string, to: string): string {
-  return `${APP}/diff${identifier}?${new URLSearchParams({ from, to }).toString()}`;
+  return `${APP}/diff${encodePath(identifier)}?${new URLSearchParams({ from, to }).toString()}`;
 }
 
 /** `/app/provisions` — the reader's one watchlist page (Day 5). */

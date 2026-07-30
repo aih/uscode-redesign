@@ -110,3 +110,33 @@ describe("gotoHref", () => {
     expect(gotoHref("/us/usc/t11/s523")).toBe("/app/goto?q=%2Fus%2Fusc%2Ft11%2Fs523");
   });
 });
+
+describe("en-dash identifiers (the ones OLRC actually publishes)", () => {
+  // `/us/usc/t16/s45a–1` uses U+2013, as do 5,697 of the corpus's 65,938
+  // sections. A raw one in a `Location:` header throws in Node — a header value
+  // is a ByteString — so both redirects in this app 500'd on those sections.
+  const EN_DASH = "/us/usc/t16/s45a–1";
+
+  it("percent-encodes the dash in every href builder", () => {
+    expect(appHref(EN_DASH)).toBe("/app/us/usc/t16/s45a%E2%80%931");
+    expect(apiHref(EN_DASH)).toBe("/api/v1/us/usc/t16/s45a%E2%80%931");
+    expect(citationHref(EN_DASH)).toBe("/us/usc/t16/s45a%E2%80%931");
+    expect(versionsHref(EN_DASH)).toBe("/app/versions/us/usc/t16/s45a%E2%80%931");
+  });
+
+  it("leaves the path separators alone", () => {
+    // encodeURI, not encodeURIComponent: the slashes are structure, not data.
+    expect(appHref(EN_DASH)).toContain("/us/usc/t16/");
+    expect(appHref(EN_DASH)).not.toContain("%2F");
+  });
+
+  it("still appends the release query after encoding", () => {
+    expect(appHref(EN_DASH, "119-99")).toBe(
+      "/app/us/usc/t16/s45a%E2%80%931?release=119-99",
+    );
+  });
+
+  it("leaves an ordinary identifier byte-for-byte unchanged", () => {
+    expect(appHref("/us/usc/t16/s45f/c/5")).toBe("/app/us/usc/t16/s45f/c/5");
+  });
+});

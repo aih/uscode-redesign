@@ -36,7 +36,9 @@ SUBDIVISIONS = [
     ("16 U.S.C. § 45f(c)(5)", "/us/usc/t16/s45f/c/5"),
 ]
 
-# A section number is not a number. These are all real.
+# A section number is not a number. These are all real. Note the parse keeps the
+# dash the reader typed — matching it against OLRC's EN DASH is the *lookup's*
+# job, via `section_variants`, and is tested below.
 AWKWARD_SECTION_NUMBERS = [
     ("42 USC 2000e-2", "/us/usc/t42/s2000e-2"),
     ("15 U.S.C. § 78j-1", "/us/usc/t15/s78j-1"),
@@ -246,3 +248,44 @@ def test_an_appendix_section_is_named_but_not_resolvable() -> None:
     assert parsed.identifier == "/us/usc/t5a/s3"
     assert parsed.appendix is True
     assert parse_citation("5 usc 3").appendix is False
+
+
+# ------------------------------------------------------- dashes, which are not
+
+
+def test_a_typed_hyphen_offers_the_en_dash_olrc_actually_uses() -> None:
+    """The single most consequential thing in this module, and it is invisible.
+
+    OLRC writes section numbers with an EN DASH: `/us/usc/t16/s45a–1`, U+2013.
+    Counted over the loaded corpus, **5,697 of 65,938 sections contain one and
+    not a single section contains a plain hyphen.** No keyboard has that key, so
+    `42 USC 2000e-2` — the way the citation is written everywhere — matched
+    nothing at all until the lookup started trying variants.
+
+    The parse keeps what was typed; `section_variants` carries the alternatives,
+    as-typed first, and the caller takes the first that exists.
+    """
+    parsed = parse_citation("16 usc 45a-1")
+
+    assert parsed.section_identifier == "/us/usc/t16/s45a-1"
+    assert parsed.section_variants[0] == "/us/usc/t16/s45a-1"
+    assert "/us/usc/t16/s45a–1" in parsed.section_variants  # en dash
+    assert "/us/usc/t16/s45a—1" in parsed.section_variants  # em dash
+
+
+def test_an_en_dash_citation_offers_the_hyphen_too() -> None:
+    """Symmetric, because a citation pasted out of a PDF already has the dash."""
+    parsed = parse_citation("16 usc 45a–1")
+
+    assert parsed.section_variants[0] == "/us/usc/t16/s45a–1"
+    assert "/us/usc/t16/s45a-1" in parsed.section_variants
+
+
+def test_a_section_without_a_dash_offers_exactly_one_spelling() -> None:
+    """No point asking the database three times for `s523`."""
+    assert parse_citation("11 usc 523").section_variants == ("/us/usc/t11/s523",)
+
+
+def test_structural_nodes_get_variants_too() -> None:
+    assert parse_citation("11 usc ch. 5").section_variants == ("/us/usc/t11/ch5",)
+    assert parse_citation("title 11").section_variants == ("/us/usc/t11",)

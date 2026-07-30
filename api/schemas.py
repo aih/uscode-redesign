@@ -392,14 +392,22 @@ class CitationOut(BaseModel):
         query: str,
         *,
         entry: TocEntry | None = None,
+        actual: str | None = None,
         release: ReleaseRef | None = None,
         message: str | None = None,
     ) -> "CitationOut":
+        # `actual` is the spelling that was found, which need not be the one
+        # typed: OLRC writes section numbers with an EN DASH, so `2000e-2`
+        # resolves to `/us/usc/t42/s2000e–2`. The reader must be sent to the
+        # identifier that exists, not the one they typed, or the redirect 404s.
+        section = actual or parsed.section_identifier
+        identifier = section + "".join(f"/{part}" for part in parsed.subdivisions)
+
         return cls(
             message=message,
             query=query,
-            identifier=parsed.identifier,
-            section_identifier=parsed.section_identifier,
+            identifier=identifier,
+            section_identifier=section,
             title_num=parsed.title_num,
             section_num=parsed.section_num,
             subdivisions=list(parsed.subdivisions),

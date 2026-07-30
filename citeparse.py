@@ -109,6 +109,19 @@ class ParsedCitation:
     title_num: str
     section_num: str | None = None
     subdivisions: tuple[str, ...] = ()
+    #: Every spelling of `section_identifier` worth looking up, as-typed first.
+    #:
+    #: Only dashes vary, and only because OLRC writes section numbers with an
+    #: EN DASH: `/us/usc/t16/s45a–1`, U+2013. Measured over the loaded corpus,
+    #: **5,697 of 65,938 sections contain one and not a single section contains
+    #: a plain hyphen** — so `42 USC 2000e-2`, typed the only way a keyboard
+    #: offers, matches nothing at all unless something tries the variant.
+    #:
+    #: Generating candidates rather than rewriting is what keeps this module
+    #: honest: `-` and `–` are different characters, this layer does not know
+    #: which one the corpus holds, and the caller's lookup is batched anyway
+    #: (`Repository.labels`), so asking for three costs what asking for one did.
+    section_variants: tuple[str, ...] = ()
     kind: Kind = "section"
     #: A trailing `note` — recorded, not resolved. This site serves no note routes.
     note: bool = False
@@ -153,6 +166,27 @@ def _is_appendix(title_id: str) -> bool:
     return bool(re.search(r"/t[0-9]+a$", title_id))
 
 
+#: Hyphen-minus, en dash, em dash. OLRC uses the middle one; keyboards offer the
+#: first; the third turns up in text pasted out of a word processor.
+_DASHES = ("-", "–", "—")
+
+
+def _dash_variants(identifier: str) -> tuple[str, ...]:
+    """Every dash spelling of an identifier, the given one first.
+
+    Order matters: the caller looks these up and takes the first that exists, so
+    what the reader actually typed wins any tie.
+    """
+    if not any(dash in identifier for dash in _DASHES):
+        return (identifier,)
+    seen: list[str] = [identifier]
+    for dash in _DASHES:
+        candidate = re.sub(r"[-–—]", dash, identifier)
+        if candidate not in seen:
+            seen.append(candidate)
+    return tuple(seen)
+
+
 def _build(parts: _Parts) -> ParsedCitation:
     title_id = f"/us/usc/{_title_segment(parts.title, parts.app)}"
 
@@ -166,6 +200,7 @@ def _build(parts: _Parts) -> ParsedCitation:
             note=parts.note,
             et_seq=parts.et_seq,
             appendix=_is_appendix(title_id),
+            section_variants=_dash_variants(node),
         )
 
     if not parts.section:
@@ -177,6 +212,7 @@ def _build(parts: _Parts) -> ParsedCitation:
             note=parts.note,
             et_seq=parts.et_seq,
             appendix=_is_appendix(title_id),
+            section_variants=(title_id,),
         )
 
     section_id = f"{title_id}/s{parts.section}"
@@ -191,6 +227,7 @@ def _build(parts: _Parts) -> ParsedCitation:
         note=parts.note,
         et_seq=parts.et_seq,
         appendix=_is_appendix(title_id),
+        section_variants=_dash_variants(section_id),
     )
 
 

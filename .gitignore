@@ -227,3 +227,8 @@ data/*
 
 # `make ci-data` unzips the committed 119-99 fixture here, then removes it.
 /.ci-data/
+
+# Playwright (make test-e2e): traces and screenshots of failures. The committed
+# evidence is docs/screenshots/, written by `make shots`.
+frontend/test-results/
+frontend/playwright-report/

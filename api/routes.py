@@ -64,6 +64,7 @@ from storage import (
     Repository,
     ResolvedRelease,
     SectionResult,
+    TocEntry,
     title_num_from_identifier,
 )
 
@@ -158,15 +159,48 @@ def citation_lookup(
         on_date=parse_date_param(date),
         title_num=parsed.title_num,
     )
-    found = repository.labels([parsed.section_identifier], resolved)
-    entry = found.get(parsed.section_identifier)
+    entry, actual = _locate(repository, parsed, resolved)
     return CitationOut.of(
         parsed,
         q,
         entry=entry,
+        actual=actual,
         release=resolved.release,
         message=None if entry else _why_not(parsed),
     )
+
+
+def _locate(
+    repository: Repository, parsed: ParsedCitation, resolved: ResolvedRelease
+) -> tuple[TocEntry | None, str | None]:
+    """Find what the citation named, and under which spelling.
+
+    Two wrinkles, both discovered by typing citations at it rather than by
+    reading the schema:
+
+    **Dashes.** OLRC writes section numbers with an EN DASH — `/us/usc/t16/s45a–1`
+    — and 5,697 of 65,938 loaded sections contain one while *none* contains a
+    plain hyphen. A reader typing `42 USC 2000e-2` on an ordinary keyboard would
+    otherwise match nothing. `parsed.section_variants` supplies the spellings and
+    they all go into the one batched `labels()` call, so trying three costs what
+    trying one did.
+
+    **Structure and titles are not sections.** `labels()` answers about sections,
+    so `11 USC ch. 5` and `title 11` came back `exists: false` while sitting in
+    the database. Those go to `get_toc`, which is what they are.
+    """
+    if parsed.kind == "section":
+        found = repository.labels(list(parsed.section_variants), resolved)
+        for candidate in parsed.section_variants:
+            if candidate in found:
+                return found[candidate], candidate
+        return None, None
+
+    for candidate in parsed.section_variants:
+        toc = repository.get_toc(candidate, resolved)
+        if toc is not None:
+            return toc.node, candidate
+    return None, None
 
 
 def _why_not(parsed: ParsedCitation) -> str | None:
