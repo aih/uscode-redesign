@@ -1,0 +1,46 @@
+---
+/**
+ * "Go to a citation" — the box PLAN §Day-2 has owed since the beginning.
+ *
+ * A plain GET form, exactly like `ReleasePicker`: no JavaScript, no
+ * autocomplete, no debounced fetch. Submitting lands on `/app/goto?q=…`, which
+ * is a URL worth pasting and a page worth bookmarking, and the whole feature
+ * works with scripting off. An autocomplete would need a search index this
+ * project does not have; a box that parses what you already know how to write
+ * needs nothing but the parser.
+ *
+ * It lives in the site header, so it is reachable from every page — the point
+ * is to get somewhere from wherever you are.
+ */
+import { gotoHref } from "../lib/url";
+
+interface Props {
+  /** Prefilled when the goto page is showing a failed attempt. */
+  value?: string | null;
+  /** The goto page renders a larger copy of the same control. */
+  variant?: "header" | "page";
+}
+
+const { value = null, variant = "header" } = Astro.props;
+const id = variant === "header" ? "cite-q" : "cite-q-page";
+---
+
+<form class={`citejump citejump--${variant}`} method="get" action={gotoHref()} role="search">
+  <label class="citejump__label" for={id}>Go to a citation</label>
+  <input
+    class="usa-input citejump__input"
+    id={id}
+    type="search"
+    name="q"
+    value={value ?? ""}
+    placeholder="11 usc 523(a)(1)"
+    autocomplete="off"
+    spellcheck="false"
+    enterkeyhint="go"
+    aria-describedby={`${id}-hint`}
+  />
+  <button class="usa-button citejump__go" type="submit">Go</button>
+  <p class="citejump__hint" id={`${id}-hint`}>
+    A citation, a path, or <code>11/523</code>.
+  </p>
+</form>

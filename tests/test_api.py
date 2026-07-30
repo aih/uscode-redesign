@@ -724,3 +724,80 @@ def test_an_ordinary_section_has_no_duplicates(client):
     body = client.get(f"{API}{SECTION}?release={CURRENT}").json()
 
     assert body["duplicates"] == []
+
+
+# --------------------------------------------------------------------- citation
+
+
+def test_a_typed_citation_resolves_to_its_identifier(client):
+    body = client.get(f"{API}/citation", params={"q": "16 usc 45f(c)(5)"}).json()
+
+    assert body["identifier"] == DEMO
+    assert body["section_identifier"] == SECTION
+    assert body["subdivisions"] == ["c", "5"]
+    assert body["exists"] is True
+    assert body["heading"] == "Mineral King Valley addition authorized"
+
+
+def test_the_written_forms_all_reach_the_same_place(client):
+    """The parser's own table is unit-tested without a database
+    (`tests/test_citeparse.py`); this checks the wiring — that each form
+    survives the query string, the route and the existence lookup."""
+    for form in (
+        "16 usc 45f",
+        "16 U.S.C. § 45f",
+        "section 45f of title 16",
+        "16/45f",
+        "/us/usc/t16/s45f",
+    ):
+        body = client.get(f"{API}/citation", params={"q": form}).json()
+        assert body["section_identifier"] == SECTION, form
+        assert body["exists"] is True, form
+
+
+def test_a_citation_honours_the_release_point(client):
+    body = client.get(
+        f"{API}/citation", params={"q": "16 usc 45f", "release": PRIOR}
+    ).json()
+
+    assert body["release"]["label"] == PRIOR
+    assert body["exists"] is True
+
+
+def test_text_that_is_not_a_citation_is_a_422(client):
+    """Malformed request, not a missing resource — and the detail names the
+    forms that would have worked."""
+    response = client.get(f"{API}/citation", params={"q": "not a citation"})
+
+    assert response.status_code == 422
+    assert "11 usc 523" in response.json()["detail"]
+
+
+def test_a_bare_section_number_is_refused_rather_than_guessed(client):
+    """`523` names a section of *some* title. Picking one would be a guess
+    presented as an answer."""
+    assert client.get(f"{API}/citation", params={"q": "523"}).status_code == 422
+
+
+def test_a_citation_naming_nothing_is_an_answer_not_an_error(client):
+    """Title 99 does not exist and never will, but "no such thing" is a
+    well-formed reply — the reader gets told which part was wrong."""
+    response = client.get(f"{API}/citation", params={"q": "99 usc 1"})
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["identifier"] == "/us/usc/t99/s1"
+    assert body["exists"] is False
+
+
+def test_an_appendix_citation_explains_why_it_cannot_resolve(client):
+    """OLRC publishes appendix titles under the enacting instrument, so
+    `/us/usc/t5a/s3` is a well-formed identifier that nothing is stored at
+    (`tests/test_citeparse.py` counts it: 0 of 461). A bare "not found" would
+    read as a bug in the parser; the message says what actually happened."""
+    body = client.get(f"{API}/citation", params={"q": "5 U.S.C. App. 3"}).json()
+
+    assert body["identifier"] == "/us/usc/t5a/s3"
+    assert body["exists"] is False
+    assert body["message"] is not None
+    assert "enacted" in body["message"]

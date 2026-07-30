@@ -90,16 +90,21 @@
 @media (min-width: 40em) {
   :root {
     --indent-step: 1.6rem;
-    /* Navbar + contextual bar + section bar, all sticky from here up. The nav is
-     * still the forced-open wrapping row until 64em (see below), so this band is
-     * the tallest the stack ever gets: 224px measured, and a deep breadcrumb
-     * trail can wrap one line further. */
-    --sticky-h: 16rem;
+    /* Navbar + citation box + contextual bar + section bar, all sticky from here
+     * up. The nav is still the forced-open wrapping row until 64em (see below)
+     * and the citation box sits under it, so this band is the tallest the stack
+     * ever gets: 280px measured, plus room for a deep breadcrumb trail to wrap
+     * one line further.
+     *
+     * This number drifts every time the chrome changes — adding the citation box
+     * moved it from 224px to 280px in one commit. It is held honest by the
+     * anchor-jump assertion in the e2e suite, not by anyone remembering. */
+    --sticky-h: 18rem;
   }
 }
 
-/* At the desktop breakpoint USWDS's nav becomes a single horizontal row and the
- * stack shrinks back to ~198px. */
+/* At the desktop breakpoint USWDS's nav becomes a single horizontal row, the
+ * citation box moves up beside it, and the stack shrinks back to ~198px. */
 @media (min-width: 64em) {
   :root {
     --sticky-h: 13rem;
@@ -175,6 +180,23 @@
 body {
   background: var(--page);
   color: var(--ink);
+}
+
+/* `hidden` must actually hide.
+ *
+ * The UA stylesheet's `[hidden] { display: none }` is the weakest rule there is,
+ * and USWDS's `.usa-button { display: inline-block }` is an author rule, so it
+ * wins. The result was on every section page: `WatchButton` correctly left
+ * "Add" and "Remove" marked `hidden` and un-hid only "Log in", and the browser
+ * drew all three anyway. The island was right; the attribute was being ignored.
+ *
+ * `!important` is the right tool and the conventional one — an author rule has
+ * to out-rank another author rule, and there is no honest specificity contest
+ * to win here. Applied globally rather than to `.watch-widget`, because every
+ * future component that hides a `.usa-button` from script would meet this again.
+ */
+[hidden] {
+  display: none !important;
 }
 
 /* ------------------------------------------------------------ the sticky stack
@@ -314,6 +336,103 @@ main[id] {
   margin: 0;
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+/* ------------------------------------------------------- the citation box */
+
+/* A plain GET form in the header. `1rem` on the input is not a style choice —
+ * iOS zooms the whole page when a focused control's text is smaller, and a
+ * reader who types a citation should not end up zoomed into the navbar. */
+.citejump {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.citejump__label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex: none;
+}
+
+.citejump__input {
+  font-size: 1rem;
+  min-height: 2.75rem;
+  margin-top: 0;
+  max-width: 18rem;
+  flex: 1 1 10rem;
+}
+
+/* `width: auto` because USWDS makes every `.usa-button` full-width below the
+ * tablet breakpoint. That is right for a form's primary action and wrong for a
+ * button that belongs beside its input — unchecked, "Go" wrapped onto its own
+ * line and spanned the phone. */
+.citejump__go {
+  min-height: 2.75rem;
+  flex: none;
+  width: auto;
+  margin-top: 0;
+}
+
+/* The hint is for the page copy, where there is room to explain. In the header
+ * the label and the placeholder already say everything. */
+.citejump--header .citejump__hint {
+  display: none;
+}
+
+.citejump--header {
+  padding: 0 1rem 0.75rem;
+}
+
+.citejump--page {
+  margin: 0 0 2rem;
+  align-items: flex-end;
+}
+
+.citejump--page .citejump__label {
+  flex-basis: 100%;
+  font-size: 0.9rem;
+}
+
+.citejump--page .citejump__input {
+  max-width: 24rem;
+}
+
+.citejump__hint {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.citejump__examples code {
+  font-size: 0.95rem;
+}
+
+/* At the desktop breakpoint the nav is a horizontal row and the box can sit
+ * beside it rather than under it. */
+@media (min-width: 64em) {
+  .citejump--header {
+    padding: 0;
+    margin-left: 1.5rem;
+  }
+
+  /* The box shares the nav's row from here up, and a flex row will happily
+     break "Release points" across two lines to make room. The links are short;
+     let the box give up width instead. */
+  .usa-nav__primary > li > a {
+    white-space: nowrap;
+  }
+
+  .citejump--header .citejump__label {
+    position: absolute;
+    left: -999em;
+  }
+
+  .citejump--header .citejump__input {
+    max-width: 13rem;
+  }
 }
 
 /* --------------------------------------------------------- the section head */

@@ -8,6 +8,7 @@
  * a phone rather than a menu that has to be opened. A menu you must tap to see is
  * worse than four links you can already read.
  */
+import CitationJump from "./CitationJump.astro";
 import { APP } from "../lib/url";
 ---
 
@@ -35,6 +36,10 @@ import { APP } from "../lib/url";
           <a class="usa-nav__link" href="/docs"><span>API docs</span></a>
         </li>
       </ul>
+      {/* The one control in the chrome: type a citation, land on it. Sits with
+          the nav because it is navigation — the fastest link on the page to a
+          provision whose number you already know. */}
+      <CitationJump />
     </nav>
   </div>
 </header>

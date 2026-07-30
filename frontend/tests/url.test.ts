@@ -5,6 +5,7 @@ import {
   appHref,
   citationHref,
   diffHref,
+  gotoHref,
   loginHref,
   provisionLabel,
   provisionsHref,
@@ -93,5 +94,19 @@ describe("loginHref and signupHref", () => {
   it("omit the query string with no next", () => {
     expect(loginHref()).toBe("/app/login");
     expect(signupHref(null)).toBe("/app/signup");
+  });
+});
+
+describe("gotoHref", () => {
+  it("is a bare form target with no query", () => {
+    expect(gotoHref()).toBe("/app/goto");
+    expect(gotoHref(null)).toBe("/app/goto");
+  });
+
+  it("encodes a citation, including the characters that mean something in a URL", () => {
+    expect(gotoHref("11 usc 523(a)(1)")).toBe("/app/goto?q=11%20usc%20523(a)(1)");
+    // `§` and `/` are the two that would otherwise change what was asked.
+    expect(gotoHref("11 U.S.C. § 523")).toBe("/app/goto?q=11%20U.S.C.%20%C2%A7%20523");
+    expect(gotoHref("/us/usc/t11/s523")).toBe("/app/goto?q=%2Fus%2Fusc%2Ft11%2Fs523");
   });
 });

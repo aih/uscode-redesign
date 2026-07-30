@@ -7,6 +7,7 @@
 
 import { API } from "./url";
 import type {
+  Citation,
   Diff,
   Entry,
   Labels,
@@ -124,6 +125,18 @@ export async function fetchReleases(titleNum?: string | null): Promise<Release[]
 
 export async function fetchTitles(): Promise<Title[]> {
   return getJson<Title[]>("/api/v1/titles");
+}
+
+/** `11 usc 523(a)(1)` → the identifier it names, and whether it is there.
+ *
+ * Throws `ApiError(422)` when the text is not a citation at all; returns a body
+ * with `exists: false` when it is a citation naming something absent. The two
+ * are different answers and `/app/goto` shows them differently. */
+export async function lookupCitation(
+  query: string,
+  params: ReleaseParams = {},
+): Promise<Citation> {
+  return getJson<Citation>(`${API}/citation${qs({ q: query, ...params })}`);
 }
 
 /** The section's change timeline — the version page's own data (Day 4). */

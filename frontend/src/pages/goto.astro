@@ -1,0 +1,132 @@
+---
+/**
+ * `/app/goto?q=11+usc+523(a)(1)` — where the citation box lands.
+ *
+ * On a hit it redirects rather than rendering, for the same reason the `?id=`
+ * guid page does: what you end up looking at and what is in the address bar
+ * should agree, and the reader's URLs stay identifier-shaped. A 307 keeps the
+ * method and is not cached as permanent by a browser that saw one query once.
+ *
+ * On a miss it renders, because there are three different misses and a reader
+ * deserves to know which one they hit:
+ *
+ *   1. Not a citation at all — 422 from the API. Show the accepted forms.
+ *   2. A citation naming something this database does not hold. Say which part
+ *      is missing, and offer the title.
+ *   3. A citation this site structurally cannot resolve — the appendix titles,
+ *      which OLRC publishes under the enacting law rather than a section
+ *      number. The API sends the explanation; this page shows it verbatim
+ *      rather than flattening it into "not found".
+ */
+import Base from "../layouts/Base.astro";
+import CitationJump from "../components/CitationJump.astro";
+import { ApiError, lookupCitation, releaseParams } from "../lib/api";
+import { setNoStore } from "../lib/cache";
+import type { Citation } from "../lib/types";
+import { appHref } from "../lib/url";
+
+const query = (Astro.url.searchParams.get("q") ?? "").trim();
+const params = releaseParams(Astro.url);
+
+let found: Citation | null = null;
+let unparseable: string | null = null;
+
+if (query) {
+  try {
+    found = await lookupCitation(query, params);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 422) {
+      unparseable = error.detail;
+    } else {
+      throw error;
+    }
+  }
+}
+
+if (found?.exists) {
+  return Astro.redirect(appHref(found.identifier, params.release ?? null), 307);
+}
+
+// Nothing below is cacheable: it is a rendering of one reader's failed attempt.
+setNoStore(Astro.response.headers);
+if (query) Astro.response.status = 404;
+
+const EXAMPLES = [
+  "11 usc 523",
+  "11 U.S.C. § 523(a)(1)",
+  "16 usc 45f(c)(5)",
+  "section 523 of title 11",
+  "42 USC 2000e-2",
+  "11/523",
+  "/us/usc/t11/s523",
+  "11 usc ch. 5",
+  "title 11",
+];
+---
+
+<Base title={query ? `No match for ${query} · U.S. Code` : "Go to a citation · U.S. Code"}>
+  <h1 class="doc-title">Go to a citation</h1>
+
+  <CitationJump value={query} variant="page" />
+
+  {
+    !query && (
+      <p class="lede">
+        Type a citation in more or less any written form — this page exists to turn it into
+        a provision.
+      </p>
+    )
+  }
+
+  {
+    unparseable && (
+      <div class="usa-alert usa-alert--error" role="alert">
+        <div class="usa-alert__body">
+          <h2 class="usa-alert__heading">That is not a citation this site can read</h2>
+          <p class="usa-alert__text">{unparseable}</p>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    found && !found.exists && (
+      <div class="usa-alert usa-alert--warning" role="alert">
+        <div class="usa-alert__body">
+          <h2 class="usa-alert__heading">
+            Read as <code>{found.identifier}</code> — which is not here
+          </h2>
+          <p class="usa-alert__text">
+            {found.message ??
+              `Nothing is published at ${found.section_identifier}${
+                found.release ? ` at release point ${found.release.label}` : ""
+              }. The citation itself parsed cleanly, so this is a gap in the Code or in what is loaded — not a typo this page can see.`}
+          </p>
+          <p class="usa-alert__text">
+            <a href={appHref(`/us/usc/t${found.title_num}`)}>
+              Open Title {found.title_num} and look from there
+            </a>
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  <p class="toc-group">Forms that work</p>
+  <ul class="toc citejump__examples">
+    {
+      EXAMPLES.map((example) => (
+        <li>
+          <a href={`/app/goto?q=${encodeURIComponent(example)}`}>
+            <code>{example}</code>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+
+  <p class="doc-meta">
+    Subdivisions keep their case — <code>(B)</code> is not <code>(b)</code> — because USLM
+    identifiers distinguish them.
+  </p>
+</Base>

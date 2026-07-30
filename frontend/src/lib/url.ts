@@ -55,6 +55,12 @@ export function provisionsHref(): string {
   return `${APP}/provisions`;
 }
 
+/** `/app/goto?q=…` — where the citation box posts. A plain GET target, so the
+ * box needs no JavaScript and the result is a URL worth pasting. */
+export function gotoHref(query?: string | null): string {
+  return query ? `${APP}/goto?q=${encodeURIComponent(query)}` : `${APP}/goto`;
+}
+
 /** `/app/login`, carrying where to return to after signing in. */
 export function loginHref(next?: string | null): string {
   return next ? `${APP}/login?next=${encodeURIComponent(next)}` : `${APP}/login`;
