@@ -1,18 +1,22 @@
 ---
 import Layout from "../layouts/Base.astro";
-import { APP } from "../lib/url";
+import { APP, appHref } from "../lib/url";
 
 const query = Astro.url.searchParams.get("q");
 const offset = Number(Astro.url.searchParams.get("offset") || "0");
+// Absent means the default the API applies: the text in force now (ADR-0022).
+const release = Astro.url.searchParams.get("release");
 
-let data = { results: [], total: 0 };
+let data = { results: [], total: 0, release: null, note: null };
 let error = null;
 
 if (query) {
   try {
     // SSR calls the API by service name
     const apiBase = process.env.API_BASE_URL || "http://api:8001";
-    const res = await fetch(`${apiBase}/api/v1/search?q=${encodeURIComponent(query)}&offset=${offset}`);
+    const params = new URLSearchParams({ q: query, offset: String(offset) });
+    if (release) params.set("release", release);
+    const res = await fetch(`${apiBase}/api/v1/search?${params}`);
     if (res.ok) {
       data = await res.json();
     } else {
@@ -22,6 +26,13 @@ if (query) {
     error = e.message;
   }
 }
+
+/** Paging keeps whatever release the search was made at. */
+function pageHref(nextOffset: number): string {
+  const params = new URLSearchParams({ q: query!, offset: String(nextOffset) });
+  if (release) params.set("release", release);
+  return `?${params}`;
+}
 ---
 
 <Layout title={query ? `Search: ${query}` : "Search"}>
@@ -30,6 +41,7 @@ if (query) {
     <form class="usa-search" role="search" action={`${APP}/search`} method="get" style="margin-bottom: 2rem;">
       <label class="usa-sr-only" for="search-field-main">Search</label>
       <input class="usa-input" id="search-field-main" type="search" name="q" value={query || ""} />
+      {release && <input type="hidden" name="release" value={release} />}
       <button class="usa-button" type="submit">
         <span class="usa-search-submit-text">Search</span>
       </button>
@@ -38,17 +50,32 @@ if (query) {
     {error && <div class="usa-alert usa-alert--error"><div class="usa-alert__body"><p class="usa-alert__text">{error}</p></div></div>}
     
     {query && !error && (
-      <p>Found {data.total} results for <strong>{query}</strong>.</p>
-      
+      <Fragment>
+      <p>
+        Found {data.total} results for <strong>{query}</strong>
+        {data.release
+          ? <> in the text as of release point <strong>{data.release}</strong>.</>
+          : <>, searching the law currently in force.</>}
+      </p>
+
+      {data.note && (
+        <div class="usa-alert usa-alert--info usa-alert--slim">
+          <div class="usa-alert__body"><p class="usa-alert__text">{data.note}</p></div>
+        </div>
+      )}
+
       <ul class="usa-list--unstyled">
         {data.results.map((result: any) => (
           <li style="margin-bottom: 2rem;">
             <h3>
-              <a href={`/us/usc/${result.identifier}`}>
+              <a href={appHref(result.identifier)}>
                 {result.num ? `${result.num} ` : ""}{result.heading || result.identifier}
               </a>
             </h3>
-            <p style="font-size: 0.9em; color: #555; margin-top: 0; margin-bottom: 0.5rem;">{result.identifier}</p>
+            <p style="font-size: 0.9em; color: #555; margin-top: 0; margin-bottom: 0.5rem;">
+              {result.identifier}
+              {result.first_release && <> · unchanged since {result.first_release}</>}
+            </p>
             {result.snippets.map((snippet: any) => (
               <blockquote style="font-size: 0.95em; border-left: 4px solid #005ea2; padding-left: 1rem; margin-top: 0.5rem; background-color: #f0f0f0; padding: 0.5rem 1rem;" set:html={snippet.text}>
               </blockquote>
@@ -59,12 +86,13 @@ if (query) {
       
       <div style="display: flex; gap: 1rem; margin-top: 2rem;">
         {offset > 0 && (
-           <a href={`?q=${encodeURIComponent(query)}&offset=${Math.max(0, offset - 20)}`} class="usa-button usa-button--outline">Previous Page</a>
+           <a href={pageHref(Math.max(0, offset - 20))} class="usa-button usa-button--outline">Previous Page</a>
         )}
         {data.total > offset + 20 && (
-           <a href={`?q=${encodeURIComponent(query)}&offset=${offset + 20}`} class="usa-button usa-button--outline">Next Page</a>
+           <a href={pageHref(offset + 20)} class="usa-button usa-button--outline">Next Page</a>
         )}
       </div>
+      </Fragment>
     )}
   </div>
 </Layout>
