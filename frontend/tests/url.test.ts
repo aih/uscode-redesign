@@ -11,6 +11,8 @@ import {
   loginHref,
   provisionLabel,
   provisionsHref,
+  safeNext,
+  searchHref,
   signupHref,
   trimNum,
   unpadTitle,
@@ -182,5 +184,75 @@ describe("apiDiffHref", () => {
     expect(apiDiffHref("/us/usc/t16/s45a\u20131", "119-99", "119-100")).toContain(
       "/sections/us/usc/t16/s45a%E2%80%931/diff",
     );
+  });
+});
+
+describe("safeNext", () => {
+  // The auth forms carry `?next=` into `window.location.assign`. Untrusted, that
+  // is an open redirect and a `javascript:` sink on the two pages in the app
+  // where a password is being typed — so this is an allowlist, and these are the
+  // cases the allowlist exists for.
+
+  it("allows a path inside the reader, query string and all", () => {
+    expect(safeNext("/app/us/usc/t16/s45f")).toBe("/app/us/usc/t16/s45f");
+    expect(safeNext("/app/us/usc/t16/s45f?release=119-99")).toBe(
+      "/app/us/usc/t16/s45f?release=119-99",
+    );
+  });
+
+  it("falls back when there is nothing to go back to", () => {
+    expect(safeNext(null)).toBe(provisionsHref());
+    expect(safeNext(undefined)).toBe(provisionsHref());
+    expect(safeNext("")).toBe(provisionsHref());
+  });
+
+  it("rejects an absolute URL on another origin", () => {
+    expect(safeNext("https://evil.example/")).toBe(provisionsHref());
+    expect(safeNext("http://evil.example/app/provisions")).toBe(provisionsHref());
+  });
+
+  it("rejects a protocol-relative URL, which is an authority and not a path", () => {
+    expect(safeNext("//evil.example/")).toBe(provisionsHref());
+    expect(safeNext("/\\evil.example/")).toBe(provisionsHref());
+    expect(safeNext("\\\\evil.example/")).toBe(provisionsHref());
+  });
+
+  it("rejects javascript:, including the whitespace-obfuscated form", () => {
+    expect(safeNext("javascript:alert(1)")).toBe(provisionsHref());
+    // Browsers ignore control characters when parsing a URL, so a denylist that
+    // matched the literal string would miss this one and `assign` would not.
+    expect(safeNext("java\tscript:alert(1)")).toBe(provisionsHref());
+    expect(safeNext("java\nscript:alert(1)")).toBe(provisionsHref());
+    expect(safeNext(" javascript:alert(1)")).toBe(provisionsHref());
+    expect(safeNext("data:text/html,<script>alert(1)</script>")).toBe(provisionsHref());
+  });
+
+  it("rejects a path outside the reader, including one that merely starts like it", () => {
+    expect(safeNext("/api/v1/us/usc/t16/s45f")).toBe(provisionsHref());
+    expect(safeNext("/appearances")).toBe(provisionsHref());
+    expect(safeNext("/app")).toBe(provisionsHref());
+  });
+});
+
+describe("searchHref", () => {
+  it("builds a plain keyword search", () => {
+    expect(searchHref("navigable waters")).toBe("/app/search?q=navigable+waters");
+  });
+
+  it("marks a cites query, so the results page can say what it actually did", () => {
+    expect(searchHref("26 usc 501", { cites: true })).toBe(
+      "/app/search?q=26+usc+501&cites=1",
+    );
+  });
+
+  it("carries a release point when the search was pinned to one", () => {
+    expect(searchHref("waters", { release: "119-99" })).toBe(
+      "/app/search?q=waters&release=119-99",
+    );
+  });
+
+  it("encodes the characters that would otherwise change the query", () => {
+    expect(searchHref("11 U.S.C. § 523")).toContain("%C2%A7");
+    expect(searchHref("a&b")).toContain("a%26b");
   });
 });

@@ -5,12 +5,14 @@
  */
 import Base from "../layouts/Base.astro";
 import { setNoStore } from "../lib/cache";
-import { loginHref } from "../lib/url";
+import { loginHref, safeNext } from "../lib/url";
 
 // Same reason as login: a credential form, never cached.
 setNoStore(Astro.response.headers);
 
-const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
+// Validated server-side, for the reason spelled out in `login.astro` — this
+// page carried the identical open-redirect and `javascript:` sink.
+const next = safeNext(Astro.url.searchParams.get("next"));
 ---
 
 <Base title="Sign up · U.S. Code">
@@ -66,7 +68,8 @@ const next = Astro.url.searchParams.get("next") ?? "/app/provisions";
       });
 
       if (response.ok) {
-        window.location.assign(form.dataset.next || "/app/provisions");
+        // Already validated server-side by `safeNext`.
+        window.location.assign(form.dataset.next);
         return;
       }
 

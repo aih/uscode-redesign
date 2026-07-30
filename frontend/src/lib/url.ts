@@ -76,15 +76,88 @@ export function apiDiffHref(identifier: string, from: string, to: string): strin
   return `${API}/sections${encodePath(identifier)}/diff?${new URLSearchParams({ from, to }).toString()}`;
 }
 
+/** `/app/preview/…` — the hover preview of a cited provision (ADR-0024).
+ *
+ * An Astro *endpoint*, not a page: it returns the rendered fragment so no USLM
+ * renderer reaches the browser. It goes through `encodePath` for the same
+ * reason everything else here does, and that is not theoretical — `CitePreview`
+ * used to build this string inline, so hovering a citation in any of the 5,697
+ * sections whose number contains U+2013 requested a malformed URL. */
+export function previewHref(identifier: string, release?: string | null): string {
+  return `${APP}/preview${encodePath(identifier)}${query({ release })}`;
+}
+
 /** `/app/provisions` — the reader's one watchlist page (Day 5). */
 export function provisionsHref(): string {
   return `${APP}/provisions`;
 }
 
-/** `/app/goto?q=…` — where the citation box posts. A plain GET target, so the
- * box needs no JavaScript and the result is a URL worth pasting. */
+/**
+ * Validate a `?next=` destination before navigating to it.
+ *
+ * `loginHref`/`signupHref` put a return destination in the query string and the
+ * auth forms navigate to it after a successful `fetch`. Taken at face value —
+ * which is what both pages used to do — that is two live holes at the exact
+ * moment someone is typing a password:
+ *
+ *   - `?next=https://evil.example/` is an **open redirect** off the trusted
+ *     origin, straight from the login form to a copy of it.
+ *   - `?next=javascript:…` is script execution in this page's **own origin**,
+ *     because `window.location.assign` honours that scheme.
+ *
+ * So the rule is an allowlist, not a denylist: the value must be a path on this
+ * origin under `/app/`. Anything else — any scheme, any authority, any path
+ * outside the reader — falls back to the watchlist page. A denylist here would
+ * be a losing game (`java\nscript:`, `//evil`, `/\evil`, `%6a%61…`); "starts
+ * with /app/ and contains no scheme or authority" is checkable.
+ */
+export function safeNext(value: string | null | undefined): string {
+  const fallback = provisionsHref();
+  if (!value) return fallback;
+
+  // Strip the control characters browsers ignore when parsing a URL: without
+  // this, `java\tscript:alert(1)` reads as a path here and as a scheme there.
+  const candidate = value.replace(/[\x00-\x1f\x7f\s]/gu, "");
+  if (!candidate) return fallback;
+
+  // A leading `//` (or `/\`) is protocol-relative — an authority, not a path.
+  if (/^[/\\]{2}/u.test(candidate)) return fallback;
+  // Any scheme at all. A colon before the first `/` means the string is naming
+  // something other than a path on this origin.
+  const firstSlash = candidate.indexOf("/");
+  const firstColon = candidate.indexOf(":");
+  if (firstColon !== -1 && (firstSlash === -1 || firstColon < firstSlash)) {
+    return fallback;
+  }
+  // And after all that it still has to be a page in this reader.
+  if (!candidate.startsWith(`${APP}/`)) return fallback;
+  return candidate;
+}
+
+/** `/app/goto?q=…` — where the site's one search box posts. A plain GET target,
+ * so the box needs no JavaScript and the result is a URL worth pasting.
+ *
+ * It is named for what it does most of the time rather than for everything it
+ * does: `/app/goto` is a router now, and a query it cannot read as a citation
+ * ends up at `searchHref` instead. */
 export function gotoHref(query?: string | null): string {
   return query ? `${APP}/goto?q=${encodeURIComponent(query)}` : `${APP}/goto`;
+}
+
+/** `/app/search?q=…` — keyword results.
+ *
+ * `cites` marks a query that arrived as `cites <citation>`: a request for the
+ * provisions that *cite* one, which this site cannot answer yet and answers as
+ * a keyword search over the subject, saying so on the page. The flag is what
+ * lets it say so. See `docs/citation-index-plan.md`. */
+export function searchHref(
+  query: string,
+  opts: { cites?: boolean; release?: string | null } = {},
+): string {
+  const params = new URLSearchParams({ q: query });
+  if (opts.release) params.set("release", opts.release);
+  if (opts.cites) params.set("cites", "1");
+  return `${APP}/search?${params.toString()}`;
 }
 
 /** `/app/login`, carrying where to return to after signing in. */
