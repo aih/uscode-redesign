@@ -30,6 +30,8 @@ const PAGES = [
   ["search", "/app/search?q=conservation"],
   ["syntax", "/app/search/syntax"],
   ["docs", "/app/docs"],
+  // Session 15: the page the footer disclaimer now leads to.
+  ["about", "/app/about"],
 ];
 
 const WIDTHS = [
