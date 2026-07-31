@@ -26,7 +26,11 @@ test("the syntax guide is reachable from a search that found nothing", async ({ 
   // is missing, a reader who mistyped has no way to discover `~1`.
   await page.goto("/app/search?q=zzzzqqqqxxxx");
 
-  const guide = page.locator('a[href="/app/search/syntax"]').first();
+  // Scoped to `main`: the header's explainer popover now links to the guide
+  // too, and an unscoped `.first()` picks that one — which is closed, and
+  // therefore hidden. What this test is about is the escape hatch on the
+  // results page, so it has to say so.
+  const guide = page.locator('main a[href="/app/search/syntax"]').first();
   await expect(guide).toBeVisible();
   await guide.click();
   await expect(page).toHaveURL(/\/app\/search\/syntax/);
@@ -209,4 +213,94 @@ test("target=_blank never ships without rel=noopener", async ({ page }) => {
     ).length,
   );
   expect(unprotected).toBe(0);
+});
+
+/* ------------------------------------------- the "i" beside the search box
+ *
+ * One box does two jobs and the placeholder only shows one of them, so the
+ * keyword half — and the fact that OpenSearch is underneath it, with its
+ * operators available — was discoverable only by finding the guide first. The
+ * guide was linked from the footer, from About and from a search that found
+ * nothing: everywhere except beside the box it describes.
+ */
+
+const INFO = ".navtools .sitesearch__info";
+const INFO_PANEL = "#site-q-info";
+
+test("the search box carries an explainer naming OpenSearch", async ({ page }) => {
+  await page.goto("/app/us/usc/t16/s45f");
+
+  const trigger = page.locator(INFO);
+  await expect(trigger).toBeVisible();
+  // Enabled and named, for the reason `ComingSoon` is: the explanation has to
+  // reach a keyboard and a screen reader, not only a pointer that hovers.
+  await expect(trigger).toBeEnabled();
+  await expect(trigger).toHaveAccessibleName(/keyword search/i);
+  await expect(trigger).toHaveAttribute("title", /OpenSearch/);
+
+  // It sits after the label, which is what "an (i) after the text" means when
+  // the DOM order is what a screen reader follows.
+  const order = await page.evaluate(() => {
+    const label = document.querySelector(".navtools .sitesearch__label")!;
+    const info = document.querySelector(".navtools .sitesearch__info")!;
+    return label.compareDocumentPosition(info) & Node.DOCUMENT_POSITION_FOLLOWING;
+  });
+  expect(order).toBeTruthy();
+
+  await trigger.click();
+  const panel = page.locator(INFO_PANEL);
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("OpenSearch");
+  await expect(panel).toContainText("query syntax");
+});
+
+test("the explainer leads to the syntax guide", async ({ page }) => {
+  await page.goto("/app/");
+  await page.locator(INFO).click();
+
+  await page.locator(`${INFO_PANEL} a[href="/app/search/syntax"]`).click();
+  await expect(page).toHaveURL(/\/app\/search\/syntax/);
+  await expect(page.locator("h1")).toContainText("Search and citation guide");
+});
+
+test("the explainer opens and closes without JavaScript of ours", async ({ page }) => {
+  // `popover` supplies the top layer, Escape and light dismiss (ADR-0024). The
+  // box itself is a plain GET form that works with scripting off (ADR-0023), so
+  // explaining it must not be the thing that needs a script.
+  await page.goto("/app/");
+
+  await page.locator(INFO).click();
+  await expect(page.locator(INFO_PANEL)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(INFO_PANEL)).toBeHidden();
+
+  // And the button must not submit the form it lives in.
+  await page.locator(INFO).click();
+  await expect(page).toHaveURL(/\/app\/$/);
+});
+
+test("the explainer is not inside the label, so it opens rather than focusing the input", async ({
+  page,
+}) => {
+  // A control nested in a `<label>` gets the label's click stolen from it: the
+  // input takes focus and the panel never opens.
+  await page.goto("/app/");
+
+  const nested = await page.locator(".navtools .sitesearch__label .sitesearch__info").count();
+  expect(nested).toBe(0);
+
+  await page.locator(INFO).click();
+  await expect(page.locator(INFO_PANEL)).toBeVisible();
+});
+
+test("the explainer is reachable by finger as well as by mouse", async ({ page }) => {
+  // The circle is 18px, which is what the label's line can afford; the target
+  // is grown past it with `::after` so the hit area is honest without the
+  // layout — and `--sticky-h` — growing. Asserted by clicking the corner of the
+  // 44px box, which misses the circle entirely.
+  await page.goto("/app/");
+
+  const box = (await page.locator(INFO).boundingBox())!;
+  await page.mouse.click(box.x - 8, box.y + box.height / 2);
+  await expect(page.locator(INFO_PANEL)).toBeVisible();
 });

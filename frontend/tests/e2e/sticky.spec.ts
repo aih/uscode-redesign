@@ -104,6 +104,53 @@ for (const size of WIDTHS) {
   });
 }
 
+test.describe("the search box's explainer costs the chrome nothing", () => {
+  /**
+   * The "i" beside the search label is 18px in a 13px line, so on its own it
+   * made every sticky stack from 640px up 5px taller — measured, not assumed.
+   * A negative block margin takes that back out of the outer height.
+   *
+   * This asserts the *difference* rather than a number, by removing the button
+   * from the layout on the same page and re-measuring: an absolute figure would
+   * only re-state what the assertions above already check against the token,
+   * and would drift with every other change to the chrome. The delta is the
+   * thing this control owes.
+   */
+  for (const size of WIDTHS) {
+    test(`at ${size.name} (${size.width}px) the stack is the same height with and without it`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await page.goto(SECTION);
+      await page.evaluate(() => window.scrollTo(0, 3000));
+      await page.waitForTimeout(300);
+
+      const measure = () =>
+        page.evaluate(() => {
+          let bottom = 0;
+          for (const element of document.querySelectorAll("body *")) {
+            const style = getComputedStyle(element);
+            if (style.position !== "sticky" && style.position !== "fixed") continue;
+            const box = element.getBoundingClientRect();
+            // `top < 400` keeps this to the chrome at the top of the viewport
+            // rather than anything pinned elsewhere on the page.
+            if (box.height > 0 && box.top < 400 && box.bottom > bottom) bottom = box.bottom;
+          }
+          return Math.round(bottom);
+        });
+
+      const withInfo = await measure();
+      await page.evaluate(() => {
+        (document.querySelector(".sitesearch__info") as HTMLElement).style.display = "none";
+      });
+      await page.waitForTimeout(200);
+      const withoutInfo = await measure();
+
+      expect(withInfo).toBe(withoutInfo);
+    });
+  }
+});
+
 test.describe("what sticks at each width", () => {
   test("a phone pins only the section bar", async ({ page }) => {
     // The whole stack would be ~280px of a 660px viewport — reading statutory
