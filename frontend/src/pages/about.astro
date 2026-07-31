@@ -54,9 +54,9 @@ setPublicCache(Astro.response.headers, null, false);
             class="usa-link usa-link--external"
             rel="noopener"
             href="https://uscode.house.gov/">uscode.house.gov</a
-          >. Nothing here amends, replaces or interprets what they publish — every page
-          on this site names the release point its text came from and links to the source
-          file it was parsed out of.
+          >. Nothing here amends, replaces or interprets what they publish. Every page on
+          this site names the release point its text came from and links to the source
+          file it was parsed from.
         </p>
       </div>
     </div>
@@ -65,19 +65,19 @@ setPublicCache(Astro.response.headers, null, false);
   <h2 class="toc-group">What it is for</h2>
 
   <p>
-    One question, asked well: <em>what did this provision say, at this moment?</em> The
-    Code is republished in full at every release point, and a release point is named for
-    the last public law it incorporates. That makes "the current text" easy to find and
-    the text as it stood two Congresses ago surprisingly hard.
+    This site answers one question: <em>what did this provision say at a given moment?</em>
+    The Code is republished in full at every release point, and each release point is named
+    for the last public law it includes. Finding the current text of a section is easy;
+    finding what it said two Congresses ago is not.
   </p>
 
   <p>
-    So every URL here carries a release point, and the URL scheme mirrors the USLM
-    <code>@identifier</code> the official XML already uses — <code
+    So every URL here carries a release point, and the URL scheme follows the USLM
+    <code>@identifier</code> already used in the official XML. <code
       >/us/usc/t16/s45f/c/5</code
-    > is subsection (c)(5) of section 45f of title 16. Add <code>?release=</code> or{" "}
-    <code>?date=</code> and you get that provision as it stood then. A citation you can
-    write down by looking at it, and one that keeps answering.
+    > is subsection (c)(5) of section 45f of title 16; add <code>?release=</code> or{" "}
+    <code>?date=</code> and you get that provision as it stood then. The citation is
+    readable on sight, and it still works later.
   </p>
 
   <h2 class="toc-group">How to check anything on it</h2>
@@ -115,10 +115,9 @@ setPublicCache(Astro.response.headers, null, false);
   </ul>
 
   <p>
-    Every section page links to its own version history, which lists each release point
-    where its text changed, and to a redline between any two of them. That is the check
-    worth knowing about: if this site has something wrong, the redline against the source
-    XML is where it shows.
+    Every section page links to its own version history, listing each release point where
+    the text changed, and to a redline between any two of them. If something here is
+    wrong, that is where it will show.
   </p>
 
   <h2 class="toc-group">How it is built</h2>
@@ -126,9 +125,9 @@ setPublicCache(Astro.response.headers, null, false);
   <p>
     The corpus is the official USLM XML — 3,153 title-releases across 58 titles and 381
     release points — parsed and stored section by section. Text that a release point
-    republished unchanged is stored once, which is what makes the whole history fit:
-    about 91% of it deduplicates, because the Code republishes every title at every
-    release point whether or not anything in it moved.
+    republished unchanged is stored once, avoiding duplication. About 91% of the stored
+    text is a republication, because the Code republishes every title at every release
+    point, whether there were changes to it or not.
   </p>
 
   <p class="doc-meta">
@@ -141,7 +140,7 @@ setPublicCache(Astro.response.headers, null, false);
   </p>
 
   <p class="doc-meta">
-    Some parts of the site are described here and not switched on yet — accounts and bulk
-    downloads. The controls for those say so where they appear, rather than being hidden.
+    Two things described here are not switched on yet: accounts and bulk downloads. Their
+    controls say so where they appear, instead of being hidden.
   </p>
 </Base>

@@ -55,16 +55,16 @@ const RELEASE_EXAMPLE = {
   <h1 class="doc-title">Search and citation guide</h1>
 
   <p class="lede">
-    There is one box in the header and it answers two kinds of question. Type a
-    citation and it goes straight there; type anything else and it searches the text.
-    Nothing tells it which you meant — it reads what you wrote.
+    There is one box in the header and it answers two kinds of question. Type a citation
+    and it goes straight there; type anything else and it searches the text. You do not
+    have to tell it which you meant — it reads what you wrote.
   </p>
 
   <p>
-    Both halves can be asked about a moment in time rather than about today. A citation
-    takes a release point and lands on the provision as it stood then; a search takes one
-    too, though only from the URL so far and with a limit worth reading before you rely on
-    it — <a href="#release">searching at a release point</a> is the section for that.
+    Both halves can also ask about the past. A citation can name a release point and land
+    on the provision as it stood then, and a search can name one too — though only through
+    the URL for now, and with a limit worth reading first. See{" "}
+    <a href="#release">searching at a release point</a>.
   </p>
 
   <nav class="apidocs__contents" aria-label="On this page">
@@ -76,8 +76,8 @@ const RELEASE_EXAMPLE = {
   <h2 class="toc-group" id="citations">Going to a citation</h2>
 
   <p>
-    Every form below is one this site accepts, followed by the official identifier it
-    resolves to. Select any example to try it.
+    Each of these forms works, and each is followed by the official identifier it resolves
+    to. Select any example to try it.
   </p>
 
   <ul class="syntax-list">
@@ -196,15 +196,15 @@ const RELEASE_EXAMPLE = {
   <h2 class="toc-group" id="release">Searching at a release point</h2>
 
   <p class="lede">
-    Every page of this site can be asked for a moment in time, and search is no exception —
-    but it is the one place where the answer is not yet complete, so here is exactly how to
-    ask and exactly what comes back.
+    You can search the Code as it stood at a past release point. This is the one place on
+    the site where the answer is not yet complete, so both halves are set out below: how to
+    ask, and what comes back.
   </p>
 
   <p>
-    There is no control for this in the search box yet. You add the release point to the
-    results URL, using either of the two parameters a citation URL takes: the label of a
-    release point, or a date that resolves to the one in force on it.
+    The search box has no control for this yet, so you add the release point to the results
+    URL. There are two parameters, the same two a citation URL takes: the label of a
+    release point, or a date.
   </p>
 
   <ul class="syntax-list">
@@ -214,10 +214,10 @@ const RELEASE_EXAMPLE = {
         <span class="syntaxop__name">by release point</span>
       </p>
       <p class="syntaxop__what">
-        The label as the Office of the Law Revision Counsel writes it, including the
-        awkward ones — <code>119-102not101</code> is a release point current through Public
-        Law 119-102 <em>except</em> 119-101. The{" "}
-        <a href={`${APP}/releases`}>release points page</a> lists them all.
+        The label as the Office of the Law Revision Counsel writes it, awkward ones
+        included: <code>119-102not101</code> is current through Public Law 119-102{" "}
+        <em>except</em> 119-101. The <a href={`${APP}/releases`}>release points page</a>{" "}
+        lists them all.
       </p>
       <p class="syntaxop__try">
         <a href={searchHref(RELEASE_EXAMPLE.query, { release: RELEASE_EXAMPLE.release })}>
@@ -231,9 +231,9 @@ const RELEASE_EXAMPLE = {
         <span class="syntaxop__name">by date</span>
       </p>
       <p class="syntaxop__what">
-        <code>MM/DD/YYYY</code>, resolved to the release point in force on that day, which
-        is usually easier than knowing a label. The results page names the release point it
-        landed on, so you can always see which one answered.
+        <code>MM/DD/YYYY</code>, resolved to the release point in force on that day. Usually
+        easier than looking up a label. The results page names the release point it landed
+        on, so you can see which one answered.
       </p>
       <p class="syntaxop__try">
         <a href={searchHref(RELEASE_EXAMPLE.query, { date: RELEASE_EXAMPLE.date })}>

@@ -107,12 +107,12 @@ const UNCHANGED_NOTE: Record<SourceDelta, string> = {
     "Both release points serve the same stored text, so nothing in the " +
     "section's words or its markup differs.",
   "guids-only":
-    "The stored XML differs only in its @id guids, which are a pin on " +
-    "(provision, release point) rather than anything the law says.",
+    "The stored XML differs only in its @id guids. A guid pins a " +
+    "(provision, release point) pair — it says nothing about the law itself.",
   "beyond-guids":
-    "The stored XML does differ by more than guids — whitespace, @temporalId, " +
-    "or another attribute that carries no words. This view diffs the displayed " +
-    "text only.",
+    "The stored XML differs by more than guids — whitespace, @temporalId, " +
+    "or another attribute that carries no words. This view diffs only the " +
+    "displayed text.",
 };
 
 // The guids, which are the metadata most likely to have moved. `guid` is
@@ -213,9 +213,9 @@ const title = after
             {fragmentFrom && (
               <>
                 The <code>@id</code> attributes inside the XML above are those of{" "}
-                <strong>{fragmentFrom}</strong>, where this text first appeared —
-                identical content is stored once, so the fragment carries the
-                guids of that release rather than of either one being compared.
+                <strong>{fragmentFrom}</strong>, where this text first appeared.
+                Identical content is stored once, so the fragment carries that
+                release's guids, not the guids of either release being compared.
               </>
             )}
           </p>
@@ -272,8 +272,8 @@ const title = after
                 href={`${sourceToggleHref(true)}#source`}
                 rel="nofollow"
                 data-source-render
-              >available as a source redline</a>. It is computed on request because it is
-              the expensive one.
+              >available as a source redline</a>. It is computed only when you ask for it,
+              because it is expensive to produce.
             </p>
           )}
 
@@ -283,7 +283,7 @@ const title = after
                 The verbatim USLM, redlined.{" "}
                 {source.inserted === 0 && source.deleted === 0
                   ? "The two fragments are byte-for-byte identical."
-                  : `${source.inserted.toLocaleString()} characters added, ${source.deleted.toLocaleString()} removed — most of which is usually @id churn rather than legal change.`}{" "}
+                  : `${source.inserted.toLocaleString()} characters added, ${source.deleted.toLocaleString()} removed — most of it is usually @id churn, not legal change.`}{" "}
                 <a href={`${sourceToggleHref(false)}#source`} rel="nofollow">Hide it</a>, or take
                 it as{" "}
                 <a href={apiDiffHref(identifier, from ?? "", to ?? "")}>JSON from the API</a>.
