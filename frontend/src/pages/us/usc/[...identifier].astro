@@ -13,6 +13,7 @@
 import Base from "../../../layouts/Base.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
 import CitePreview from "../../../components/CitePreview.astro";
+import CopyColumn from "../../../components/CopyColumn.astro";
 import KeyboardNav from "../../../components/KeyboardNav.astro";
 import Neighbors from "../../../components/Neighbors.astro";
 import Provenance from "../../../components/Provenance.astro";
@@ -27,6 +28,7 @@ import {
   releaseParams,
 } from "../../../lib/api";
 import { REVALIDATE, setPublicCache } from "../../../lib/cache";
+import { ACCOUNTS_ENABLED } from "../../../lib/features";
 import { citedIdentifiers } from "../../../lib/refs";
 import type {
   Entry,
@@ -45,7 +47,7 @@ import {
   trimNum,
   versionsHref,
 } from "../../../lib/url";
-import { hrefs, parseFragment, render } from "../../../lib/uslm";
+import { copyableIdentifiers, hrefs, parseFragment, render } from "../../../lib/uslm";
 
 /** Name the subdivisions after what they actually are: a title lists chapters, a
  * chapter lists subchapters, and USLM 2.x titles have subtitles. */
@@ -87,6 +89,9 @@ let duplicateHtml: string[] = [];
 let toc: Toc | null = null;
 let section: Section | null = null;
 let titleNum: string | null = null;
+/** Every provision the copy column offers a control for — computed from the
+ *  same parsed fragment the page renders, never from the emitted HTML. */
+let copyTargets: string[] = [];
 
 if (body && isToc(body)) {
   toc = body;
@@ -141,6 +146,7 @@ if (body && isToc(body)) {
   };
   sectionHtml = render(fragment, renderOptions);
   duplicateHtml = dupFragments.map((f) => render(f, renderOptions));
+  copyTargets = copyableIdentifiers(fragment);
   title = `${trimNum(section.num)} ${section.heading ?? ""} · ${selected} · U.S. Code`;
 }
 
@@ -185,7 +191,11 @@ const bar = section
 
         <Provenance served={section.served_from} note={section.note} />
 
-        <WatchButton identifier={section.identifier} release={selected} />
+        {/* Same reasoning as the navbar's account control: an island that can
+            only ever be told 401 is a request per page view for nothing. */}
+        {ACCOUNTS_ENABLED && (
+          <WatchButton identifier={section.identifier} release={selected} />
+        )}
 
         {/* `NavStrip` used to sit here. Its prev/up/next moved into the sticky
             `SectionBar`, which carries them at every scroll position rather than
@@ -228,6 +238,12 @@ const bar = section
         {duplicateHtml.length > 0 && (
           <p class="doc-occurrence">Occurrence 1 of {duplicateHtml.length + 1}</p>
         )}
+
+        {/* Before the text, so the mode toggle is the first thing a reader
+            meets rather than something found after scrolling past the controls
+            it governs. The widget itself injects the per-provision buttons into
+            the article below. */}
+        <CopyColumn identifiers={copyTargets} release={selected} />
 
         <article class="section-body" set:html={sectionHtml} />
 
