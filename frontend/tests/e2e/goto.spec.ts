@@ -12,7 +12,14 @@
  */
 import { expect, test } from "@playwright/test";
 
-const BOX = ".sitesearch--header .sitesearch__input";
+/** There is exactly one of these on a page now.
+ *
+ * It used to be `.sitesearch--header`, distinguishing the header's box from a
+ * second, larger copy the search and go-to pages rendered in the body. That
+ * copy is gone — two identical boxes on one screen, only one of them holding
+ * the query — so the variant class went with it and the header box is simply
+ * the box. */
+const BOX = ".navtools .sitesearch__input";
 
 /** One representative of each parser shape, all naming the same provision, so a
  * failure says which *form* broke rather than which section is missing. */

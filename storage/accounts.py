@@ -72,6 +72,15 @@ class SessionRef:
 
 
 @dataclass(frozen=True, slots=True)
+class UserSettingsRef:
+    """One user's preferences. `user_id` rather than an id of its own — see
+    `db.models.UserSettings` for why the row's key is the user's key."""
+
+    user_id: uuid.UUID
+    open_links_in_new_tab: bool
+
+
+@dataclass(frozen=True, slots=True)
 class WatchlistRef:
     id: int
     user_id: uuid.UUID
@@ -160,6 +169,22 @@ class AccountsRepository(Protocol):
     def delete_expired_sessions(self, *, now: datetime.datetime) -> int:
         """Rows past their expiry are already treated as absent on read; this is
         what actually removes them. Returns how many went."""
+        ...
+
+    # ------------------------------------------------------------ settings
+
+    def get_settings(self, user_id: uuid.UUID) -> UserSettingsRef:
+        """Defaults when the user has no row yet — a user who has never changed
+        a setting costs no write, and the caller never has to tell "unset" apart
+        from "set to the default" because there is no such distinction."""
+        ...
+
+    def update_settings(
+        self, user_id: uuid.UUID, *, open_links_in_new_tab: bool
+    ) -> UserSettingsRef:
+        """Upsert: the first call for a user creates the row, later ones update
+        it. Whole-object replace, same as `update_item` — one setting today, and
+        a partial-update sentinel would cost more than it saves."""
         ...
 
     # ---------------------------------------------------------- watchlists

@@ -47,6 +47,25 @@ MAX_OFFSET = 1000
 `offset` is therefore both a 500 and heap pressure, from a query string. A
 thousand results deep is far past where a keyword search is useful anyway."""
 
+QUERY_SYNTAX_FLAGS = (
+    "AND|OR|NOT|PHRASE|PRECEDENCE|PREFIX|FUZZY|SLOP|ESCAPE|WHITESPACE"
+)
+"""Which operators `simple_query_string` will honour — ADR-0031.
+
+Every flag here is a promise the syntax guide makes, and the two must not
+drift: a flag left out is an operator the guide describes and the cluster
+silently swallows. Naming the set rather than passing `ALL` is what makes that
+checkable — `tests/test_search_syntax.py` asserts the guide and this constant
+agree.
+
+`WHITESPACE` looks like the one flag a search box would never need, and
+leaving it out is the mistake this comment exists to prevent. It does not mean
+"treat tabs as operators": it is what makes the parser *split on spaces at
+all*. Without it `water -pollution` parses to `+water +pollution` — the `-` is
+swallowed and the query returns the opposite of what was asked. Verified
+through `_validate/query?explain=true`, which is the only way to see this: the
+query is valid either way and simply means something else."""
+
 
 class SearchSnippet(BaseModel):
     field: str
@@ -122,10 +141,30 @@ def search(
             "bool": {
                 "must": [
                     {
-                        "multi_match": {
+                        # Strict by default, loose only when asked — ADR-0031.
+                        # This used to be a `multi_match` with `fuzziness:
+                        # "AUTO"`, which silently spent two edits on every term:
+                        # a search for `compare` returned `compact` and
+                        # `company`, both of which are exactly two edits away.
+                        # Nobody typing a word into a legal corpus wants a
+                        # different word back. `simple_query_string` matches the
+                        # terms as typed and leaves the edits to the reader, who
+                        # asks for them with `~`.
+                        #
+                        # It is the forgiving parser of the two on purpose:
+                        # `query_string` throws on an unbalanced quote or paren,
+                        # which on a public endpoint turns a typo into a 400.
+                        # `simple_query_string` treats the stray character as
+                        # text and answers.
+                        "simple_query_string": {
                             "query": q,
                             "fields": ["heading^2", "xml_text"],
-                            "fuzziness": "AUTO"
+                            # Every word must appear. The old default was OR,
+                            # so a two-word search ranked by "matched either"
+                            # and buried the documents that matched both.
+                            "default_operator": "and",
+                            "flags": QUERY_SYNTAX_FLAGS,
+                            "analyze_wildcard": True,
                         }
                     }
                 ],

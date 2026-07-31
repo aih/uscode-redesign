@@ -17,11 +17,11 @@
  */
 import Base from "../layouts/Base.astro";
 import ErrorPage from "../components/ErrorPage.astro";
-import SiteSearch from "../components/SiteSearch.astro";
 import { ApiError, fetchSearch, releaseParams } from "../lib/api";
 import { CITES_KEYWORD } from "../lib/query";
+import { fuzzify } from "../lib/searchsyntax";
 import type { SearchResponse } from "../lib/types";
-import { appHref, gotoHref, searchHref } from "../lib/url";
+import { appHref, gotoHref, searchHref, syntaxHref } from "../lib/url";
 import { highlightHtml } from "../lib/uslm";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
@@ -65,10 +65,8 @@ const results = data?.results ?? [];
 const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
 ---
 
-<Base title={title}>
+<Base title={title} searchValue={asCites ? `${CITES_KEYWORD} ${query}` : query}>
   <h1 class="doc-title">Search</h1>
-
-  <SiteSearch value={asCites ? `${CITES_KEYWORD} ${query}` : query} variant="page" />
 
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
@@ -115,7 +113,8 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
             </>
           ) : (
             <>Searching the law currently in force.</>
-          )}
+          )}{" "}
+          Words match as typed — <a href={syntaxHref()}>operators</a> loosen that.
         </p>
 
         {data?.note && (
@@ -131,10 +130,22 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
             <div class="usa-alert__body">
               <h3 class="usa-alert__heading">Nothing matched those words</h3>
               <p class="usa-alert__text">
-                The search covers the text of sections and the headings above them. If you
-                already know the citation — <code>11 usc 523</code>,{" "}
-                <code>16 usc 45f(c)(5)</code> — type it into the box and it will go straight
-                there rather than searching for it.
+                The search covers the text of sections and the headings above them. Every
+                word you type has to appear, so a long query narrows quickly.
+              </p>
+              {/* The single most useful thing to say to someone who got nothing
+                  back, now that the search no longer quietly tolerates two
+                  character edits per word (ADR-0031). A reader who mistyped, or
+                  who is guessing at a spelling, gets the old behaviour by
+                  asking for it — and this is where they find that out. */}
+              <p class="usa-alert__text">
+                Unsure of a spelling? Add <code>~1</code> to a word —{" "}
+                <a href={searchHref(fuzzify(query))}>
+                  <code>{fuzzify(query)}</code>
+                </a>{" "}
+                also matches words one character away. Widen a query with{" "}
+                <code>|</code>, narrow it with <code>-</code>:{" "}
+                <a href={syntaxHref()}>the full syntax</a>.
               </p>
               <p class="usa-alert__text">
                 <a href={gotoHref(query)}>Try “{query}” as a citation</a>
@@ -146,8 +157,17 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
         <ul class="toc searchresults">
           {results.map((result) => (
             <li class="searchresult">
+              {/* New tab, like a cross reference and for the same reason: a
+                  results list is something you work *through*, and following a
+                  hit should not throw away the other nineteen. `data-newtab`
+                  lets the reader's preference undo it. */}
               <h3 class="searchresult__title">
-                <a href={appHref(result.identifier, params.release)}>
+                <a
+                  href={appHref(result.identifier, params.release)}
+                  target="_blank"
+                  rel="noopener"
+                  data-newtab
+                >
                   {result.num ? `${result.num} ` : ""}
                   {result.heading || result.identifier}
                 </a>

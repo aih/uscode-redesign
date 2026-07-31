@@ -14,6 +14,7 @@ import datetime
 import uuid
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -23,6 +24,7 @@ from db.models import (
     ReleasePoint,
     Title,
     User,
+    UserSettings,
     Watchlist,
     WatchlistItem,
 )
@@ -32,6 +34,7 @@ from storage.accounts import (
     UnknownReleaseError,
     UnknownTitleError,
     UserRef,
+    UserSettingsRef,
     WatchlistItemRef,
     WatchlistRef,
 )
@@ -185,6 +188,47 @@ class PostgresAccounts:
         )
         self._session.commit()
         return int(result.rowcount or 0)
+
+    # ------------------------------------------------------------ settings
+
+    #: Mirrors `db.models.UserSettings.open_links_in_new_tab`'s column default —
+    #: kept here too because `get_settings` answers for a user with no row at
+    #: all, so there is no column default to fall back on for that read.
+    _DEFAULT_OPEN_LINKS_IN_NEW_TAB = True
+
+    def get_settings(self, user_id: uuid.UUID) -> UserSettingsRef:
+        row = self._session.get(UserSettings, user_id)
+        if row is None:
+            return UserSettingsRef(
+                user_id=user_id,
+                open_links_in_new_tab=self._DEFAULT_OPEN_LINKS_IN_NEW_TAB,
+            )
+        return UserSettingsRef(
+            user_id=row.user_id, open_links_in_new_tab=row.open_links_in_new_tab
+        )
+
+    def update_settings(
+        self, user_id: uuid.UUID, *, open_links_in_new_tab: bool
+    ) -> UserSettingsRef:
+        # Postgres `ON CONFLICT` rather than get-then-add: the row may or may not
+        # exist yet (see `_DEFAULT_OPEN_LINKS_IN_NEW_TAB` above), and a
+        # read-then-write here would race two tabs saving the same user's
+        # settings at once the same way a plain add-then-catch-IntegrityError
+        # would — one upsert statement makes the race the database's problem,
+        # not ours.
+        stmt = insert(UserSettings).values(
+            user_id=user_id, open_links_in_new_tab=open_links_in_new_tab
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[UserSettings.user_id],
+            set_={
+                "open_links_in_new_tab": stmt.excluded.open_links_in_new_tab,
+                "updated_at": func.now(),
+            },
+        )
+        self._session.execute(stmt)
+        self._session.commit()
+        return UserSettingsRef(user_id=user_id, open_links_in_new_tab=open_links_in_new_tab)
 
     # ---------------------------------------------------------- watchlists
 

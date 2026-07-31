@@ -29,7 +29,6 @@
  * explains rather than 404s.
  */
 import Base from "../layouts/Base.astro";
-import SiteSearch from "../components/SiteSearch.astro";
 import { ApiError, lookupCitation, releaseParams } from "../lib/api";
 import { setNoStore } from "../lib/cache";
 import { parseCites } from "../lib/query";
@@ -85,10 +84,11 @@ const EXAMPLES = [
 ];
 ---
 
-<Base title={query ? `No match for ${query} · U.S. Code` : "Search the U.S. Code"}>
+<Base
+  title={query ? `No match for ${query} · U.S. Code` : "Search the U.S. Code"}
+  searchValue={query}
+>
   <h1 class="doc-title">Search or go to a citation</h1>
-
-  <SiteSearch value={query} variant="page" />
 
   {
     !query && (

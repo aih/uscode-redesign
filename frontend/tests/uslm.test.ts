@@ -202,3 +202,45 @@ describe("highlightHtml", () => {
     expect(highlightHtml("&lt;")).toBe("&amp;lt;");
   });
 });
+
+describe("link target (ADR-0031)", () => {
+  const NS_ = `xmlns="http://xml.house.gov/schemas/uslm/1.0"`;
+  const opts = { target: null, release: "119-99", labels: {} };
+
+  it("opens an internal cross reference in a new tab", () => {
+    const xml = `<section ${NS_}><p><ref href="/us/usc/t16/s1">section 1</ref></p></section>`;
+    const html = render(parseFragment(xml), opts);
+    expect(html).toContain('target="_blank"');
+    // The preference undoes it by this attribute and nothing else, so a link
+    // that opts in must always be findable.
+    expect(html).toContain("data-newtab");
+  });
+
+  it("never emits target without rel=noopener", () => {
+    // `target="_blank"` alone hands the opened page a live `window.opener`
+    // handle on this one. The two must not come apart.
+    for (const href of ["/us/usc/t16/s1", "/us/stat/100/1"]) {
+      const xml = `<section ${NS_}><p><ref href="${href}">x</ref></p></section>`;
+      const html = render(parseFragment(xml), opts);
+      if (!html.includes('target="_blank"')) continue;
+      expect(html).toContain('rel="noopener"');
+    }
+  });
+
+  it("emits exactly one rel attribute on an external reference", () => {
+    // The external branch already carried `rel="noopener"`; adding a second
+    // `rel` would be invalid HTML and the browser would discard one of them —
+    // silently dropping the protection from the links that leave this site.
+    const xml = `<section ${NS_}><p><ref href="/us/stat/100/1">100 Stat. 1</ref></p></section>`;
+    const html = render(parseFragment(xml), opts);
+    const anchor = html.slice(html.indexOf("<a "), html.indexOf(">", html.indexOf("<a ")) + 1);
+    expect(anchor.match(/\srel=/gu)?.length ?? 0).toBe(1);
+  });
+
+  it("leaves an unresolvable reference alone — it is not a link", () => {
+    const xml = `<section ${NS_}><p><ref href="/us/act/1917-05-18">the Act</ref></p></section>`;
+    const html = render(parseFragment(xml), opts);
+    expect(html).not.toContain("target=");
+    expect(html).not.toContain("data-newtab");
+  });
+});

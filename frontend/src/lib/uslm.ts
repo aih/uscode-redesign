@@ -233,7 +233,26 @@ function renderRef(el: UslmElement, opts: RenderOptions): string {
   }
   const title = resolved.title ? ` title="${escapeAttr(resolved.title)}"` : "";
   const external = /^https?:\/\//u.test(resolved.href);
-  const rel = external ? ' rel="noopener" class="usa-link usa-link--external"' : "";
+  // A cross reference opens in a new tab, so that following one does not cost
+  // the reader the provision they were reading — the case this is for is
+  // "what does § 1531 say", asked in the middle of a sentence, and the answer
+  // is useless if getting it means losing the sentence.
+  //
+  // Baked into the HTML rather than applied by script, because these pages are
+  // served from a shared cache (ADR-0018) and cannot vary per reader. That
+  // makes new-tab the behaviour with scripting off, which is the right default
+  // to fail to; `data-newtab` is the handle the reader's preference uses to
+  // take it back off again (`Base.astro`).
+  //
+  // `rel="noopener"` is not optional next to `target="_blank"`: without it the
+  // opened page gets a live `window.opener` handle on this one. It is written
+  // once here rather than appended to the external case's `rel`, because two
+  // `rel` attributes on one tag is invalid HTML and the second is discarded —
+  // which would have silently dropped exactly the protection govinfo links
+  // need most.
+  const rel = external
+    ? ' target="_blank" rel="noopener" data-newtab class="usa-link usa-link--external"'
+    : ' target="_blank" rel="noopener" data-newtab';
   // `data-cite` is the hover-preview island's only hook, and it carries the
   // *identifier* rather than the href so the island never has to un-prefix
   // `/app` to build a preview URL. Internal references only: there is nothing

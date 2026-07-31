@@ -19,17 +19,21 @@ import { gotoHref } from "../lib/url";
 import { CITES_KEYWORD } from "../lib/query";
 
 interface Props {
-  /** Prefilled when a page is showing the result of a query. */
+  /** Prefilled when a page is showing the result of a query.
+   *
+   * There is exactly one of these on a page, in the header. The search and
+   * go-to pages used to render a second, larger copy in the body so the reader
+   * could see the query behind the results; that meant two identical boxes on
+   * screen with only one of them filled in. The header box is prefilled
+   * instead, through `Base`'s `searchValue`. */
   value?: string | null;
-  /** The goto and search pages render a larger copy of the same control. */
-  variant?: "header" | "page";
 }
 
-const { value = null, variant = "header" } = Astro.props;
-const id = variant === "header" ? "site-q" : "site-q-page";
+const { value = null } = Astro.props;
+const id = "site-q";
 ---
 
-<form class={`sitesearch sitesearch--${variant}`} method="get" action={gotoHref()} role="search">
+<form class="sitesearch" method="get" action={gotoHref()} role="search">
   <label class="sitesearch__label" for={id}>Search or go to a citation</label>
   <div class="sitesearch__row">
     <input

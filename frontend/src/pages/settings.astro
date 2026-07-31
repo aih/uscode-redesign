@@ -1,0 +1,204 @@
+---
+/**
+ * `/app/settings` — the signed-in reader's preferences.
+ *
+ * One setting so far: whether links open in a new tab. It is stored on the
+ * account, so it follows the reader to another browser, and *applied* in the
+ * browser, because it has to be. Reader pages are served from a shared cache
+ * (ADR-0018) and a page whose HTML depended on who asked for it would mean
+ * `Vary: Cookie` on the whole Code — the same trade ADR-0027 refused for the
+ * theme. So the markup ships the default (`target="_blank"`, `lib/uslm.ts`) and
+ * `Base.astro` adjusts it from `localStorage`, which `AuthNav` keeps in step
+ * with the account.
+ *
+ * The theme toggle is deliberately *not* moved here. It lives in the header
+ * where it is one click from any page, it works signed out, and it never
+ * touches the server — folding it into an account settings page would make a
+ * per-browser display choice look like account state.
+ *
+ * The page renders the same for everyone and the island fills it in, for the
+ * same cache reason. `no-store` all the same: what a reader sees here after the
+ * fetch resolves is theirs.
+ */
+import Base from "../layouts/Base.astro";
+import { setNoStore } from "../lib/cache";
+import { loginHref } from "../lib/url";
+
+setNoStore(Astro.response.headers);
+
+const next = "/app/settings";
+---
+
+<Base title="Settings · U.S. Code">
+  <h1 class="doc-title">Settings</h1>
+
+  <div class="settings" data-settings>
+    {/* Which of these three the reader sees is decided client-side, once
+        `/api/v1/auth/me` has answered. All three ship hidden so that none of
+        them is briefly wrong. */}
+    <p class="lede" data-role="loading">Loading your settings…</p>
+
+    <div class="usa-alert usa-alert--info" data-role="anon" hidden>
+      <div class="usa-alert__body">
+        <h2 class="usa-alert__heading">These settings belong to an account</h2>
+        <p class="usa-alert__text">
+          <a href={loginHref(next)}>Log in</a> to set how links open and have the choice
+          follow you to another browser.
+        </p>
+        <p class="usa-alert__text">
+          Without an account, links open in a new tab — which is the default either way.
+        </p>
+      </div>
+    </div>
+
+    <form class="usa-form settings__form" data-role="form" hidden>
+      <fieldset class="usa-fieldset">
+        <legend class="usa-legend">Following a link</legend>
+        <p class="doc-meta">
+          Applies to cross references inside the text of a provision, and to search
+          results. Navigation — breadcrumbs, previous and next, contents listings — always
+          stays in the current tab, because that is the reading itself rather than a
+          departure from it.
+        </p>
+
+        <div class="usa-radio">
+          <input
+            class="usa-radio__input"
+            id="link-new"
+            type="radio"
+            name="linktarget"
+            value="new"
+          />
+          <label class="usa-radio__label" for="link-new">
+            Open in a new tab
+            <span class="usa-checkbox__label-description">
+              Following a citation keeps the provision you were reading open behind it.
+            </span>
+          </label>
+        </div>
+
+        <div class="usa-radio">
+          <input
+            class="usa-radio__input"
+            id="link-same"
+            type="radio"
+            name="linktarget"
+            value="same"
+          />
+          <label class="usa-radio__label" for="link-same">
+            Open in the same tab
+            <span class="usa-checkbox__label-description">
+              The browser's back button is how you return.
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <p class="settings__status doc-meta" data-role="status" role="status" aria-live="polite">
+      </p>
+    </form>
+  </div>
+
+  <script is:inline>
+    {
+      const root = document.querySelector("[data-settings]");
+      const loading = root.querySelector('[data-role="loading"]');
+      const anon = root.querySelector('[data-role="anon"]');
+      const form = root.querySelector('[data-role="form"]');
+      const status = root.querySelector('[data-role="status"]');
+      const radios = form.querySelectorAll('input[name="linktarget"]');
+
+      function csrfToken() {
+        const match = document.cookie.match(/(?:^|; )usc_csrf=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : "";
+      }
+
+      function show(el) {
+        for (const candidate of [loading, anon, form]) candidate.hidden = candidate !== el;
+      }
+
+      function setChecked(newTab) {
+        for (const radio of radios) radio.checked = radio.value === (newTab ? "new" : "same");
+      }
+
+      /** Write through to the browser too, and tell the current page to
+       *  re-apply — otherwise the setting would not take effect until the
+       *  reader navigated somewhere else. */
+      function mirrorLocally(newTab) {
+        try {
+          localStorage.setItem("usc-linktarget", newTab ? "new" : "same");
+        } catch {
+          // No storage: the account still has it, this browser will not
+          // remember it between pages.
+        }
+        document.dispatchEvent(new CustomEvent("usc:linktarget"));
+      }
+
+      async function save(newTab) {
+        status.textContent = "Saving…";
+        for (const radio of radios) radio.disabled = true;
+        try {
+          const response = await fetch("/api/v1/settings", {
+            method: "PUT",
+            headers: { "content-type": "application/json", "x-csrf-token": csrfToken() },
+            body: JSON.stringify({ open_links_in_new_tab: newTab }),
+          });
+          if (!response.ok) {
+            // Do not mirror a value the server rejected, and put the control
+            // back to what is actually stored — a settings page that shows a
+            // choice the server did not take is worse than one that fails.
+            status.textContent = "Could not save — try again.";
+            const current = await fetch("/api/v1/settings", {
+              headers: { accept: "application/json" },
+            });
+            if (current.ok) setChecked((await current.json()).open_links_in_new_tab);
+            return;
+          }
+          const saved = await response.json();
+          setChecked(saved.open_links_in_new_tab);
+          mirrorLocally(saved.open_links_in_new_tab);
+          status.textContent = "Saved.";
+        } catch {
+          status.textContent = "Could not save — try again.";
+        } finally {
+          for (const radio of radios) radio.disabled = false;
+        }
+      }
+
+      for (const radio of radios) {
+        radio.addEventListener("change", () => {
+          if (radio.checked) save(radio.value === "new");
+        });
+      }
+
+      (async () => {
+        try {
+          const me = await fetch("/api/v1/auth/me", {
+            headers: { accept: "application/json" },
+          });
+          if (me.status === 401) {
+            show(anon);
+            return;
+          }
+          if (!me.ok) {
+            loading.textContent = "Settings are unavailable right now.";
+            return;
+          }
+          const settings = await fetch("/api/v1/settings", {
+            headers: { accept: "application/json" },
+          });
+          if (!settings.ok) {
+            loading.textContent = "Settings are unavailable right now.";
+            return;
+          }
+          const prefs = await settings.json();
+          setChecked(prefs.open_links_in_new_tab);
+          mirrorLocally(prefs.open_links_in_new_tab);
+          show(form);
+        } catch {
+          loading.textContent = "Settings are unavailable right now.";
+        }
+      })();
+    }
+  </script>
+</Base>

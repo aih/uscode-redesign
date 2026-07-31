@@ -161,6 +161,16 @@ export function searchHref(
 }
 
 /** `/app/login`, carrying where to return to after signing in. */
+/** `/app/search/syntax` — the operators the search box accepts (ADR-0031). */
+export function syntaxHref(): string {
+  return `${APP}/search/syntax`;
+}
+
+/** `/app/settings` — the signed-in reader's preferences. */
+export function settingsHref(): string {
+  return `${APP}/settings`;
+}
+
 export function loginHref(next?: string | null): string {
   return next ? `${APP}/login?next=${encodeURIComponent(next)}` : `${APP}/login`;
 }

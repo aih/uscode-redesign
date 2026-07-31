@@ -150,7 +150,7 @@ NO_STORE = "private, no-store"
 """Anything a signed-in user sees. A shared cache holding one reader's watchlist
 and handing it to the next reader is the failure this exists to prevent."""
 
-PRIVATE_PREFIXES = ("/api/v1/auth", "/api/v1/watchlist")
+PRIVATE_PREFIXES = ("/api/v1/auth", "/api/v1/watchlist", "/api/v1/settings")
 """The path prefixes that must never be cached, by path rather than by route.
 
 The routers carry `no_store` as a dependency, but a raised `HTTPException`
