@@ -13,7 +13,8 @@
  * Now the page renders both versions as reading text (`uslm.readingBlocks`) and
  * diffs *those* (`lib/diffdoc.ts`): the redline is of what the section says.
  * The source-level redline has not gone anywhere — it is what the API serves,
- * and it is linked at the foot of this page for anyone who wants the bytes.
+ * and this page renders it too, in the "Source XML" panel below, opt-in behind
+ * `?source=1` for anyone who wants the bytes.
  *
  * Two fetches rather than one call to `/sections/{id}/diff`, because the text
  * diff is computed here: the USLM vocabulary needed to turn a fragment into
@@ -110,8 +111,8 @@ const UNCHANGED_NOTE: Record<SourceDelta, string> = {
     "(provision, release point) rather than anything the law says.",
   "beyond-guids":
     "The stored XML does differ by more than guids — whitespace, @temporalId, " +
-    "or another attribute that carries no words. This view diffs what the " +
-    "section says, so it cannot show what that was:",
+    "or another attribute that carries no words. This view diffs the displayed " +
+    "text only.",
 };
 
 // The guids, which are the metadata most likely to have moved. `guid` is
@@ -185,10 +186,15 @@ const title = after
           {unchanged && delta === "beyond-guids" && (
             <>
               {" "}
-              <a href={apiDiffHref(identifier, from ?? "", to ?? "")}>
-                the source-level redline
-              </a>{" "}
-              shows it.
+              The{" "}
+              {/* No whitespace inside the anchor: Astro keeps it, and a newline
+                  becomes an underlined space hanging off the link. */}
+              <a
+                href={showSource ? "#source" : `${sourceToggleHref(true)}#source`}
+                rel="nofollow"
+                data-source-render={showSource ? undefined : ""}
+              >source-level redline</a>{" "}
+              shows the changed metadata as well.
             </>
           )}
         </p>
@@ -262,10 +268,12 @@ const title = after
               This redline is of what the section <em>says</em>. The same comparison of the
               verbatim USLM — every attribute, including the <code>@id</code> guids that
               regenerate at every release point — is{" "}
-              <a href={`${sourceToggleHref(true)}#source`} rel="nofollow">
-                available as a source redline
-              </a>
-              . It is computed on request because it is the expensive one.
+              <a
+                href={`${sourceToggleHref(true)}#source`}
+                rel="nofollow"
+                data-source-render
+              >available as a source redline</a>. It is computed on request because it is
+              the expensive one.
             </p>
           )}
 
@@ -284,6 +292,46 @@ const title = after
             </>
           )}
         </section>
+
+        {/* Asking for the source redline is a round trip that recomputes the
+            expensive diff, so the click can sit for a second or two with
+            nothing but the browser's own tab spinner to show for it. This is
+            the only thing on the page that needs script: the links work
+            without it, and this adds a "rendering…" line next to whichever one
+            was clicked. Modified clicks (new tab, new window) open elsewhere,
+            so they get no indicator on *this* page. */}
+        <script is:inline>
+          {
+            for (const link of document.querySelectorAll("a[data-source-render]")) {
+              link.addEventListener("click", (event) => {
+                if (
+                  event.defaultPrevented ||
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey ||
+                  link.dataset.rendering === "1"
+                ) {
+                  return;
+                }
+                link.dataset.rendering = "1";
+                link.setAttribute("aria-busy", "true");
+                const status = document.createElement("p");
+                status.className = "sourceload";
+                // `role="status"` rather than a bare span: the wait is the
+                // message, and a reader who cannot see the spinner still needs
+                // to be told the click did something.
+                status.setAttribute("role", "status");
+                status.innerHTML =
+                  '<span class="sourceload__spin" aria-hidden="true"></span>Rendering the source redline…';
+                // Below the sentence the link sits in, not inside it: dropping
+                // it after the anchor puts a spinner mid-clause.
+                (link.closest("p") ?? link).insertAdjacentElement("afterend", status);
+              });
+            }
+          }
+        </script>
       </>
     )
   }

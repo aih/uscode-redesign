@@ -1548,6 +1548,46 @@ main[id] {
   border-top: 1px solid var(--rule);
 }
 
+/* Both links to the panel carry `#source`, so the heading is an anchor target
+ * like any provision — and pays the same `--sticky-h` toll, or the panel lands
+ * behind the reading chrome. */
+.sourcepanel > h2 {
+  scroll-margin-top: calc(var(--sticky-h) + 0.5rem);
+}
+
+/* Rendering the source redline is a server round trip over the expensive diff.
+ * This sits beside the link that asked for it until the new page paints. */
+.sourceload {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.sourceload__spin {
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid var(--rule);
+  border-top-color: var(--link);
+  border-radius: 50%;
+  animation: sourceload-spin 0.7s linear infinite;
+}
+
+@keyframes sourceload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A spinner is decoration; the words next to it carry the message. */
+@media (prefers-reduced-motion: reduce) {
+  .sourceload__spin {
+    animation: none;
+  }
+}
+
 /* Monospace and scrollable, because this is source: it must not be re-wrapped
  * into something that reads like prose, and a long attribute value must not
  * push the page sideways. `overflow-x` on the panel keeps the horizontal scroll
