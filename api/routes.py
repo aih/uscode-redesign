@@ -283,9 +283,17 @@ def labels(
             "the answer rather than an error.",
             examples=[["/us/usc/t16/s45f", "/us/usc/t16/s1"]],
             # The list fans into one `IN (...)`, so an unbounded one is an
-            # unbounded query. The densest section in the corpus carries a few
-            # dozen cross references; 100 is well clear of that and still a
-            # bound (ADR-0029).
+            # unbounded query (ADR-0029).
+            #
+            # "The densest section carries a few dozen cross references" is what
+            # this comment used to say, and it was an estimate. Measured over
+            # all 489,738 stored versions: the densest carries 1,011, and 4,221
+            # of them carry more than 100. 3 U.S.C. § 301 has 242 distinct ones,
+            # and every reader request for it was a 422 here and a 500 upstairs.
+            #
+            # The bound stays — it is the protection, and a caller that needs
+            # more asks more than once (`LABELS_PER_REQUEST` in
+            # `frontend/src/lib/api.ts`, which batches to exactly this size).
             max_length=100,
         ),
     ],

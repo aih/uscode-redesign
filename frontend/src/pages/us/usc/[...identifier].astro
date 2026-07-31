@@ -120,16 +120,26 @@ if (body && isToc(body)) {
   const dupFragments = (section.duplicates ?? []).map((d) => parseFragment(d.xml));
 
   // Three calls, all server-side and all on localhost: the labels this page's
-  // citations need (one request for all of them), the neighbours, and the
-  // release points a picker can offer. There used to be a fourth — the parent
-  // node's whole table of contents, fetched to keep two fields of it — which is
-  // the Day-6 debt carried over from the Jinja reader. The breadcrumb now rides
-  // on the section itself (PLAN Day 6b).
+  // citations need (batched, `fetchLabels`), the neighbours, and the release
+  // points a picker can offer. There used to be a fourth — the parent node's
+  // whole table of contents, fetched to keep two fields of it — which is the
+  // Day-6 debt carried over from the Jinja reader. The breadcrumb now rides on
+  // the section itself (PLAN Day 6b).
+  //
+  // The labels are the one call allowed to fail. They are hover text over
+  // citations that are already links, and the section's own words are in hand
+  // before this runs — so losing them costs a tooltip, while `Promise.all`
+  // rejecting costs the reader the statute. 3 U.S.C. § 301 is where that bill
+  // came due: 242 cross references, one over-long request, 422, and a page
+  // that 500ed with its text sitting in memory.
   [labels, neighbors, releases] = await Promise.all([
     fetchLabels(
       citedIdentifiers([fragment, ...dupFragments].flatMap((f) => hrefs(f))),
       selected,
-    ),
+    ).catch((error) => {
+      console.error(`labels for ${section.identifier} at ${selected}:`, error);
+      return {};
+    }),
     fetchNeighbors(section.identifier, selected),
     fetchReleases(titleNum),
   ]);

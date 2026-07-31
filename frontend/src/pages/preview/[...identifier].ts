@@ -79,14 +79,18 @@ export const GET: APIRoute = async ({ params, url }) => {
       const heading = `${trimNum(section.num)} ${section.heading ?? ""}`.trim();
 
       // The preview's own citations get labelled too, so hover text inside a
-      // hover card is not blank. One batched call, exactly as the section page
-      // does it — worth the request, because a cross reference is often
-      // precisely what a reader is chasing when they open one of these.
+      // hover card is not blank. Batched, exactly as the section page does it —
+      // worth the requests, because a cross reference is often precisely what a
+      // reader is chasing when they open one of these.
+      //
+      // And non-fatal for the same reason as there: the `catch` below turns any
+      // throw into a note *instead of* the provision, so without this a failed
+      // label lookup would replace the text the card exists to show.
       const fragment = parseFragment(section.xml);
       const labels = await fetchLabels(
         citedIdentifiers(hrefs(fragment)),
         section.served_from.label,
-      );
+      ).catch(() => ({}));
       const cut = truncateFragment(
         render(fragment, { target: null, release: section.served_from.label, labels }),
       );
