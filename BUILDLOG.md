@@ -704,3 +704,24 @@ Session-by-session record of how this site was built. One entry per working sess
   - The e2e sticky-height assertions still pass with a third control in `.navtools`, which was the real risk of putting auth in the navbar — `--sticky-h` is unchanged.
 - **Corrected during the session:** `params.PRIVATE_PREFIXES` did not list `/api/v1/settings`, so the 401 was cacheable — every settings test passed anyway, because they all checked a 200. Test added for the error path. Two e2e specs failed correctly on the new-tab change (they asserted the current page navigates) and were rewritten to assert the popup.
 - **Open, unchanged by this session:** the `heading` field carries both a deprecated index-time `boost: 2.0` and a query-time `heading^2`; `total` is the uncollapsed hit count, so the pager over-counts on `?release=` queries; the search index still holds Session 12's 4,000-document smoke slice, so the absolute result counts above are smaller than they will be after `python -m ingest.reindex_search --recreate`.
+
+---
+
+## 029 — 2026-07-30 — Session 14b: looking at the pages
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Pull the merged `main` and fix whatever I identify in the UI.
+- **Decided / found:** Six defects, none of which was visible in the code — all six came from rendering the pages at 375px and 1280px and reading them.
+  - **An empty 72px band on every section page**, and a regression from this session's own work: removing "Log in to track this section" left `.watch-widget` holding nothing, but it reserves `min-height: 2.5rem` plus 1rem of margin either side so that swapping Add for Remove does not shift the page. The island now hides the container.
+  - **The API reference printed its own Markdown.** OpenAPI descriptions are Markdown by specification, and `main.py`'s is a bulleted list full of `code` spans — shown as text it was literal backticks and asterisks with every bullet collapsed into one run-on paragraph. `renderMarkdown` in `lib/openapi.ts` covers the four constructs the docstrings here actually use; deliberately not a dependency, since the input is our own prose and the output goes through `set:html`.
+  - **"9 endpoint s"** — the plural `s` was a second JSX expression on its own line, so a newline landed between the noun and its suffix.
+  - **The contents list read as eight rows for four groups** (`.toc li` gives every item a rule and a block layout), with FastAPI's lowercase route tags (`api`, `auth`) as the labels.
+  - **The syntax table was wrong at both ends, and the first fix made it worse.** It overflowed a phone by 135px; making the table its own scroll container fixed that and broke the desktop, because `display: block` takes the cells out of table layout and the last column was clipped at 1280px with room to spare either side. Four columns of which one is prose does not fit a 700px reading measure, so the operators are a list of blocks now. The API parameter tables keep their table and get a scrolling *wrapper*, which is the version that works in both directions.
+  - **Astro preserves whitespace inside an element**, unlike React JSX, so `<a>\n  <code>x</code>\n</a>` renders a link with underlined spaces hanging off it. Confirmed in the emitted HTML rather than assumed, then fixed in four places.
+  - Not a defect but a clear improvement while there: search snippets were OpenSearch's defaults — five fragments of 100 characters *per field*, so one result could carry ten disconnected shards cut mid-clause. Now two fragments of 220, with the heading highlight used *as* the result title rather than repeated beneath it.
+- **Produced:** branch `fix/ui-followups`, commit 4abf952, plus this entry.
+- **Verified:**
+  - `make test` **441**, `make test-web` **159**, `make test-e2e` **53** — all green.
+  - **`make shots` now covers `/app/search`, `/app/search/syntax` and `/app/docs`** at both widths. That script asserts no horizontal overflow, and it is what caught the 135px table; the docs page earns its place there because it renders a parameter table per endpoint, which is the thing most likely to push a phone sideways. Re-check with `make shots` — it exits non-zero on overflow.
+  - Dark mode checked on the new pages by driving the header toggle.
+- **Method note worth keeping:** every one of these was invisible to the test suites, which were green throughout, and invisible to `astro check`, which reported 0 errors throughout. Rendering the page and looking at it is a distinct verification step from running the tests, and this session is the argument for doing it before saying a UI is done.

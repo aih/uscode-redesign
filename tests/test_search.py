@@ -258,3 +258,32 @@ def test_search_enables_the_operators_the_guide_documents(client, search_client)
     assert flags == QUERY_SYNTAX_FLAGS
     assert "WHITESPACE" in flags.split("|")
     assert "FUZZY" in flags.split("|")
+
+
+def test_search_highlights_are_sized_for_reading(client, search_client):
+    """Snippet defaults were tuned for a log search, not for statutory prose.
+
+    OpenSearch's defaults are five fragments of 100 characters *per field*, so
+    one result could carry ten disconnected shards — more text than the
+    provision's own heading, each one cut mid-clause.
+    """
+    client.get("/api/v1/search?q=conservation")
+
+    highlight = _body(search_client)["highlight"]
+
+    assert highlight["fields"]["xml_text"]["number_of_fragments"] == 2
+    assert highlight["fields"]["xml_text"]["fragment_size"] > 100
+    # The heading is one line; more than one fragment of it is the same line
+    # twice.
+    assert highlight["fields"]["heading"]["number_of_fragments"] == 1
+    # A field that did not match contributes nothing, rather than the opening
+    # of every section in the corpus.
+    assert highlight["no_match_size"] == 0
+
+
+def test_the_release_query_highlights_the_same_way(client, search_client):
+    """The collapse branch reuses the highlight block, so it must not drift."""
+    client.get("/api/v1/search?q=conservation&release=119-99")
+
+    body = _body(search_client)
+    assert body["collapse"]["inner_hits"]["highlight"] == body["highlight"]

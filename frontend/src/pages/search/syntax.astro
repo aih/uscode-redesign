@@ -51,10 +51,10 @@ setPublicCache(Astro.response.headers, null, false);
         </p>
         <p>
           If you are unsure of a spelling, add <code>~1</code> to the word:{" "}
-          <a href={searchHref("conservation~1")}>
-            <code>conservation~1</code>
-          </a>{" "}
-          finds provisions containing anything within one character edit of it.
+          {/* No whitespace inside the anchor: a newline around the `<code>`
+              becomes an underlined trailing space hanging off the link. */}
+          <a href={searchHref("conservation~1")}><code>conservation~1</code></a> finds
+          provisions containing anything within one character edit of it.
         </p>
       </div>
     </div>
@@ -62,37 +62,29 @@ setPublicCache(Astro.response.headers, null, false);
 
   <h2 class="toc-group">Operators</h2>
 
-  <table class="usa-table usa-table--borderless syntax-table">
-    <caption class="usa-sr-only">
-      Search operators, what each one does, and a worked example
-    </caption>
-    <thead>
-      <tr>
-        <th scope="col">Write</th>
-        <th scope="col">To</th>
-        <th scope="col">Example</th>
-        <th scope="col">What it does</th>
-      </tr>
-    </thead>
-    <tbody>
-      {
-        SEARCH_OPERATORS.map((operator) => (
-          <tr>
-            <th scope="row">
-              <code>{operator.syntax}</code>
-            </th>
-            <td>{operator.name}</td>
-            <td>
-              <a href={searchHref(operator.example)}>
-                <code>{operator.example}</code>
-              </a>
-            </td>
-            <td>{operator.explanation}</td>
-          </tr>
-        ))
-      }
-    </tbody>
-  </table>
+  {/* A list, not a table.
+      This was a four-column table — write / to / example / what it does — and
+      a table is arguably the honest markup for it. But one of those columns is
+      a paragraph of prose, and in a ~700px reading measure the other three
+      left it about 185px: every row became eight lines tall, and on a phone
+      the whole thing had to scroll sideways. The operator, its example and its
+      explanation are one thing said three ways, so they are one block. */}
+  <ul class="syntax-list">
+    {
+      SEARCH_OPERATORS.map((operator) => (
+        <li class="syntaxop">
+          <p class="syntaxop__head">
+            <code class="syntaxop__syntax">{operator.syntax}</code>
+            <span class="syntaxop__name">{operator.name}</span>
+          </p>
+          <p class="syntaxop__what">{operator.explanation}</p>
+          <p class="syntaxop__try">
+            <a href={searchHref(operator.example)}><code>{operator.example}</code></a>
+          </p>
+        </li>
+      ))
+    }
+  </ul>
 
   <h2 class="toc-group">What is searched</h2>
 
@@ -104,9 +96,7 @@ setPublicCache(Astro.response.headers, null, false);
 
   <p class="doc-meta">
     Operators combine, and grouping works the way it does in arithmetic:{" "}
-    <a href={searchHref("(forest | grassland) -timber")}>
-      <code>(forest | grassland) -timber</code>
-    </a>
+    <a href={searchHref("(forest | grassland) -timber")}><code>(forest | grassland) -timber</code></a>
     .
   </p>
 

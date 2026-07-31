@@ -1514,7 +1514,13 @@ main[id] {
   border-left: 4px solid var(--link);
 }
 
-/* The matched terms, which are the only markup the highlighter adds. */
+/* The matched terms, which are the only markup the highlighter adds.
+ *
+ * The title gets the same treatment as a snippet, not the browser's italic:
+ * the heading is already set in a serif face, and an italic run inside it reads
+ * as a quotation or a case name rather than as "this is the bit you searched
+ * for". Weight and the underline wash say it without changing the voice. */
+.searchresult__title em,
 .searchresult__snippet em {
   font-style: normal;
   font-weight: 700;
@@ -1596,6 +1602,26 @@ main[id] {
   margin: 2rem 0;
 }
 
+/* Name and count on one line. `.toc li` gives every item a rule and a block
+ * layout, which is right for a list of provisions and wrong here — it put the
+ * endpoint count on its own line under each tag with a rule between them, so
+ * four groups read as eight rows. */
+.apidocs__contents-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.apidocs__intro ul,
+.endpoint__prose ul {
+  max-width: 44rem;
+}
+
+.apidocs__intro li,
+.endpoint__prose li {
+  margin-bottom: 0.35rem;
+}
+
 .apidocs__group {
   margin-top: 2.5rem;
 }
@@ -1667,9 +1693,8 @@ main[id] {
 /* Parameters are genuinely tabular, so this is a table — and it scrolls inside
  * itself rather than pushing the page sideways on a phone. */
 .endpoint__params {
-  display: block;
   width: 100%;
-  overflow-x: auto;
+  min-width: 32rem;
   margin: 0.75rem 0;
   border-collapse: collapse;
   font-size: 0.9rem;
@@ -1695,6 +1720,15 @@ main[id] {
   white-space: nowrap;
 }
 
+/* The type column too. `string | null` broken across two lines reads as two
+ * types rather than one nullable one, and the table already scrolls inside
+ * itself, so keeping it whole costs the page nothing. */
+.endpoint__params td:nth-child(3) code {
+  white-space: nowrap;
+}
+
+
+
 .endpoint__required {
   color: #b3261e;
   font-weight: 700;
@@ -1702,4 +1736,73 @@ main[id] {
 
 .endpoint__returns {
   margin: 0.5rem 0 0;
+}
+
+/* Wide tables — the syntax guide's operators and the API reference's
+ * parameters.
+ *
+ * Both have a prose column, so both were wider than a phone: the syntax table
+ * pushed the document 135px sideways at 375px, which is the one layout failure
+ * `scripts/screenshots.mjs` asserts against.
+ *
+ * The scrolling belongs to a *wrapper*, not to the table. Putting
+ * `display: block; overflow-x: auto` on the table itself fixed the phone and
+ * broke the desktop: `display: block` takes the cells out of table layout, so
+ * the columns stop sizing themselves to the available width and the last one
+ * was clipped at 1280px with room to spare either side. The table stays a
+ * table and lays out normally; the wrapper deals with the overflow, and
+ * `min-width` is what decides when there is any. */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* One operator per block: what to write, what it does, and something to click.
+ * No columns, so nothing to scroll and nothing to clip at any width. */
+.syntax-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 44rem;
+}
+
+.syntaxop {
+  padding: 1rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.syntaxop__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 0.35rem;
+}
+
+/* The operator itself is the heading of its block, so it is given the weight
+ * and a field to sit in rather than being one more inline code span. */
+.syntaxop__syntax {
+  padding: 0.15rem 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.syntaxop__name {
+  font-weight: 600;
+}
+
+.syntaxop__what {
+  margin: 0;
+}
+
+.syntaxop__try {
+  margin: 0.4rem 0 0;
+}
+
+.syntaxop__try code {
+  white-space: nowrap;
 }
