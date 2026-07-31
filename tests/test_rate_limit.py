@@ -11,8 +11,11 @@ someone removed a limit.
 module where the limits are asserted rather than got out of the way of.
 """
 
+import typing
+
 import pytest
 
+from api.routes import labels as labels_route
 from params import RateLimiter
 
 
@@ -139,6 +142,41 @@ def test_the_labels_route_bounds_how_many_identifiers_one_call_may_ask_for():
     with TestClient(app) as unloaded:
         query = "&".join(f"identifier=/us/usc/t16/s{i}" for i in range(101))
         assert unloaded.get(f"/api/v1/labels?{query}").status_code == 422
+
+
+def test_the_reader_batches_to_exactly_the_bound_this_route_enforces():
+    """The bound above is only safe because its one caller respects it.
+
+    The reader asked for a whole page's citations in a single request until a
+    section with 242 of them (3 U.S.C. § 301) turned this 422 into a 500 on a
+    page whose text the reader already had. It now batches — and the batch size
+    and the bound are the same number written in two languages, which is
+    exactly the pair that drifts silently: raising `max_length` here costs
+    nothing visible, and lowering it puts the 500 back.
+
+    Read as text rather than imported, for the reason `test_search_syntax.py`
+    gives: a Node build step in the Python suite to check one integer would
+    cost more than it is worth, and the regex fails loudly if the file's shape
+    changes rather than quietly matching nothing.
+    """
+    import re
+    from pathlib import Path
+
+    api_ts = Path(__file__).resolve().parent.parent / "frontend/src/lib/api.ts"
+    found = re.search(
+        r"^export const LABELS_PER_REQUEST = (\d+);", api_ts.read_text(encoding="utf-8"), re.M
+    )
+    assert found, "LABELS_PER_REQUEST is not declared where this test looks for it"
+
+    # `include_extras` keeps the `Query(...)` in the `Annotated`, which is where
+    # the bound lives; `api/routes.py` postpones its annotations, so the
+    # signature alone would give back the string "Annotated[list[str], Query…]".
+    hints = typing.get_type_hints(labels_route, include_extras=True)
+    query = hints["identifier"].__metadata__[0]
+    # Pydantic keeps it as an `annotated_types.MaxLen` in `Query.metadata`,
+    # not as an attribute of the `Query` itself.
+    bound = next(m.max_length for m in query.metadata if hasattr(m, "max_length"))
+    assert int(found.group(1)) == bound == 100
 
 
 @pytest.mark.integration

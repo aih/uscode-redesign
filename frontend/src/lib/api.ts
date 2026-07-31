@@ -106,17 +106,48 @@ export async function fetchNeighbors(
   return getJson<Neighbors>(`/api/v1/sections${identifier}/neighbors${qs({ release })}`);
 }
 
-/** One request for every citation a page makes (`api/routes.py`'s `labels`
- * docstring: forty citations, one query, not forty). */
+/** The API's own bound on one `/labels` call (`api/routes.py`, ADR-0029). The
+ * list fans into one `IN (...)`, so an unbounded request is an unbounded
+ * query; asking for 101 is a 422, not a truncated answer. */
+export const LABELS_PER_REQUEST = 100;
+
+/** How many citations one page will label at all — twelve requests' worth.
+ *
+ * Measured rather than guessed: across all 489,738 stored section versions the
+ * densest carries 1,011 `<ref>`s into the Code, and exactly one exceeds 1,000.
+ * This clears that, and still bounds a fan-out whose input is a *document* —
+ * which is the thing ADR-0029 exists to stop. Past it the tail of a section's
+ * citations goes unlabelled: they are still links, and still followable.
+ */
+export const LABELS_MAX = LABELS_PER_REQUEST * 12;
+
+/** What a page's citations *say*, in as few requests as the bound allows.
+ *
+ * One request per hundred, not one per citation (`api/routes.py`'s `labels`
+ * docstring: forty citations, one query, not forty) — but not one request for
+ * all of them either, which is what this used to do. 3 U.S.C. § 301 carries
+ * 242 distinct cross references, the API refused the list with a 422, and the
+ * reader turned that into a 500 on a page whose text it already had. 4,221
+ * stored versions are over the bound.
+ */
 export async function fetchLabels(
   identifiers: string[],
   release?: string | null,
 ): Promise<Labels> {
   if (identifiers.length === 0) return {};
-  const out: Record<string, Entry> = await getJson(
-    `/api/v1/labels${qs({ identifier: identifiers, release })}`,
+
+  const wanted = identifiers.slice(0, LABELS_MAX);
+  const batches: string[][] = [];
+  for (let i = 0; i < wanted.length; i += LABELS_PER_REQUEST) {
+    batches.push(wanted.slice(i, i + LABELS_PER_REQUEST));
+  }
+
+  const answers = await Promise.all(
+    batches.map((batch) =>
+      getJson<Record<string, Entry>>(`/api/v1/labels${qs({ identifier: batch, release })}`),
+    ),
   );
-  return out;
+  return Object.assign({}, ...answers) as Labels;
 }
 
 /** Release points this title is actually *ingested* at, not all 382 —
