@@ -149,13 +149,19 @@ export function gotoHref(query?: string | null): string {
  * `cites` marks a query that arrived as `cites <citation>`: a request for the
  * provisions that *cite* one, which this site cannot answer yet and answers as
  * a keyword search over the subject, saying so on the page. The flag is what
- * lets it say so. See `docs/citation-index-plan.md`. */
+ * lets it say so. See `docs/citation-index-plan.md`.
+ *
+ * `release` and `date` are the two ways to ask for a moment in time, and they
+ * are the same two a citation URL takes. `date` was missing here, which is why
+ * paging a dated search silently fell back to the text in force at page two —
+ * the pager rebuilds its own href, and could only rebuild what this accepts. */
 export function searchHref(
   query: string,
-  opts: { cites?: boolean; release?: string | null } = {},
+  opts: { cites?: boolean; release?: string | null; date?: string | null } = {},
 ): string {
   const params = new URLSearchParams({ q: query });
   if (opts.release) params.set("release", opts.release);
+  if (opts.date) params.set("date", opts.date);
   if (opts.cites) params.set("cites", "1");
   return `${APP}/search?${params.toString()}`;
 }

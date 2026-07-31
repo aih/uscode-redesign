@@ -54,9 +54,19 @@ if (query) {
   }
 }
 
-/** Paging keeps the release the search was made at, and the `cites` framing. */
+/** Paging keeps the moment the search was made at, and the `cites` framing.
+ *
+ * Both halves of that moment: a search made with `?date=` used to lose it here,
+ * so page one read the law as it stood at that date and page two read the law
+ * in force — the same query, the same result count in the heading, different
+ * text underneath. The line below the heading does change, which is the only
+ * reason this was a quiet bug rather than a silent one. */
 function pageHref(nextOffset: number): string {
-  const base = searchHref(query, { cites: asCites, release: params.release });
+  const base = searchHref(query, {
+    cites: asCites,
+    release: params.release,
+    date: params.date,
+  });
   return nextOffset ? `${base}&offset=${nextOffset}` : base;
 }
 
@@ -77,9 +87,8 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
           <p class="usa-alert__text">
             Showing a <strong>keyword search</strong> for <code>{query}</code>. Finding the
             provisions that <em>cite</em> it needs an index of every cross reference in the
-            Code, which this site does not have yet — so this searches for the words
-            instead, which finds a citation written out in text but not one written as a
-            link.
+            Code, and this site does not have one yet. This searches for the words instead.
+            That finds a citation written out in text, but not one written as a link.
           </p>
         </div>
       </div>
@@ -90,7 +99,7 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
     !query && !failure && (
       <p class="lede">
         Search the text of the Code. A citation typed into the box above goes straight to
-        the provision instead — <a href={gotoHref()}>the forms it accepts</a> are listed on
+        the provision instead. <a href={gotoHref()}>The forms it accepts</a> are listed on
         the go-to page.
       </p>
     )
@@ -114,7 +123,7 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
           ) : (
             <>Searching the law currently in force.</>
           )}{" "}
-          Words match as typed — <a href={syntaxHref()}>operators</a> loosen that.
+          Words match as typed. <a href={syntaxHref()}>Operators</a> loosen that.
         </p>
 
         {data?.note && (
@@ -139,10 +148,10 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
                   who is guessing at a spelling, gets the old behaviour by
                   asking for it — and this is where they find that out. */}
               <p class="usa-alert__text">
-                Unsure of a spelling? Add <code>~1</code> to a word —{" "}
+                Unsure of a spelling? Add <code>~1</code> to a word:{" "}
                 <a href={searchHref(fuzzify(query))}><code>{fuzzify(query)}</code></a>{" "}
                 also matches words one character away. Widen a query with{" "}
-                <code>|</code>, narrow it with <code>-</code>:{" "}
+                <code>|</code>, narrow it with <code>-</code>. See{" "}
                 <a href={syntaxHref()}>the full syntax</a>.
               </p>
               <p class="usa-alert__text">

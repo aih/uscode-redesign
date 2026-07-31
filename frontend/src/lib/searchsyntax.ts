@@ -66,7 +66,7 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     name: "Misspellings",
     example: "conservation~1",
     explanation:
-      "Also matches words within n single-character edits — one insertion, deletion, substitution or transposition each. This is the one to reach for when you are unsure of a spelling. Keep n at 1 or 2: at 2, six-letter words start matching genuinely unrelated ones.",
+      "Also matches words within n single-character edits — one insertion, deletion, substitution or transposition each. Use it when you are unsure of a spelling. Keep n at 1 or 2: at 2, six-letter words start matching genuinely unrelated ones.",
   },
   {
     flag: "PREFIX",
@@ -106,7 +106,7 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     name: "Either word",
     example: "forest | grassland",
     explanation:
-      "Matches provisions containing either word. This is what loosens a search that is finding too little.",
+      "Matches provisions containing either word. Use it to loosen a search that is finding too little.",
   },
   {
     flag: "PRECEDENCE",
@@ -130,6 +130,6 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     name: "Space",
     example: "public lands",
     explanation:
-      "A space separates terms, and all of them must be present. This is the default, and it is why a plain two-word search is narrower than it used to be.",
+      "A space separates terms, and all of them must be present. This is the default, so every word you add narrows the search.",
   },
 ];

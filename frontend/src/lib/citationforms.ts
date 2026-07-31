@@ -117,21 +117,21 @@ export const CITATION_FORMS: CitationForm[] = [
     example: "11 usc 523 note",
     identifier: "/us/usc/t11/s523",
     explanation:
-      "The trailing note is recognised and you land on the section, whose notes are on the page. This site serves no separate route for notes, so the word is read and then set aside rather than ignored.",
+      "The trailing note is recognised and you land on the section, whose notes are on the page. There is no separate route for notes, so the word is read and then set aside.",
   },
   {
     name: "A run of sections",
     example: "16 usc 45f et seq.",
     identifier: "/us/usc/t16/s45f",
     explanation:
-      "et seq. names a run starting at a section. You land at its start; there is no view of a range as such.",
+      "et seq. names a run starting at a section. You land at its start; there is no view of a range.",
   },
   {
     name: "Wrapped in brackets",
     example: "(11 U.S.C. 523)",
     identifier: "/us/usc/t11/s523",
     explanation:
-      "Enclosing brackets, quotes and trailing punctuation are stripped, so a citation pasted out of the middle of a sentence works. Brackets that belong to the citation are kept — 523(a)(1) is not mistaken for one of these.",
+      "Enclosing brackets, quotes and trailing punctuation are stripped, so a citation pasted from the middle of a sentence works. Brackets that belong to the citation are kept: 523(a)(1) is read as a subdivision.",
   },
 ];
 
@@ -152,12 +152,12 @@ export const CITATION_LIMITS: CitationLimit[] = [
     example: "523",
     identifier: null,
     explanation:
-      "A section number with no title is unresolvable — there is a § 523 in many titles — and guessing would be worse than asking. Typed on its own it is treated as a word and searched for.",
+      "A section number with no title is unresolvable, because many titles have a § 523. Typed on its own it is treated as a word and searched for.",
   },
   {
     example: "5 U.S.C. App. 3",
     identifier: "/us/usc/t5a/s3",
     explanation:
-      "Appendix citations parse and then find nothing. The five appendix titles are published under the enacting instrument rather than a flat section number — 0 of 461 appendix sections use this shape; they look like /us/usc/t5a/pl/92/463/s1. Getting from one to the other needs a lookup table this site does not have, so it says so rather than inventing one.",
+      "Appendix citations parse and then find nothing. The five appendix titles are published under the enacting instrument, not a flat section number: 0 of 461 appendix sections use this shape, and they look like /us/usc/t5a/pl/92/463/s1. Getting from one form to the other needs a lookup table this site does not have.",
   },
 ];

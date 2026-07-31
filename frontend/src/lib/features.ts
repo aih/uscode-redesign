@@ -59,24 +59,23 @@ export const DOWNLOADS_ENABLED = false;
 export const ACCOUNTS_NOTICE = {
   heading: "Accounts are coming, but are not switched on yet",
   lead:
-    "A future version of this site will let you sign in and make it yours: " +
-    "watch provisions and whole titles, get alerted when a release point " +
-    "changes text you care about, and keep a set of favourites you can return " +
-    "to without searching for them again.",
+    "A later version will let you sign in and keep track of things: watch " +
+    "provisions and whole titles, get alerted when a release point changes " +
+    "text you care about, and keep a set of favourites to come back to.",
   detail:
-    "Everything else on this site works without an account, and will keep " +
-    "working without one — the reading, the search, the version history, the " +
-    "redlines and the API are all open.",
+    "Everything else works without an account and will keep working without " +
+    "one. The reading, the search, the version history, the redlines and the " +
+    "API are all open.",
 } as const;
 
 /** The same, for the downloads control. */
 export const DOWNLOADS_NOTICE = {
   heading: "Bulk downloads are planned",
   lead:
-    "A future version will serve the corpus in bulk as part of the API — whole " +
-    "titles, whole release points, and the differences between them — refreshed " +
-    "from the Office of the Law Revision Counsel as each new release point is " +
-    "published.",
+    "A later version will serve the corpus in bulk through the API: whole " +
+    "titles, whole release points, and the differences between them, " +
+    "refreshed from the Office of the Law Revision Counsel as each new " +
+    "release point is published.",
   detail:
     "Until then the official downloads are the place to get the source XML, " +
     "and every page here links to the exact file its text came from.",

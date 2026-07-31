@@ -93,8 +93,8 @@ const EXAMPLES = [
   {
     !query && (
       <p class="lede">
-        Type a citation in more or less any written form and this lands on the provision.
-        Type anything else and it searches the text.
+        Type a citation in almost any written form and you land on the provision. Type
+        anything else and it searches the text.
       </p>
     )
   }
@@ -104,13 +104,13 @@ const EXAMPLES = [
       <div class="usa-alert usa-alert--warning" role="alert">
         <div class="usa-alert__body">
           <h2 class="usa-alert__heading">
-            Read as <code>{found.identifier}</code> — which is not here
+            Read as <code>{found.identifier}</code>, but nothing is published there
           </h2>
           <p class="usa-alert__text">
             {found.message ??
               `Nothing is published at ${found.section_identifier}${
                 found.release ? ` at release point ${found.release.label}` : ""
-              }. The citation itself parsed cleanly, so this is a gap in the Code or in what is loaded — not a typo this page can see.`}
+              }. The citation parsed correctly, so this is a gap in the Code or in what this site has loaded, not a typo.`}
           </p>
           <p class="usa-alert__text">
             <a href={appHref(`/us/usc/t${found.title_num}`)}>
@@ -141,7 +141,7 @@ const EXAMPLES = [
   </ul>
 
   <p class="doc-meta">
-    Subdivisions keep their case — <code>(B)</code> is not <code>(b)</code> — because USLM
-    identifiers distinguish them.
+    Subdivisions keep their case: <code>(B)</code> is not <code>(b)</code>. USLM identifiers
+    distinguish them.
   </p>
 </Base>
