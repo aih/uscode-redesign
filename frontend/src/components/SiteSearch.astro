@@ -14,8 +14,22 @@
  * Still a plain GET form, so it works with scripting off (ADR-0023). The
  * routing happens on the server at `/app/goto`, which is where this lands and
  * which is now a router rather than only a citation resolver.
+ *
+ * ## The "i"
+ *
+ * One box doing two jobs is the right control and it is also unguessable: the
+ * placeholder shows a citation, so the keyword half — and the fact that it is
+ * OpenSearch underneath, with OpenSearch's operators available — was only
+ * discoverable by finding the guide first. The guide is linked from the footer,
+ * from the About page and from a search that found nothing, which is to say
+ * from everywhere except beside the box it describes. The "i" puts it there.
+ *
+ * It has to be free, vertically: this box sits in the sticky chrome, the hint
+ * paragraph below it is already hidden there for exactly that reason, and
+ * `--sticky-h` is the token `scroll-margin-top` spends. So the button sits on
+ * the label's line and the explanation lives in a popover.
  */
-import { gotoHref } from "../lib/url";
+import { gotoHref, syntaxHref } from "../lib/url";
 import { CITES_KEYWORD } from "../lib/query";
 
 interface Props {
@@ -31,10 +45,69 @@ interface Props {
 
 const { value = null } = Astro.props;
 const id = "site-q";
+const infoId = `${id}-info`;
+
+/** The one-sentence version, for a pointer that hovers without clicking. The
+ * panel says the rest. */
+const infoLead =
+  "Anything that is not a citation runs as a keyword search over OpenSearch, " +
+  "which accepts its query syntax.";
 ---
 
 <form class="sitesearch" method="get" action={gotoHref()} role="search">
-  <label class="sitesearch__label" for={id}>Search or go to a citation</label>
+  {/* The label and its explainer share a line.
+      A row rather than two blocks, because this box lives in the sticky header
+      and every block here is `--sticky-h` growing — the token
+      `scroll-margin-top` spends, re-measured at eight widths in Session 15.
+      The button is sized to sit inside the label's own line box, so the chrome
+      is exactly as tall as it was. */}
+  <div class="sitesearch__labelrow">
+    <label class="sitesearch__label" for={id}>Search or go to a citation</label>
+    {/* Outside the `<label>`, deliberately: a control nested in a label steals
+        the label's click, so pressing the "i" would focus the input and never
+        open the panel. And a `popover`, for the same reasons as `ComingSoon`
+        and the citation preview (ADR-0024) — top layer, Escape and light
+        dismiss from the platform, with no script at all. This box is a plain
+        GET form that works with scripting off (ADR-0023); explaining it should
+        not be the thing that needs JavaScript. */}
+    <button
+      class="sitesearch__info"
+      type="button"
+      popovertarget={infoId}
+      title={infoLead}
+      aria-label="About the keyword search"
+    >
+      <span class="sitesearch__info-glyph" aria-hidden="true">i</span>
+    </button>
+  </div>
+
+  <div class="sitesearch__infopanel" id={infoId} popover role="dialog" aria-labelledby={`${infoId}-h`}>
+    <h2 class="sitesearch__info-heading" id={`${infoId}-h`}>How this box searches</h2>
+    <p class="sitesearch__info-lead">
+      Type a citation and it goes straight to the provision — that is parsed here and
+      never reaches the index. Type anything else and it becomes a{" "}
+      <strong>keyword search over OpenSearch</strong>, which holds the text of every
+      section.
+    </p>
+    <p class="sitesearch__info-detail">
+      Because it is OpenSearch, its query syntax works: every word you type has to
+      appear, and <code>"…"</code>, <code>-</code>, <code>|</code>, <code>*</code> and{" "}
+      <code>~1</code> loosen or narrow that deliberately.
+    </p>
+    <p class="sitesearch__info-more">
+      <a href={syntaxHref()}>Read the search and citation guide</a>
+    </p>
+    {/* Light dismiss and Escape are both there, but a reader who opened this
+        with a click looks for something to click to close it. */}
+    <button
+      class="usa-button usa-button--outline sitesearch__info-close"
+      type="button"
+      popovertarget={infoId}
+      popovertargetaction="hide"
+    >
+      Close
+    </button>
+  </div>
   <div class="sitesearch__row">
     <input
       class="usa-input sitesearch__input"

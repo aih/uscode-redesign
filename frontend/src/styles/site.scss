@@ -465,9 +465,138 @@ main[id] {
   min-width: 0;
 }
 
+/* The label and the "i" share the label's line, so the explainer costs the
+ * sticky chrome nothing. `baseline` rather than `center` because the glyph is a
+ * letter: aligned by box it sat a pixel high against the words beside it. */
+.sitesearch__labelrow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
 .sitesearch__label {
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+/* ------------------------------------------------- the "i", and its hit area
+ *
+ * A circled letter at the label's own size, because anything bigger is a row
+ * this box cannot afford — it is in the sticky header, and `--sticky-h` is what
+ * `scroll-margin-top` spends.
+ *
+ * That leaves a ~18px target, well under the 44px a finger needs. The fix is
+ * `::after`: an absolutely positioned overlay that extends the *pointer* target
+ * past the visible circle without extending the box, so the touch target is
+ * honest and the layout is unchanged. Growing the button itself would have put
+ * the whole chrome back into the measurement it just passed. */
+.sitesearch__info {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  /* The circle is 18px and the label's line box is 13px, so on its own the
+   * button made the row — and therefore the sticky stack — 5px taller at every
+   * width from 640px up. Measured, because "it is only an icon" is exactly the
+   * assumption that has moved this token twice before. A negative block margin
+   * takes the difference back out of the *outer* height, so the row is as tall
+   * as its text and the circle overflows it by ~2.5px into the 0.25rem gap
+   * above the input. Re-measured after: 0px at all eight widths. */
+  margin-block: -0.25rem;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+  /* It explains rather than navigates. */
+  cursor: help;
+  anchor-name: --sitesearch-info-anchor;
+}
+
+.sitesearch__info::after {
+  content: "";
+  position: absolute;
+  /* 1.15rem + 2 × 0.7rem ≈ 44px. */
+  inset: -0.7rem;
+}
+
+.sitesearch__info:hover,
+.sitesearch__info:focus-visible {
+  color: var(--ink);
+}
+
+.sitesearch__info-glyph {
+  /* The serif "i" of a book's footnote, and it needs the nudge a lowercase
+   * letter needs to look centred in a circle. */
+  font-family: var(--reading);
+  font-style: italic;
+  font-weight: 700;
+  transform: translateY(-0.02em);
+}
+
+/* The panel. Same platform feature and same reasoning as `.soon__panel`
+ * (ADR-0024), sized for three short paragraphs rather than duplicated wholesale
+ * — the two differ in width, in anchor and in what they are attached to, and a
+ * shared class would have to be undone in both places. */
+.sitesearch__infopanel {
+  margin: 0;
+  /* Inherited from the chrome, which is set for one-line controls. */
+  white-space: normal;
+  line-height: 1.5;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 18%);
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: min(24rem, calc(100vh - 4rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 0.95rem;
+}
+
+@supports (anchor-name: --x) {
+  .sitesearch__infopanel {
+    position: fixed;
+    position-anchor: --sitesearch-info-anchor;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin-block-start: 0.35rem;
+    inset: auto;
+  }
+}
+
+.sitesearch__info-heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--reading);
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+
+.sitesearch__info-lead {
+  margin: 0 0 0.75rem;
+}
+
+.sitesearch__info-detail {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.sitesearch__info-more {
+  margin: 0 0 0.75rem;
+}
+
+.sitesearch__info-close {
+  margin-top: 0.25rem;
 }
 
 .sitesearch__row {
