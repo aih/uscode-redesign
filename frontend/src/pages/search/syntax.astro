@@ -14,14 +14,26 @@
  * be told how to ask for it back. Hence `~1`, and hence a guide rather than a
  * silent behaviour change.
  *
- * Every operator listed comes from `lib/searchsyntax.ts`, which
- * `tests/test_search_syntax.py` checks against the flags `api/search.py`
- * actually enables.
+ * It documents both halves of the one box, because the box is one box: what it
+ * does with your words, and what it accepts as a citation. Those used to be
+ * two controls and are not any more (BUILDLOG 027), so a guide that covered
+ * only the keyword half described a control that no longer exists — and the
+ * citation half was the one nobody could have guessed at, since "type a
+ * citation in more or less any written form" is a claim about 84 accepted
+ * shapes with nothing on the site listing them.
+ *
+ * Both tables are data, in `lib/searchsyntax.ts` and `lib/citationforms.ts`,
+ * and both are checked against the code that implements them:
+ * `tests/test_search_syntax.py` against the `simple_query_string` flags
+ * `api/search.py` enables, and `tests/test_citation_forms.py` by running every
+ * documented example through `citeparse.parse_citation` and comparing the
+ * identifier it produces with the one this page prints.
  */
 import Base from "../../layouts/Base.astro";
+import { CITATION_FORMS, CITATION_LIMITS } from "../../lib/citationforms";
 import { SEARCH_OPERATORS } from "../../lib/searchsyntax";
 import { setPublicCache } from "../../lib/cache";
-import { searchHref } from "../../lib/url";
+import { gotoHref, searchHref } from "../../lib/url";
 
 /** Static prose about a parser — it changes when the code does, not per
  * request, and never per reader. Revalidate rather than pin: there is no
@@ -29,8 +41,70 @@ import { searchHref } from "../../lib/url";
 setPublicCache(Astro.response.headers, null, false);
 ---
 
-<Base title="Search syntax · U.S. Code">
-  <h1 class="doc-title">Search syntax</h1>
+<Base title="Search and citation guide · U.S. Code">
+  <h1 class="doc-title">Search and citation guide</h1>
+
+  <p class="lede">
+    There is one box in the header and it answers two kinds of question. Type a
+    citation and it goes straight there; type anything else and it searches the text.
+    Nothing tells it which you meant — it reads what you wrote.
+  </p>
+
+  <nav class="apidocs__contents" aria-label="On this page">
+    <p class="apidocs__contents-item"><a href="#citations">Going to a citation</a></p>
+    <p class="apidocs__contents-item"><a href="#operators">Searching the text</a></p>
+  </nav>
+
+  <h2 class="toc-group" id="citations">Going to a citation</h2>
+
+  <p>
+    Every form below is one this site accepts, followed by the official identifier it
+    resolves to. Select any example to try it.
+  </p>
+
+  <ul class="syntax-list">
+    {
+      CITATION_FORMS.map((form) => (
+        <li class="syntaxop">
+          <p class="syntaxop__head">
+            <span class="syntaxop__name">{form.name}</span>
+          </p>
+          <p class="syntaxop__try">
+            <a href={gotoHref(form.example)}><code>{form.example}</code></a>
+            <span class="syntaxop__arrow" aria-hidden="true"> → </span>
+            <span class="usa-sr-only"> goes to </span>
+            <code class="syntaxop__result">{form.identifier}</code>
+          </p>
+          <p class="syntaxop__what">{form.explanation}</p>
+        </li>
+      ))
+    }
+  </ul>
+
+  <h3 class="toc-group">Two things that will catch you out</h3>
+
+  <ul class="syntax-list">
+    {
+      CITATION_LIMITS.map((limit) => (
+        <li class="syntaxop">
+          <p class="syntaxop__head">
+            <code class="syntaxop__syntax">{limit.example}</code>
+            <span class="syntaxop__name">
+              {limit.identifier === null ? "not read as a citation" : "parses, finds nothing"}
+            </span>
+          </p>
+          <p class="syntaxop__what">{limit.explanation}</p>
+        </li>
+      ))
+    }
+  </ul>
+
+  <p class="doc-meta">
+    Add a release point to any of these — <code>?release=119-99</code> or{" "}
+    <code>?date=07/12/2026</code> — and you land on the provision as it stood then.
+  </p>
+
+  <h2 class="toc-group" id="operators">Searching the text</h2>
 
   <p class="lede">
     By default a search matches the words you typed, and every one of them has to
@@ -60,7 +134,7 @@ setPublicCache(Astro.response.headers, null, false);
     </div>
   </div>
 
-  <h2 class="toc-group">Operators</h2>
+  <h3 class="toc-group">Operators</h3>
 
   {/* A list, not a table.
       This was a four-column table — write / to / example / what it does — and
@@ -86,7 +160,7 @@ setPublicCache(Astro.response.headers, null, false);
     }
   </ul>
 
-  <h2 class="toc-group">What is searched</h2>
+  <h3 class="toc-group">What is searched</h3>
 
   <p>
     The text of sections and the headings above them — chapters, subchapters, parts. A
@@ -100,11 +174,13 @@ setPublicCache(Astro.response.headers, null, false);
     .
   </p>
 
-  <h2 class="toc-group">Going to a provision instead</h2>
+  <h3 class="toc-group">Asking what cites a provision</h3>
 
   <p>
-    If you already know the citation, type it — <code>16 usc 45f(c)(5)</code>,{" "}
-    <code>11 U.S.C. § 523</code> — and the box goes straight there rather than searching
-    for the words. <a href="/app/goto">The forms it accepts</a> are listed separately.
+    Prefix a citation with <code>cites</code> — <a href={gotoHref("cites 26 usc 501")}
+      ><code>cites 26 usc 501</code></a
+    > — and the search looks for provisions that refer to it. This is a keyword search
+    over the citation's text for now, not a real cross-reference index, and the results
+    page says so rather than letting the answer pass for the finished thing.
   </p>
 </Base>
