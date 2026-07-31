@@ -177,3 +177,87 @@ export function requestBodyType(operation: OpenApiOperation): string | null {
   const json = operation.requestBody?.content?.["application/json"]?.schema;
   return json ? typeName(json) : null;
 }
+
+/** A tag as a heading: `release points` → `Release points`, `api` → `API`.
+ *
+ * FastAPI tags are lowercase route-grouping strings, and printed raw the
+ * contents list read `api / auth / watchlists / settings` — which looks like
+ * variable names rather than sections of a document. The acronyms are spelled
+ * out because "Api" is worse than either. */
+const TAG_LABELS: Record<string, string> = {
+  api: "Provisions",
+  auth: "Accounts",
+  search: "Search",
+  settings: "Settings",
+  watchlists: "Watchlists",
+};
+
+export function tagLabel(tag: string): string {
+  return TAG_LABELS[tag] ?? tag.charAt(0).toUpperCase() + tag.slice(1);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/gu, "&amp;")
+    .replace(/</gu, "&lt;")
+    .replace(/>/gu, "&gt;")
+    .replace(/"/gu, "&quot;");
+}
+
+/**
+ * The little bit of Markdown that OpenAPI descriptions are actually written in.
+ *
+ * They are Markdown by specification — Swagger UI renders them as such — and
+ * this project's are no exception: `main.py`'s `DESCRIPTION` is a bulleted list
+ * full of `` `code` `` spans and `**bold**`. Rendered as plain text, the page
+ * showed literal backticks and asterisks, and every bullet collapsed into one
+ * run-on paragraph because the list markers meant nothing.
+ *
+ * Deliberately not a Markdown library. The input is this repository's own
+ * docstrings, not arbitrary user content, and the four constructs below are all
+ * of it — a dependency to parse text we write ourselves would be a poor trade,
+ * and a general parser is a much larger surface to keep safe next to `set:html`.
+ * Anything unsupported degrades to the literal characters, which is what the
+ * page did for everything before this.
+ *
+ * Escaped *first*, always. The emitted tags are only ever the ones added below,
+ * so nothing in a docstring can introduce markup.
+ */
+export function renderMarkdown(source: string): string {
+  const inline = (text: string): string =>
+    // Code spans are taken first and their contents are left alone, so an
+    // asterisk inside `**` stays an asterisk rather than becoming emphasis.
+    escapeHtml(text)
+      .split(/(`[^`]+`)/u)
+      .map((part) =>
+        part.startsWith("`") && part.endsWith("`") && part.length > 1
+          ? `<code>${part.slice(1, -1)}</code>`
+          : part
+              .replace(/\*\*([^*]+)\*\*/gu, "<strong>$1</strong>")
+              .replace(/(^|[^*])\*([^*]+)\*/gu, "$1<em>$2</em>"),
+      )
+      .join("");
+
+  return source
+    .trim()
+    .split(/\n{2,}/u)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n");
+      if (/^[*-]\s/u.test(lines[0])) {
+        // A wrapped bullet continues on an indented line, so items are split on
+        // the marker rather than on the newline — otherwise every continuation
+        // becomes a bullet of its own.
+        const items = block
+          .split(/\n(?=[*-]\s)/u)
+          .map((item) => item.replace(/^[*-]\s+/u, "").replace(/\s*\n\s*/gu, " ").trim())
+          .filter(Boolean);
+        return `<ul class="usa-list">${items.map((i) => `<li>${inline(i)}</li>`).join("")}</ul>`;
+      }
+      // Source newlines inside a paragraph are hard wrapping in a docstring,
+      // not line breaks the reader should see.
+      return `<p>${inline(block.replace(/\s*\n\s*/gu, " "))}</p>`;
+    })
+    .join("");
+}

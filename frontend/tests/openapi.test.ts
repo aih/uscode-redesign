@@ -5,10 +5,12 @@ import {
   endpointSlug,
   groupByTag,
   refName,
+  renderMarkdown,
   requestBodyType,
   slugify,
   sortedParameters,
   successSchema,
+  tagLabel,
   typeName,
 } from "../src/lib/openapi";
 import type { OpenApiSchema } from "../src/lib/types";
@@ -161,5 +163,66 @@ describe("anchors", () => {
 describe("refName", () => {
   it("returns null for an inline schema", () => {
     expect(refName({ type: "string" })).toBeNull();
+  });
+});
+
+describe("renderMarkdown", () => {
+  it("renders a bulleted list as a list", () => {
+    // `main.py`'s DESCRIPTION is mostly bullets. Split on blank lines alone
+    // they collapsed into one run-on paragraph.
+    const html = renderMarkdown("* one\n* two");
+    expect(html).toContain("<ul");
+    expect(html.match(/<li>/gu)).toHaveLength(2);
+  });
+
+  it("keeps a wrapped bullet as one item", () => {
+    // Docstrings hard-wrap; a continuation line is not a new bullet.
+    const html = renderMarkdown("* a bullet that\n  wraps onto a second line\n* second");
+    expect(html.match(/<li>/gu)).toHaveLength(2);
+    expect(html).toContain("a bullet that wraps onto a second line");
+  });
+
+  it("renders code spans, bold and italic", () => {
+    expect(renderMarkdown("the `@identifier` field")).toContain("<code>@identifier</code>");
+    expect(renderMarkdown("a **307 redirect**")).toContain("<strong>307 redirect</strong>");
+    expect(renderMarkdown("a law that was *skipped*")).toContain("<em>skipped</em>");
+  });
+
+  it("leaves asterisks inside a code span alone", () => {
+    const html = renderMarkdown("write `a * b * c` here");
+    expect(html).toContain("<code>a * b * c</code>");
+    expect(html).not.toContain("<em>");
+  });
+
+  it("escapes HTML before adding any of its own", () => {
+    // The output goes through `set:html`, so nothing in a docstring may
+    // introduce markup.
+    const html = renderMarkdown('<img src=x onerror="alert(1)">');
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img");
+  });
+
+  it("joins hard-wrapped paragraph lines rather than breaking them", () => {
+    expect(renderMarkdown("one line\nwrapped here")).toBe("<p>one line wrapped here</p>");
+  });
+
+  it("splits paragraphs on blank lines", () => {
+    expect(renderMarkdown("first\n\nsecond").match(/<p>/gu)).toHaveLength(2);
+  });
+
+  it("is empty for empty input", () => {
+    expect(renderMarkdown("")).toBe("");
+    expect(renderMarkdown("   \n\n  ")).toBe("");
+  });
+});
+
+describe("tagLabel", () => {
+  it("gives FastAPI's lowercase route tags a heading a reader would write", () => {
+    expect(tagLabel("api")).toBe("Provisions");
+    expect(tagLabel("auth")).toBe("Accounts");
+  });
+
+  it("capitalises anything it does not know rather than dropping it", () => {
+    expect(tagLabel("releases")).toBe("Releases");
   });
 });

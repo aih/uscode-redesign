@@ -23,6 +23,13 @@ const PAGES = [
   ["section", "/app/us/usc/t16/s45f"],
   ["toc", "/app/us/usc/t16/ch1"],
   ["home", "/app/"],
+  // Session 14's pages. `docs` earns its place in this list rather than only in
+  // the gallery: it renders a parameter *table* per endpoint, and a table is
+  // the thing most likely to push a phone sideways — which is exactly what the
+  // overflow assertion below catches.
+  ["search", "/app/search?q=conservation"],
+  ["syntax", "/app/search/syntax"],
+  ["docs", "/app/docs"],
 ];
 
 const WIDTHS = [

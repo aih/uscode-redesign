@@ -80,8 +80,14 @@ const { identifier, release = null } = Astro.props;
       async function init() {
         const me = await fetch("/api/v1/auth/me", { headers: { accept: "application/json" } });
         if (me.status === 401) {
-          // Nothing to offer: the navbar carries the sign-in prompt now.
+          // Nothing to offer: the navbar carries the sign-in prompt now. Hide
+          // the container, not just its contents — `.watch-widget` reserves
+          // `min-height: 2.5rem` plus 1rem of margin either side so that
+          // swapping Add for Remove does not shift the page, and an empty box
+          // of that size sat between the status line and the first subsection
+          // for every logged-out reader, which is most of them.
           showOnly(null);
+          widget.hidden = true;
           return;
         }
         if (!me.ok) return;

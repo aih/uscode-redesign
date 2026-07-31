@@ -52,6 +52,13 @@ test("a section page no longer asks the reader to log in", async ({ page }) => {
   await expect(page.getByText("Log in to track this section")).toHaveCount(0);
   await expect(page.locator('.watch-widget [data-role="add"]')).toBeHidden();
   await expect(page.locator('.watch-widget [data-role="remove"]')).toBeHidden();
+
+  // The container too, not only its contents. It reserves `min-height: 2.5rem`
+  // plus a rem of margin either side so that swapping Add for Remove does not
+  // shift the page — which, once the login link was removed, left an empty
+  // 72px band between the status line and the first subsection for every
+  // logged-out reader.
+  await expect(page.locator(".watch-widget")).toBeHidden();
 });
 
 test("the API reference renders inside the site, not as a bare Swagger page", async ({

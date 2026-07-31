@@ -171,12 +171,28 @@ def search(
                 "filter": [version_filter],
             }
         },
+        # Every value here was previously a default nobody chose, and the
+        # defaults are tuned for a log search rather than for reading.
+        #
+        # `number_of_fragments` was 5, per field, over two fields — so a single
+        # result could carry ten disconnected 100-character shards, which is
+        # more text than the provision's own heading and impossible to scan. Two
+        # is enough to show the match in context; the section itself is one
+        # click away and is the thing actually worth reading.
+        #
+        # `fragment_size` was 100, which in statutory prose lands mid-clause
+        # ("…shall include approximately one"). 220 is roughly two lines at the
+        # reading width and usually reaches a sentence boundary.
+        #
+        # `no_match_size: 0` keeps the old behaviour of showing nothing for a
+        # field that did not match, rather than the opening of every section.
         "highlight": {
             "fields": {
-                "heading": {},
-                "xml_text": {}
-            }
-        }
+                "heading": {"number_of_fragments": 1},
+                "xml_text": {"number_of_fragments": 2, "fragment_size": 220},
+            },
+            "no_match_size": 0,
+        },
     }
 
     if resolved is not None:

@@ -20,9 +20,11 @@ import { setPublicCache } from "../lib/cache";
 import {
   endpointSlug,
   groupByTag,
+  renderMarkdown,
   requestBodyType,
   sortedParameters,
   successSchema,
+  tagLabel,
   typeName,
 } from "../lib/openapi";
 import type { OpenApiSchema } from "../lib/types";
@@ -68,31 +70,29 @@ const groups = schema ? groupByTag(schema) : [];
 
         <p class="doc-meta">
           Also available as <a href="/docs">Swagger UI</a>, which can send requests from the
-          browser, as <a href="/redoc">ReDoc</a>, or as the raw{" "}
-          <a href="/openapi.json">OpenAPI schema</a> this page is built from.
+          browser, as <a href="/redoc">ReDoc</a>, or as the{" "}
+          <a href="/openapi.json">raw OpenAPI schema</a> this page is built from.
         </p>
 
+        {/* Markdown, because an OpenAPI description is Markdown by
+            specification and this project's is a bulleted list of `code`
+            spans. Printed as text it showed literal backticks and asterisks
+            and collapsed every bullet into one paragraph. */}
         {schema.info.description && (
-          <div class="apidocs__intro">
-            {schema.info.description
-              .split(/\n{2,}/u)
-              .map((paragraph) => paragraph.trim())
-              .filter(Boolean)
-              .map((paragraph) => (
-                <p>{paragraph}</p>
-              ))}
-          </div>
+          <div class="apidocs__intro" set:html={renderMarkdown(schema.info.description)} />
         )}
 
         <nav class="apidocs__contents" aria-label="API contents">
           <h2 class="toc-group">Contents</h2>
           <ul class="toc">
             {groups.map((group) => (
-              <li>
-                <a href={`#${group.slug}`}>{group.tag}</a>{" "}
+              <li class="apidocs__contents-item">
+                <a href={`#${group.slug}`}>{tagLabel(group.tag)}</a>
                 <span class="doc-meta">
-                  · {group.endpoints.length} endpoint
-                  {group.endpoints.length === 1 ? "" : "s"}
+                  {/* One expression, not two adjacent ones: split across JSX
+                      lines the plural `s` was separated from its noun by a
+                      newline, and the page read "9 endpoint s". */}
+                  {`${group.endpoints.length} endpoint${group.endpoints.length === 1 ? "" : "s"}`}
                 </span>
               </li>
             ))}
@@ -102,7 +102,7 @@ const groups = schema ? groupByTag(schema) : [];
         {groups.map((group) => (
           <section class="apidocs__group">
             <h2 class="toc-group" id={group.slug}>
-              {group.tag}
+              {tagLabel(group.tag)}
             </h2>
 
             {group.endpoints.map((endpoint) => {
@@ -124,51 +124,45 @@ const groups = schema ? groupByTag(schema) : [];
                   )}
 
                   {description && description !== endpoint.operation.summary && (
-                    <div class="endpoint__prose">
-                      {description
-                        .split(/\n{2,}/u)
-                        .map((paragraph) => paragraph.trim())
-                        .filter(Boolean)
-                        .map((paragraph) => (
-                          <p>{paragraph}</p>
-                        ))}
-                    </div>
+                    <div class="endpoint__prose" set:html={renderMarkdown(description)} />
                   )}
 
                   {params.length > 0 && (
-                    <table class="endpoint__params">
-                      <caption class="usa-sr-only">
-                        Parameters for {endpoint.method.toUpperCase()} {endpoint.path}
-                      </caption>
-                      <thead>
-                        <tr>
-                          <th scope="col">Parameter</th>
-                          <th scope="col">In</th>
-                          <th scope="col">Type</th>
-                          <th scope="col">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {params.map((param) => (
+                    <div class="table-scroll">
+                      <table class="endpoint__params">
+                        <caption class="usa-sr-only">
+                          Parameters for {endpoint.method.toUpperCase()} {endpoint.path}
+                        </caption>
+                        <thead>
                           <tr>
-                            <th scope="row">
-                              <code>{param.name}</code>
-                              {param.required && (
-                                <span class="endpoint__required" title="Required">
-                                  {" "}
-                                  *
-                                </span>
-                              )}
-                            </th>
-                            <td>{param.in}</td>
-                            <td>
-                              <code>{typeName(param.schema)}</code>
-                            </td>
-                            <td>{param.description ?? param.schema?.description ?? ""}</td>
+                            <th scope="col">Parameter</th>
+                            <th scope="col">In</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Description</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {params.map((param) => (
+                            <tr>
+                              <th scope="row">
+                                <code>{param.name}</code>
+                                {param.required && (
+                                  <span class="endpoint__required" title="Required">
+                                    {" "}
+                                    *
+                                  </span>
+                                )}
+                              </th>
+                              <td>{param.in}</td>
+                              <td>
+                                <code>{typeName(param.schema)}</code>
+                              </td>
+                              <td>{param.description ?? param.schema?.description ?? ""}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
 
                   <p class="endpoint__returns doc-meta">
