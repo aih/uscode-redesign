@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="USC">
+  <title>United States Code</title>
+  <!--
+    The tab mark. One file, served at /favicon.svg by the API (main.py) and
+    linked from every reader page (Base.astro) and from the two API docs pages.
+
+    Three letters in a 16px square is about five pixels per letter, so this is
+    drawn for the smallest size and allowed to look plain at the largest, rather
+    than the other way round:
+
+      * Full bleed. A rounded card loses two pixels of every edge at 16px, and
+        those pixels are the only thing separating the mark from the tab strip.
+        The corner radius is 6/64 : visible at 64px, gone by 16px, which is the
+        point.
+      * `textLength` with `lengthAdjust="spacingAndGlyphs"` rather than a font
+        size chosen by eye. The glyphs are whatever the renderer has, so their
+        natural widths cannot be relied on; this pins the word to 54 of the 64
+        units whatever font answers.
+      * Letters as text, not paths, because a path traced from one font is a
+        worse promise than a stack every renderer can satisfy.
+
+    The colour is the site link blue darkened (USWDS primary-darker), so the
+    mark reads as the same site as the header. It carries its own dark-scheme
+    rule: against a dark tab strip the navy square goes nearly invisible, so it
+    lightens rather than inverting. The letters stay white either way, which is
+    what keeps the shape recognisable when someone has both themes open in two
+    windows.
+
+    Watch the XML: an SVG comment must not contain a double hyphen, so no em
+    dashes and no CSS custom property names in here. The file parses as XML, not
+    as HTML, and a parse error is a blank tab rather than a warning.
+  -->
+  <style>
+    .bg { fill: #1a4480; }
+    .fg { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #2670c4; }
+    }
+  </style>
+  <rect class="bg" width="64" height="64" rx="6" />
+  <text
+    class="fg"
+    x="32"
+    y="47"
+    text-anchor="middle"
+    textLength="56"
+    lengthAdjust="spacingAndGlyphs"
+    font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+    font-size="44"
+    font-weight="700"
+  >USC</text>
+</svg>

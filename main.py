@@ -3,8 +3,15 @@
 Two things are mounted here — the machine surface at `/api/v1` and the citation
 redirector at `/us/usc/…` — and one thing deliberately is not: the reader. Since
 Session 7 the reader is an Astro application in `frontend/`, served at `/app` by
-the proxy in `deploy/Caddyfile` (ADR-0011), so this process holds no templates,
-no static assets and no HTML at all.
+the proxy in `deploy/Caddyfile` (ADR-0011), so this process holds no templates
+and renders no page of its own.
+
+It does now serve a small `static/` directory, which is the one amendment to
+that shape and is worth naming rather than leaving to be discovered: the
+interactive API docs and the site's favicon. Both are assets FastAPI's own pages
+need, both used to be fetched from someone else's domain, and the CSP this site
+ships names no domain but its own (ADR-0030, ADR-0032). None of it is reader
+markup — the reader still has no HTML here.
 
 That is the shape ADR-0010 was aiming at. The redirector still sends browsers to
 `/app`; whether anything is listening there is the proxy's business, not this
@@ -14,8 +21,16 @@ Every question about *which text* belongs to *which release point* is answered b
 the `Repository` behind `storage/` (CLAUDE.md architecture rule 1).
 """
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.openapi.docs import (
+    get_redoc_html,
+    get_swagger_ui_html,
+    get_swagger_ui_oauth2_redirect_html,
+)
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from api.auth import auth
 from api.routes import api
@@ -47,12 +62,25 @@ rather than only a date.
 """
 
 
+STATIC = Path(__file__).resolve().parent / "static"
+#: Where the vendored Swagger UI / ReDoc bundles are addressed from.
+APIDOCS = "/static/apidocs"
+FAVICON = "/favicon.svg"
+
+# `docs_url=None`/`redoc_url=None` turns off FastAPI's built-in pages so the
+# custom ones below can take those paths. The OpenAPI schema itself is untouched
+# and still served at /openapi.json — it is the *pages* that need rewriting, not
+# the document they read (ADR-0032).
 app = FastAPI(
     title="uscode-redesign",
     version="0.1.0",
     summary="Versioned US Code retrieval: any provision, at any release point.",
     description=DESCRIPTION,
+    docs_url=None,
+    redoc_url=None,
 )
+
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 app.include_router(api)  # the machine surface, at /api/v1
 app.include_router(auth)  # /api/v1/auth: signup, login, logout, me (PLAN §4)
@@ -67,6 +95,89 @@ app.include_router(search_router)
 @app.get("/health", tags=["ops"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# ------------------------------------------------------------- the docs pages
+#
+# Swagger UI and ReDoc, served from this origin instead of cdn.jsdelivr.net.
+#
+# Both pages were arriving 200 with an empty body. The reason is one line of the
+# Caddyfile: `default-src 'self'` with no CDN named, which is not a rule anyone
+# chose *for* these pages — it is a description of a site that loads no
+# third-party anything (ADR-0030). FastAPI's stock docs HTML points at jsdelivr,
+# so the browser fetched the page, blocked every asset in it, and showed a blank
+# div. Nothing in the server logs says so; the evidence is entirely in the
+# browser console, which is why it survived two sessions of the site being
+# looked at.
+#
+# Widening the CSP was the alternative and is the wrong trade: it would put a
+# third-party script origin into the policy protecting the reader's `set:html`
+# sinks, permanently, to serve two developer pages. ADR-0032.
+#
+# `/app/docs` remains the readable reference, in the site's own chrome. These two
+# are the ones with a "Try it" button.
+
+
+@app.get("/docs", include_in_schema=False)
+def swagger_ui() -> HTMLResponse:
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url or "/openapi.json",
+        title=f"{app.title} — Swagger UI",
+        oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+        swagger_js_url=f"{APIDOCS}/swagger-ui-bundle.js",
+        swagger_css_url=f"{APIDOCS}/swagger-ui.css",
+        # Stock value is https://fastapi.tiangolo.com/img/favicon.png — a third
+        # host, and blocked by `img-src 'self' data:` just as surely as the
+        # scripts were.
+        swagger_favicon_url=FAVICON,
+    )
+
+
+@app.get(app.swagger_ui_oauth2_redirect_url or "/docs/oauth2-redirect", include_in_schema=False)
+def swagger_ui_redirect() -> HTMLResponse:
+    """Kept because turning off `docs_url` also unmounts this.
+
+    Nothing here uses OAuth, so it is never reached — but Swagger UI names this
+    path in its own configuration, and a page that 404s the URL it just told the
+    browser to use is a worse thing to leave behind than four lines.
+    """
+    return get_swagger_ui_oauth2_redirect_html()
+
+
+@app.get("/redoc", include_in_schema=False)
+def redoc() -> HTMLResponse:
+    return get_redoc_html(
+        openapi_url=app.openapi_url or "/openapi.json",
+        title=f"{app.title} — ReDoc",
+        redoc_js_url=f"{APIDOCS}/redoc.standalone.js",
+        redoc_favicon_url=FAVICON,
+        # Montserrat and Roboto, from fonts.googleapis.com. `font-src 'self'`
+        # blocks them, and ReDoc falls back to the system stack without
+        # complaint — so this is one request saved rather than a compromise.
+        with_google_fonts=False,
+    )
+
+
+@app.get(FAVICON, include_in_schema=False)
+def favicon() -> FileResponse:
+    """The tab mark, at the root where a browser looks for it unprompted.
+
+    One file for the whole site: the reader links it from `Base.astro` and both
+    docs pages above point at this same path. It lives on this surface rather
+    than in `frontend/public/` because `/favicon.svg` is not under `/app`, and
+    Caddy sends everything that is not to this process.
+    """
+    return FileResponse(
+        STATIC / "favicon.svg",
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico() -> Response:
+    """Browsers ask for this without being told to. Answer, rather than 404."""
+    return Response(status_code=301, headers={"Location": FAVICON})
 
 
 @app.exception_handler(HTTPException)
