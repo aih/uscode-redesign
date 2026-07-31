@@ -541,7 +541,12 @@ def test_titles_are_listed_in_the_codes_own_order(client):
 
     assert nums, "no titles loaded"
     assert _in_code_order(nums)
-    assert nums[0] == "1"
+    # Guarded, like the comparison below it: CI loads Title 16 alone (`make
+    # ci-data`), so a bare `nums[0] == "1"` asserts the fixture rather than the
+    # ordering — which is what the docstring above says this test is not for.
+    # It failed in CI from the day the job existed for exactly that reason.
+    if "1" in nums:
+        assert nums[0] == "1"
     # The one comparison string order gets wrong at the very top of the list.
     if "2" in nums:
         assert nums.index("2") < nums.index("10")

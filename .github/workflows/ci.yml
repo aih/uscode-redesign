@@ -52,9 +52,9 @@ jobs:
       USC_REQUIRE_INTEGRATION: "1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
@@ -70,9 +70,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -98,13 +98,13 @@ jobs:
     # This runs the real shape — two processes behind Caddy (ADR-0015) — via
     # docker compose, rather than a second and lying copy of the deployment.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -112,8 +112,26 @@ jobs:
 
       - run: uv sync --frozen
 
+      # docker-compose.yml interpolates the WHOLE file before it decides which
+      # service to start, so `up -d db` fails on the OpenSearch service's
+      # `${SEARCH_PASSWORD:?}` just as surely as `up -d` does. Since Session 13
+      # removed the committed default (that was the point), CI has to supply
+      # one — generated per run rather than written into this file, which would
+      # put the credential back in the repository under a different name.
+      #
+      # The security plugin rejects a weak password and one containing "admin",
+      # and the container exits 1 at boot if either holds.
+      - name: Generate the ephemeral search credential
+        run: |
+          printf 'SEARCH_PASSWORD=%s\n' \
+            "Ci$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9')!7q" >> .env
+
+      # `--wait` is load-bearing: without it `up -d` returns as soon as the
+      # container is *started*, and the next step ran `alembic upgrade` into the
+      # middle of initdb — "server closed the connection unexpectedly". The
+      # service has a healthcheck; this is what makes anything read it.
       - name: Start Postgres
-        run: docker compose up -d db
+        run: docker compose up -d --wait db
 
       - name: Load the fixture corpus (offline)
         env:
@@ -122,6 +140,21 @@ jobs:
 
       - name: Bring the site up as deployed
         run: docker compose up -d --build
+
+      # `make ci-data` runs before the cluster exists, and ingest is allowed to
+      # run without one (DISABLE_SEARCH_SYNC / SearchNotConfigured), so nothing
+      # has indexed the fixture corpus at this point. An index that does not
+      # exist is a 404 from OpenSearch, which the reader renders as a failure
+      # panel — and `chrome.spec.ts` asserts on the *zero-results* panel, which
+      # is a different thing. Build it: Title 16 alone, seconds.
+      - name: Build the search index
+        env:
+          DATABASE_URL: postgresql+psycopg://uscode:uscode@localhost:5432/uscode
+          SEARCH_URL: https://localhost:9200
+          SEARCH_VERIFY_CERTS: "false"
+        run: |
+          set -a; . ./.env; set +a
+          uv run python -m ingest.reindex_search --recreate
 
       - name: Wait for the reader
         run: |
@@ -146,12 +179,16 @@ jobs:
       - if: failure()
         run: docker compose logs --tail 100
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: playwright-traces
           path: frontend/test-results/
           retention-days: 7
+          # A job that fails *before* Playwright runs leaves no traces, and the
+          # default turns that into a second, misleading annotation about the
+          # missing directory next to the real failure.
+          if-no-files-found: ignore
 
   slow:
     name: make test-slow (full samples)
@@ -159,9 +196,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
