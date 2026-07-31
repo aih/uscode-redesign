@@ -4,7 +4,7 @@ Two things are mounted here — the machine surface at `/api/v1` and the citatio
 redirector at `/us/usc/…` — and one thing deliberately is not: the reader. Since
 Session 7 the reader is an Astro application in `frontend/`, served at `/app` by
 the proxy in `deploy/Caddyfile` (ADR-0011), so this process holds no templates
-and renders no page of its own.
+and serves no reader pages of its own.
 
 It does now serve a small `static/` directory, which is the one amendment to
 that shape and is worth naming rather than leaving to be discovered: the
