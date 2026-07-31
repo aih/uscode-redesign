@@ -251,6 +251,21 @@ describe("searchHref", () => {
     );
   });
 
+  it("carries a date, which is the other way to name a moment in time", () => {
+    // Missing until the syntax guide documented `&date=`, which is how the
+    // pager came to drop it: `search.astro` rebuilds its own href from this
+    // helper, so page two of a dated search reverted to the text in force.
+    expect(searchHref("waters", { date: "06/12/2026" })).toBe(
+      "/app/search?q=waters&date=06%2F12%2F2026",
+    );
+  });
+
+  it("carries both halves of the query the pager has to reproduce", () => {
+    expect(searchHref("26 usc 501", { cites: true, release: "119-99" })).toBe(
+      "/app/search?q=26+usc+501&release=119-99&cites=1",
+    );
+  });
+
   it("encodes the characters that would otherwise change the query", () => {
     expect(searchHref("11 U.S.C. § 523")).toContain("%C2%A7");
     expect(searchHref("a&b")).toContain("a%26b");

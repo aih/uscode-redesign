@@ -33,12 +33,22 @@ import Base from "../../layouts/Base.astro";
 import { CITATION_FORMS, CITATION_LIMITS } from "../../lib/citationforms";
 import { SEARCH_OPERATORS } from "../../lib/searchsyntax";
 import { setPublicCache } from "../../lib/cache";
-import { gotoHref, searchHref } from "../../lib/url";
+import { APP, gotoHref, searchHref } from "../../lib/url";
 
 /** Static prose about a parser — it changes when the code does, not per
  * request, and never per reader. Revalidate rather than pin: there is no
  * release point to make it immutable against. */
 setPublicCache(Astro.response.headers, null, false);
+
+/** One query shown two ways, so the label form and the date form are visibly
+ * the same request. `119-99` is a real release point and `06/12/2026` is its
+ * currency date, which is what makes the pair a demonstration rather than two
+ * unrelated examples. */
+const RELEASE_EXAMPLE = {
+  query: "conservation",
+  release: "119-99",
+  date: "06/12/2026",
+};
 ---
 
 <Base title="Search and citation guide · U.S. Code">
@@ -50,9 +60,17 @@ setPublicCache(Astro.response.headers, null, false);
     Nothing tells it which you meant — it reads what you wrote.
   </p>
 
+  <p>
+    Both halves can be asked about a moment in time rather than about today. A citation
+    takes a release point and lands on the provision as it stood then; a search takes one
+    too, though only from the URL so far and with a limit worth reading before you rely on
+    it — <a href="#release">searching at a release point</a> is the section for that.
+  </p>
+
   <nav class="apidocs__contents" aria-label="On this page">
     <p class="apidocs__contents-item"><a href="#citations">Going to a citation</a></p>
     <p class="apidocs__contents-item"><a href="#operators">Searching the text</a></p>
+    <p class="apidocs__contents-item"><a href="#release">Searching at a release point</a></p>
   </nav>
 
   <h2 class="toc-group" id="citations">Going to a citation</h2>
@@ -165,7 +183,8 @@ setPublicCache(Astro.response.headers, null, false);
   <p>
     The text of sections and the headings above them — chapters, subchapters, parts. A
     search covers the law <strong>currently in force</strong> unless you name a release
-    point, in which case it covers the text as it stood then.
+    point, which is done from the URL and is described{" "}
+    <a href="#release">in the next section</a>.
   </p>
 
   <p class="doc-meta">
@@ -173,6 +192,91 @@ setPublicCache(Astro.response.headers, null, false);
     <a href={searchHref("(forest | grassland) -timber")}><code>(forest | grassland) -timber</code></a>
     .
   </p>
+
+  <h2 class="toc-group" id="release">Searching at a release point</h2>
+
+  <p class="lede">
+    Every page of this site can be asked for a moment in time, and search is no exception —
+    but it is the one place where the answer is not yet complete, so here is exactly how to
+    ask and exactly what comes back.
+  </p>
+
+  <p>
+    There is no control for this in the search box yet. You add the release point to the
+    results URL, using either of the two parameters a citation URL takes: the label of a
+    release point, or a date that resolves to the one in force on it.
+  </p>
+
+  <ul class="syntax-list">
+    <li class="syntaxop">
+      <p class="syntaxop__head">
+        <code class="syntaxop__syntax">&amp;release=</code>
+        <span class="syntaxop__name">by release point</span>
+      </p>
+      <p class="syntaxop__what">
+        The label as the Office of the Law Revision Counsel writes it, including the
+        awkward ones — <code>119-102not101</code> is a release point current through Public
+        Law 119-102 <em>except</em> 119-101. The{" "}
+        <a href={`${APP}/releases`}>release points page</a> lists them all.
+      </p>
+      <p class="syntaxop__try">
+        <a href={searchHref(RELEASE_EXAMPLE.query, { release: RELEASE_EXAMPLE.release })}>
+          <code>?q={RELEASE_EXAMPLE.query}&amp;release={RELEASE_EXAMPLE.release}</code>
+        </a>
+      </p>
+    </li>
+    <li class="syntaxop">
+      <p class="syntaxop__head">
+        <code class="syntaxop__syntax">&amp;date=</code>
+        <span class="syntaxop__name">by date</span>
+      </p>
+      <p class="syntaxop__what">
+        <code>MM/DD/YYYY</code>, resolved to the release point in force on that day, which
+        is usually easier than knowing a label. The results page names the release point it
+        landed on, so you can always see which one answered.
+      </p>
+      <p class="syntaxop__try">
+        <a href={searchHref(RELEASE_EXAMPLE.query, { date: RELEASE_EXAMPLE.date })}>
+          <code>?q={RELEASE_EXAMPLE.query}&amp;date={RELEASE_EXAMPLE.date}</code>
+        </a>
+      </p>
+    </li>
+  </ul>
+
+  {/* The honest limit. It is a summary box rather than a footnote because a
+      reader who does not see it will read an incomplete answer as a complete
+      one — and a search that quietly under-reports is worse in a legal corpus
+      than a search that refuses. */}
+  <div class="usa-summary-box" role="region" aria-labelledby="pit-heading">
+    <div class="usa-summary-box__body">
+      <h3 class="usa-summary-box__heading" id="pit-heading">
+        Not the whole picture yet
+      </h3>
+      <div class="usa-summary-box__text">
+        <p>
+          The search index currently holds <strong>the text in force</strong> — one
+          document per section, as it reads today. A search at a release point therefore
+          finds the provisions whose current text was <em>already</em> in force then, and
+          it misses text that has since been replaced: a section amended in 2024 cannot be
+          searched as it read in 2019, even though the reader will happily show you that
+          version.
+        </p>
+        <p>
+          What is missing is the index, not the feature. Every superseded version is in the
+          database and the indexer knows how to write them —{" "}
+          <code>python -m ingest.reindex_search --all-versions</code> builds them, roughly
+          490,000 documents against the 66,000 the default search reads. It has not been
+          run against this deployment, and until it is, a point-in-time search is answering
+          from current text alone.
+        </p>
+        <p>
+          You can always tell which you got: the results page says either{" "}
+          <em>“In the text as of release point …”</em> or{" "}
+          <em>“Searching the law currently in force.”</em>
+        </p>
+      </div>
+    </div>
+  </div>
 
   <h3 class="toc-group">Asking what cites a provision</h3>
 

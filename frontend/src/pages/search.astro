@@ -54,9 +54,19 @@ if (query) {
   }
 }
 
-/** Paging keeps the release the search was made at, and the `cites` framing. */
+/** Paging keeps the moment the search was made at, and the `cites` framing.
+ *
+ * Both halves of that moment: a search made with `?date=` used to lose it here,
+ * so page one read the law as it stood at that date and page two read the law
+ * in force — the same query, the same result count in the heading, different
+ * text underneath. The line below the heading does change, which is the only
+ * reason this was a quiet bug rather than a silent one. */
 function pageHref(nextOffset: number): string {
-  const base = searchHref(query, { cites: asCites, release: params.release });
+  const base = searchHref(query, {
+    cites: asCites,
+    release: params.release,
+    date: params.date,
+  });
   return nextOffset ? `${base}&offset=${nextOffset}` : base;
 }
 
