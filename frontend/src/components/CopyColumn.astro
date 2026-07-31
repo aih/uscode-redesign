@@ -1,0 +1,347 @@
+---
+/**
+ * A copy control beside every provision, and one toggle deciding what "copy"
+ * means. Congress.gov has the idea; this is the version with fewer clicks.
+ *
+ * ## What it copies
+ *
+ * Four things, and the reason there are four is that "copy this provision"
+ * genuinely means four different things depending on what you are writing:
+ *
+ *   * **Text** — the words, with the notes and source credit left out.
+ *   * **Citation** — `16 U.S.C. § 45f(c)(5)`.
+ *   * **Citation + text** — the citation, a blank line, the words. What goes
+ *     into a brief.
+ *   * **Link** — the URL. It writes a `text/html` flavour as well as plain
+ *     text, so pasting into anything rich (an email, a document, a ticket)
+ *     produces a real hyperlink whose label is the citation rather than a bare
+ *     URL. That is the one thing here that Congress.gov's version does not do
+ *     and the one most often wanted.
+ *
+ * The mode is a toggle at the top of the column — a `<select>`, because four
+ * options is where a segmented control stops fitting a phone — and it is
+ * remembered per browser. **Modifier keys override it for one click**, which is
+ * the affordance for the reader who wants text nine times and a link once:
+ * Shift for the citation, Alt for citation + text, Ctrl or ⌘ for the link. Both
+ * mechanisms the request asked about are here because they answer different
+ * needs: the toggle is for a session's worth of copying, the modifier for the
+ * exception.
+ *
+ * ## Why the island is dumb
+ *
+ * Every citation and every URL on this page is computed on the *server*, by
+ * `lib/cite.ts` and `lib/url.ts`, and shipped as a JSON block. The island reads
+ * it. That split is deliberate: an inline island cannot import a module, so
+ * anything it computes is untestable by construction, and citation formatting
+ * is precisely the part worth testing (`frontend/tests/cite.test.ts`, and
+ * `tests/test_citation_forms.py` for the inverse). What is left in the browser
+ * is DOM insertion and the clipboard, which is what genuinely cannot happen
+ * anywhere else.
+ *
+ * ## With scripting off
+ *
+ * Nothing appears. No dead buttons, no gutter reserved for controls that will
+ * never arrive — the island adds the `has-copy` class that opens the gutter, so
+ * the reading column is untouched until the widget is actually working. There
+ * is no non-JavaScript way to write to the clipboard, so a control that ships
+ * in the HTML would be a promise the page cannot keep.
+ *
+ * ## The trade
+ *
+ * A long section can hold a hundred provisions, so this adds a hundred stops to
+ * the tab order. That is real, and the alternative — `tabindex="-1"` — makes
+ * the whole feature mouse-only, which is worse. The controls come after the
+ * section's own heading and links, `Escape` is never captured, and the existing
+ * skip-nav still jumps the chrome.
+ */
+import { formatCitation, type CopyTarget } from "../lib/cite";
+import { appHref } from "../lib/url";
+
+interface Props {
+  /** Identifiers in the rendered section, from `uslm.copyableIdentifiers`. */
+  identifiers: string[];
+  /** The release point the page is showing — carried into the copied link, so
+   * the URL names the text the reader was actually looking at. */
+  release: string | null;
+}
+
+const { identifiers, release } = Astro.props;
+
+const targets: CopyTarget[] = identifiers.map((identifier) => ({
+  identifier,
+  cite: formatCitation(identifier),
+  href: appHref(identifier, release),
+}));
+
+/** The section itself, which `copyableIdentifiers` returns first.
+ *
+ * It gets a named button in the bar rather than an icon in the gutter, because
+ * the gutter position it would take is the same line as the first subsection's
+ * — two icons side by side, one copying six words and the other copying the
+ * whole section, with nothing to tell them apart. "Whole section" is also the
+ * one target worth labelling: everything else is identified by what it sits
+ * next to. */
+const whole = targets[0] ?? null;
+---
+
+{
+  targets.length > 0 && (
+    <div class="copycol" data-copycol hidden>
+      <div class="copycol__bar">
+        <label class="copycol__label" for="copy-mode">Copy</label>
+        <select class="usa-select copycol__mode" id="copy-mode" data-copy-mode>
+          <option value="text">Text</option>
+          <option value="citation">Citation</option>
+          <option value="both">Citation + text</option>
+          <option value="link">Link</option>
+        </select>
+        {whole && (
+          <button class="usa-button usa-button--outline copycol__whole" type="button" data-copy-whole={whole.identifier}>
+            Whole section
+          </button>
+        )}
+        <p class="copycol__hint">
+          Or hold <kbd>Shift</kbd> for the citation, <kbd>Alt</kbd> for both,{" "}
+          <kbd>Ctrl</kbd>/<kbd>⌘</kbd> for a link.
+        </p>
+        <p class="copycol__status" data-copy-status role="status" aria-live="polite"></p>
+      </div>
+
+      {/* The data the island works from. `type="application/json"` so the
+          browser does not execute it and the CSP has no opinion about it.
+          Every target, including the whole-section one the bar's button uses. */}
+      <script type="application/json" data-copy-targets set:html={JSON.stringify(targets)} />
+    </div>
+  )
+}
+
+<script is:inline>
+  function initCopyColumn() {
+    const root = document.querySelector("[data-copycol]");
+    if (!root) return;
+
+    const body = document.querySelector(".section-body");
+    if (!body) return;
+
+    const targets = JSON.parse(
+      root.querySelector("[data-copy-targets]").textContent || "[]",
+    );
+    const byId = new Map(targets.map((t) => [t.identifier, t]));
+
+    const modeSelect = root.querySelector("[data-copy-mode]");
+    const status = root.querySelector("[data-copy-status]");
+
+    const STORAGE_KEY = "usc-copymode";
+    const MODES = new Set(["text", "citation", "both", "link"]);
+
+    function storedMode() {
+      try {
+        const value = localStorage.getItem(STORAGE_KEY);
+        return MODES.has(value) ? value : "text";
+      } catch {
+        return "text";
+      }
+    }
+
+    modeSelect.value = storedMode();
+    modeSelect.addEventListener("change", () => {
+      try {
+        localStorage.setItem(STORAGE_KEY, modeSelect.value);
+      } catch {
+        // No storage: the choice still holds for this page.
+      }
+    });
+
+    /* One click's mode. A modifier wins over the toggle, and only for that
+       click — the toggle is what the reader set, the modifier is the exception
+       they are making right now, so writing the modifier back to storage would
+       silently redefine "set". Meta and Ctrl are both listed because the key
+       for "the other thing" is ⌘ on a Mac and Ctrl everywhere else. */
+    function modeFor(event) {
+      if (event.metaKey || event.ctrlKey) return "link";
+      if (event.altKey) return "both";
+      if (event.shiftKey) return "citation";
+      return modeSelect.value;
+    }
+
+    /* Elements whose text is *about* the provision rather than part of it.
+       Statutory notes and the source credit are the section's apparatus; a
+       reader copying subsection (c) into a brief does not want the amendment
+       history of the whole section pasted underneath it. They are still on the
+       page, and still copyable by selecting them. */
+    const NOT_TEXT = ["copybtn", "uslm-notes", "uslm-note", "uslm-sourceCredit"];
+    const BLOCK = new Set([
+      "P", "DIV", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "TR", "TABLE", "SECTION",
+    ]);
+
+    /* A designator and the words it introduces are one line.
+       `<content>` renders as a `<p>`, so a naive block rule puts a break
+       between `(1)` and the sentence it numbers — and the Code prints them
+       together, which is what someone pasting into a brief needs. The test is
+       structural rather than a regex over the result: a block whose immediately
+       preceding sibling is the provision's `<num>` continues that line. */
+    function continuesTheNum(node) {
+      const previous = node.previousElementSibling;
+      return !!previous && previous.classList.contains("uslm-num");
+    }
+
+    function collect(node, out) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        out.push(node.nodeValue);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      for (const cls of NOT_TEXT) if (node.classList.contains(cls)) return;
+      const isBlock = BLOCK.has(node.tagName);
+      if (isBlock) out.push(continuesTheNum(node) ? " " : "\n");
+      for (const child of node.childNodes) collect(child, out);
+      if (isBlock) out.push("\n");
+    }
+
+    /** The provision's words, with the page's line structure and none of its
+        controls. Not `innerText`: that would include or exclude the notes
+        depending on whether their `<details>` happens to be open, which makes
+        what you get depend on the width of your screen. */
+    function provisionText(el) {
+      const out = [];
+      collect(el, out);
+      return out
+        .join("")
+        .replace(/[^\S\n]+/gu, " ")
+        .replace(/ *\n */gu, "\n")
+        .replace(/\n{3,}/gu, "\n\n")
+        .trim();
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replace(/&/gu, "&amp;")
+        .replace(/</gu, "&lt;")
+        .replace(/>/gu, "&gt;")
+        .replace(/"/gu, "&quot;");
+    }
+
+    function payload(mode, target, el) {
+      const url = new URL(target.href, window.location.origin).href;
+      if (mode === "citation") return { text: target.cite, label: "Citation copied" };
+      if (mode === "link") {
+        return {
+          text: url,
+          // The rich flavour, which is the point of the mode: pasted into
+          // anything that understands HTML this becomes a link labelled with
+          // the citation, not a naked URL.
+          html: `<a href="${escapeHtml(url)}">${escapeHtml(target.cite)}</a>`,
+          label: "Link copied",
+        };
+      }
+      const text = provisionText(el);
+      if (mode === "both") {
+        return { text: `${target.cite}\n\n${text}`, label: "Citation and text copied" };
+      }
+      return { text, label: "Text copied" };
+    }
+
+    async function write({ text, html }) {
+      if (html && window.ClipboardItem && navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": new Blob([text], { type: "text/plain" }),
+            "text/html": new Blob([html], { type: "text/html" }),
+          }),
+        ]);
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+    }
+
+    let clearTimer = null;
+    function announce(message, button) {
+      status.textContent = message;
+      if (button) {
+        button.classList.add("copybtn--done");
+        window.clearTimeout(clearTimer);
+        clearTimer = window.setTimeout(() => {
+          button.classList.remove("copybtn--done");
+          status.textContent = "";
+        }, 1600);
+      }
+    }
+
+    async function onClick(event) {
+      const button = event.currentTarget;
+      const target = byId.get(button.dataset.copyId);
+      const el = document.getElementById(button.dataset.copyId);
+      if (!target || !el) return;
+      // Read the modifiers and build the payload once: `event` is still live
+      // here, but re-deriving either would make the announcement and the thing
+      // on the clipboard two separate answers to the same question.
+      const result = payload(modeFor(event), target, el);
+      try {
+        await write(result);
+        announce(result.label, button);
+      } catch {
+        // Denied permission, or an insecure origin — `navigator.clipboard` is
+        // unavailable outside a secure context, which includes plain HTTP on a
+        // hostname that is not localhost.
+        announce("Could not copy — your browser blocked it.", button);
+      }
+    }
+
+    let injected = 0;
+    // `slice(1)`: the section itself is the bar's "Whole section" button, not a
+    // gutter icon — in the gutter it would land on the same line as the first
+    // subsection's, two identical icons an inch apart doing very different
+    // things.
+    for (const target of targets.slice(1)) {
+      const el = document.getElementById(target.identifier);
+      if (!el) continue;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "copybtn";
+      button.dataset.copyId = target.identifier;
+      // The citation, not "Copy" — with a hundred of these on a page, a screen
+      // reader announcing "Copy, button" a hundred times says nothing.
+      button.setAttribute("aria-label", `Copy ${target.cite}`);
+      button.title = `Copy ${target.cite}`;
+      button.innerHTML =
+        '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">' +
+        '<path fill="currentColor" d="M4 1h7l3 3v8H4zm1 1v9h8V5h-3V2zM2 4v11h9v-1H3V4z"/>' +
+        "</svg>";
+      button.addEventListener("click", onClick);
+      el.insertBefore(button, el.firstChild);
+      injected += 1;
+    }
+
+    const wholeBtn = root.querySelector("[data-copy-whole]");
+    if (wholeBtn) {
+      wholeBtn.dataset.copyId = wholeBtn.dataset.copyWhole;
+      wholeBtn.addEventListener("click", onClick);
+    }
+
+    if (injected === 0) return;
+    // Only now: the gutter the buttons sit in is opened by this class, so a
+    // page where nothing could be injected keeps its full reading measure.
+    body.classList.add("has-copy");
+    root.hidden = false;
+  }
+
+  /* Wait for the document, and this is not boilerplate — it is the bug this
+     component shipped with for exactly one build.
+
+     The widget renders *above* the statutory text, because the mode toggle
+     governs the controls below it and a toggle found after the thing it governs
+     is a toggle nobody uses. An inline script runs the instant the parser
+     reaches it, so at that moment `.section-body` and every provision the
+     island is looking for are still unparsed: `querySelector` returned null,
+     the guard did its job, and the feature silently did not exist — no error,
+     no missing element, nothing in the console to notice.
+
+     `readyState` is checked rather than always listening, because a script that
+     only ever waits for DOMContentLoaded misses it entirely if it is added
+     after the event has already fired. */
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initCopyColumn, { once: true });
+  } else {
+    initCopyColumn();
+  }
+</script>

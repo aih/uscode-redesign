@@ -112,8 +112,17 @@
      * it: `getComputedStyle` over every `position: sticky` element *after
      * scrolling*, because unscrolled they sit at their natural place and report
      * a height that means nothing. Held honest by the anchor-jump assertion in
-     * the e2e suite, not by anyone remembering. */
-    --sticky-h: 22rem;
+     * the e2e suite, not by anyone remembering.
+     *
+     * It drifted again, exactly as advertised: "About" and "Downloads" joined
+     * the nav, and in this band the nav is the forced-open *wrapping* row, so
+     * two more items is another 44px band — **386px measured** at 700px wide on
+     * `/us/usc/t16/s470a`, against a 352px token. Every anchor jump in this
+     * band was landing 34px behind the bar. 25rem is 400px, so 14px of
+     * headroom. The lesson is the one already written above and is worth
+     * restating because it was not obeyed: adding a nav item is a change to
+     * this number. */
+    --sticky-h: 25rem;
   }
 }
 
@@ -479,6 +488,53 @@ main[id] {
   flex: 1 1 auto;
   min-width: 0;
   max-width: none;
+
+  /* --------------------------------------------- undoing `[type="search"]`
+   *
+   * The box's right edge was missing, so the text ran to the boundary and the
+   * "Go" button appeared to sit on top of it. The cause is not in this file and
+   * not in this component: USWDS's search package ships an **unscoped**
+   * selector,
+   *
+   *     [type="search"], .usa-search__input { border-right: none;
+   *       border-top-right-radius: 0; border-bottom-right-radius: 0;
+   *       float: left; height: units(4); }
+   *
+   * which is right for `.usa-search`, where the input and its submit button are
+   * flush and the button supplies the missing edge. This box is not that
+   * component — it is an input with a gap and a separate button — but the
+   * selector matches on the `type` attribute alone, so it applied anyway and
+   * took three visible properties with it. Measured in the browser before
+   * changing anything: `border-width` computed to `1px 0 1px 1px`.
+   *
+   * So these four lines are not styling, they are a restoration, and they must
+   * stay as specific as the rule they undo. `float` is included because a
+   * floated flex item is a no-op today and a layout bug the moment this row
+   * stops being a flex container. */
+  border-right: 1px solid;
+  border-top-right-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+  float: none;
+
+  /* Room for the browser's own clear button, which WebKit and Blink draw
+   * *inside* the content box at the right edge — so with the stock 8px of
+   * padding it sat on top of the last characters of a long citation. Padding
+   * is what moves the text out from under it; the button itself stays where the
+   * platform puts it, which is where readers expect it. */
+  padding-right: 2rem;
+}
+
+/* Firefox draws no clear button at all, so the reserved 2rem would just be a
+ * wide empty gutter. `::-webkit-search-cancel-button` exists only where the
+ * button does, which makes this the honest test for "is there one". */
+.sitesearch__input::-webkit-search-cancel-button {
+  margin-left: 0.25rem;
+}
+
+@supports not selector(::-webkit-search-cancel-button) {
+  .sitesearch__input {
+    padding-right: 0.5rem;
+  }
 }
 
 /* `width: auto` because USWDS makes every `.usa-button` full-width below the
@@ -965,6 +1021,177 @@ main[id] {
 
 .watch-remove {
   display: inline;
+}
+
+/* ------------------------------------------------------------ the copy column
+ *
+ * A control beside every provision, and one toggle saying what "copy" means
+ * (`CopyColumn.astro`).
+ *
+ * The gutter is opened by `.has-copy`, which the island adds only once it has
+ * actually injected something — so a reader with scripting off, or a page where
+ * no provision carries an identifier, keeps the full reading measure rather
+ * than a 2rem strip reserved for controls that never arrive.
+ *
+ * The buttons are positioned against each provision rather than against a
+ * single fixed column. That looks like the harder option and is the easier one:
+ * a provision is indented by its depth (`--indent-step`), so a fixed column
+ * would leave a four-deep clause's button an inch and a half from the clause it
+ * copies, with three other buttons in between. Hanging each one off its own
+ * provision means the control is always exactly where the thing it acts on
+ * starts, and the indent whitespace it sits in was already empty. */
+
+.copycol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin: 1rem 0 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.copycol__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  width: 100%;
+}
+
+.copycol__label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.copycol__mode {
+  width: auto;
+  min-width: 10rem;
+  height: 2.25rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Named rather than iconic, and the only copy control that is: everything in
+ * the gutter is identified by what it sits next to, and "the whole thing" has
+ * nothing to sit next to. */
+.copycol__whole {
+  margin: 0;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  width: auto;
+}
+
+.copycol__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.copycol__hint kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.2rem;
+  padding: 0 0.25rem;
+}
+
+/* The status line is `aria-live`, so it must exist in the DOM before it has
+ * anything to say — it cannot be `hidden` and then revealed, or the
+ * announcement is missed. Zero height until it holds text. */
+.copycol__status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-height: 1.1rem;
+  flex-basis: 100%;
+}
+
+/* The gutter. `position: relative` on the provisions is what the absolutely
+ * positioned buttons hang from, and it is set on `.has-copy` rather than on
+ * `.section-body [id]` generally so that a page without the widget carries no
+ * containing blocks it does not need. */
+.section-body.has-copy {
+  padding-left: 1.75rem;
+}
+
+.section-body.has-copy > .uslm-section,
+.section-body.has-copy [class*="uslm-"][id] {
+  position: relative;
+}
+
+.copybtn {
+  position: absolute;
+  left: -1.6rem;
+  top: 0.15rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.2rem;
+  background: none;
+  color: var(--muted);
+  /* Present but quiet. Invisible-until-hover is the usual treatment and it is
+   * wrong here: a reader who does not know the controls exist never hovers to
+   * find out. 45% is enough to read as an affordance and little enough that a
+   * column of them does not compete with the statute. */
+  opacity: 0.45;
+  cursor: pointer;
+  transition: opacity 120ms ease-in-out, background-color 120ms ease-in-out;
+}
+
+.copybtn:hover,
+.copybtn:focus-visible,
+[class*="uslm-"]:hover > .copybtn {
+  opacity: 1;
+  background: var(--panel);
+}
+
+.copybtn:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: 1px;
+}
+
+/* Confirmation, on the control itself as well as in the live region — the
+ * status line is at the top of the page and the button may be a screenful
+ * below it. */
+.copybtn--done {
+  opacity: 1;
+  color: var(--page);
+  background: var(--target-edge);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copybtn {
+    transition: none;
+  }
+}
+
+/* On a phone the gutter is most of the indent. The buttons go inline instead:
+ * still first in the provision, still one tap, no longer competing with the
+ * indentation that shows structure. */
+@media (max-width: 29.99em) {
+  .section-body.has-copy {
+    padding-left: 0;
+  }
+
+  .copybtn {
+    position: static;
+    margin-right: 0.35rem;
+    vertical-align: text-bottom;
+    opacity: 0.55;
+  }
+}
+
+@media print {
+  .copycol,
+  .copybtn {
+    display: none;
+  }
 }
 
 /* --------------------------------------------------------- statutory text */
@@ -1474,6 +1701,187 @@ main[id] {
   align-items: center;
 }
 
+/* The same links, styled the same way, at both ends of the page.
+ *
+ * These are largely the same destinations as the navbar's — Titles, Release
+ * points, API docs, About — and they were underlined while the navbar's were
+ * not, which read as two different kinds of thing rather than one menu repeated
+ * where it is useful. Of the two treatments the navbar's is the right one: a
+ * row of navigation is a set of choices, and underlining every choice turns a
+ * menu back into a paragraph.
+ *
+ * Underline on hover and focus, though, in both places. That is where the
+ * affordance is actually wanted, and dropping it entirely would leave a
+ * keyboard reader with nothing but the focus ring to say a thing is a link.
+ * `usa-footer__primary-link` is `font-weight: 700`; the navbar's is not, so
+ * this matches down rather than up. */
+.usa-footer__nav .usa-footer__primary-link {
+  text-decoration: none;
+  font-weight: normal;
+  color: var(--ink);
+}
+
+.usa-footer__nav .usa-footer__primary-link:hover,
+.usa-footer__nav .usa-footer__primary-link:focus {
+  text-decoration: underline;
+  color: var(--link);
+}
+
+/* ------------------------------------------------ a feature that is not on yet
+ *
+ * Accounts and bulk downloads (`lib/features.ts`). Both controls stay where a
+ * working one would be and explain themselves when asked, so a reader is never
+ * looking at a dead control with no way to find out why.
+ *
+ * The trigger is a real, focusable, *enabled* `<button>` — neither `disabled`
+ * nor `aria-disabled`. A disabled button leaves the tab order and refuses
+ * focus, hiding the explanation from the readers least able to guess at it; and
+ * the button genuinely is not disabled, since its action is to explain itself
+ * and it always performs it. So the greyed look has to be written here rather
+ * than inherited from `:disabled`. See `ComingSoon.astro`. */
+.soon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.soon__trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  font-family: inherit;
+  /* USWDS underlines interactive text in the navbar; this must match the links
+   * beside it, which do not. */
+  text-decoration: none;
+  color: var(--muted);
+  cursor: help;
+  anchor-name: --soon-anchor;
+}
+
+.soon__trigger:hover .soon__label,
+.soon__trigger:focus-visible .soon__label {
+  text-decoration: underline;
+}
+
+/* Small, quiet, and not a colour anyone has to decode: the word does the work.
+ * A dot or a lock icon would need a legend. */
+.soon__tag {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid currentcolor;
+  border-radius: 0.75rem;
+  padding: 0 0.4rem;
+  opacity: 0.85;
+}
+
+/* In the navbar's link row it has to sit on the links' baseline and carry the
+ * same padding, or it reads as a control that fell out of the menu. */
+/* Measured against the anchors it sits beside rather than guessed: below 64em
+ * USWDS gives `.usa-nav__primary a` `8px 16px` and a 44px box, and a trigger
+ * padded `16px` stood 50px tall and half a line lower than "About" next to it.
+ * Above 64em the anchors are `16px` all round at 48px, which the desktop rule
+ * below matches with a narrower inline padding so six items still fit a row. */
+.soon--nav .soon__trigger {
+  padding: 0.5rem 1rem;
+  min-height: 2.75rem;
+  line-height: 1.1;
+}
+
+/* USWDS underlines and blue-links every `<button>` inside `.usa-nav__primary`,
+ * on the assumption that a button in a nav is a disclosure control dressed as a
+ * link. `.usa-nav__primary button` is (0,1,1) and beats a bare `.soon__trigger`
+ * at (0,1,0), so "Downloads" shipped underlined next to five links that are
+ * not. Scoping is the whole reason this selector is written the long way. */
+.usa-nav__primary .soon__trigger,
+.usa-nav__primary .soon__trigger:hover {
+  text-decoration: none;
+  color: var(--muted);
+  background-color: transparent;
+}
+
+.usa-nav__primary .soon__trigger:hover .soon__label,
+.usa-nav__primary .soon__trigger:focus-visible .soon__label {
+  text-decoration: underline;
+}
+
+@media (min-width: 64em) {
+  .soon--nav .soon__trigger {
+    padding: 1rem 0.75rem;
+    white-space: nowrap;
+  }
+}
+
+/* The panel. A `popover`, for the same reasons as the citation preview
+ * (ADR-0024): the browser's top layer, Escape, and light dismiss, with no
+ * script of any kind. Anchor positioning where it exists; centred on the
+ * viewport where it does not, which is a fine place for a paragraph of
+ * explanation and needs no measuring island to arrange. */
+.soon__panel {
+  margin: 0;
+  /* `.authnav` is `white-space: nowrap` so the account control can never be the
+   * thing that wraps the chrome's row — and the panel is a descendant of it, so
+   * it inherited that and its three paragraphs rendered as three very long
+   * lines clipped at the panel's edge. A popover is in the top layer but it is
+   * still a descendant for inheritance, which is the part that is easy to
+   * forget. */
+  white-space: normal;
+  /* Inherited from the chrome, which is set for one-line controls. Prose needs
+   * its own. */
+  line-height: 1.5;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 18%);
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: min(28rem, calc(100vh - 4rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 0.95rem;
+}
+
+@supports (anchor-name: --x) {
+  .soon__panel {
+    position: fixed;
+    position-anchor: --soon-anchor;
+    position-area: block-end span-inline-start;
+    position-try-fallbacks: flip-block, flip-inline;
+    margin-block-start: 0.35rem;
+    inset: auto;
+  }
+}
+
+.soon__heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--reading);
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+
+.soon__lead {
+  margin: 0 0 0.75rem;
+}
+
+.soon__detail {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.soon__close {
+  margin-top: 0.25rem;
+}
+
+/* Standalone, in the body of a page rather than in the chrome. */
+.soon--inline .soon__trigger {
+  padding: 0.5rem 0;
+}
+
 /* ------------------------------------------------------- search results */
 
 .searchresults {
@@ -1841,6 +2249,19 @@ main[id] {
 
 .syntaxop__try {
   margin: 0.4rem 0 0;
+}
+
+/* The identifier a citation resolves to, printed next to the example. Quiet
+ * relative to the clickable example: the example is the thing to try, this is
+ * the confirmation of where it goes. */
+.syntaxop__arrow {
+  color: var(--muted);
+  padding: 0 0.15rem;
+}
+
+.syntaxop__result {
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .syntaxop__try code {

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { highlightHtml, hrefs, parseFragment, render } from "../src/lib/uslm";
+import {
+  copyableIdentifiers,
+  highlightHtml,
+  hrefs,
+  parseFragment,
+  render,
+} from "../src/lib/uslm";
 import type { Labels } from "../src/lib/types";
 
 const NS = 'xmlns="http://xml.house.gov/schemas/uslm/1.0"';
@@ -242,5 +248,47 @@ describe("link target (ADR-0031)", () => {
     const html = render(parseFragment(xml), opts);
     expect(html).not.toContain("target=");
     expect(html).not.toContain("data-newtab");
+  });
+});
+
+describe("copyableIdentifiers — what the copy column offers a control for", () => {
+  it("returns the section itself first, then its provisions in reading order", () => {
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><num>§ 45f.</num><subsection identifier="/us/usc/t16/s45f/a"><num>(a)</num><content>one</content></subsection><subsection identifier="/us/usc/t16/s45f/c"><num>(c)</num><paragraph identifier="/us/usc/t16/s45f/c/5"><content>five</content></paragraph></subsection></section>`;
+
+    expect(copyableIdentifiers(parseFragment(xml))).toEqual([
+      "/us/usc/t16/s45f",
+      "/us/usc/t16/s45f/a",
+      "/us/usc/t16/s45f/c",
+      "/us/usc/t16/s45f/c/5",
+    ]);
+  });
+
+  it("skips elements that carry an identifier but are not provisions", () => {
+    // `<num>` and `<content>` can carry identifiers of their own. A copy button
+    // on a paragraph's number, an inch from the one on the paragraph, is two
+    // controls doing nearly the same thing.
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><num identifier="/us/usc/t16/s45f/num">§ 45f.</num><subsection identifier="/us/usc/t16/s45f/a"><content identifier="/us/usc/t16/s45f/a/content">text</content></subsection></section>`;
+
+    expect(copyableIdentifiers(parseFragment(xml))).toEqual([
+      "/us/usc/t16/s45f",
+      "/us/usc/t16/s45f/a",
+    ]);
+  });
+
+  it("skips a provision with no identifier, since there is nothing to cite", () => {
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><subsection><content>unidentified</content></subsection></section>`;
+
+    expect(copyableIdentifiers(parseFragment(xml))).toEqual(["/us/usc/t16/s45f"]);
+  });
+
+  it("offers one control when the source repeats an identifier (ADR-0021)", () => {
+    // The page renders every occurrence, but `getElementById` finds only the
+    // first — so a second button would silently copy the wrong body.
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><subsection identifier="/us/usc/t16/s45f/a"><content>one</content></subsection><subsection identifier="/us/usc/t16/s45f/a"><content>again</content></subsection></section>`;
+
+    expect(copyableIdentifiers(parseFragment(xml))).toEqual([
+      "/us/usc/t16/s45f",
+      "/us/usc/t16/s45f/a",
+    ]);
   });
 });

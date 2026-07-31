@@ -9,8 +9,15 @@
  * worse than four links you can already read.
  */
 import AuthNav from "./AuthNav.astro";
+import ComingSoon from "./ComingSoon.astro";
 import SiteSearch from "./SiteSearch.astro";
 import ThemeToggle from "./ThemeToggle.astro";
+import {
+  ACCOUNTS_ENABLED,
+  ACCOUNTS_NOTICE,
+  DOWNLOADS_ENABLED,
+  DOWNLOADS_NOTICE,
+} from "../lib/features";
 import { APP } from "../lib/url";
 
 interface Props {
@@ -48,6 +55,37 @@ const { searchValue = null } = Astro.props;
         <li class="usa-nav__primary-item">
           <a class="usa-nav__link" href={`${APP}/docs`}><span>API docs</span></a>
         </li>
+        {/* The disclaimer this site has always carried in the footer — "a
+            conceptual redesign … not an official publication" — is the single
+            most important sentence on the page for anyone who lands on a
+            provision from a search engine, and it was in eight-point grey type
+            below the fold. It has a page now, and this is the way in. */}
+        <li class="usa-nav__primary-item">
+          <a class="usa-nav__link" href={`${APP}/about`}><span>About</span></a>
+        </li>
+        {/* Not a link, because there is nothing to link to yet — it explains
+            itself instead of 404ing. See `ComingSoon` for why it is not
+            `<button disabled>`. */}
+        {!DOWNLOADS_ENABLED && (
+          <li class="usa-nav__primary-item">
+            <ComingSoon
+              id="downloads"
+              label="Downloads"
+              heading={DOWNLOADS_NOTICE.heading}
+              lead={DOWNLOADS_NOTICE.lead}
+              detail={DOWNLOADS_NOTICE.detail}
+            >
+              <p class="soon__detail">
+                <a
+                  class="usa-link usa-link--external"
+                  rel="noopener"
+                  href="https://uscode.house.gov/download/download.shtml">
+                  Release-point downloads at the OLRC
+                </a>
+              </p>
+            </ComingSoon>
+          </li>
+        )}
       </ul>
       {/* The chrome's controls share one row at every width — which is also
           what keeps them out of `--sticky-h`: a second block in the nav would
@@ -64,7 +102,27 @@ const { searchValue = null } = Astro.props;
           rather than navigation. */}
       <div class="navtools">
         <SiteSearch value={searchValue} />
-        <AuthNav />
+        {/* `AuthNav` is the island that asks `/api/v1/auth/me` who the reader
+            is. With accounts switched off there is nobody to be, so it is not
+            rendered at all rather than rendered and hidden — a hidden island
+            still ships its script and still makes the request, on every page,
+            to be told 401. The control that takes its place explains what an
+            account will be for, and is plain server-rendered markup.
+            `AuthNav` itself is untouched: `ACCOUNTS_ENABLED = true` puts it
+            back. */}
+        {ACCOUNTS_ENABLED ? (
+          <AuthNav />
+        ) : (
+          <span class="authnav authnav--off">
+            <ComingSoon
+              id="accounts"
+              label="Accounts"
+              heading={ACCOUNTS_NOTICE.heading}
+              lead={ACCOUNTS_NOTICE.lead}
+              detail={ACCOUNTS_NOTICE.detail}
+            />
+          </span>
+        )}
         <ThemeToggle />
       </div>
     </nav>

@@ -1,0 +1,147 @@
+---
+/**
+ * `/app/about` — what this site is, and what it is not.
+ *
+ * The sentence this page is built around has been on every page since Session 8
+ * ("A conceptual redesign of the Office of the Law Revision Counsel's site …
+ * Not an official publication of the United States government") and it has been
+ * in grey eight-point type below the fold the whole time. For anyone who lands
+ * on a provision from a search engine, that is the most important sentence on
+ * the screen and the least likely to be read.
+ *
+ * Three ways to fix it were on the table — an anchor from the navbar down to
+ * the footer, a hover, and a page. A page won: the anchor scrolls someone to
+ * two lines of small print and calls it an answer, a hover cannot be linked or
+ * printed, and neither has room for the thing a reader actually needs next,
+ * which is *how to check the text* — the release point it came from, the file
+ * it was parsed out of, and how to see what changed.
+ *
+ * The footer keeps the sentence and now links here, so nothing moved out of
+ * reach on the way.
+ */
+import Base from "../layouts/Base.astro";
+import { setPublicCache } from "../lib/cache";
+import { APP, syntaxHref } from "../lib/url";
+
+/** Prose about the project — it changes when the project does, not per request
+ * and never per reader. Revalidate rather than pin: there is no release point
+ * this could be immutable against. */
+setPublicCache(Astro.response.headers, null, false);
+---
+
+<Base title="About · U.S. Code">
+  <h1 class="doc-title">About this site</h1>
+
+  <p class="lede">
+    A conceptual redesign of the <a
+      class="usa-link usa-link--external"
+      rel="noopener"
+      href="https://uscode.house.gov/">Office of the Law Revision Counsel</a
+    >'s United States Code website, built entirely from the official USLM downloads.
+    <strong>It is not an official publication of the United States government.</strong>
+  </p>
+
+  <div class="usa-summary-box" role="region" aria-labelledby="official-heading">
+    <div class="usa-summary-box__body">
+      <h2 class="usa-summary-box__heading" id="official-heading">
+        Where to go for the official text
+      </h2>
+      <div class="usa-summary-box__text">
+        <p>
+          The Office of the Law Revision Counsel publishes the Code and is the authority
+          on it. If you need the official text, or the currency of a title, go to{" "}
+          <a
+            class="usa-link usa-link--external"
+            rel="noopener"
+            href="https://uscode.house.gov/">uscode.house.gov</a
+          >. Nothing here amends, replaces or interprets what they publish — every page
+          on this site names the release point its text came from and links to the source
+          file it was parsed out of.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="toc-group">What it is for</h2>
+
+  <p>
+    One question, asked well: <em>what did this provision say, at this moment?</em> The
+    Code is republished in full at every release point, and a release point is named for
+    the last public law it incorporates. That makes "the current text" easy to find and
+    the text as it stood two Congresses ago surprisingly hard.
+  </p>
+
+  <p>
+    So every URL here carries a release point, and the URL scheme mirrors the USLM
+    <code>@identifier</code> the official XML already uses — <code
+      >/us/usc/t16/s45f/c/5</code
+    > is subsection (c)(5) of section 45f of title 16. Add <code>?release=</code> or{" "}
+    <code>?date=</code> and you get that provision as it stood then. A citation you can
+    write down by looking at it, and one that keeps answering.
+  </p>
+
+  <h2 class="toc-group">How to check anything on it</h2>
+
+  <ul class="toc">
+    <li>
+      <a href={`${APP}/releases`}>
+        <span class="toc__heading">
+          Release points — every one this site holds, and which titles each changed
+        </span>
+      </a>
+    </li>
+    <li>
+      <a href={`${APP}/docs`}>
+        <span class="toc__heading">
+          The API — the same data as JSON, or as the source XML, verbatim
+        </span>
+      </a>
+    </li>
+    <li>
+      <a href={syntaxHref()}>
+        <span class="toc__heading">
+          Search and citation syntax — what the one box in the header accepts
+        </span>
+      </a>
+    </li>
+    <li>
+      <a
+        class="usa-link usa-link--external"
+        rel="noopener"
+        href="https://uscode.house.gov/download/download.shtml">
+        <span class="toc__heading">The official downloads this site is built from</span>
+      </a>
+    </li>
+  </ul>
+
+  <p>
+    Every section page links to its own version history, which lists each release point
+    where its text changed, and to a redline between any two of them. That is the check
+    worth knowing about: if this site has something wrong, the redline against the source
+    XML is where it shows.
+  </p>
+
+  <h2 class="toc-group">How it is built</h2>
+
+  <p>
+    The corpus is the official USLM XML — 3,153 title-releases across 58 titles and 381
+    release points — parsed and stored section by section. Text that a release point
+    republished unchanged is stored once, which is what makes the whole history fit:
+    about 91% of it deduplicates, because the Code republishes every title at every
+    release point whether or not anything in it moved.
+  </p>
+
+  <p class="doc-meta">
+    The source, the design decisions behind it and the build log are public:{" "}
+    <a
+      class="usa-link usa-link--external"
+      rel="noopener"
+      href="https://github.com/aih/uscode-redesign">github.com/aih/uscode-redesign</a
+    >.
+  </p>
+
+  <p class="doc-meta">
+    Some parts of the site are described here and not switched on yet — accounts and bulk
+    downloads. The controls for those say so where they appear, rather than being hidden.
+  </p>
+</Base>

@@ -66,6 +66,14 @@ const hasContext = crumbs.length > 0 || picker !== null;
     <title>{title}</title>
     <meta name="description" content="Any provision of the US Code, at any release point." />
 
+    {/* The tab mark. Root-absolute, not `/app/...`: it is served by the API
+        (`main.py`), which is what everything outside `/app` reaches, so one
+        file answers for the reader and for both API docs pages. An SVG because
+        the mark is three letters and a square — it should be sharp on a 4K tab
+        strip and legible at 16px, and one vector file is both. */}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="mask-icon" href="/favicon.svg" color="#1a4480" />
+
     {/* The theme, before first paint.
 
         Light is the default for everyone (`site.scss`), so the common case

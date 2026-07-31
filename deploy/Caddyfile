@@ -127,7 +127,23 @@
 		# ADR-0029 has just added, so that is a follow-up with somewhere to go
 		# rather than a wish. `style-src` is the same story: USWDS ships bundled
 		# CSS, but a handful of components still carry `style="…"` attributes.
-		?Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+		#
+		# `worker-src 'self' blob:` is here for exactly one thing: ReDoc builds
+		# its search index in a worker created from a Blob, and with no
+		# `worker-src` the browser falls back to `script-src`, which has no
+		# `blob:` — so `/redoc` rendered in full and its search box silently
+		# returned nothing for every query (measured, ADR-0032). Naming the
+		# directive is what keeps the widening *narrow*: it permits a worker
+		# from a blob and changes nothing about what may execute in the page,
+		# which is the part `script-src` governs and which stays as it was.
+		#
+		# The reader itself has no worker of any kind, so this buys the reader
+		# nothing and costs it nothing — it is a docs-page allowance that has to
+		# live in a site-wide header because there is one header. The
+		# alternative was leaving a documented page half-broken to keep a
+		# directive absent, which is a worse trade than it sounds: an absent
+		# directive is not a stricter one, it is `script-src` doing double duty.
+		?Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'"
 	}
 
 	log {

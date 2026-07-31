@@ -1,0 +1,27 @@
+{
+  "why": "Swagger UI and ReDoc, vendored. The site's CSP (deploy/Caddyfile, ADR-0030) is default-src 'self' with no CDN named, so the copies FastAPI loads from cdn.jsdelivr.net by default are blocked and both pages render blank. See ADR-0032.",
+  "regenerate": "uv run python scripts/vendor_apidocs.py --check   (verify)\nuv run python scripts/vendor_apidocs.py            (re-download)",
+  "assets": [
+    {
+      "file": "swagger-ui-bundle.js",
+      "package": "swagger-ui-dist",
+      "version": "5.30.2",
+      "url": "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.30.2/swagger-ui-bundle.js",
+      "sha256": "002503ad9e92c33a9c9e2f7d4910a6fba4dd9dd8c57cfdb53b090629df0f5787"
+    },
+    {
+      "file": "swagger-ui.css",
+      "package": "swagger-ui-dist",
+      "version": "5.30.2",
+      "url": "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.30.2/swagger-ui.css",
+      "sha256": "bc5e8d5c013477cf1f35e2fb8ba1dff66be0f72f24e669a509635657145e1acb"
+    },
+    {
+      "file": "redoc.standalone.js",
+      "package": "redoc",
+      "version": "2.5.1",
+      "url": "https://cdn.jsdelivr.net/npm/redoc@2.5.1/bundles/redoc.standalone.js",
+      "sha256": "2d8d13e94b5a21011cc6f8260d87ca475d0f6f2faed16dd12e7394dfa3bb05b8"
+    }
+  ]
+}

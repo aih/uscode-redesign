@@ -60,6 +60,43 @@ function walk(el: UslmElement, visit: (el: UslmElement) => void): void {
   }
 }
 
+/**
+ * Every provision in the fragment that is worth offering a copy control for, in
+ * document order, the section itself first.
+ *
+ * "Worth offering" is two conditions, and both matter:
+ *
+ *   * It carries an `@identifier`, so there is something to cite and a URL that
+ *     addresses it. Anything without one has no citation to copy.
+ *   * It is a `LEVEL_TAGS` container — a subsection, paragraph, clause and so
+ *     on. Not every identified element is a provision: `<num>`, `<heading>` and
+ *     `<content>` can carry identifiers too, and a copy button on the number of
+ *     a paragraph, immediately next to the one on the paragraph, is two
+ *     controls that do almost the same thing an inch apart.
+ *
+ * This function is in `uslm.ts` rather than next to the widget because it is
+ * the one module allowed to know USLM element names (CLAUDE.md architecture
+ * rule 5) — `LEVEL_TAGS` is already the list, already maintained for the
+ * heading outline, and a second copy of it in a component is exactly the kind
+ * of duplication that rule exists to prevent.
+ */
+export function copyableIdentifiers(fragment: UslmElement): string[] {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  walk(fragment, (el) => {
+    if (!LEVEL_TAGS.has(tagOf(el))) return;
+    const identifier = el.getAttribute("identifier");
+    // The source publishes the odd repeated identifier at one release point
+    // (ADR-0021); the page renders every occurrence, so `getElementById` would
+    // find only the first. One control, on the first, rather than a second that
+    // silently copies the wrong body.
+    if (!identifier || seen.has(identifier)) return;
+    seen.add(identifier);
+    found.push(identifier);
+  });
+  return found;
+}
+
 function tagOf(el: UslmElement): string {
   return el.localName ?? el.tagName;
 }

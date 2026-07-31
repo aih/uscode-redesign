@@ -1,0 +1,57 @@
+---
+/**
+ * The page-sized version of the navbar's account control.
+ *
+ * Shown in place of the sign-in form, the sign-up form, the settings form and
+ * the watchlist, whenever `ACCOUNTS_ENABLED` is false. Those four routes stay
+ * reachable rather than 404ing, because a bookmark or a stale link should land
+ * on an explanation, not on a wall — and because "the page is gone" and "the
+ * feature is not on yet" are different facts and a 404 says the wrong one.
+ *
+ * The wording is `lib/features.ts`'s single copy, so this and the navbar cannot
+ * drift into two different promises.
+ */
+import { ACCOUNTS_NOTICE } from "../lib/features";
+import { APP, syntaxHref } from "../lib/url";
+---
+
+<div class="usa-alert usa-alert--info" role="note">
+  <div class="usa-alert__body">
+    <h2 class="usa-alert__heading">{ACCOUNTS_NOTICE.heading}</h2>
+    <p class="usa-alert__text">{ACCOUNTS_NOTICE.lead}</p>
+    <p class="usa-alert__text">{ACCOUNTS_NOTICE.detail}</p>
+  </div>
+</div>
+
+{/* Not a consolation prize: the two things an account would have bought — come
+    back to a provision, and see what changed — both already work without one.
+    A version-history URL is a bookmark that keeps answering. */}
+<h2 class="toc-group">What you can do without one</h2>
+<ul class="toc">
+  <li>
+    <a href={`${APP}/`}>
+      <span class="toc__heading">Read any provision at any of 381 release points</span>
+    </a>
+  </li>
+  <li>
+    <a href={`${APP}/releases`}>
+      <span class="toc__heading">See which titles each release point changed</span>
+    </a>
+  </li>
+  <li>
+    <a href={syntaxHref()}>
+      <span class="toc__heading">Search the text, or jump straight to a citation</span>
+    </a>
+  </li>
+  <li>
+    <a href={`${APP}/docs`}>
+      <span class="toc__heading">Use the same data through the API</span>
+    </a>
+  </li>
+</ul>
+
+<p class="doc-meta">
+  Every page here is addressable, so a bookmark does most of what a saved favourite
+  would: a URL naming a release point keeps answering with that text forever, and a
+  section's version history lists every release point where it changed.
+</p>

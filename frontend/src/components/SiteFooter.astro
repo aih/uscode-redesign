@@ -5,8 +5,20 @@
  * It says what this site is, because a page of statutory text that does not
  * identify its publisher is a page a researcher cannot cite. The source of the
  * data is named, and linked, on every page.
+ *
+ * Its links are styled to match the navbar's rather than USWDS's own footer
+ * treatment. That was a visible inconsistency — the same four destinations,
+ * underlined at the bottom of the page and not at the top — and between the two
+ * the navbar is right: a row of navigation is read as a set of choices, and
+ * underlining every one of them turns a menu into a paragraph of links. Both
+ * now underline on hover and focus, which is where the affordance is actually
+ * needed. See `.usa-footer__nav` in `site.scss`.
+ *
+ * The disclaimer stays where it has always been and is now also a link: it is
+ * the most important sentence on the page for anyone who arrived from a search
+ * engine, and it had no room here to say anything more.
  */
-import { APP } from "../lib/url";
+import { APP, syntaxHref } from "../lib/url";
 ---
 
 <footer class="usa-footer usa-footer--slim">
@@ -16,7 +28,9 @@ import { APP } from "../lib/url";
         <ul class="usa-list usa-list--unstyled">
           <li><a class="usa-footer__primary-link" href={`${APP}/`}>Titles</a></li>
           <li><a class="usa-footer__primary-link" href={`${APP}/releases`}>Release points</a></li>
-          <li><a class="usa-footer__primary-link" href="/docs">API documentation</a></li>
+          <li><a class="usa-footer__primary-link" href={syntaxHref()}>Search guide</a></li>
+          <li><a class="usa-footer__primary-link" href={`${APP}/docs`}>API documentation</a></li>
+          <li><a class="usa-footer__primary-link" href={`${APP}/about`}>About</a></li>
           <li>
             <a
               class="usa-footer__primary-link usa-link usa-link--external"
@@ -33,6 +47,7 @@ import { APP } from "../lib/url";
       <p class="doc-meta">
         A conceptual redesign of the Office of the Law Revision Counsel's site, built from the
         official USLM downloads. Not an official publication of the United States government.
+        <a href={`${APP}/about`}>More about this site</a>.
       </p>
     </div>
   </div>

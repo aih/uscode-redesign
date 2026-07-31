@@ -51,7 +51,11 @@ export default defineConfig({
       // The bare citation URL is FastAPI's route anyway; in dev it answers on
       // :8000, and under Caddy (`make dev-all`) both share one origin.
       proxy: Object.fromEntries(
-        ["/api/v1", "/health", "/docs", "/openapi.json"].map((path) => [
+        // `/favicon.svg` and `/static` are the API's too (ADR-0032): the docs
+        // bundles and the tab mark live there, and `Base.astro` links the
+        // favicon root-absolute so one file serves the whole site. Without
+        // them here, `npm run dev` alone shows a blank tab.
+        ["/api/v1", "/health", "/docs", "/redoc", "/openapi.json", "/static", "/favicon"].map((path) => [
           `^${path}`,
           { target: API, changeOrigin: true },
         ]),
