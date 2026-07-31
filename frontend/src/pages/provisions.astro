@@ -10,27 +10,38 @@
  * (`fetchMe`/`fetchDefaultWatchlist`'s docstring) — the one thing that makes
  * this page different from `releases.astro`.
  */
+import AccountsOff from "../components/AccountsOff.astro";
 import Base from "../layouts/Base.astro";
 import RemoveWatchItem from "../components/RemoveWatchItem.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import { fetchDefaultWatchlist, fetchMe } from "../lib/api";
 import { setNoStore } from "../lib/cache";
+import { ACCOUNTS_ENABLED } from "../lib/features";
 import { appHref, loginHref, trimNum } from "../lib/url";
 
 // One reader's watchlist rendered into HTML and handed to the next reader by a
 // shared cache is the failure this page is most exposed to (PLAN Day 6a).
 setNoStore(Astro.response.headers);
 
+// With accounts off there is nobody to be and nothing to fetch. Skipping the
+// two calls matters here more than on the other pages: this one runs them
+// server-side, so an unauthenticated round trip to the API happens per request
+// rather than per browser.
 const cookie = Astro.request.headers.get("cookie");
-const me = await fetchMe(cookie);
+const me = ACCOUNTS_ENABLED ? await fetchMe(cookie) : null;
 const watchlist = me ? await fetchDefaultWatchlist(cookie) : null;
 ---
 
 <Base title="My Provisions · U.S. Code">
   <h1 class="doc-title">My Provisions</h1>
 
+  {/* The page the request asked for this text to appear on: someone who has
+      found "My Provisions" has already decided they want the feature, so this
+      is where the explanation is most owed. */}
+  {!ACCOUNTS_ENABLED && <AccountsOff />}
+
   {
-    !me && (
+    ACCOUNTS_ENABLED && !me && (
       <p class="lede">
         <a href={loginHref("/app/provisions")}>Log in</a> to track provisions you care about.
       </p>

@@ -1,0 +1,82 @@
+---
+/**
+ * A control for something the site will do and does not do yet.
+ *
+ * Used twice in the navbar — Accounts and Downloads — and once more inside the
+ * body of the pages those two would have led to. The rule it encodes: a
+ * disabled control must say what it is for. A greyed-out button with no
+ * explanation is a dead end that looks like a bug.
+ *
+ * ## No JavaScript
+ *
+ * `popover` gives the panel a top layer, `Escape`, and light dismiss with no
+ * script at all — the same platform feature `CitePreview` is built on
+ * (ADR-0024), used here in its simplest form. `title` carries the short version
+ * for a pointer that hovers without clicking, so the two mechanisms the request
+ * asked for — hover text and a pop-up — are both present and neither costs a
+ * kilobyte.
+ *
+ * ## Neither `disabled` nor `aria-disabled`
+ *
+ * A genuinely disabled button is removed from the tab order and refuses focus,
+ * so a keyboard reader cannot reach it and a screen reader will not announce
+ * it — which would hide the explanation from exactly the people least able to
+ * guess at it.
+ *
+ * `aria-disabled="true"` was the first attempt and is also wrong, which the
+ * Playwright suite caught by refusing to click it: "element is not enabled".
+ * That refusal is correct, and it is the point. The button is *not* disabled —
+ * it has an action, it performs it, and it performs it every time. What is
+ * unavailable is the feature it names, and saying "this control does nothing"
+ * about a control that does something is a lie told to exactly the readers who
+ * cannot see the greyed-out styling.
+ *
+ * So it is an ordinary enabled button whose action is to explain itself. The
+ * unavailability is carried by things that are true: the word "soon" beside the
+ * label, the sentence in `title`, and a visually-hidden phrase for anyone who
+ * gets neither. That is why the greyed look lives in `.soon__trigger` rather
+ * than in `:disabled`.
+ */
+interface Props {
+  /** Unique on the page: ties the trigger to its panel. */
+  id: string;
+  /** What the control would be called if it worked. */
+  label: string;
+  /** The panel's heading. */
+  heading: string;
+  /** The sentence a hover shows, and the panel's first paragraph. */
+  lead: string;
+  /** The second paragraph — context, or where to go instead. */
+  detail?: string;
+  /** `nav` renders it as a navbar item; `inline` as a standalone block. */
+  variant?: "nav" | "inline";
+}
+
+const { id, label, heading, lead, detail, variant = "nav" } = Astro.props;
+const panelId = `${id}-panel`;
+---
+
+<span class={`soon soon--${variant}`}>
+  <button
+    class="soon__trigger"
+    type="button"
+    popovertarget={panelId}
+    title={lead}
+  >
+    <span class="soon__label">{label}</span>
+    <span class="soon__tag" aria-hidden="true">soon</span>
+    <span class="usa-sr-only">— not available yet; select to read what it will do</span>
+  </button>
+
+  <div class="soon__panel" id={panelId} popover role="dialog" aria-labelledby={`${id}-h`}>
+    <h2 class="soon__heading" id={`${id}-h`}>{heading}</h2>
+    <p class="soon__lead">{lead}</p>
+    {detail && <p class="soon__detail">{detail}</p>}
+    <slot />
+    {/* The panel is light-dismissable and closes on Escape, but a pointer user
+        who opened it by clicking looks for a way to close it by clicking. */}
+    <button class="usa-button usa-button--outline soon__close" type="button" popovertarget={panelId} popovertargetaction="hide">
+      Close
+    </button>
+  </div>
+</span>

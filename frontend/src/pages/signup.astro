@@ -3,8 +3,10 @@
  * `/app/signup` — same shape and same reason as `login.astro`: `/api/v1/auth/signup`
  * is JSON-only, so this is a `fetch`-driven form rather than a plain POST.
  */
+import AccountsOff from "../components/AccountsOff.astro";
 import Base from "../layouts/Base.astro";
 import { setNoStore } from "../lib/cache";
+import { ACCOUNTS_ENABLED } from "../lib/features";
 import { loginHref, safeNext } from "../lib/url";
 
 // Same reason as login: a credential form, never cached.
@@ -18,6 +20,10 @@ const next = safeNext(Astro.url.searchParams.get("next"));
 <Base title="Sign up · U.S. Code">
   <h1 class="doc-title">Sign up</h1>
 
+  {!ACCOUNTS_ENABLED && <AccountsOff />}
+
+  {ACCOUNTS_ENABLED && (
+  <>
   <form class="usa-form" id="signup-form" data-next={next}>
     <label class="usa-label" for="email">Email</label>
     <input class="usa-input" type="email" id="email" name="email" required autocomplete="email" />
@@ -46,6 +52,8 @@ const next = safeNext(Astro.url.searchParams.get("next"));
   <p class="doc-meta">
     Already have an account? <a href={loginHref(next)}>Log in</a>
   </p>
+  </>
+  )}
 </Base>
 
 <script is:inline>
@@ -54,7 +62,9 @@ const next = safeNext(Astro.url.searchParams.get("next"));
     const error = document.getElementById("signup-error");
     const errorText = document.getElementById("signup-error-text");
 
-    form.addEventListener("submit", async (event) => {
+    // Absent when accounts are switched off — see `login.astro` for why the
+    // guard is here rather than around the script tag.
+    form?.addEventListener("submit", async (event) => {
       event.preventDefault();
       error.hidden = true;
 
