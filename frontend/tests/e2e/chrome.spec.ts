@@ -30,35 +30,139 @@ test("the syntax guide is reachable from a search that found nothing", async ({ 
   await expect(guide).toBeVisible();
   await guide.click();
   await expect(page).toHaveURL(/\/app\/search\/syntax/);
-  await expect(page.locator("h1")).toContainText("Search syntax");
+  await expect(page.locator("h1")).toContainText("Search and citation guide");
 });
 
-test("a logged-out reader is offered sign-in in the navbar", async ({ page }) => {
-  await page.goto("/app/us/usc/t16/s45f");
+test("the guide covers both halves of the one box", async ({ page }) => {
+  // The box does two jobs and the guide used to document one of them, which
+  // left the citation half — 84 accepted shapes — with nothing describing it.
+  await page.goto("/app/search/syntax");
 
-  // Rendered hidden and revealed by the island once `/api/v1/auth/me` answers,
-  // because the page itself is shared by every reader and cannot say who is
-  // looking at it.
-  await expect(page.locator('.authnav [data-role="anon"]')).toBeVisible();
-  await expect(page.locator('.authnav a[href^="/app/login"]')).toBeVisible();
+  await expect(page.locator("#citations")).toBeVisible();
+  await expect(page.locator("#operators")).toBeVisible();
+  // Each documented citation form prints the identifier it resolves to; that is
+  // the claim `tests/test_citation_forms.py` checks against the real parser.
+  await expect(page.locator(".syntaxop__result").first()).toContainText("/us/usc/t");
 });
 
-test("a section page no longer asks the reader to log in", async ({ page }) => {
+test("accounts are offered as coming, not as a broken door", async ({ page }) => {
+  // Accounts are built and switched off (`lib/features.ts`). The failure this
+  // guards against is not "no login link" — that is the intent — but a
+  // greyed-out control with nothing saying why.
   await page.goto("/app/us/usc/t16/s45f");
-  await expect(page.locator('.authnav [data-role="anon"]')).toBeVisible();
 
-  // The watch widget shows a logged-out reader nothing at all now; the door is
-  // in the chrome, not in the middle of the statutory text.
+  const trigger = page.locator('.navtools .soon__trigger');
+  await expect(trigger).toBeVisible();
+  // Enabled, deliberately. `aria-disabled` was the first attempt and Playwright
+  // refused to click it — correctly: the button is not disabled, it has an
+  // action and performs it. What is unavailable is the feature it names, and
+  // the label, the `title` and a visually-hidden phrase are what say so.
+  await expect(trigger).toBeEnabled();
+  await expect(trigger).toHaveAttribute("title", /accounts|sign in/i);
+
+  // No door anywhere that leads to a form that cannot work.
+  await expect(page.locator('.authnav a[href^="/app/login"]')).toHaveCount(0);
+
+  await trigger.click();
+  const panel = page.locator("#accounts-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("alerted");
+});
+
+test("the coming-soon panel closes on Escape", async ({ page }) => {
+  // It is a `popover`, so this is the platform's behaviour rather than ours —
+  // asserted because it is the whole reason the control needs no JavaScript.
+  await page.goto("/app/");
+
+  await page.locator(".navtools .soon__trigger").click();
+  await expect(page.locator("#accounts-panel")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#accounts-panel")).toBeHidden();
+});
+
+test("a section page asks nothing of the reader", async ({ page }) => {
+  await page.goto("/app/us/usc/t16/s45f");
+
+  // With accounts off the watch island is not rendered at all, rather than
+  // rendered and hidden: a hidden island still ships its script and still asks
+  // `/api/v1/auth/me` who is reading, on every page, to be told nobody.
   await expect(page.getByText("Log in to track this section")).toHaveCount(0);
-  await expect(page.locator('.watch-widget [data-role="add"]')).toBeHidden();
-  await expect(page.locator('.watch-widget [data-role="remove"]')).toBeHidden();
+  await expect(page.locator(".watch-widget")).toHaveCount(0);
+});
 
-  // The container too, not only its contents. It reserves `min-height: 2.5rem`
-  // plus a rem of margin either side so that swapping Add for Remove does not
-  // shift the page — which, once the login link was removed, left an empty
-  // 72px band between the status line and the first subsection for every
-  // logged-out reader.
-  await expect(page.locator(".watch-widget")).toBeHidden();
+test("My Provisions explains itself rather than showing a login prompt", async ({
+  page,
+}) => {
+  await page.goto("/app/provisions");
+
+  await expect(page.locator("h1")).toContainText("My Provisions");
+  // Scoped to `main`: the navbar's popover carries the identical heading,
+  // which is the point of both reading from one constant in `lib/features.ts`.
+  await expect(page.locator("main").getByText("Accounts are coming")).toBeVisible();
+  // The page a bookmark lands on must not be a 404: "gone" and "not on yet"
+  // are different facts.
+  await expect(page.locator(".usa-alert--info")).toBeVisible();
+});
+
+test("the disabled Downloads control says what it will do", async ({ page }) => {
+  await page.goto("/app/");
+
+  const trigger = page.locator('.usa-nav__primary .soon__trigger');
+  await expect(trigger).toContainText("Downloads");
+  // USWDS underlines and blue-links every button inside `.usa-nav__primary`,
+  // which shipped this one underlined beside five links that are not.
+  await expect(trigger).toHaveCSS("text-decoration-line", "none");
+
+  await trigger.click();
+  await expect(page.locator("#downloads-panel")).toContainText("bulk");
+});
+
+test("About is in the nav and carries the disclaimer", async ({ page }) => {
+  await page.goto("/app/");
+  await page.locator('.usa-nav__primary a[href="/app/about"]').click();
+
+  await expect(page).toHaveURL(/\/app\/about/);
+  // The sentence that used to be eight-point grey type below the fold.
+  await expect(page.locator("main")).toContainText(
+    "not an official publication of the United States government",
+  );
+});
+
+test("the footer and the navbar style their links the same way", async ({ page }) => {
+  await page.goto("/app/");
+
+  const footerLink = page.locator('.usa-footer__nav a[href="/app/about"]');
+  await expect(footerLink).toHaveCSS("text-decoration-line", "none");
+});
+
+test("the tab mark is served and is an SVG", async ({ page, request }) => {
+  await page.goto("/app/");
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    "href",
+    "/favicon.svg",
+  );
+
+  // Root-absolute, so it is the API that answers for it rather than `/app`.
+  const response = await request.get("/favicon.svg");
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("image/svg+xml");
+});
+
+test("the search input keeps its right edge", async ({ page }) => {
+  // USWDS ships an unscoped `[type="search"]` rule that strips `border-right`
+  // and the right radii, on the assumption the input sits flush inside
+  // `.usa-search` with the submit button supplying the edge. This box is not
+  // that component, so the edge simply vanished into the Go button.
+  await page.goto("/app/");
+
+  const input = page.locator(".navtools .sitesearch__input");
+  await expect(input).not.toHaveCSS("border-right-width", "0px");
+  await expect(input).toHaveCSS("float", "none");
+
+  // And the text must not run under the browser's own clear button.
+  const box = await input.boundingBox();
+  const go = await page.locator(".sitesearch__go").boundingBox();
+  expect(box!.x + box!.width).toBeLessThanOrEqual(go!.x);
 });
 
 test("the API reference renders inside the site, not as a bare Swagger page", async ({
