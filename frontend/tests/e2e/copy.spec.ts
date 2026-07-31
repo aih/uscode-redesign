@@ -14,7 +14,7 @@
  * appeared in the console, and the feature silently did not exist. Every
  * assertion below that counts buttons is an assertion about that.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const SECTION = "/app/us/usc/t16/s45f";
 
@@ -22,6 +22,41 @@ test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
 function clipboard(page: Page): Promise<string> {
   return page.evaluate(() => navigator.clipboard.readText());
+}
+
+/** What each mode announces when it has finished writing. */
+const ANNOUNCED = {
+  text: "Text copied",
+  citation: "Citation copied",
+  both: "Citation and text copied",
+  link: "Link copied",
+} as const;
+
+/**
+ * Click a control, wait for it to finish, and read what it wrote.
+ *
+ * The waiting is the point. `click()` returns once the click is dispatched,
+ * and the handler writes the clipboard in a promise nothing on this side
+ * awaits — so reading immediately is a race, and **link mode loses it**: a
+ * `ClipboardItem` carrying two blobs takes measurably longer to resolve than
+ * `writeText`, so the read came back with the *previous* mode's text while the
+ * page went on to say "Link copied" a moment later. It failed only on CI,
+ * where one worker on a slower machine widened the gap; the widget was working
+ * the whole time.
+ *
+ * The status line is the page's own signal that the write resolved, and each
+ * mode's wording is distinct, so this waits for the exact event rather than
+ * sleeping and hoping. Every clipboard read in this file goes through it.
+ */
+async function copyWith(
+  page: Page,
+  button: Locator,
+  mode: keyof typeof ANNOUNCED,
+  options?: Parameters<Locator["click"]>[0],
+): Promise<string> {
+  await button.click(options);
+  await expect(page.locator("[data-copy-status]")).toHaveText(ANNOUNCED[mode]);
+  return clipboard(page);
 }
 
 test("a control appears beside every provision", async ({ page }) => {
@@ -46,8 +81,7 @@ test("the section itself is a named button, not a gutter icon", async ({ page })
   const whole = page.locator("[data-copy-whole]");
   await expect(whole).toContainText("Whole section");
 
-  await whole.click();
-  const text = await clipboard(page);
+  const text = await copyWith(page, whole, "text");
   expect(text).toContain("Mineral King Valley");
   expect(text.length).toBeGreaterThan(2000);
 });
@@ -57,23 +91,19 @@ test("each mode copies what it says it copies", async ({ page }) => {
   const button = page.locator(".copybtn").nth(1);
 
   await page.selectOption("[data-copy-mode]", "citation");
-  await button.click();
-  const cite = await clipboard(page);
+  const cite = await copyWith(page, button, "citation");
   expect(cite).toMatch(/^16 U\.S\.C\. § 45f\([a-z0-9]+\)/u);
 
   await page.selectOption("[data-copy-mode]", "text");
-  await button.click();
-  const text = await clipboard(page);
+  const text = await copyWith(page, button, "text");
   expect(text).not.toContain("U.S.C.");
   expect(text.length).toBeGreaterThan(20);
 
   await page.selectOption("[data-copy-mode]", "both");
-  await button.click();
-  expect(await clipboard(page)).toBe(`${cite}\n\n${text}`);
+  expect(await copyWith(page, button, "both")).toBe(`${cite}\n\n${text}`);
 
   await page.selectOption("[data-copy-mode]", "link");
-  await button.click();
-  const link = await clipboard(page);
+  const link = await copyWith(page, button, "link");
   expect(link).toContain("/app/us/usc/t16/s45f/");
   // The release point travels with it, so the URL names the text the reader was
   // actually looking at rather than whatever is current when it is opened.
@@ -85,14 +115,13 @@ test("a modifier key overrides the toggle for one click only", async ({ page }) 
   await page.selectOption("[data-copy-mode]", "text");
   const button = page.locator(".copybtn").nth(1);
 
-  await button.click({ modifiers: ["Shift"] });
-  expect(await clipboard(page)).toContain("U.S.C. §");
+  const shifted = await copyWith(page, button, "citation", { modifiers: ["Shift"] });
+  expect(shifted).toContain("U.S.C. §");
 
   // The toggle is what the reader set; the modifier is the exception they made
   // just now. Writing it back to storage would silently redefine "set".
   await expect(page.locator("[data-copy-mode]")).toHaveValue("text");
-  await button.click();
-  expect(await clipboard(page)).not.toContain("U.S.C. §");
+  expect(await copyWith(page, button, "text")).not.toContain("U.S.C. §");
 });
 
 test("the chosen mode survives a navigation", async ({ page }) => {
@@ -106,9 +135,8 @@ test("the chosen mode survives a navigation", async ({ page }) => {
 test("copied text leaves out the notes and the source credit", async ({ page }) => {
   await page.goto(SECTION);
   await page.selectOption("[data-copy-mode]", "text");
-  await page.locator("[data-copy-whole]").click();
+  const text = await copyWith(page, page.locator("[data-copy-whole]"), "text");
 
-  const text = await clipboard(page);
   // The section's apparatus is about the provision rather than part of it; a
   // reader pasting into a brief does not want the amendment history under it.
   const credit = await page.locator(".uslm-sourceCredit").first().innerText();
@@ -123,9 +151,9 @@ test("a designator and its sentence stay on one line", async ({ page }) => {
   // `(1)` and the words it numbers — and the Code prints them together.
   await page.goto(SECTION);
   await page.selectOption("[data-copy-mode]", "text");
-  await page.locator("[data-copy-whole]").click();
+  const text = await copyWith(page, page.locator("[data-copy-whole]"), "text");
 
-  expect(await clipboard(page)).toMatch(/\([a-z0-9]+\) \S/u);
+  expect(text).toMatch(/\([a-z0-9]+\) \S/u);
 });
 
 test("copying announces itself", async ({ page }) => {
