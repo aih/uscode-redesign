@@ -324,6 +324,35 @@ running regardless, and an incomplete run resumes on the next Monday.
 Logs from both workflows land on the box at `${DATA_ROOT}/logs/` (`deploy.log`,
 `update-corpus.log`) — check there first if a run's GitHub Actions summary isn't enough.
 
+## 8. Alarms
+
+```bash
+ALERT_EMAIL=you@example.org bash deploy/alarms.sh <instance-id>
+```
+
+Creates an SNS topic, subscribes the address, and puts five alarms on it: sustained CPU, CPU
+credit balance, the EC2 status check, hourly bytes out, and data-volume usage. **AWS sends nothing
+until the subscription is confirmed from that mailbox** — an unconfirmed topic fails quietly, which
+is the same as having no alarms at all. Confirm it, then prove delivery:
+
+```bash
+aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
+  --state-value ALARM --state-reason 'testing delivery'
+```
+
+These are tripwires, not monitoring. There is nothing to autoscale (§ *What is deliberately not
+here*), so an alarm is a mail to a human who decides whether the demo has outgrown one box. Two of
+them are worth explaining: **CPU credit balance**, because a throttled burstable instance serves
+every page slowly while its CPU percentage looks unremarkable — the credit balance is the metric
+that says why; and **NetworkOut**, set at roughly 5 GB in an hour, which a few hundred readers will
+never approach, so crossing it means either the demo landed or something is scraping it.
+
+The disk alarm reads `CWAgent/disk_used_percent`, which only exists if the CloudWatch agent is
+installed on the box (`dnf install -y amazon-cloudwatch-agent`, then a config publishing
+`disk` for `/var/lib/uscode`). Without it that one alarm sits in `INSUFFICIENT_DATA` — deliberately
+quiet rather than deliberately noisy — and the other four still work, since they come from EC2's
+own metrics.
+
 ## What is deliberately not here
 
 - **No CDN.** The `immutable` headers make CloudFront a drop-in when it is wanted; nothing about
