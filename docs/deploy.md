@@ -51,10 +51,21 @@ with room to spare.
 
 ## 2. Provision
 
-`deploy/admin-grant.sh` does everything below in one run — the security group, the instance role
-and its policies, the OIDC provider and `uscode-github-deploy` role Actions assumes (§7) — and is
-meant to be run once, by a human with an admin profile, not folded into the site's own deploy path.
-The steps it performs, spelled out:
+Two scripts, in this order:
+
+```bash
+# Once, by a human with an admin profile — the IAM objects nothing else may
+# create: the uscode-site instance role, the GitHub OIDC provider, and the
+# uscode-github-deploy role Actions assumes (§7).
+AWS_PROFILE=<admin> bash deploy/admin-grant.sh
+
+# Then, with the ordinary deploy identity: security group, instance, data
+# volume, Elastic IP. Idempotent — re-running reuses what exists rather than
+# building a second one — and it prints the IP for the DNS record.
+bash deploy/provision.sh
+```
+
+The steps `provision.sh` performs, spelled out, since two of them are silent when wrong:
 
 ```bash
 export AWS_REGION=us-east-1
