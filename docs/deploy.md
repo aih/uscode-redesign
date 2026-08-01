@@ -113,7 +113,22 @@ Then allocate an Elastic IP, associate it, and point the domain's A record at it
 
 ## 3. Set the box up
 
-`aws ssm start-session --target <instance-id>`, then:
+`deploy/bootstrap-box.sh` does all of this in one idempotent run — fetch it onto the box and:
+
+```bash
+SITE_ADDRESS=uscode.linkedlegislation.org \
+ECR_REGISTRY=739065237548.dkr.ecr.us-east-1.amazonaws.com \
+USC_MIRROR_BUCKET=uscode-mirror-dreamproit \
+  sudo -E bash bootstrap-box.sh
+```
+
+It finds the data volume by elimination rather than assuming `/dev/nvme1n1` (NVMe device order is
+not guaranteed), formats it only if it has no filesystem, and **keeps an existing `.env` rather
+than regenerating it** — `SEARCH_PASSWORD` is honoured only on the OpenSearch volume's first boot,
+so a re-run that wrote a fresh one would leave every search 401ing behind a green healthcheck.
+
+The same steps by hand, if you would rather watch them: `aws ssm start-session --target
+<instance-id>`, then:
 
 ```bash
 sudo dnf install -y docker git
