@@ -26,9 +26,13 @@ env:
 
 jobs:
   deploy:
+    # AWS_DEPLOY_ROLE_ARN is set once deploy/admin-grant.sh has been run and
+    # the box exists. Until then this job skips rather than failing every
+    # merge to main on a credentials step that cannot succeed yet.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      vars.AWS_DEPLOY_ROLE_ARN != '' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Resolve sha

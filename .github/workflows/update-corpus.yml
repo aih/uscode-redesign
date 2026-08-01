@@ -24,6 +24,8 @@ env:
 
 jobs:
   update-corpus:
+    # Skips until deploy/admin-grant.sh has been run — see deploy.yml.
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS credentials
