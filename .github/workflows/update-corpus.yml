@@ -1,0 +1,111 @@
+# Weekly corpus refresh on the site box (ADR-0013, ADR-0020). Dispatches
+# deploy/update-corpus.sh over SSM and lets it run there — the chain
+# (inventory -> backfill -> mirror push -> load-all -> verify) can take hours,
+# and SSM keeps running it independent of this job's own runtime.
+name: Update corpus
+
+on:
+  schedule:
+    # Monday 07:23 UTC. An odd minute, deliberately, so a fleet of scheduled
+    # jobs across repos doesn't all fire on the hour together.
+    - cron: "23 7 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: update-corpus
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  update-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Dispatch the update on the box via SSM
+        id: dispatch
+        run: |
+          REMOTE_CMD="sudo -iu ec2-user bash /home/ec2-user/uscode-redesign/deploy/update-corpus.sh"
+          PARAMS=$(jq -n --arg cmd "$REMOTE_CMD" \
+            '{commands: [$cmd], executionTimeout: ["43200"]}')
+          COMMAND_ID=$(aws ssm send-command \
+            --targets "Key=tag:Name,Values=uscode-site" \
+            --document-name "AWS-RunShellScript" \
+            --comment "weekly corpus update" \
+            --parameters "$PARAMS" \
+            --query "Command.CommandId" --output text)
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+          echo "Dispatched SSM command $COMMAND_ID"
+
+      - name: Poll until done or this job's time runs out
+        run: |
+          COMMAND_ID="${{ steps.dispatch.outputs.command_id }}"
+          INSTANCE_ID=$(aws ssm list-commands --command-id "$COMMAND_ID" \
+            --query "Commands[0].InstanceIds[0]" --output text)
+          for _ in $(seq 1 12); do
+            [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && break
+            sleep 5
+            INSTANCE_ID=$(aws ssm list-commands --command-id "$COMMAND_ID" \
+              --query "Commands[0].InstanceIds[0]" --output text)
+          done
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "Could not resolve the target instance for command $COMMAND_ID" >&2
+            exit 1
+          fi
+          echo "Polling command $COMMAND_ID on instance $INSTANCE_ID"
+
+          # GitHub caps a job at 6h; the SSM command itself can run up to 12h
+          # (executionTimeout above). Poll for at most 330 minutes so this job
+          # always has time left to report before GitHub kills it outright.
+          DEADLINE=$(( $(date +%s) + 330 * 60 ))
+          STATUS="InProgress"
+          while [ "$STATUS" = "InProgress" ] || [ "$STATUS" = "Pending" ] || [ "$STATUS" = "Delayed" ]; do
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "::notice::corpus update still running on the box (command $COMMAND_ID); SSM continues without this job"
+              exit 0
+            fi
+            sleep 60
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query "Status" --output text)
+            echo "status: $STATUS"
+          done
+
+          INVOCATION=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID")
+          STDOUT=$(echo "$INVOCATION" | jq -r ".StandardOutputContent")
+          STDERR=$(echo "$INVOCATION" | jq -r ".StandardErrorContent")
+
+          case "$STATUS" in
+            Success)
+              echo "=== stdout ==="
+              echo "$STDOUT"
+              exit 0
+              ;;
+            Failed)
+              echo "=== stdout ==="
+              echo "$STDOUT"
+              echo "=== stderr ==="
+              echo "$STDERR"
+              echo "Corpus update ended in status $STATUS" >&2
+              exit 1
+              ;;
+            *)
+              echo "=== stdout ==="
+              echo "$STDOUT"
+              echo "=== stderr ==="
+              echo "$STDERR"
+              echo "Corpus update ended in unexpected status $STATUS" >&2
+              exit 1
+              ;;
+          esac
