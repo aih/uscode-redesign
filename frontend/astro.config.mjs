@@ -57,7 +57,20 @@ export default defineConfig({
         // them here, `npm run dev` alone shows a blank tab.
         ["/api/v1", "/health", "/docs", "/redoc", "/openapi.json", "/static", "/favicon"].map((path) => [
           `^${path}`,
-          { target: API, changeOrigin: true },
+          { 
+            target: API, 
+            changeOrigin: true,
+            bypass(req) {
+              // The dev server strips `base` (`/app`) before the proxy sees a URL.
+              // A request to `/app/docs` arrives as `/docs` and would be proxied
+              // to the API's Swagger UI instead of rendering `pages/docs.astro`.
+              // Bypassing any request that originally started with `/app/` ensures
+              // Astro handles all reader pages.
+              if (req.originalUrl && req.originalUrl.startsWith("/app/")) {
+                return req.url;
+              }
+            }
+          },
         ]),
       ),
     },

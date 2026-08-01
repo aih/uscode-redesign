@@ -2,30 +2,11 @@
 /**
  * `/app/about` — what this site is, and what it is not.
  *
- * The sentence this page is built around has been on every page since Session 8
- * ("A conceptual redesign of the Office of the Law Revision Counsel's site …
- * Not an official publication of the United States government") and it has been
- * in grey eight-point type below the fold the whole time. For anyone who lands
- * on a provision from a search engine, that is the most important sentence on
- * the screen and the least likely to be read.
- *
- * Three ways to fix it were on the table — an anchor from the navbar down to
- * the footer, a hover, and a page. A page won: the anchor scrolls someone to
- * two lines of small print and calls it an answer, a hover cannot be linked or
- * printed, and neither has room for the thing a reader actually needs next,
- * which is *how to check the text* — the release point it came from, the file
- * it was parsed out of, and how to see what changed.
- *
- * The footer keeps the sentence and now links here, so nothing moved out of
- * reach on the way.
  */
 import Base from "../layouts/Base.astro";
 import { setPublicCache } from "../lib/cache";
 import { APP, syntaxHref } from "../lib/url";
 
-/** Prose about the project — it changes when the project does, not per request
- * and never per reader. Revalidate rather than pin: there is no release point
- * this could be immutable against. */
 setPublicCache(Astro.response.headers, null, false);
 ---
 
@@ -65,19 +46,21 @@ setPublicCache(Astro.response.headers, null, false);
   <h2 class="toc-group">What it is for</h2>
 
   <p>
-    This site answers one question: <em>what did this provision say at a given moment?</em>
-    The Code is republished in full at every release point, and each release point is named
-    for the last public law it includes. Finding the current text of a section is easy;
-    finding what it said two Congresses ago is not.
+    This site provides an updated, navigable version of the United States Code, representing the codification of federal statutes as of a given date. 
+    When new laws are passed by Congress, the OLRC <i>classifies</i> each provision to determine where it will go in the U.S. Code; then the office executes the
+    changes into the code along with editorial notes. The Code, with these updates, is republished in full at every "release point", and each release point is named
+    for the last public law it includes. This site indexes each section of the Code at each release point, and allows you to search by keyword or by citation.
   </p>
 
   <p>
-    So every URL here carries a release point, and the URL scheme follows the USLM
-    <code>@identifier</code> already used in the official XML. <code
+    The site is built around a well-defined API that provides a 1:1 correspondence between a textual citation and a URL. The URL scheme follows the official XML structure
+    in the United States Legislative Markup (USLM), and the url corresponds to the 
+    <code>@identifier</code> used in the official XML. For example, <code
       >/us/usc/t16/s45f/c/5</code
     > is subsection (c)(5) of section 45f of title 16; add <code>?release=</code> or{" "}
-    <code>?date=</code> and you get that provision as it stood then. The citation is
-    readable on sight, and it still works later.
+    <code>?date=</code> and you get that provision as it was as of that date or release. The citation is
+    human-readable and it still works later. In addition, each provision carries a unique ID and that ID can also be used to
+    pull up the provision, in the context of its section, on this site.
   </p>
 
   <h2 class="toc-group">How to check anything on it</h2>
@@ -86,21 +69,21 @@ setPublicCache(Astro.response.headers, null, false);
     <li>
       <a href={`${APP}/releases`}>
         <span class="toc__heading">
-          Release points — every one this site holds, and which titles each changed
+          Release points — every release point published electronically by OLRC, and which titles each changed
         </span>
       </a>
     </li>
     <li>
       <a href={`${APP}/docs`}>
         <span class="toc__heading">
-          The API — the same data as JSON, or as the source XML, verbatim
+          The API — the same data as JSON, or as the source XML
         </span>
       </a>
     </li>
     <li>
       <a href={syntaxHref()}>
         <span class="toc__heading">
-          Search and citation syntax — what the one box in the header accepts
+          Search and citation syntax — how to use the search box on each page
         </span>
       </a>
     </li>
@@ -116,7 +99,7 @@ setPublicCache(Astro.response.headers, null, false);
 
   <p>
     Every section page links to its own version history, listing each release point where
-    the text changed, and to a redline between any two of them. If something here is
+    the text changed, and to an automated redline (difference) between any two of them. If something here is
     wrong, that is where it will show.
   </p>
 
@@ -140,7 +123,10 @@ setPublicCache(Astro.response.headers, null, false);
   </p>
 
   <p class="doc-meta">
-    Two things described here are not switched on yet: accounts and bulk downloads. Their
-    controls say so where they appear, instead of being hidden.
+    Two things described here are not switched on yet: accounts and bulk downloads. These features will allow users to customize their
+    navigation and alerts for the U.S. Code, and to retrieve bulk downloads of the Code and its updates in a variety of formats. For now, consult the official OLRC site at <a 
+    class="usa-link usa-link--external"
+    rel="noopener"
+    href="https://uscode.house.gov/">uscode.house.gov</a> for more information.
   </p>
 </Base>
