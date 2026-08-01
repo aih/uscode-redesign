@@ -164,7 +164,24 @@ back to each service's `build:` block.
 Caddy gets its certificate within a few seconds of the DNS record resolving. The site is now up
 and **empty**, which is fine — fill it while it serves. Two ways in, pick one:
 
-**Fast path — restore a dump.** Minutes, not days, if a recent one exists in the mirror:
+**Fast path — restore a dump.** Minutes, not days, if a recent one exists in the mirror.
+
+**A dump taken from a development database carries that database's accounts.** The local one held
+1,301 users and 1,343 sessions left behind by test runs, and ADR-0034 switched accounts off in the
+*reader* only — `POST /api/v1/auth/signup` and the login routes answer a direct caller either way,
+so those rows would have been live credentials on the public site. Dump the corpus without them:
+
+```bash
+pg_dump -U uscode -Fc \
+  --exclude-table-data=users --exclude-table-data=user_settings \
+  --exclude-table-data=auth_sessions --exclude-table-data=login_attempts \
+  --exclude-table-data=watchlists --exclude-table-data=watchlist_items \
+  uscode > uscode-$(date +%F).dump
+```
+
+The schema still comes across — it is only the rows that are left behind. This does not apply to
+the nightly backup in §6, which dumps the production database in full because restoring it should
+restore real accounts.
 
 ```bash
 # Pull the newest dump and restore it. This is the corpus as of whenever the
