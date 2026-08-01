@@ -24,6 +24,12 @@
   $theme-font-path: "/app/uswds/fonts",
   $theme-font-type-sans: "system",
   $theme-font-type-serif: "georgia",
+  // USWDS's default mono is Roboto Mono Web, whose @font-face rules point at
+  // /app/uswds/fonts/. Only public/uswds/img/ is shipped, so those six woff2
+  // files have always 404'd and every page has fallen back to a system mono
+  // anyway. Asking for the fallback directly renders the same and stops
+  // requesting fonts that aren't there.
+  $theme-font-type-mono: "system",
   $theme-font-role-heading: "sans",
   $theme-font-role-body: "sans",
   $theme-respect-user-font-size: true,
