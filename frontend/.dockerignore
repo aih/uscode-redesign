@@ -12,6 +12,11 @@ dist/
 test-results/
 playwright-report/
 
+# Test sources and config are not part of the runtime image; the build stage
+# does not need them either since `npm run build` is `astro build` alone.
+tests/
+playwright.config.ts
+
 .env
 .env.*
 .DS_Store

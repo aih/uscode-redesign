@@ -17,6 +17,13 @@
 #   SEARCH_PASSWORD=…                    openssl rand -base64 24, no "admin" in it
 #   DATA_ROOT=/var/lib/uscode            the mounted data volume
 #   USC_MIRROR_BUCKET=…                  the S3 corpus mirror (ADR-0013)
+#
+# Optional in .env:
+#   ECR_REGISTRY=…                       pull api/frontend images from here instead of
+#                                         building locally; unset falls back to `local`,
+#                                         which `build:` still produces on `up --build`
+#   IMAGE_TAG=…                          tag to pull/build; defaults to `latest`
+#   OPENSEARCH_HEAP=2g                   -Xms/-Xmx for the opensearch JVM; defaults to 2g
 services:
   db:
     image: postgres:16
@@ -58,8 +65,8 @@ services:
       # "admin" in it, or the container exits 1 at boot with only a log line.
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
       # The index is the corpus, not a smoke slice; the 512 MB default heap is
-      # not enough to build it.
-      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
+      # not enough to build it. Override with OPENSEARCH_HEAP for a bigger box.
+      - OPENSEARCH_JAVA_OPTS=-Xms${OPENSEARCH_HEAP:-2g} -Xmx${OPENSEARCH_HEAP:-2g}
     # No published ports, same rule as the database: reachable only from this
     # network. It holds no certificate a browser would trust and needs none.
     volumes:
@@ -86,6 +93,7 @@ services:
       start_period: 60s
 
   api:
+    image: ${ECR_REGISTRY:-local}/uscode-api:${IMAGE_TAG:-latest}
     build: .
     depends_on:
       db:
@@ -130,11 +138,26 @@ services:
         "main:app", "--host", "0.0.0.0", "--port", "8001",
         "--proxy-headers", "--forwarded-allow-ips", "*",
       ]
+    # No curl in python:3.12-slim; urllib is stdlib.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
+    image: ${ECR_REGISTRY:-local}/uscode-frontend:${IMAGE_TAG:-latest}
     build: ./frontend
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       API_BASE_URL: http://api:8001
       HOST: 0.0.0.0
@@ -142,12 +165,20 @@ services:
     expose:
       - "4321"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4321/app/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   proxy:
     image: caddy:2-alpine
     depends_on:
-      - api
-      - frontend
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     environment:
       # Caddy reads this as the site address. A bare hostname means automatic
       # HTTPS from Let's Encrypt; the Caddyfile's default of :8000 means plain
