@@ -215,12 +215,12 @@ corpus doesn't):
 # Current text — 66k docs, what the default (unpinned) search reads. Do this
 # first: it's what makes search go from empty to live.
 docker compose -f docker-compose.prod.yml exec api \
-  uv run python -m ingest reindex_search --recreate
+  uv run python -m ingest.reindex_search --recreate
 
 # Superseded text — 490k docs, what `?release=` search needs. Bigger, so run
 # it detached and let it finish in the background.
 docker compose -f docker-compose.prod.yml exec -d api \
-  sh -c 'uv run python -m ingest reindex_search --all-versions >> /app/data/reindex.log 2>&1'
+  sh -c 'uv run python -m ingest.reindex_search --all-versions >> /app/data/reindex.log 2>&1'
 ```
 
 When the corpus load finishes: `make verify`, then `make verify-deep` — the independent recount,
