@@ -190,6 +190,24 @@ jobs:
           # missing directory next to the real failure.
           if-no-files-found: ignore
 
+  compose:
+    name: docker-compose.prod.yml validates
+    runs-on: ubuntu-latest
+
+    # Nothing currently parses the prod compose file before a deploy. Cheap
+    # and fast: `config` resolves interpolation and merge without building or
+    # starting anything, so a required-var typo or YAML error is caught here
+    # rather than at 2am on the box.
+    env:
+      SITE_ADDRESS: x
+      POSTGRES_PASSWORD: x
+      SEARCH_PASSWORD: x
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - run: docker compose -f docker-compose.prod.yml config -q
+
   slow:
     name: make test-slow (full samples)
     if: github.event_name == 'schedule'
