@@ -50,6 +50,13 @@ fi
 echo "=== pulling images ==="
 docker compose -f docker-compose.prod.yml pull api frontend
 
+# --no-deps below means the migration container starts nothing for itself, so
+# the database has to already be up: true on every redeploy, false on a first
+# bring-up. Starting db and opensearch first (and waiting on their
+# healthchecks) makes this script the same command in both cases.
+echo "=== starting stateful services ==="
+docker compose -f docker-compose.prod.yml up -d --wait db opensearch
+
 echo "=== migrating (new image, before it serves) ==="
 docker compose -f docker-compose.prod.yml run --rm --no-deps api uv run alembic upgrade head
 

@@ -467,9 +467,12 @@ cat > "$GITHUB_PERMISSIONS_DOC" <<EOF
       "Resource": "arn:aws:ssm:${REGION}::document/AWS-RunShellScript"
     },
     {
-      "Sid": "SsmGetCommandInvocation",
+      "Sid": "SsmPollCommand",
       "Effect": "Allow",
-      "Action": "ssm:GetCommandInvocation",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommands"
+      ],
       "Resource": "*"
     },
     {
