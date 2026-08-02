@@ -1,0 +1,104 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GroupForTheDeployIdentity",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateGroup",
+        "iam:GetGroup",
+        "iam:ListAttachedGroupPolicies",
+        "iam:AddUserToGroup"
+      ],
+      "Resource": [
+        "arn:aws:iam::739065237548:group/uscode-deploy",
+        "arn:aws:iam::739065237548:user/linkedlegislation-deploy"
+      ]
+    },
+    {
+      "Sid": "AttachOnlyOurOwnPolicyToThatGroup",
+      "Effect": "Allow",
+      "Action": "iam:AttachGroupPolicy",
+      "Resource": "arn:aws:iam::739065237548:group/uscode-deploy",
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": "arn:aws:iam::739065237548:policy/uscode-deploy-policy"
+        }
+      }
+    },
+    {
+      "Sid": "TheCustomerManagedPolicy",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicyVersion",
+        "iam:ListPolicyVersions",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion"
+      ],
+      "Resource": "arn:aws:iam::739065237548:policy/uscode-deploy-policy"
+    },
+    {
+      "Sid": "TheTwoRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:GetRole",
+        "iam:PutRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:UpdateAssumeRolePolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::739065237548:role/uscode-site",
+        "arn:aws:iam::739065237548:role/uscode-github-deploy"
+      ]
+    },
+    {
+      "Sid": "OnlyTheseAwsManagedPoliciesMayBeAttached",
+      "Effect": "Allow",
+      "Action": "iam:AttachRolePolicy",
+      "Resource": [
+        "arn:aws:iam::739065237548:role/uscode-site",
+        "arn:aws:iam::739065237548:role/uscode-github-deploy"
+      ],
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": [
+            "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+            "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "InstanceProfileForTheBox",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateInstanceProfile",
+        "iam:GetInstanceProfile",
+        "iam:AddRoleToInstanceProfile"
+      ],
+      "Resource": "arn:aws:iam::739065237548:instance-profile/uscode-site"
+    },
+    {
+      "Sid": "GitHubOidcProvider",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateOpenIDConnectProvider",
+        "iam:GetOpenIDConnectProvider"
+      ],
+      "Resource": "arn:aws:iam::739065237548:oidc-provider/token.actions.githubusercontent.com"
+    },
+    {
+      "Sid": "ListsThatCannotBeScoped",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListPolicies",
+        "iam:ListOpenIDConnectProviders",
+        "iam:ListRoles"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

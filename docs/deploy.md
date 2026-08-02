@@ -37,9 +37,17 @@ with room to spare.
 - **A domain name** with an A record pointing at the instance's Elastic IP. Caddy needs a
   hostname to get a certificate; there is no way around this. (`sslip.io` works in a pinch —
   `1-2-3-4.sslip.io` resolves to `1.2.3.4` — but use a real name for anything public.)
-- **An IAM identity that can create EC2 and IAM resources**, to run `deploy/admin-grant.sh` (§2)
-  once. The `uscode` profile (`uscode-mirror-dreamproit-user`) is scoped to the mirror bucket and
-  **cannot** do this; it cannot even `s3:ListAllMyBuckets`. Provisioning needs a wider identity.
+- **An IAM identity that can create IAM resources**, to run `deploy/admin-grant.sh` (§2) once, and
+  a second one that does the day-to-day provisioning afterwards (`linkedlegislation-deploy` here;
+  override with `DEPLOY_USER`). The `uscode` profile (`uscode-mirror-dreamproit-user`) is scoped to
+  the mirror bucket and **cannot** do either; it cannot even `s3:ListAllMyBuckets`.
+
+  This account is shared with unrelated projects, so the setup identity does not need — and should
+  not get — `AdministratorAccess`. `deploy/admin-grant-bootstrap-policy.json` is exactly the 21 IAM
+  actions `admin-grant.sh` calls, every one scoped to a `uscode-*` resource or the GitHub OIDC
+  provider. Attach it, run the script, detach it. It stays a *temporary* grant because creating
+  roles and writing inline policies onto them is escalation-capable whatever the resource scope
+  says, and nothing in the ongoing deploy path needs IAM write at all.
 - **The mirror complete.** It is: the ledger is 3,153 `ok` / 44 `unavailable` / 0 pending, 9.7 GB
   on disk, verified against the local corpus (`docs/verification/database.json`). Nothing to do
   here for a fresh deploy — noted because it wasn't always true, and a partial mirror would mean
@@ -54,10 +62,12 @@ with room to spare.
 Two scripts, in this order:
 
 ```bash
-# Once, by a human with an admin profile — the IAM objects nothing else may
-# create: the uscode-site instance role, the GitHub OIDC provider, and the
-# uscode-github-deploy role Actions assumes (§7).
-AWS_PROFILE=<admin> bash deploy/admin-grant.sh
+# Once, by a human holding admin-grant-bootstrap-policy.json (§1) — the IAM
+# objects nothing else may create: the uscode-site instance role, the GitHub
+# OIDC provider, and the uscode-github-deploy role Actions assumes (§7). It
+# also puts $DEPLOY_USER into the uscode-deploy group, which is what makes
+# the next command work.
+AWS_PROFILE=<setup-identity> bash deploy/admin-grant.sh
 
 # Then, with the ordinary deploy identity: security group, instance, data
 # volume, Elastic IP. Idempotent — re-running reuses what exists rather than
