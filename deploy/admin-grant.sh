@@ -95,6 +95,12 @@ else
     echo "created group ${DEPLOY_GROUP}"
 fi
 
+# Two SNS statements, not one, and the split is not cosmetic: `sns:ListTopics`
+# and `sns:ListSubscriptions` are account-wide calls that do not support
+# resource-level permissions, so scoping them to `uscode-*` denies them
+# outright. They were in the scoped statement until deploy/alerts-status.sh
+# tried to read why no alarm mail was arriving and got AccessDenied for a
+# permission the policy appeared to grant.
 DEPLOY_POLICY_DOC="$(mktemp_tracked)"
 cat > "$DEPLOY_POLICY_DOC" <<EOF
 {
@@ -216,10 +222,20 @@ cat > "$DEPLOY_POLICY_DOC" <<EOF
         "sns:CreateTopic",
         "sns:Subscribe",
         "sns:GetTopicAttributes",
-        "sns:ListTopics",
+        "sns:ListSubscriptionsByTopic",
+        "sns:GetSubscriptionAttributes",
         "sns:Publish"
       ],
       "Resource": "arn:aws:sns:${REGION}:${ACCOUNT_ID}:uscode-*"
+    },
+    {
+      "Sid": "SnsList",
+      "Effect": "Allow",
+      "Action": [
+        "sns:ListTopics",
+        "sns:ListSubscriptions"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "PassSiteRole",
