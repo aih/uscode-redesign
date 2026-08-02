@@ -187,22 +187,36 @@ Two things were done to the box along the way and both should stay:
   Start/Stop), which is worth adding. Everything came back on its own: containers restarted, swap
   remounted from fstab, the Elastic IP stayed attached.
 
-The index is being rebuilt from scratch (`--recreate --all-versions`) with the patched file copied
-into the running container, since the fix is not merged yet. Check it with:
+The patched file was copied into the running container (`docker cp`), since the fix is not merged
+yet. **Merging #18 and letting deploy.yml rebuild the image is what makes it permanent** — the
+copy is lost the next time the container is recreated.
+
+**Current state: search works.** `uscode_sections` holds 65,938 current-text documents and
+`uscode_structure` 9,916; "conservation" returns 199 hits led by `/us/usc/t16/s2903`. Verified
+after the rebuild described below.
+
+The superseded pass got further with the fix — 230,500 documents, with **swap untouched**, where
+before it had died around 3.4 GB — but was killed again at that point. This time there was no
+kernel OOM logged at all and no traceback, and the only new thing in that run was a
+`MemoryMax=2G` I had put on the systemd unit as a backstop. That was a mistake twice over: it
+constrains the compose client rather than the Python inside the container, so it never protected
+what I intended, and it is the most likely thing that sent the kill. It has been removed.
+
+It was also a mistake to run that pass as `--recreate --all-versions`: `--recreate` drops the
+index first, so a failure half way left **no working search** rather than a partial one. The
+current-text index was rebuilt on its own to restore service, and the superseded pass is now
+running **additively** (`--all-versions`, no `--recreate`). The two passes share document ids, so
+the additive run tops the index up and a failure leaves working search behind. Check it with:
 
 ```bash
 systemctl status uscode-reindex.service
 tail -f /var/lib/uscode/logs/reindex-all.log
 ```
 
-**If it is still unfinished or failed, nothing is broken** — but note that `--recreate` wipes the
-index first, so if it died mid-run **search will be empty or partial**. The recovery is to re-run
-it; the 66k current-text pass alone takes about seven minutes:
-
-```bash
-docker compose -f docker-compose.prod.yml exec api \
-  uv run python -m ingest.reindex_search --recreate
-```
+**If it failed again, nothing is broken and there is nothing urgent to do.** The default search
+covers current text, and a point-in-time search answers from current text while naming the release
+it searched, so the gap is visible rather than silent. Re-run it, or leave it — `?release=` search
+reaching back through superseded text is the only thing it buys.
 
 ## Still owed
 
