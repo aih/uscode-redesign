@@ -26,6 +26,39 @@ dnf install -y docker git >/dev/null
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
+# AL2023's `docker` package is the engine and CLI only — it ships the buildx
+# plugin but not compose, and AL2023's repositories carry no compose package at
+# all. Without this, every `docker compose -f ...` on the box fails with
+# "unknown shorthand flag: 'f' in -f", because `compose` was never a subcommand
+# and docker read the -f as its own.
+COMPOSE_PLUGIN=/usr/libexec/docker/cli-plugins/docker-compose
+if [ -x "$COMPOSE_PLUGIN" ]; then
+    echo "    compose plugin already installed ($("$COMPOSE_PLUGIN" version --short 2>/dev/null))"
+else
+    echo "    installing the docker compose plugin"
+    COMPOSE_TAG="${COMPOSE_TAG:-$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+        https://github.com/docker/compose/releases/latest | sed 's#.*/tag/##')}"
+    COMPOSE_URL="https://github.com/docker/compose/releases/download/${COMPOSE_TAG}/docker-compose-linux-$(uname -m)"
+    curl -fsSL "$COMPOSE_URL" -o /tmp/docker-compose
+    # The release publishes a checksum beside the binary; a download that lands
+    # corrupt should fail here rather than at the first deploy.
+    if curl -fsSL "${COMPOSE_URL}.sha256" -o /tmp/docker-compose.sha256; then
+        expected="$(awk '{print $1}' /tmp/docker-compose.sha256)"
+        actual="$(sha256sum /tmp/docker-compose | awk '{print $1}')"
+        if [ "$expected" != "$actual" ]; then
+            echo "compose checksum mismatch: expected $expected, got $actual" >&2
+            exit 1
+        fi
+        echo "    checksum verified"
+    else
+        echo "    no published checksum for ${COMPOSE_TAG}; installing unverified" >&2
+    fi
+    mkdir -p "$(dirname "$COMPOSE_PLUGIN")"
+    install -m 0755 /tmp/docker-compose "$COMPOSE_PLUGIN"
+    rm -f /tmp/docker-compose /tmp/docker-compose.sha256
+    echo "    installed compose ${COMPOSE_TAG}"
+fi
+
 echo "==> data volume at $DATA_ROOT"
 # The root volume is nvme0n1; the data volume is the other one. Finding it by
 # elimination rather than by name because NVMe device order is not guaranteed.

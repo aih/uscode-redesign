@@ -37,33 +37,35 @@ jobs:
       - name: Dispatch the update on the box via SSM
         id: dispatch
         run: |
+          # By instance id, not by tag: a tag-targeted command's
+          # Commands[0].InstanceIds stays empty, leaving nothing to poll
+          # get-command-invocation with (see deploy.yml).
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=uscode-site" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "no running instance tagged Name=uscode-site" >&2
+            exit 1
+          fi
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
           REMOTE_CMD="sudo -iu ec2-user bash /home/ec2-user/uscode-redesign/deploy/update-corpus.sh"
           PARAMS=$(jq -n --arg cmd "$REMOTE_CMD" \
             '{commands: [$cmd], executionTimeout: ["43200"]}')
           COMMAND_ID=$(aws ssm send-command \
-            --targets "Key=tag:Name,Values=uscode-site" \
+            --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "weekly corpus update" \
             --parameters "$PARAMS" \
             --query "Command.CommandId" --output text)
           echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
-          echo "Dispatched SSM command $COMMAND_ID"
+          echo "Dispatched SSM command $COMMAND_ID to $INSTANCE_ID"
 
       - name: Poll until done or this job's time runs out
         run: |
           COMMAND_ID="${{ steps.dispatch.outputs.command_id }}"
-          INSTANCE_ID=$(aws ssm list-commands --command-id "$COMMAND_ID" \
-            --query "Commands[0].InstanceIds[0]" --output text)
-          for _ in $(seq 1 12); do
-            [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && break
-            sleep 5
-            INSTANCE_ID=$(aws ssm list-commands --command-id "$COMMAND_ID" \
-              --query "Commands[0].InstanceIds[0]" --output text)
-          done
-          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "Could not resolve the target instance for command $COMMAND_ID" >&2
-            exit 1
-          fi
+          INSTANCE_ID="${{ steps.dispatch.outputs.instance_id }}"
           echo "Polling command $COMMAND_ID on instance $INSTANCE_ID"
 
           # GitHub caps a job at 6h; the SSM command itself can run up to 12h

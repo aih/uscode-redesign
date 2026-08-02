@@ -84,6 +84,23 @@ jobs:
         id: dispatch
         run: |
           SHA="${{ steps.sha.outputs.sha }}"
+
+          # Resolve the instance from its tag here rather than targeting the
+          # tag in send-command. A tag-targeted command reports an EMPTY
+          # Commands[0].InstanceIds forever, so there is no id to poll
+          # get-command-invocation with, and the deploy "fails" while the box
+          # is running it perfectly well. Targeting by id keeps the tag
+          # condition on the IAM policy satisfied either way.
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=uscode-site" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "no running instance tagged Name=uscode-site" >&2
+            exit 1
+          fi
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
           # Build the inner command with plain bash interpolation, then let
           # jq --arg do all the JSON/quote escaping — no manual quote
           # concatenation to get wrong.
@@ -92,32 +109,18 @@ jobs:
           PARAMS=$(jq -n --arg cmd "$REMOTE_CMD" \
             '{commands: [$cmd], executionTimeout: ["1800"]}')
           COMMAND_ID=$(aws ssm send-command \
-            --targets "Key=tag:Name,Values=uscode-site" \
+            --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "deploy $SHA" \
             --parameters "$PARAMS" \
             --query "Command.CommandId" --output text)
           echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
-          echo "Dispatched SSM command $COMMAND_ID for deploy of $SHA"
+          echo "Dispatched SSM command $COMMAND_ID to $INSTANCE_ID for deploy of $SHA"
 
       - name: Wait for the box to finish
         run: |
           COMMAND_ID="${{ steps.dispatch.outputs.command_id }}"
-          INSTANCE_ID=$(aws ssm list-commands --command-id "$COMMAND_ID" \
-            --query "Commands[0].InstanceIds[0]" --output text)
-
-          # aws ssm list-commands can return an empty InstanceIds[] for a
-          # moment right after send-command; give it a few tries.
-          for _ in $(seq 1 12); do
-            [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && break
-            sleep 5
-            INSTANCE_ID=$(aws ssm list-commands --command-id "$COMMAND_ID" \
-              --query "Commands[0].InstanceIds[0]" --output text)
-          done
-          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "Could not resolve the target instance for command $COMMAND_ID" >&2
-            exit 1
-          fi
+          INSTANCE_ID="${{ steps.dispatch.outputs.instance_id }}"
           echo "Polling command $COMMAND_ID on instance $INSTANCE_ID"
 
           STATUS="InProgress"

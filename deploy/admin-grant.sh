@@ -403,6 +403,18 @@ else
     echo "created OIDC provider for ${OIDC_PROVIDER_URL}"
 fi
 
+# GitHub now issues the `sub` claim with immutable numeric ids appended to the
+# owner and repository names:
+#
+#   repo:aih@217356/uscode-redesign@1314203308:ref:refs/heads/main
+#
+# not the documented `repo:OWNER/REPO:ref:refs/heads/main`. Matching only the
+# latter denies every assume with "Not authorized to perform
+# sts:AssumeRoleWithWebIdentity" while the trust policy reads as correct, so
+# both spellings are accepted here. The real scoping is the StringEquals on
+# `repository` and `ref`, which are exact and carry no ids; AWS additionally
+# *requires* a `sub` or `job_workflow_ref` condition on a GitHub OIDC trust
+# policy and rejects the document without one.
 GITHUB_TRUST_DOC="$(mktemp_tracked)"
 cat > "$GITHUB_TRUST_DOC" <<EOF
 {
@@ -414,10 +426,15 @@ cat > "$GITHUB_TRUST_DOC" <<EOF
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:repository": "${GITHUB_REPO}",
+          "token.actions.githubusercontent.com:ref": "refs/heads/main"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:${GITHUB_REPO}:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub": [
+            "repo:${GITHUB_REPO%%/*}@*/${GITHUB_REPO##*/}@*:ref:refs/heads/main",
+            "repo:${GITHUB_REPO}:ref:refs/heads/main"
+          ]
         }
       }
     }
