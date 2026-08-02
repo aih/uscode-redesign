@@ -848,3 +848,28 @@ Session-by-session record of how this site was built. One entry per working sess
   - Every kept section still present after the splice: 17 Gotchas, 5 Architecture rules, 5 Documentation duties (27 numbered bold items total), both fence delimiters balanced, `Open debts:` / `Test speed rule` / `purge_login_failures` / `HEAD is 405` all still matched by grep.
   - The whole edit is reversible with `git checkout CLAUDE.md`; nothing was committed before review.
   - **Re-check the context claim with `/context`** — the figures here are disk-based estimates at characters/4, not a live measurement.
+
+## 036 — 2026-08-02 — Session 19: the site went up, and four things that looked like something else
+
+- **Tool/model:** Claude Code, Fable 5.
+- **Asked:** Plan and execute the AWS deployment — the app, the preprocessing, and the search index, with GitHub Actions deploying pushes to main automatically. Containerize everything, keep the images in the cloud, keep it cheap, and parallelise the work across agents on the cheapest models that would do it reliably. Goal: a high-performance demo for a few hundred people, meant to convince an LRC-familiar audience.
+- **Decided:**
+  - **Followed ADR-0020's shape unchanged** (one EC2 box, compose, Caddy, data on a separate volume) and added what it left open in **[ADR-0035](docs/adr/0035-images-from-ecr-deploys-from-actions.md)**: images built by Actions on native arm64 runners and pushed to ECR, deploys by SSM running a repo-versioned script, a `pg_restore` fast path beside `load-all`, and the weekly corpus update — which **moves ADR-0013's one-writer role onto the site box**, the backfill machine having finished its job.
+  - **`t4g.large`, not `t4g.medium`.** ADR-0020 never reconciled OpenSearch's 2 GB heap with a 4 GB box; 8 GB is that arithmetic actually adding up. ~$60–65/month all in.
+  - **Three file-disjoint tracks in parallel worktrees on Sonnet** (images/compose, workflows/scripts, docs), reviewed and merged here. Provisioning and every judgement call stayed on the orchestrator.
+  - **The repo went public** rather than putting a deploy key on the box — checked first that neither the tree nor any of the 206 commits carried a credential.
+- **Produced:** PRs #14–#18. `.github/workflows/deploy.yml`, `update-corpus.yml`; `deploy/` gained `admin-grant.sh`, `admin-grant-bootstrap-policy.json`, `provision.sh`, `bootstrap-box.sh`, `deploy-on-box.sh`, `update-corpus.sh`, `alarms.sh`; multi-stage `frontend/Dockerfile`, `aws` CLI in the API image, ECR image refs and real healthchecks in `docker-compose.prod.yml`, `/app/healthz`, a compose-lint CI job; ADR-0035; a rewritten `docs/deploy.md`; and `docs/deploy-status.md` as the live picture.
+- **Found — four failures that each named the wrong thing:**
+  - **`docker compose` was never installed.** AL2023's `docker` package is engine, CLI and buildx only, and the distro ships no compose package at all — so `docker compose -f …` failed with `unknown shorthand flag: 'f' in -f`, because docker had never heard of `compose` and read the `-f` as its own.
+  - **A tag-targeted SSM command cannot be polled.** `Commands[].InstanceIds` is empty for one *permanently*, not briefly, so the workflow reported "Could not resolve the target instance" while the box was running the deploy perfectly well. Both workflows now resolve the instance by tag and send by id.
+  - **GitHub's OIDC `sub` carries immutable numeric ids** — `repo:aih@217356/uscode-redesign@1314203308:ref:refs/heads/main`, not the documented `repo:OWNER/REPO:ref:…` — so every assume was denied against a trust policy that read as correct. Diagnosed by having a throwaway workflow print the token's claims instead of guessing a fifth time.
+  - **`iam:PassRole` is required by `AddRoleToInstanceProfile` without appearing in it.** The bootstrap policy was derived by reading the script's `aws iam` calls, which is exactly how that one gets missed; the run died with the group, role and profile already made.
+  - Also caught before it bit: `--image-id resolve:ssm:…` makes `RunInstances` call `ssm:GetParameters`, and fails with an error naming SSM rather than the AMI.
+  - **The seed dump would have shipped 1,301 test accounts and 1,343 sessions to production.** ADR-0034 turned accounts off in the reader and deliberately not in the API, so those were live credentials behind a working signup route. Re-dumped with `--exclude-table-data` for the six auth tables; the nightly backup deliberately keeps them.
+- **Verified:**
+  - Instance `i-06b433caacd78fd96` at `52.1.30.78`; all five services healthy, migrations applied, images pulled from ECR.
+  - The whole Actions path proven as far as it can be: OIDC assume, both arm64 builds, ECR push, SSM dispatch. The box-side deploy then ran to completion.
+  - Seed dump verified before upload — nine corpus tables carry data, zero auth tables do — and its TOC read back with `pg_restore -l`.
+  - `make test-slow`'s CI failure investigated rather than accepted: **not** a streaming regression. On aarch64 Linux peak RSS is flat against file size (0.3 MB → 19 MB, 23 MB → 31 MB, 33 MB → 33 MB), `MALLOC_ARENA_MAX` changes nothing, macOS gives 48 MB, and only GitHub's x86_64 runners report 551 MB. The box is arm64, so `load-all` is memory-safe there.
+  - A mono-font "fix" was **reverted** after checking what it actually touched: the rules belong to `.usa-input` and friends, which the search box puts on every page, so it would have changed how form controls render for a cosmetic reason no test could catch.
+- **Left for the morning:** the DNS A record (the one blocker for TLS), confirming the SNS subscription, merging #17 and #18, and the search index — see `docs/deploy-status.md`.
