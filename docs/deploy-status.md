@@ -195,18 +195,38 @@ copy is lost the next time the container is recreated.
 `uscode_structure` 9,916; "conservation" returns 199 hits led by `/us/usc/t16/s2903`. Verified
 after the rebuild described below.
 
-The superseded pass got further with the fix — 230,500 documents, with **swap untouched**, where
-before it had died around 3.4 GB — but was killed again at that point. This time there was no
-kernel OOM logged at all and no traceback, and the only new thing in that run was a
-`MemoryMax=2G` I had put on the systemd unit as a backstop. That was a mistake twice over: it
-constrains the compose client rather than the Python inside the container, so it never protected
-what I intended, and it is the most likely thing that sent the kill. It has been removed.
+**Everything that killed the superseded pass after the streaming fix was this project's own deploy
+pipeline, not memory.** Each documentation push to `main` went green in CI, which fired
+`deploy.yml` on `workflow_run`, which ran `deploy-on-box.sh`, which runs `docker compose up -d` —
+recreating the `api` container and killing the `docker compose exec` running inside it. The
+correlation is exact:
 
-It was also a mistake to run that pass as `--recreate --all-versions`: `--recreate` drops the
-index first, so a failure half way left **no working search** rather than a partial one. The
-current-text index was rebuilt on its own to restore service, and the superseded pass is now
-running **additively** (`--all-versions`, no `--recreate`). The two passes share document ids, so
-the additive run tops the index up and a failure leaves working search behind. Check it with:
+| deploy.yml run | reindex died |
+|---|---|
+| 12:24:20–12:25:40 | 12:25:00 |
+| 12:29:15–12:30:55 | container churn at 12:30:09 |
+| 12:36:48–12:38:07 | 12:37:26 |
+
+The evidence that it was never memory: `systemd-oomd` inactive, nothing in `dmesg`, the api
+container's cgroup reporting `oom_kill 0`, memory pressure at zero — and the container's
+`StartedAt` matching the moment of death, with dockerd logging `hasBeenManuallyStopped=true`.
+
+**This is exactly the cost ADR-0035 records** — "a deploy that recreates the `api` container
+mid-update kills whatever `update-corpus.sh` was running inside it" — met in the wild, with a
+reindex standing in for the corpus update. The operational rule it implies: **do not push to
+`main` while a long job is running on the box**, or run that job somewhere a deploy does not
+recreate. The weekly update inherits the same exposure and the same recovery, which is that
+its work is resumable.
+
+Two of my own missteps along the way, recorded because the reasoning was wrong and not just the
+outcome. I put a `MemoryMax=2G` on the systemd unit as a backstop and then blamed it for a kill:
+it constrains the compose client rather than the Python inside the container, so it never
+protected what I intended *and* was not the culprit. And running the pass as
+`--recreate --all-versions` meant a failure half way left **no working search** rather than a
+partial one — `--recreate` drops the index first. The current-text index was rebuilt on its own to
+restore service, and the pass now runs **additively** (`--all-versions`, no `--recreate`); the two
+passes share document ids, so it tops the index up and a failure leaves working search behind.
+That worked: the run killed at 94,500 left 156,440 documents serving. Check it with:
 
 ```bash
 systemctl status uscode-reindex.service
