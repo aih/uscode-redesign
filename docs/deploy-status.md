@@ -119,24 +119,49 @@ an 8 GB box a few hundred MB would be safe and would cut it substantially. Not c
 because the setting is read per session and altering it would have meant interrupting the job to
 gain time on a job already running.
 
-## Still owed after the corpus lands
+## Search index
 
-1. **Build the search index** — nothing populates it after a bulk restore (day-to-day loads sync
-   incrementally inside `ingest/load.py`; a from-scratch corpus does not):
+**Current text is built and live: 65,938 documents in `uscode_sections`, 9,916 in
+`uscode_structure`.** A query for "conservation" returns 199 hits (`/us/usc/t16/s2903`
+"Conservation plans", `/us/usc/t16/s3831` "Conservation reserve"). That retires CLAUDE.md's
+"4,000-document smoke slice" debt for the deployed box — dev is unchanged.
 
-   ```bash
-   # 66k current-text docs — this is what makes search go from empty to live.
-   docker compose -f docker-compose.prod.yml exec api \
-     uv run python -m ingest.reindex_search --recreate
+**The `--all-versions` pass (490k superseded docs) does not fit in memory.** It was OOM-killed
+twice, at 3.28 GB and 3.46 GB resident, while OpenSearch held 2.5 GB and Postgres 1.1 GB of the
+box's 7.8 GB. The failure looks like it dies indexing structure nodes; it does not. The node
+counter prints with `flush=True` and the later lines do not, so with output redirected to a file
+everything after the last flush is lost when `SIGKILL` lands — the process was well into the
+section pass.
 
-   # 490k superseded docs, what `?release=` search needs. Much longer; detach it.
-   docker compose -f docker-compose.prod.yml exec -d api \
-     sh -c 'uv run python -m ingest.reindex_search --all-versions >> /app/data/reindex.log 2>&1'
-   ```
+What it is actually doing there is buffering the whole result set: `_all_version_query()` selects
+`SectionVersion.xml` across 489,738 rows, which is the ~3.5 GB the code's own comment says `.all()`
+would cost, and the observed RSS matches it. **So `yield_per` is not streaming from the server
+here** — worth fixing in `ingest/reindex_search.py` (a real server-side cursor, or chunking by
+`first_release_id`), because the same buffering will bite any future full reindex regardless of box
+size.
 
-2. **`ingest verify`** (shallow) to confirm the restore matches what the dump claimed.
-3. **`mirror pull`** so the box has the zips locally for future incremental loads.
-4. **Smoke tests** — deploy.md §5, against the real hostname once TLS is up.
+**Mitigation in place:** the box had no swap at all, so a single batch job peaking above free RAM
+was a kill rather than a slowdown. There is now a **6 GB swapfile** at `/var/lib/uscode/swapfile`
+(in `/etc/fstab`, `vm.swappiness=10`), and the pass has been restarted under
+`systemd-run --unit=uscode-reindex` with `PYTHONUNBUFFERED=1`. Check it with:
+
+```bash
+systemctl status uscode-reindex.service
+tail -f /var/lib/uscode/logs/reindex-all.log
+```
+
+**If it failed again, nothing is broken** — the site works on current text, and a point-in-time
+search answers from current text while naming the release it searched, so the gap is visible rather
+than silent. Fix the streaming and re-run rather than throwing RAM at it.
+
+## Still owed
+
+1. **`ingest verify` — done, and it passes.** 3,153 title-versions across 381 release points and
+   58 titles; 91.0% dedupe; the six count mismatches it reports are exactly the ADR-0021 ones
+   CLAUDE.md documents (`113-296not287/54`, `114-329/10`, `115-8/10`, `117-80/19`,
+   `117-110not103/19`, `117-111not103/19`). Report at `docs/verification/database.json` **on the
+   box** — not committed from there, since the repo copy is the development corpus's.
+2. **Smoke tests** — deploy.md §5, against the real hostname once TLS is up.
 5. **A real end-to-end deploy** — push a trivial commit to main and watch CI → deploy.yml → the
    box, which is the first time the whole automated path runs unassisted.
 6. **`workflow_dispatch` on update-corpus.yml** once, to prove the weekly job before it fires
