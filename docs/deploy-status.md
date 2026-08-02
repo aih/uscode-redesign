@@ -191,7 +191,37 @@ docker compose -f docker-compose.prod.yml exec api \
    CLAUDE.md documents (`113-296not287/54`, `114-329/10`, `115-8/10`, `117-80/19`,
    `117-110not103/19`, `117-111not103/19`). Report at `docs/verification/database.json` **on the
    box** — not committed from there, since the repo copy is the development corpus's.
-2. **Smoke tests** — deploy.md §5, against the real hostname once TLS is up.
+2. **Smoke tests** — deploy.md §5 is the full set; this is the copy-paste version for once TLS is
+   up. Every line should be checked against what it *should* say, not just that it returned:
+
+   ```bash
+   SITE=https://uscode.linkedlegislation.org
+
+   # The demo URL end to end: the citation redirector into the reader (PLAN §10).
+   curl -sL -o /dev/null -w '%{http_code} %{url_effective}\n' \
+     -H 'Accept: text/html' "$SITE/us/usc/t16/s45f/c/5?date=07/12/2026"
+
+   # Same URL, JSON — should land on /api/v1 rather than the reader.
+   curl -sL -o /dev/null -w '%{http_code} %{url_effective}\n' \
+     -H 'Accept: application/json' "$SITE/us/usc/t16/s45f/c/5"
+
+   # ADR-0018: pinned is immutable, unpinned is five minutes.
+   curl -sI "$SITE/api/v1/us/usc/t16/s45f?release=119-102not101" | grep -i cache-control
+   curl -sI "$SITE/api/v1/us/usc/t16/s45f"                        | grep -i cache-control
+
+   # Search over the real corpus, not a smoke slice.
+   curl -s "$SITE/api/v1/search?q=conservation" | head -c 300
+
+   # ADR-0029: the diff budget is the tightest in the project, so this should
+   # start returning 429 with a Retry-After rather than collapsing.
+   for i in $(seq 1 8); do
+     curl -s -o /dev/null -w '%{http_code} ' \
+       "$SITE/api/v1/diff/us/usc/t16/s45f?from=119-99&to=119-102not101"
+   done; echo
+   ```
+
+   Known-good anchor from CLAUDE.md: `id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd` ↔
+   `/us/usc/t16/s45f/c/5`.
 5. **A real end-to-end deploy** — push a trivial commit to main and watch CI → deploy.yml → the
    box, which is the first time the whole automated path runs unassisted.
 6. **`workflow_dispatch` on update-corpus.yml** once, to prove the weekly job before it fires
