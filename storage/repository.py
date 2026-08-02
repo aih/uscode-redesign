@@ -282,8 +282,69 @@ class TitleInfo:
     ingested_releases: tuple[str, ...] = field(default=())
 
 
+SOURCE_URL = "https://uscode.house.gov/download/priorreleasepoints.htm"
+"""The page this mirror polls, and the only thing `/api/v1/status` can say
+about the source when no check has ever run. Defined here rather than in
+`ingest` so the API can name it without importing the ingest layer;
+`ingest.inventory` imports it back as `PRIOR_RELEASE_POINTS_URL`."""
+
+SOURCE_CHECK_STALE_AFTER = datetime.timedelta(days=7)
+"""How old a successful check may get before the mirror should stop claiming to
+be current. This is the *lower* bound on the checking cadence — the schedule
+polls daily (deploy/update-corpus.sh), so a week without a successful check
+means several consecutive failures or a checker that is no longer running,
+either of which a reader deserves to be told about rather than shown a
+confident date."""
+
+
+@dataclass(frozen=True, slots=True)
+class SourceCheckInfo:
+    """The last time this deployment asked uscode.house.gov what exists.
+
+    Freshness is a property of a *mirror*, not of the law, and it is the one
+    thing a reader cannot check for themselves: a corpus that stopped updating
+    a month ago looks exactly like a corpus with nothing to update. So the
+    answer to "how current is this" has two halves, and both are here — the
+    newest release point we hold (`latest_label`) and when we last confirmed
+    that is still the newest one OLRC publishes (`checked_at`).
+    """
+
+    checked_at: datetime.datetime
+    source_url: str
+    ok: bool
+    release_points_seen: int | None
+    new_labels: tuple[str, ...]
+    """Release points that check found and this database had not seen before —
+    empty on a check that found nothing new, which is the usual answer."""
+    latest_label: str | None
+    latest_currency_date: datetime.date | None
+    error: str | None
+
+    def age(self, *, now: datetime.datetime | None = None) -> datetime.timedelta:
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+        checked_at = self.checked_at
+        # Postgres hands back an aware datetime; SQLite in tests may not, and a
+        # naive/aware subtraction raises rather than returning a wrong answer.
+        if checked_at.tzinfo is None:
+            checked_at = checked_at.replace(tzinfo=datetime.timezone.utc)
+        return now - checked_at
+
+    def is_stale(self, *, now: datetime.datetime | None = None) -> bool:
+        """A failed check is stale immediately — it did not confirm anything."""
+        return not self.ok or self.age(now=now) > SOURCE_CHECK_STALE_AFTER
+
+
 class Repository(Protocol):
     """Everything the API needs. Implemented by `PostgresRepository` today."""
+
+    def last_source_check(self) -> SourceCheckInfo | None:
+        """The most recent poll of uscode.house.gov, successful or not.
+
+        `None` means no check has ever been recorded — a corpus seeded from a
+        dump on a box whose checker has never run, which is a different (and
+        louder) answer than "checked, nothing new".
+        """
+        ...
 
     def resolve_release(
         self,

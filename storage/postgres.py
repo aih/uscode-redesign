@@ -30,6 +30,7 @@ from db.models import (
     Section,
     SectionReleaseMap,
     SectionVersion,
+    SourceCheck,
     StructureNode,
     Title,
     TitleVersion,
@@ -45,6 +46,7 @@ from storage.repository import (
     ResolvedRelease,
     SectionResult,
     SectionVersionInfo,
+    SourceCheckInfo,
     TitleInfo,
     TocEntry,
     TocResult,
@@ -198,6 +200,23 @@ class PostgresRepository:
             self._ref(release, ingested.get(release.id, []))
             for release in self._session.scalars(statement)
         ]
+
+    def last_source_check(self) -> SourceCheckInfo | None:
+        row = self._session.scalars(
+            select(SourceCheck).order_by(SourceCheck.checked_at.desc()).limit(1)
+        ).first()
+        if row is None:
+            return None
+        return SourceCheckInfo(
+            checked_at=row.checked_at,
+            source_url=row.source_url,
+            ok=row.ok,
+            release_points_seen=row.release_points_seen,
+            new_labels=tuple(row.new_labels or ()),
+            latest_label=row.latest_label,
+            latest_currency_date=row.latest_currency_date,
+            error=row.error,
+        )
 
     def list_titles(self) -> list[TitleInfo]:
         releases: dict[int, list[tuple[int, str]]] = {}

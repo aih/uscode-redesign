@@ -28,6 +28,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from api.diff import diff_ops
 from api.schemas import (
     CitationOut,
+    CorpusStatusOut,
     DiffOpOut,
     DiffOut,
     DiffSectionOut,
@@ -36,6 +37,8 @@ from api.schemas import (
     NeighborsOut,
     ReleaseOut,
     SectionOut,
+    SourceCheckOut,
+    StatusOut,
     TitleOut,
     TocEntryOut,
     TocOut,
@@ -62,6 +65,7 @@ from params import (
     served_note,
 )
 from storage import (
+    SOURCE_URL,
     Repository,
     ResolvedRelease,
     SectionResult,
@@ -126,6 +130,52 @@ def list_releases(
     if ingested_title is not None:
         releases = [r for r in releases if ingested_title in r.ingested_titles]
     return [ReleaseOut.of(r) for r in releases]
+
+
+@api.get(
+    "/status",
+    response_model=StatusOut,
+    summary="How current this mirror is, and when it last checked",
+)
+def status(repository: RepositoryDep) -> StatusOut:
+    """What this deployment holds, and when it last asked OLRC what exists.
+
+    A versioned mirror of a living source has two ways of being wrong and only
+    one of them is visible from the text: it can be missing a release point
+    that was published last week, or it can have stopped asking altogether. The
+    second is the dangerous one, because a corpus that has quietly stopped
+    updating is indistinguishable from a corpus with nothing to update — every
+    page still renders, every date still looks authoritative. So the answer
+    here is two facts side by side: the newest release point loaded, and the
+    timestamp of the last poll of uscode.house.gov.
+
+    Polled daily; `stale` goes true after a week without a successful check
+    (`storage.SOURCE_CHECK_STALE_AFTER`).
+    """
+    check = repository.last_source_check()
+    releases = repository.list_releases()
+    loaded = next((r for r in releases if r.ingested_titles), None)
+
+    behind_by = None
+    if check is not None and check.ok and check.latest_label is not None:
+        # Count by `seq`, the inventory's own global ordering — release-point
+        # labels do not sort (gotcha 4), and comparing dates would tie.
+        by_label = {r.label: r for r in releases}
+        published = by_label.get(check.latest_label)
+        if published is not None and loaded is not None:
+            behind_by = sum(
+                1 for r in releases if loaded.seq < r.seq <= published.seq
+            )
+
+    return StatusOut(
+        source=SourceCheckOut.of(check, url=SOURCE_URL),
+        corpus=CorpusStatusOut(
+            latest_release=loaded.label if loaded else None,
+            latest_currency_date=loaded.currency_date if loaded else None,
+            release_points_known=len(releases),
+            behind_by=behind_by,
+        ),
+    )
 
 
 @api.get("/titles", response_model=list[TitleOut], summary="Ingested titles")

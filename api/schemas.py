@@ -19,6 +19,7 @@ from storage import (
     ReleaseRef,
     SectionResult,
     SectionVersionInfo,
+    SourceCheckInfo,
     TitleInfo,
     TocEntry,
     TocResult,
@@ -352,6 +353,91 @@ class TitleOut(BaseModel):
             is_positive_law=title.is_positive_law,
             ingested_releases=list(title.ingested_releases),
         )
+
+
+class SourceCheckOut(BaseModel):
+    """When this mirror last asked uscode.house.gov what exists."""
+
+    url: str = Field(
+        examples=["https://uscode.house.gov/download/priorreleasepoints.htm"],
+        description="The page that is polled — one request per check.",
+    )
+    last_checked_at: datetime.datetime | None = Field(
+        default=None, description="null means no check has ever been recorded here."
+    )
+    hours_since_check: float | None = None
+    ok: bool = Field(description="Did the last check reach and parse the page?")
+    stale: bool = Field(
+        description="True when the last check failed, is over a week old, or has "
+        "never happened. A stale check does not mean the text is wrong — it means "
+        "nobody has confirmed lately that it is still the newest published."
+    )
+    release_points_seen: int | None = Field(
+        default=None, description="How many release points the page listed."
+    )
+    new_release_points: list[str] = Field(
+        default_factory=list,
+        description="Release points that check found and this database had not "
+        "seen before. Non-empty means an ingest is pending, not that it failed.",
+    )
+    latest_published_label: str | None = Field(
+        default=None, description="The newest release point OLRC published, as of that check."
+    )
+    latest_published_date: datetime.date | None = None
+    error: str | None = Field(
+        default=None, description="Why the last check failed, if it did."
+    )
+
+    @classmethod
+    def of(cls, check: SourceCheckInfo | None, *, url: str) -> "SourceCheckOut":
+        if check is None:
+            # Never checked. Reported as stale rather than as an error: a corpus
+            # restored from a dump onto a box whose schedule has not yet fired is
+            # exactly this, and it is honest to say "unconfirmed" out loud.
+            return cls(url=url, ok=False, stale=True)
+        return cls(
+            url=check.source_url,
+            last_checked_at=check.checked_at,
+            hours_since_check=round(check.age().total_seconds() / 3600, 2),
+            ok=check.ok,
+            stale=check.is_stale(),
+            release_points_seen=check.release_points_seen,
+            new_release_points=list(check.new_labels),
+            latest_published_label=check.latest_label,
+            latest_published_date=check.latest_currency_date,
+            error=check.error,
+        )
+
+
+class CorpusStatusOut(BaseModel):
+    """What this database actually holds, against what the source publishes."""
+
+    latest_release: str | None = Field(
+        default=None, description="Newest release point with content loaded."
+    )
+    latest_currency_date: datetime.date | None = None
+    release_points_known: int = Field(
+        description="Rows in the release-point inventory — including ones not yet ingested."
+    )
+    behind_by: int | None = Field(
+        default=None,
+        description="Release points published since the newest one loaded here. "
+        "null when the last check never succeeded, because then there is nothing "
+        "trustworthy to compare against — which is not the same as zero.",
+    )
+
+
+class StatusOut(BaseModel):
+    """`GET /api/v1/status` — how current this mirror is, and how it knows.
+
+    Two independent facts, deliberately not collapsed into one "up to date"
+    flag: what we hold, and when we last confirmed that is everything there is.
+    A mirror can be current and unverified, or verified and behind, and the two
+    call for different responses.
+    """
+
+    source: SourceCheckOut
+    corpus: CorpusStatusOut
 
 
 class CitationOut(BaseModel):

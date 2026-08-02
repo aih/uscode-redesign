@@ -21,6 +21,8 @@ from storage.postgres import PostgresRepository, title_num_from_identifier
 from storage.postgres_accounts import PostgresAccounts
 from storage.session import get_accounts, get_repository
 from storage.repository import (
+    SOURCE_CHECK_STALE_AFTER,
+    SOURCE_URL,
     AmbiguousReleaseError,
     GuidResolution,
     Neighbors,
@@ -32,12 +34,15 @@ from storage.repository import (
     ResolvedRelease,
     SectionResult,
     SectionVersionInfo,
+    SourceCheckInfo,
     TitleInfo,
     TocEntry,
     TocResult,
 )
 
 __all__ = [
+    "SOURCE_CHECK_STALE_AFTER",
+    "SOURCE_URL",
     "AccountsError",
     "AccountsRepository",
     "AmbiguousReleaseError",
@@ -55,6 +60,7 @@ __all__ = [
     "SectionResult",
     "SectionVersionInfo",
     "SessionRef",
+    "SourceCheckInfo",
     "TitleInfo",
     "TocEntry",
     "TocResult",
