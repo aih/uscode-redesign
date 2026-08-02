@@ -23,6 +23,10 @@ settled and the interesting parts have moved into deploy.md.
 
 ## What you need to do in the morning
 
+At a glance: **DNS record → restart Caddy → confirm the alarm email → merge #17 and #18.** The
+first is the only one blocking a working site; the rest can follow in any order. Both PRs are
+green on all four suites.
+
 **1. Add the DNS record.** This is the only thing blocking a working site:
 
 ```
