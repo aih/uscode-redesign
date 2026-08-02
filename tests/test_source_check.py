@@ -64,8 +64,9 @@ def test_age_tolerates_a_naive_timestamp():
 
 
 # --------------------------------------------------------------- the poll itself
-
-pytestmark_integration = pytest.mark.integration
+#
+# Marked per-test rather than per-module: the staleness rules above are pure and
+# must run on a fresh clone with no Postgres.
 
 
 @pytest.fixture()
