@@ -195,9 +195,26 @@ The patched file was copied into the running container (`docker cp`), since the 
 yet. **Merging #18 and letting deploy.yml rebuild the image is what makes it permanent** — the
 copy is lost the next time the container is recreated.
 
-**Current state: search works.** `uscode_sections` holds 65,938 current-text documents and
-`uscode_structure` 9,916; "conservation" returns 199 hits led by `/us/usc/t16/s2903`. Verified
-after the rebuild described below.
+**Done — the whole corpus is indexed, superseded text included.**
+
+| | |
+|---|---|
+| `uscode_sections` total | **489,578** |
+| — `is_current: true` | 65,929 |
+| — `is_current: false` | 423,649 |
+| `uscode_structure` | 9,916 |
+| "conservation" | 2,227 hits (199 against current text alone) |
+
+Two gaps, both expected and both the same cause. The pass reports `Finished SectionVersions
+(489,738)` while the index holds 489,578, and the current-text subset is 65,929 against 65,938
+sections in the database — **160 and 9 short respectively**. That is ADR-0021: where the source
+publishes several elements under one `@identifier` at one release point, they collapse onto a
+shared OpenSearch `_id` and the index keeps one of them. CLAUDE.md already records this as a known
+cost of the search design, and the arithmetic here is consistent with it rather than with anything
+having gone wrong in the run.
+
+Peak swap use across the whole 490k pass: **9 MB**. Before the streaming fix the same work was
+being killed at 3.4 GB resident.
 
 **Everything that killed the superseded pass after the streaming fix was this project's own deploy
 pipeline, not memory.** Each documentation push to `main` went green in CI, which fired
@@ -237,10 +254,9 @@ systemctl status uscode-reindex.service
 tail -f /var/lib/uscode/logs/reindex-all.log
 ```
 
-**If it failed again, nothing is broken and there is nothing urgent to do.** The default search
-covers current text, and a point-in-time search answers from current text while naming the release
-it searched, so the gap is visible rather than silent. Re-run it, or leave it — `?release=` search
-reaching back through superseded text is the only thing it buys.
+**Nothing is outstanding here.** `?release=` search now reaches back through superseded text. If a
+future full reindex is ever needed, run it when nothing is deploying, and additively unless a
+mapping change forces `--recreate`.
 
 ## Still owed
 
