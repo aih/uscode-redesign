@@ -236,3 +236,7 @@ frontend/playwright-report/
 # Agent skills discovered from installed packages: symlinks into .venv, so this
 # directory is a view of the virtualenv and not source.
 /.agents/
+
+# Worktrees the coding agent creates for parallel work; each is its own
+# checkout and must never be committed into this one.
+.claude/worktrees/
