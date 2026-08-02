@@ -95,6 +95,13 @@ would have put test credentials on the public site. Schema comes across, rows do
 **not** apply to the nightly backup cron, which dumps everything because restoring production
 should restore real accounts.
 
+Worth knowing for next time: `docker-compose.prod.yml` tunes `shared_buffers` and `work_mem` but
+leaves `maintenance_work_mem` at Postgres's 64 MB default, and the restore spends most of its wall
+clock building one index — `guid_map`'s primary key over 96,185,732 rows — inside that budget. On
+an 8 GB box a few hundred MB would be safe and would cut it substantially. Not changed mid-restore,
+because the setting is read per session and altering it would have meant interrupting the job to
+gain time on a job already running.
+
 ## Still owed after the corpus lands
 
 1. **Build the search index** — nothing populates it after a bulk restore (day-to-day loads sync
