@@ -51,6 +51,20 @@ Then, within a minute or two:
 curl -sS -o /dev/null -w '%{http_code}\n' https://uscode.linkedlegislation.org/health
 ```
 
+The half of this that does not depend on you has already been checked: from off the box, with the
+hostname forced to the Elastic IP, **port 80 answers and redirects correctly**
+(`308 → https://uscode.linkedlegislation.org/health`), which is the path Let's Encrypt's HTTP-01
+challenge uses. So the security group, Caddy's routing and the redirect are all confirmed working
+from the public internet — the certificate is waiting on the DNS record and nothing else. HTTPS
+currently fails the handshake outright, which is what "no certificate yet" looks like rather than a
+misconfiguration:
+
+```bash
+# what was run, and what it said
+curl -sk --resolve uscode.linkedlegislation.org:443:52.1.30.78 ... # status=000 (no cert yet)
+curl -s  --resolve uscode.linkedlegislation.org:80:52.1.30.78  ... # status=308 → https://...
+```
+
 **3. Confirm the alarm email.** AWS sent a subscription confirmation to
 `arihershowitz@gmail.com` for the `uscode-alerts` SNS topic. **Until you click it, every alarm
 is silent** — an unconfirmed topic fails quietly, which looks exactly like nothing being wrong.
