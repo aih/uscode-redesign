@@ -45,6 +45,20 @@ run() {
 
 echo "=== $(date -u +%FT%TZ) corpus update starting ==="
 
+# Pull BEFORE anything else, exactly as scripts/run-backfill-ec2.sh does, and
+# for two reasons that both bite on a box seeded from a pg_dump rather than by
+# load-all:
+#
+#   - backfill skips what the ledger settles and adopts what is on disk. This
+#     box has neither, so without a pull it would plan the whole corpus —
+#     ~3,197 downloads at one request per second, which is 40-50 hours of
+#     hammering uscode.house.gov for files the mirror already holds.
+#   - `mirror push` writes ledger.json with `cp`, unconditionally. A ledger
+#     built from a partial local corpus would overwrite the complete one in
+#     S3. The zips survive that (push syncs without --delete) and the bucket
+#     is versioned, but the ledger is the corpus index of record (ADR-0013)
+#     and should not need recovering.
+run mirror pull || { echo "mirror pull failed"; exit 1; }
 run inventory || { echo "inventory failed"; exit 1; }
 run backfill --quiet || { echo "backfill failed"; exit 1; }
 run mirror push || { echo "mirror push failed"; exit 1; }
