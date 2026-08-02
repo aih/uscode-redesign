@@ -21,11 +21,34 @@ settled and the interesting parts have moved into deploy.md.
 | Logs | `/var/lib/uscode/logs/` — `deploy.log`, `backup.log`, `purge.log` |
 | AWS profile | `uscode-admin` = IAM user `linkedlegislation-deploy` |
 
+## The site is live
+
+`https://uscode.linkedlegislation.org` — DNS in Route 53 (Namecheap delegates the zone to AWS),
+certificate issued by Let's Encrypt on the first attempt after the record appeared. Smoke-tested
+against the live host:
+
+| check | result |
+|---|---|
+| TLS | verified, `CN=uscode.linkedlegislation.org`, issuer Let's Encrypt |
+| `/health` | 200 in 0.61 s |
+| citation URL, `Accept: text/html` | 200 → `/app/us/usc/t16/s45f/c/5?date=…` (the reader) |
+| citation URL, `Accept: application/json` | 200 → `/api/v1/us/usc/t16/s45f/c/5` |
+| reader content | `§ 45f Mineral King Valley addition authorized · 119-102not101` |
+| search | real corpus — "conservation" returns `/us/usc/t16/s3831` "Conservation reserve" |
+| cache, pinned (ADR-0018) | `public, max-age=31536000, immutable` |
+| cache, unpinned | `public, max-age=300` |
+| CSP / HSTS / nosniff / frame-deny (ADR-0030) | all present |
+| diff rate limit (ADR-0029) | burst served, then `429` with `Retry-After: 4`, then recovery |
+
+**`HEAD` returns 405 where `GET` returns 200** on `/api/v1`, live — CLAUDE.md's recorded debt,
+confirmed rather than discovered. It matters the moment a CDN or uptime monitor is put in front,
+because both probe with HEAD by default.
+
 ## What you need to do in the morning
 
-At a glance: **DNS record → restart Caddy → confirm the alarm email → merge #17 and #18.** The
-first is the only one blocking a working site; the rest can follow in any order. Both PRs are
-green on all four suites.
+**Done:** the DNS record is in Route 53, Caddy holds a certificate, and #17 and #18 are merged —
+so the reindex streaming fix is baked into the running image rather than copied into a container.
+**Left: confirm the alarm email** (below), and the verification items under "Still owed".
 
 **1. Add the DNS record.** This is the only thing blocking a working site:
 
