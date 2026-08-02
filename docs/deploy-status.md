@@ -54,7 +54,13 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://uscode.linkedlegislation.org/h
 **3. Confirm the alarm email.** AWS sent a subscription confirmation to
 `arihershowitz@gmail.com` for the `uscode-alerts` SNS topic. **Until you click it, every alarm
 is silent** — an unconfirmed topic fails quietly, which looks exactly like nothing being wrong.
-Prove delivery afterwards:
+
+All five alarms exist and point at the topic. Four read `OK`; **`uscode-cpu-credits-low` reads
+`ALARM`, and that is the alarm being right rather than a fault** — a t4g.large earns CPU credits
+while idle and spends them under load, and this box has spent the night restoring 22 GB and
+indexing half a million documents. It should clear once the box is only serving pages. If it is
+still in alarm after a quiet day, that is the signal the instance is undersized for what is being
+asked of it. Prove delivery afterwards:
 
 ```bash
 aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
