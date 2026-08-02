@@ -326,25 +326,25 @@ ran green on `workflow_dispatch`.
 What is genuinely outstanding is above: **the alarm subscription**, and the admin re-run of
 `admin-grant.sh`.
 
-Two things need doing **on the box** the first time this session's changes deploy, and neither is
-automatic:
+**The box side of ADR-0036 is done and proven**, 2026-08-02 16:26 UTC:
 
-```bash
-# 1. The daily source check's cron (ADR-0036). deploy-on-box.sh does not touch
-#    /etc/cron.d, so the schedule lands only when this is run once:
-sudo bash /home/ec2-user/uscode-redesign/deploy/install-crons.sh
+| step | result |
+|---|---|
+| `deploy/install-crons.sh` | `/etc/cron.d/uscode` rewritten with the daily check at 06:41 UTC beside the existing dump and purge |
+| `update-corpus.sh --check-only` | 382 release points, newest `119-102not101` (2026-07-12), `nothing new since the last check`, 7 seconds |
+| `USCode/SourceCheckStale` | published, value 0 |
+| `deploy/alarms.sh` | `uscode-source-check-stale` created, `treat-missing-data: breaching`, 86400 s × 2 |
+| `/api/v1/status` (live) | `ok: true`, `stale: false`, `behind_by: 0`, `release_points_seen: 382` |
+| `/app/releases` (live) | "Checked uscode.house.gov for new release points in the last hour." |
 
-# 2. The staleness alarm, which is new in deploy/alarms.sh:
-ALERT_EMAIL=arihershowitz@gmail.com bash deploy/alarms.sh i-06b433caacd78fd96
-```
+Before the check ran, the same endpoint answered `last_checked_at: null, stale: true,
+behind_by: null` — a corpus restored from a dump on a box whose schedule had never fired, which is
+exactly the state ADR-0036 exists to make visible rather than let pass for "current".
 
-Prove the check itself before trusting the schedule — it is one HTTP request and it should say
-`nothing new since the last check`:
-
-```bash
-cd /home/ec2-user/uscode-redesign && bash deploy/update-corpus.sh --check-only
-curl -s https://uscode.linkedlegislation.org/api/v1/status
-```
+`deploy-on-box.sh` does not touch `/etc/cron.d`, so **re-run `install-crons.sh` after any edit to
+it**, and on any rebuilt box (`bootstrap-box.sh` calls it, so a from-scratch bring-up is covered).
+Note that running it as root over the ec2-user checkout makes `git` complain about "dubious
+ownership" — harmless, and only affects `git` commands, not the script.
 
 The smoke block, kept because it is the copy-paste version and every line should be checked against
 what it *should* say, not just that it returned:
