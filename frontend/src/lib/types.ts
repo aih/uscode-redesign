@@ -21,6 +21,37 @@ export interface Release {
   ingested_titles: string[];
 }
 
+/** `GET /api/v1/status` — how current this mirror is, and how it knows.
+ *
+ * Two facts, kept apart on purpose: what is loaded here, and when this
+ * deployment last confirmed with OLRC that it is still everything published.
+ * A reader can check the first for themselves by reading a date; only the
+ * site can answer the second. */
+export interface SourceCheck {
+  url: string;
+  last_checked_at: string | null;
+  hours_since_check: number | null;
+  ok: boolean;
+  stale: boolean;
+  release_points_seen: number | null;
+  new_release_points: string[];
+  latest_published_label: string | null;
+  latest_published_date: string | null;
+  error: string | null;
+}
+
+export interface CorpusStatus {
+  latest_release: string | null;
+  latest_currency_date: string | null;
+  release_points_known: number;
+  behind_by: number | null;
+}
+
+export interface Status {
+  source: SourceCheck;
+  corpus: CorpusStatus;
+}
+
 export interface Provision {
   identifier: string;
   found: boolean;

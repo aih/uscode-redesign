@@ -1,0 +1,45 @@
+---
+/**
+ * "Checked uscode.house.gov for new release points 3 hours ago."
+ *
+ * The one fact about a mirror that a reader cannot establish for themselves.
+ * Every other currency statement on this site is a property of the *text* — the
+ * release point, its date, its caveat — and can be read off the page. Whether
+ * anyone has looked lately to see if OLRC published something newer is a
+ * property of this deployment, and if it is not stated it is assumed, which is
+ * exactly how a mirror that quietly stopped updating keeps its readers.
+ *
+ * Rendered as a plain line when the answer is reassuring and as a USWDS warning
+ * alert when it is not, because the two are read differently: a status line is
+ * skimmed, an alert is a claim on attention, and "this may be out of date" has
+ * earned one. It never throws — `fetchStatus` swallows its own errors — because
+ * a note *about* the law must not be able to take down the law.
+ */
+import { currencyNote } from "../lib/currency";
+import type { Status } from "../lib/types";
+
+interface Props {
+  status: Status | null;
+}
+
+const note = currencyNote(Astro.props.status);
+---
+
+{
+  note &&
+    (note.tone === "warning" ? (
+      <div class="usa-alert usa-alert--warning usa-alert--slim" role="status">
+        <div class="usa-alert__body">
+          <p class="usa-alert__text">
+            {note.text}
+            {note.detail && <span class="source-currency__detail"> {note.detail}</span>}
+          </p>
+        </div>
+      </div>
+    ) : (
+      <p class="doc-meta source-currency" role="status">
+        {note.text}
+        {note.detail && <span class="source-currency__detail"> {note.detail}</span>}
+      </p>
+    ))
+}

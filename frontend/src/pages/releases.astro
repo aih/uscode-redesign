@@ -17,6 +17,8 @@
  * being inferred by comparing two counts.
  */
 import Base from "../layouts/Base.astro";
+import SourceCurrency from "../components/SourceCurrency.astro";
+import { fetchStatus } from "../lib/api";
 import type { Release } from "../lib/types";
 import { appHref, compareTitles, unpadTitle } from "../lib/url";
 
@@ -25,6 +27,11 @@ const response = await fetch(
   { headers: { accept: "application/json" } },
 );
 const releases = (await response.json()) as Release[];
+
+// This is the page that answers "what exists and how current is it", so it is
+// the page that owes the other half of the answer: when this site last asked
+// OLRC whether the list below is still complete.
+const status = await fetchStatus();
 
 function usDate(iso: string): string {
   const [year, month, day] = iso.split("-");
@@ -51,6 +58,8 @@ function changedTitles(release: Release): { num: string; held: boolean }[] {
     it stood at that release point. One shown in grey with a <span aria-hidden="true">†</span> is a
     title OLRC republished that this database does not hold.
   </p>
+
+  <SourceCurrency status={status} />
 
   <table class="usa-table usa-table--striped">
     <caption>Release points, newest first</caption>

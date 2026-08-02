@@ -960,6 +960,17 @@ main[id] {
   font-weight: 700;
 }
 
+// When this site last asked uscode.house.gov what exists (SourceCurrency.astro).
+// The headline sentence carries the state; the detail behind it is the evidence,
+// set quieter so the line reads as one statement rather than two competing ones.
+.source-currency {
+  margin-bottom: 1.5rem;
+}
+
+.source-currency__detail {
+  color: var(--muted);
+}
+
 // Labels the repeated bodies apart when the source published one identifier more
 // than once at a release point (ADR-0021). Rare, so it stays quiet: a rule and a
 // small caption, not a second layout.

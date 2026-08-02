@@ -16,6 +16,7 @@ import type {
   Release,
   SearchResponse,
   Section,
+  Status,
   Title,
   Toc,
   User,
@@ -158,6 +159,19 @@ export async function fetchReleases(titleNum?: string | null): Promise<Release[]
 
 export async function fetchTitles(): Promise<Title[]> {
   return getJson<Title[]>("/api/v1/titles");
+}
+
+/** How current this mirror is, and when it last asked uscode.house.gov.
+ *
+ * Never let this fail a page: a currency note is context around the law, not
+ * the law, and a status endpoint that is briefly down is not a reason to stop
+ * serving the text it describes. Callers get `null` and render nothing. */
+export async function fetchStatus(): Promise<Status | null> {
+  try {
+    return await getJson<Status>("/api/v1/status");
+  } catch {
+    return null;
+  }
 }
 
 /** `11 usc 523(a)(1)` → the identifier it names, and whether it is there.
