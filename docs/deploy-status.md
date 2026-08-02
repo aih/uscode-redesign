@@ -230,6 +230,32 @@ tail -f /var/lib/uscode/logs/reindex-all.log
 future full reindex is ever needed, run it when nothing is deploying, and additively unless a
 mapping change forces `--recreate`.
 
+## The weekly update is proven
+
+Dispatched by hand before it can fire unattended on a Monday, and it now runs green end to end:
+
+```
+mirror pull   1m18s
+inventory     refreshed from uscode.house.gov
+backfill      planned 3197: 0 downloaded, 3197 skipped, 44 unavailable
+mirror push   nothing new to send
+load-all      planned 3153: 0 loaded, 3153 skipped
+verify        6 count mismatches (ADR-0021, expected), 0 source, 0 incomplete
+```
+
+**`0 downloaded, 3197 skipped` is the whole point of the `mirror pull` fix.** Without it this box —
+seeded from a dump rather than by `load-all` — had no ledger and no zips, so backfill would have
+planned the entire corpus: 3,197 files at one request per second against uscode.house.gov, 40-50
+hours, for files the mirror already held.
+
+**The first run failed, and the failure was mine.** `ingest verify` exits non-zero whenever
+`report.sound` is false, and sound is false if there are *any* count mismatches — of which this
+corpus always has exactly six (ADR-0021, recorded in CLAUDE.md, deliberately reported rather than
+smoothed away). Gating the weekly job on that exit code would have failed it every week forever
+while nothing was wrong, which is worse than not checking at all: an alert that always fires is an
+alert nobody reads. The gate is now `source_mismatches` and `incomplete_loads` — the two fields
+that mean something is actually wrong — with `count_mismatches` printed rather than gated on.
+
 ## Still owed
 
 1. **`ingest verify` — done, and it passes.** 3,153 title-versions across 381 release points and
