@@ -85,8 +85,25 @@ reproduce them rather than repeat the debugging.
 
 ## Where the corpus stands
 
-The seed dump (2.33 GB compressed, restoring to ~27 GB) was uploaded to
-`s3://uscode-mirror-dreamproit/usc/db/uscode-2026-08-01.dump` and is being restored on the box.
+**Restored and verified.** The seed dump (2.33 GB compressed) was uploaded to
+`s3://uscode-mirror-dreamproit/usc/db/uscode-2026-08-01.dump` and restored in 24 minutes with
+`pg_restore -j 3`, no errors. Every count matches CLAUDE.md exactly:
+
+| | on the box | expected |
+|---|---|---|
+| titles | 58 | 58 |
+| release points | 382 | 382 |
+| distinct sections | 65,938 | 65,938 |
+| `section_versions` | 489,738 | 489,738 |
+| `section_release_map` | 5,466,652 | 5,466,652 |
+| `guid_map` | 96,185,732 | 96,185,732 |
+| title-releases | 3,153 | 3,153 |
+| `structure_nodes` | 9,916 | — |
+
+`users` and `auth_sessions` are both **0**, so the account exclusion did what it was meant to.
+Alembic reports `a2f0edc8f5e2 (head)` and migrated nothing, which is the check that the dump was
+taken on the same schema the running image expects. On disk: 22 GB, smaller than the 27 GB the
+development database occupies because a fresh restore carries no dead tuples.
 
 **That dump deliberately excludes the accounts tables.** The local database held 1,301 users and
 1,343 sessions left over from test runs, and ADR-0034 turned accounts off in the *reader* only —
