@@ -83,7 +83,10 @@ def _index_structure(session, batch_size: int) -> int:
     print("Indexing StructureNodes...")
     buffer: list[dict] = []
     total = 0
-    for node in session.execute(select(StructureNode)).scalars().yield_per(batch_size):
+    stmt = select(StructureNode).execution_options(
+        stream_results=True, yield_per=batch_size
+    )
+    for node in session.execute(stmt).scalars():
         buffer.append({
             "identifier": node.identifier,
             "level": node.level,
@@ -109,7 +112,12 @@ def _index_sections(session, batch_size: int, limit, all_versions: bool) -> int:
         # is_current=False rather than left to the default search to trip over.
         print("Collecting current versions...")
         current_ids = {
-            row[1] for row in session.execute(_current_version_query()).yield_per(5000)
+            row[1]
+            for row in session.execute(
+                _current_version_query().execution_options(
+                    stream_results=True, yield_per=5000
+                )
+            )
         }
         print(f"  {len(current_ids)} sections have a current version.")
         stmt = _all_version_query()
@@ -122,7 +130,15 @@ def _index_sections(session, batch_size: int, limit, all_versions: bool) -> int:
     print("Indexing SectionVersions...")
     buffer: list[dict] = []
     total = 0
-    rows = session.execute(stmt).yield_per(batch_size)
+    # `yield_per` has to be an execution option on the statement, not a call on
+    # the Result: by the time a Result exists the query has run and psycopg has
+    # already buffered every row client-side. Selecting SectionVersion.xml
+    # across 489,738 rows that way costs ~3.5 GB, which is an OOM kill on an
+    # 8 GB box. Measured over the real corpus: 1,020 MB and still climbing at
+    # 60k rows the old way, a flat 283 MB this way.
+    rows = session.execute(
+        stmt.execution_options(stream_results=True, yield_per=batch_size)
+    )
     for (
         identifier,
         version_id,
