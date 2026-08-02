@@ -45,6 +45,46 @@ class ReleasePoint(Base):
     titles_affected: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
 
 
+class SourceCheck(Base):
+    """One poll of uscode.house.gov's release-points page.
+
+    A row is written every time the inventory is fetched — including when the
+    fetch *fails*, which is the case this table exists for. A mirror of a
+    living source has two ways to fall behind: the source publishes something
+    new and we don't ingest it, or we stop asking altogether. The first is
+    visible (the newest release point on the site is older than the newest one
+    on OLRC's page); the second is invisible, because a corpus that has stopped
+    updating looks identical to a corpus with nothing to update. Recording the
+    *attempt*, not just its result, is what tells those two apart, and it is
+    what `/api/v1/status` reports and the reader shows on the releases page.
+
+    Deliberately append-only and never pruned: at one row a day this is ~4 KB a
+    year, and the history answers "when did it stop working" rather than only
+    "is it working now".
+    """
+
+    __tablename__ = "source_checks"
+    __table_args__ = (Index("ix_source_checks_checked_at", "checked_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    checked_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    source_url: Mapped[str] = mapped_column(String)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    # NULL on a failed check — the page never parsed, so there is no count to
+    # record. Zero would be a lie of a different kind.
+    release_points_seen: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Labels the page carried that `release_points` did not already hold. This
+    # is the answer to "was there anything new", and it is recorded rather than
+    # recomputed because the next check will have seeded them and the answer
+    # would be lost.
+    new_labels: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    latest_label: Mapped[str | None] = mapped_column(String, nullable=True)
+    latest_currency_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class Title(Base):
     __tablename__ = "titles"
 

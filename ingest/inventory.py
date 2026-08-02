@@ -42,10 +42,14 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db.models import ReleasePoint
+from db.models import ReleasePoint, SourceCheck
 from ingest.release_label import parse_label
+from storage.repository import SOURCE_URL
 
-PRIOR_RELEASE_POINTS_URL = "https://uscode.house.gov/download/priorreleasepoints.htm"
+PRIOR_RELEASE_POINTS_URL = SOURCE_URL
+"""Defined in `storage.repository` so `/api/v1/status` can name the source
+without importing the ingest layer. Re-exported under this name because that is
+what the CLI and the tests have always called it."""
 DOWNLOAD_BASE_URL = "https://uscode.house.gov/download/"
 INVENTORY_PATH = Path("data/uscreleasepoints.json")
 
@@ -332,6 +336,99 @@ def seed_release_points(session: Session, entries: list[ReleasePointEntry]) -> t
             updated += 1
     session.flush()
     return inserted, updated
+
+
+@dataclass(frozen=True, slots=True)
+class CheckResult:
+    """What one poll of uscode.house.gov found. Mirrors the `source_checks` row."""
+
+    ok: bool
+    entries: list[ReleasePointEntry]
+    new_labels: tuple[str, ...]
+    """Labels on the page that `release_points` did not already hold."""
+    inserted: int = 0
+    updated: int = 0
+    error: str | None = None
+
+    @property
+    def has_new_release_points(self) -> bool:
+        return bool(self.new_labels)
+
+
+def record_source_check(
+    session: Session,
+    *,
+    source_url: str,
+    ok: bool,
+    entries: list[ReleasePointEntry] | None = None,
+    new_labels: tuple[str, ...] = (),
+    error: str | None = None,
+) -> SourceCheck:
+    """Write one `source_checks` row. Called on success *and* on failure.
+
+    The failure case is the one that matters: a check that could not reach the
+    page still proves the checker itself is alive, and distinguishes "OLRC has
+    published nothing new" from "we stopped asking three weeks ago". Nothing
+    else in the system can tell those apart.
+    """
+    newest = entries[-1] if entries else None
+    row = SourceCheck(
+        source_url=source_url,
+        ok=ok,
+        release_points_seen=len(entries) if entries is not None else None,
+        new_labels=list(new_labels),
+        latest_label=newest.label if newest else None,
+        latest_currency_date=newest.currency_date if newest else None,
+        # Truncated: an error here is a one-line diagnosis, and a stack trace or
+        # an HTML error page would push a status response into the kilobytes.
+        error=(error[:500] if error else None),
+    )
+    session.add(row)
+    return row
+
+
+def poll_source(
+    session: Session,
+    *,
+    url: str = PRIOR_RELEASE_POINTS_URL,
+    out_path: Path | None = INVENTORY_PATH,
+    seed: bool = True,
+) -> CheckResult:
+    """Fetch the release-points page, seed what is new, and record the check.
+
+    One network request (CLAUDE.md's source etiquette) and one `source_checks`
+    row per call, whatever happens. Commits nothing — the caller owns the
+    transaction, because on the success path the check row and the release
+    points it describes should land together or not at all.
+    """
+    try:
+        html = fetch_inventory_html(url)
+        entries = parse_inventory(html)
+    except Exception as exc:  # network, HTTP, or InventoryParseError
+        record_source_check(session, source_url=url, ok=False, error=f"{type(exc).__name__}: {exc}")
+        return CheckResult(ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}")
+
+    if out_path is not None:
+        write_inventory(entries, out_path, source_url=url)
+
+    # Computed BEFORE seeding, or seeding would make every label look known.
+    known = {label for label in session.scalars(select(ReleasePoint.label))}
+    new_labels = tuple(entry.label for entry in entries if entry.label not in known)
+
+    inserted = updated = 0
+    if seed:
+        inserted, updated = seed_release_points(session, entries)
+
+    record_source_check(
+        session, source_url=url, ok=True, entries=entries, new_labels=new_labels
+    )
+    return CheckResult(
+        ok=True,
+        entries=entries,
+        new_labels=new_labels,
+        inserted=inserted,
+        updated=updated,
+    )
 
 
 def _clean_text(raw: str) -> str:

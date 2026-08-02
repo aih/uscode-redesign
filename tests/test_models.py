@@ -15,6 +15,7 @@ EXPECTED_TABLES = {
     "auth_sessions",
     "login_attempts",
     "user_settings",
+    "source_checks",
 }
 
 

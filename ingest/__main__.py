@@ -1,4 +1,4 @@
-"""`python -m ingest {inventory,fetch,backfill,verify-downloads,load}` — CLAUDE.md Commands."""
+"""`python -m ingest {inventory,check,fetch,backfill,verify-downloads,load}` — CLAUDE.md Commands."""
 
 from __future__ import annotations
 
@@ -39,6 +39,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     inventory_parser.add_argument(
         "--no-seed", action="store_true", help="Write the JSON but don't touch the database"
+    )
+
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Poll uscode.house.gov for new release points, record the check, "
+        "and exit 10 if there is anything new",
+    )
+    check_parser.add_argument(
+        "--url", default=inventory_mod.PRIOR_RELEASE_POINTS_URL, help="Source page"
+    )
+    check_parser.add_argument(
+        "--out", type=Path, default=inventory_mod.INVENTORY_PATH, help="Inventory JSON path"
     )
 
     fetch_parser = subparsers.add_parser(
@@ -214,6 +226,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     return {
         "inventory": _cmd_inventory,
+        "check": _cmd_check,
         "fetch": _cmd_fetch,
         "backfill": _cmd_backfill,
         "verify-downloads": _cmd_verify_downloads,
@@ -225,34 +238,98 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _cmd_inventory(args: argparse.Namespace) -> int:
+    # Reading a file back is not a check of uscode.house.gov, and neither is a
+    # run told not to touch the database, so neither writes a `source_checks`
+    # row. Only a real fetch counts as having asked the source.
     if args.from_file is not None:
         entries = inventory_mod.read_inventory(args.from_file)
         print(f"read {len(entries)} release points from {args.from_file}")
-    else:
+        _print_span(entries)
+        if args.no_seed:
+            return 0
+        session = SessionLocal()
+        try:
+            inserted, updated = inventory_mod.seed_release_points(session, entries)
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            print(f"seed failed: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            session.close()
+        print(f"release_points seeded: {inserted} inserted, {updated} updated")
+        return 0
+
+    if args.no_seed:
         html = inventory_mod.fetch_inventory_html(args.url)
         entries = inventory_mod.parse_inventory(html)
         path = inventory_mod.write_inventory(entries, args.out, source_url=args.url)
         print(f"wrote {len(entries)} release points to {path}")
+        _print_span(entries)
+        return 0
 
+    result = _poll(url=args.url, out_path=args.out)
+    if not result.ok:
+        print(f"inventory failed: {result.error}", file=sys.stderr)
+        return 1
+    print(f"wrote {len(result.entries)} release points to {args.out}")
+    _print_span(result.entries)
+    print(f"release_points seeded: {result.inserted} inserted, {result.updated} updated")
+    return 0
+
+
+def _cmd_check(args: argparse.Namespace) -> int:
+    """Poll uscode.house.gov, record the check, and say so in the exit code.
+
+    Exit codes are the interface here, because the caller is a shell script on
+    a box with no jq guarantee (deploy/update-corpus.sh):
+
+        0   checked; nothing new
+        10  checked; new release points published — run the full update
+        1   the check itself failed
+
+    The `source_checks` row is written in all three cases.
+    """
+    result = _poll(url=args.url, out_path=args.out)
+    if not result.ok:
+        print(f"check failed: {result.error}", file=sys.stderr)
+        return 1
+
+    newest = result.entries[-1]
+    print(
+        f"checked {args.url}: {len(result.entries)} release points, "
+        f"newest {newest.label} ({newest.currency_date})"
+    )
+    if not result.new_labels:
+        print("nothing new since the last check")
+        return 0
+    print(f"NEW release points ({len(result.new_labels)}): {', '.join(result.new_labels)}")
+    return 10
+
+
+def _poll(*, url: str, out_path: Path) -> inventory_mod.CheckResult:
+    """Run one poll in its own transaction, committing the check row either way."""
+    session = SessionLocal()
+    try:
+        result = inventory_mod.poll_source(session, url=url, out_path=out_path)
+        session.commit()
+        return result
+    except Exception as exc:
+        # A failure to *record* the check — the database being down, say. The
+        # poll's own failures are already inside CheckResult.
+        session.rollback()
+        return inventory_mod.CheckResult(
+            ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}"
+        )
+    finally:
+        session.close()
+
+
+def _print_span(entries: list[inventory_mod.ReleasePointEntry]) -> None:
     print(
         f"oldest: {entries[0].label} ({entries[0].currency_date}); "
         f"newest: {entries[-1].label} ({entries[-1].currency_date})"
     )
-    if args.no_seed:
-        return 0
-
-    session = SessionLocal()
-    try:
-        inserted, updated = inventory_mod.seed_release_points(session, entries)
-        session.commit()
-    except Exception as exc:
-        session.rollback()
-        print(f"seed failed: {exc}", file=sys.stderr)
-        return 1
-    finally:
-        session.close()
-    print(f"release_points seeded: {inserted} inserted, {updated} updated")
-    return 0
 
 
 def _cmd_fetch(args: argparse.Namespace) -> int:
