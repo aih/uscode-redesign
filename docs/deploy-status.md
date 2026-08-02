@@ -6,7 +6,7 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-08-02, overnight session.
+**Last updated:** 2026-08-02, second session — the alarm-email diagnosis and ADR-0036's daily check.
 
 ## The box
 
@@ -46,14 +46,42 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-**One thing: confirm the alarm email.** AWS sent a subscription confirmation to
-`arihershowitz@gmail.com` for the `uscode-alerts` SNS topic. **Until you click it every alarm is
-silent** — an unconfirmed topic fails quietly, which looks exactly like nothing being wrong. Prove
-delivery afterwards:
+**One thing, still: confirm the alarm email.** Checked on 2026-08-02 and the topic reads
+`SubscriptionsConfirmed: 0, SubscriptionsPending: 1, SubscriptionsDeleted: 1` — **nobody has ever
+received an alarm from this site.** The `Deleted: 1` is the first confirmation link expiring: AWS
+drops an unconfirmed subscription after three days, so "I'll click it later" silently became "I need
+a new one". A fresh confirmation was sent to `arihershowitz@gmail.com` on 2026-08-02 at 16:00 UTC.
+
+It comes from `no-reply@sns.amazonaws.com`, subject **"AWS Notification - Subscription
+Confirmation"**, and Gmail files it under Promotions or Spam as often as not. It expires in three
+days.
+
+Check that it took, and re-send it if it lapsed again:
+
+```bash
+AWS_PROFILE=uscode-admin bash deploy/alerts-status.sh
+# and if it says nobody is receiving them:
+ALERT_EMAIL=arihershowitz@gmail.com RESEND=1 AWS_PROFILE=uscode-admin bash deploy/alerts-status.sh
+```
+
+That script exists because of this failure: five alarms wired to a real topic look identical whether
+or not anyone is subscribed, so the broken state was indistinguishable from the working one. It exits
+non-zero when nothing is confirmed. Prove delivery once it is:
 
 ```bash
 aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
   --state-value ALARM --state-reason 'testing delivery' --region us-east-1
+```
+
+**One IAM re-run needs an admin profile (not the deploy user).** `deploy/admin-grant.sh` now grants
+`sns:ListSubscriptionsByTopic` and `sns:GetSubscriptionAttributes`, and moves `sns:ListTopics` to
+`Resource: "*"` — that call is account-wide and does not support resource-level permissions, so
+scoping it to `uscode-*` denied it outright, which is how the diagnosis above started with an
+`AccessDenied` for a permission the policy appeared to grant. Re-run it (idempotent; it adds a new
+policy version) to pick that up:
+
+```bash
+AWS_PROFILE=<admin> bash deploy/admin-grant.sh
 ```
 
 All five alarms exist and point at the topic. Four read `OK`; **`uscode-cpu-credits-low` reads
@@ -79,7 +107,11 @@ image rather than copied into a container.
 - **Alarms**: five on the `uscode-alerts` topic — CPU, CPU credit balance, status check, network
   out, disk. CloudWatch agent installed and publishing disk and memory.
 - **Crons** (`/etc/cron.d/uscode`): nightly `pg_dump` to `s3://uscode-mirror-dreamproit/usc/db/`
-  at 04:17 UTC, and the weekly `purge_login_failures` that nothing had ever scheduled.
+  at 04:17 UTC, and the weekly `purge_login_failures` that nothing had ever scheduled. Both were
+  typed in by hand and existed nowhere else; they are now written by **`deploy/install-crons.sh`**,
+  which `bootstrap-box.sh` calls, so a rebuilt box arrives with its schedule instead of arriving
+  without one and looking fine. The daily source check joins them there (ADR-0036) — **run that
+  script once on the box to pick it up**, since `deploy-on-box.sh` does not touch `/etc/cron.d`.
 - **Repo is public** — the box clones it with no credentials. Verified beforehand that no
   secrets are in the tree or in any of the 206 commits of history.
 
@@ -230,7 +262,31 @@ tail -f /var/lib/uscode/logs/reindex-all.log
 future full reindex is ever needed, run it when nothing is deploying, and additively unless a
 mapping change forces `--recreate`.
 
-## The weekly update is proven
+## How the corpus keeps up (ADR-0036)
+
+**Daily poll on the box, weekly full sweep from Actions.** The box's cron runs
+`deploy/update-corpus.sh` with no arguments at 06:41 UTC: one request to
+uscode.house.gov's release-points page, one `source_checks` row, and — on the ~360 days a year when
+OLRC has published nothing — nothing else. When the poll finds a release point this box has not seen
+(`python -m ingest check` exits 10) it runs the whole download-and-load chain there and then, so new
+law is picked up within a day rather than within a week.
+
+The weekly Actions job now dispatches `--force`, which makes it the backstop rather than the primary
+schedule: it runs the full chain whether or not anything was published, so a load that half-finished
+or a zip that never reached the mirror is repaired within the week. The two schedules fail
+independently — a disabled GitHub schedule leaves the box's cron running, a dead `crond` leaves the
+weekly sweep — which matters because GitHub disables scheduled workflows on a repository with no
+pushes for 60 days.
+
+**Every check is recorded, including the failures.** That is the point rather than a detail: a corpus
+that has stopped being updated looks exactly like a corpus with nothing to update, from the outside
+and from the inside. `GET /api/v1/status` reports when the site last looked and what it found, and
+`/app/releases` says it in a sentence. Past seven days without a successful check the site stops
+claiming to be current and shows a warning instead, and `USCode/SourceCheckStale` alarms — with
+`treat-missing-data breaching`, uniquely among these alarms, because a checker that has stopped
+publishes nothing at all.
+
+## The weekly sweep is proven
 
 Dispatched by hand before it can fire unattended on a Monday, and it now runs green end to end:
 
@@ -258,13 +314,40 @@ that mean something is actually wrong — with `count_mismatches` printed rather
 
 ## Still owed
 
-1. **`ingest verify` — done, and it passes.** 3,153 title-versions across 381 release points and
-   58 titles; 91.0% dedupe; the six count mismatches it reports are exactly the ADR-0021 ones
-   CLAUDE.md documents (`113-296not287/54`, `114-329/10`, `115-8/10`, `117-80/19`,
-   `117-110not103/19`, `117-111not103/19`). Report at `docs/verification/database.json` **on the
-   box** — not committed from there, since the repo copy is the development corpus's.
-2. **Smoke tests** — deploy.md §5 is the full set; this is the copy-paste version for once TLS is
-   up. Every line should be checked against what it *should* say, not just that it returned:
+Everything this list used to hold is done. `ingest verify` passes on the box (3,153 title-versions
+across 381 release points and 58 titles; 91.0% dedupe; the six count mismatches are exactly the
+ADR-0021 ones CLAUDE.md documents — `113-296not287/54`, `114-329/10`, `115-8/10`, `117-80/19`,
+`117-110not103/19`, `117-111not103/19`; report at `docs/verification/database.json` **on the box**,
+not committed from there since the repo copy is the development corpus's). The smoke tests ran
+against the live host — the table at the top of this file *is* their result. `deploy.yml` has run
+green on `workflow_run` a dozen times, which is the automated path proving itself. `update-corpus.yml`
+ran green on `workflow_dispatch`.
+
+What is genuinely outstanding is above: **the alarm subscription**, and the admin re-run of
+`admin-grant.sh`.
+
+Two things need doing **on the box** the first time this session's changes deploy, and neither is
+automatic:
+
+```bash
+# 1. The daily source check's cron (ADR-0036). deploy-on-box.sh does not touch
+#    /etc/cron.d, so the schedule lands only when this is run once:
+sudo bash /home/ec2-user/uscode-redesign/deploy/install-crons.sh
+
+# 2. The staleness alarm, which is new in deploy/alarms.sh:
+ALERT_EMAIL=arihershowitz@gmail.com bash deploy/alarms.sh i-06b433caacd78fd96
+```
+
+Prove the check itself before trusting the schedule — it is one HTTP request and it should say
+`nothing new since the last check`:
+
+```bash
+cd /home/ec2-user/uscode-redesign && bash deploy/update-corpus.sh --check-only
+curl -s https://uscode.linkedlegislation.org/api/v1/status
+```
+
+The smoke block, kept because it is the copy-paste version and every line should be checked against
+what it *should* say, not just that it returned:
 
    ```bash
    SITE=https://uscode.linkedlegislation.org
@@ -294,10 +377,6 @@ that mean something is actually wrong — with `count_mismatches` printed rather
 
    Known-good anchor from CLAUDE.md: `id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd` ↔
    `/us/usc/t16/s45f/c/5`.
-5. **A real end-to-end deploy** — push a trivial commit to main and watch CI → deploy.yml → the
-   box, which is the first time the whole automated path runs unassisted.
-6. **`workflow_dispatch` on update-corpus.yml** once, to prove the weekly job before it fires
-   unattended on a Monday.
 
 ## Known debts this deployment did not create
 

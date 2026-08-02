@@ -13,6 +13,18 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   ({name, date, titlesAffected, url} per RP, loadusc-xcitedb's shape), and seeds release_points
   with real currency dates, titles_affected, and a global seq from page order.
 
+  Records a `source_checks` row when it actually fetches (not for `--from-file`, and not for
+  `--no-seed`, which is told to leave the database alone) — see `check` below and ADR-0036.
+
+## python -m ingest check [--url U] [--out PATH]
+  The daily poll (ADR-0036). One request to the release-points page; writes a `source_checks`
+  row whatever happens — including when the fetch fails, which is the case the table exists
+  for — seeds any new release points, and signals through its **exit code**: 0 nothing new,
+  10 new release points published, 1 the check itself failed. `deploy/update-corpus.sh` runs
+  the full download-and-load chain only on 10. Pass `--out` somewhere disposable when the
+  canonical `data/uscreleasepoints.json` must survive: `mirror pull` overwrites it, and a
+  backfill planned from the stale copy would miss the release point just found.
+
 ## python -m ingest fetch --release <label> --title <num>
   Downloads and unpacks one title's zip into data/releases/{label}/ (~1 req/sec, cached on disk).
   Raises on failure — the interactive single-title path. The bulk path records and continues.

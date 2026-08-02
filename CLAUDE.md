@@ -19,7 +19,8 @@ against the local corpus.
 `api/` serves PLAN §4's routes — identifier lookup with `?release`/`?date`/`?format`, `?id=` guid lookup,
 TOC, neighbors, versions, releases, a diff between two release points (ADR-0016), the batched
 `/api/v1/labels` (100 identifiers max, the bound the route enforces), `/api/v1/search`,
-`/api/v1/citation`, and auth + watchlist CRUD (ADR-0017). `frontend/` is the reader — **Astro 5 +
+`/api/v1/citation`, `/api/v1/status` (how current the mirror is and when it last checked, ADR-0036),
+and auth + watchlist CRUD (ADR-0017). `frontend/` is the reader — **Astro 5 +
 TypeScript + USWDS** at `/app/us/usc/…` (ADR-0011, ADR-0015), server-rendered with a handful of small
 islands: sticky reading chrome, a version timeline, a reading-text redline (ADR-0026), keyword search,
 hover previews (ADR-0024), one search-and-citation box (ADR-0023), a theme toggle (ADR-0027), and a copy
@@ -27,18 +28,22 @@ control (ADR-0033). Every response carries a cache policy (ADR-0018); every expe
 route is rate-limited (ADR-0029); CSP and frame headers are ADR-0030; accounts and bulk downloads are
 built-and-off in the UI, a UI switch and not a security control (ADR-0034).
 
-`make test` = **475** Python tests; `make test-web` = **194** frontend tests; `make test-e2e` = **82**
+`make test` = **485** Python tests; `make test-web` = **205** frontend tests; `make test-e2e` = **82**
 Playwright tests (**all three are required** — reader coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(34 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(36 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
-Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror,
-weekly corpus update scheduled. **Live state and what is still owed are in
+Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
+**The source is polled daily and every poll is recorded** (ADR-0036): `python -m ingest check` writes a
+`source_checks` row whether it succeeds or fails, runs the full load chain only when OLRC has published
+something new, and `GET /api/v1/status` and `/app/releases` say when the site last looked — a mirror
+that has stopped updating is otherwise indistinguishable from one with nothing to update. A weekly
+`--force` sweep from Actions is the backstop. **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.
 
 **Next: (1) finish the deployment's open items (`docs/deploy-status.md`); (2) Day 7 hardening.**
