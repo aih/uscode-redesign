@@ -1,7 +1,15 @@
-# Weekly corpus refresh on the site box (ADR-0013, ADR-0020). Dispatches
-# deploy/update-corpus.sh over SSM and lets it run there — the chain
-# (inventory -> backfill -> mirror push -> load-all -> verify) can take hours,
-# and SSM keeps running it independent of this job's own runtime.
+# Weekly full corpus sweep on the site box (ADR-0013, ADR-0020, ADR-0036).
+# Dispatches deploy/update-corpus.sh --force over SSM and lets it run there —
+# the chain (inventory -> backfill -> mirror push -> load-all -> verify) can
+# take hours, and SSM keeps running it independent of this job's own runtime.
+#
+# `--force` because this is the backstop, not the primary schedule. The box's
+# own daily cron (deploy/install-crons.sh) is what notices a new release point
+# within a day; this runs the whole chain once a week whether or not anything
+# was published, so a half-finished load or a zip that never reached the mirror
+# is repaired within the week instead of waiting for the next release point to
+# expose it. The two schedules also fail independently — a disabled GitHub
+# schedule leaves the daily check running, and a dead crond leaves this.
 name: Update corpus
 
 on:
@@ -50,7 +58,7 @@ jobs:
           fi
           echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
 
-          REMOTE_CMD="sudo -iu ec2-user bash /home/ec2-user/uscode-redesign/deploy/update-corpus.sh"
+          REMOTE_CMD="sudo -iu ec2-user bash /home/ec2-user/uscode-redesign/deploy/update-corpus.sh --force"
           PARAMS=$(jq -n --arg cmd "$REMOTE_CMD" \
             '{commands: [$cmd], executionTimeout: ["43200"]}')
           COMMAND_ID=$(aws ssm send-command \

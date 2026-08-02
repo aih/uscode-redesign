@@ -75,6 +75,38 @@ alarm uscode-network-out-high \
     "Over ~5 GB out in an hour — more traffic than this demo was sized for" \
     AWS/EC2 NetworkOut Sum 3600 1 5000000000 GreaterThanThreshold "$DIM"
 
+# The one alarm here that is about the *site* rather than the box: has this
+# deployment stopped checking uscode.house.gov for new law? (ADR-0036.)
+#
+# deploy/update-corpus.sh publishes USCode/SourceCheckStale — 0 when the last
+# recorded check is one the site would still call current, 1 when it is not —
+# every day, whether the check succeeded or failed. Two things make this alarm
+# work where the other four would not:
+#
+#   * `--treat-missing-data breaching`, uniquely here. Everywhere else missing
+#     data means "no traffic", which is fine. Here it means the daily job did
+#     not run at all, which is precisely the failure being watched for: a
+#     checker that has stopped publishes nothing, and an alarm that stays quiet
+#     when its metric disappears would be silent for exactly the reason it
+#     exists.
+#   * a one-day period with two evaluation periods, matching the daily cadence.
+#     One missed day is a reboot or a slow load; two is a pattern.
+echo "==> alarm uscode-source-check-stale"
+aws cloudwatch put-metric-alarm \
+    --alarm-name uscode-source-check-stale \
+    --alarm-description "The site has not confirmed with uscode.house.gov that it has every release point — the daily check is failing or has stopped running" \
+    --namespace USCode \
+    --metric-name SourceCheckStale \
+    --statistic Maximum \
+    --period 86400 \
+    --evaluation-periods 2 \
+    --threshold 0 \
+    --comparison-operator GreaterThanThreshold \
+    --dimensions "$DIM" \
+    --alarm-actions "$TOPIC_ARN" \
+    --treat-missing-data breaching \
+    --region "$REGION"
+
 # Disk needs the CloudWatch agent (it publishes CWAgent/disk_used_percent);
 # without the agent installed this alarm sits in INSUFFICIENT_DATA, which
 # treat-missing-data notBreaching keeps quiet rather than noisy.
@@ -95,6 +127,9 @@ aws cloudwatch put-metric-alarm \
     --region "$REGION"
 
 echo
-echo "Done. Confirm the subscription in $ALERT_EMAIL, then test delivery with:"
+echo "Done — but not delivering yet. Confirm the subscription in $ALERT_EMAIL"
+echo "(the link expires after three days), then check that it took:"
+echo "  bash deploy/alerts-status.sh"
+echo "and prove delivery end to end with:"
 echo "  aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \\"
 echo "    --state-value ALARM --state-reason 'testing delivery' --region $REGION"

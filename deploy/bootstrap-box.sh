@@ -121,6 +121,13 @@ ENVEOF
     echo "    because SSM keeps command output)"
 fi
 
+echo "==> schedule"
+# The daily source check, the nightly dump and the weekly purge. Installed here
+# so a rebuilt box arrives with its schedule: a box with no cron looks healthy
+# in every way except that it has quietly stopped checking for new law.
+DATA_ROOT="$DATA_ROOT" REPO_DIR="$REPO_DIR" USC_MIRROR_BUCKET="$USC_MIRROR_BUCKET" \
+    bash "$REPO_DIR/deploy/install-crons.sh"
+
 echo
 echo "Bootstrap complete. Next: deploy/deploy-on-box.sh <sha> to bring the"
 echo "stack up, then seed the database (docs/deploy.md §4)."
