@@ -140,19 +140,45 @@ here** — worth fixing in `ingest/reindex_search.py` (a real server-side cursor
 `first_release_id`), because the same buffering will bite any future full reindex regardless of box
 size.
 
-**Mitigation in place:** the box had no swap at all, so a single batch job peaking above free RAM
-was a kill rather than a slowdown. There is now a **6 GB swapfile** at `/var/lib/uscode/swapfile`
-(in `/etc/fstab`, `vm.swappiness=10`), and the pass has been restarted under
-`systemd-run --unit=uscode-reindex` with `PYTHONUNBUFFERED=1`. Check it with:
+**Fixed, not worked around.** `session.execute(stmt).yield_per(n)` calls `yield_per` on the
+*Result* — by then the query has run and psycopg has buffered every row. Passing it as an execution
+option on the statement is what opens a server-side cursor. Measured against the full local corpus:
+
+| rows | before | after |
+|---|---|---|
+| 20,000 | 562 MB | 258 MB |
+| 40,000 | 996 MB | 281 MB |
+| 60,000 | 1,020 MB, still climbing | 283 MB, flat |
+
+The whole patched `_index_sections` over 80,000 rows peaks at 448 MB. The fix is in **PR #18**
+(`ingest/reindex_search.py`), with all 475 tests passing.
+
+Two things were done to the box along the way and both should stay:
+
+- **A 6 GB swapfile** at `/var/lib/uscode/swapfile` (in `/etc/fstab`, `vm.swappiness=10`). The box
+  had none, so any job peaking above free RAM was a kill rather than a slowdown.
+- **The instance was stopped and started.** With swap in play the runaway process thrashed instead
+  of dying, which starved the SSM agent to `ConnectionLost` — the box was healthy to EC2 and
+  unreachable to everything else. `ec2:RebootInstances` is **not** in the deploy policy (only
+  Start/Stop), which is worth adding. Everything came back on its own: containers restarted, swap
+  remounted from fstab, the Elastic IP stayed attached.
+
+The index is being rebuilt from scratch (`--recreate --all-versions`) with the patched file copied
+into the running container, since the fix is not merged yet. Check it with:
 
 ```bash
 systemctl status uscode-reindex.service
 tail -f /var/lib/uscode/logs/reindex-all.log
 ```
 
-**If it failed again, nothing is broken** — the site works on current text, and a point-in-time
-search answers from current text while naming the release it searched, so the gap is visible rather
-than silent. Fix the streaming and re-run rather than throwing RAM at it.
+**If it is still unfinished or failed, nothing is broken** — but note that `--recreate` wipes the
+index first, so if it died mid-run **search will be empty or partial**. The recovery is to re-run
+it; the 66k current-text pass alone takes about seven minutes:
+
+```bash
+docker compose -f docker-compose.prod.yml exec api \
+  uv run python -m ingest.reindex_search --recreate
+```
 
 ## Still owed
 
