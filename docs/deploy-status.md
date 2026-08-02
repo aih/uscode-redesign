@@ -81,7 +81,11 @@ aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
   --state-value ALARM --state-reason 'testing delivery' --region us-east-1
 ```
 
-**4. Merge the two open PRs** (merging is blocked for the agent by a permission classifier):
+**4. Merge the two open PRs** (merging is blocked for the agent by a permission classifier).
+**Merging fires a deploy, and a deploy recreates the `api` container** — so if the superseded
+reindex is still running it will be killed. That is expected and harmless: the pass is additive, so
+whatever it has indexed stays and search keeps working. Either let it finish first
+(`systemctl is-active uscode-reindex.service`) or merge now and re-run it afterwards.
 
 - **#17** — deploy as `linkedlegislation-deploy`, least-privilege bootstrap policy, AMI lookup
   instead of the SSM alias.
