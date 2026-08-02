@@ -82,6 +82,12 @@
       "Resource": "arn:aws:iam::739065237548:instance-profile/uscode-site"
     },
     {
+      "Sid": "PassRoleIsImplicitInAddRoleToInstanceProfile",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::739065237548:role/uscode-site"
+    },
+    {
       "Sid": "GitHubOidcProvider",
       "Effect": "Allow",
       "Action": [
