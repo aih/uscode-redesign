@@ -44,78 +44,27 @@ against the live host:
 confirmed rather than discovered. It matters the moment a CDN or uptime monitor is put in front,
 because both probe with HEAD by default.
 
-## What you need to do in the morning
+## What is left for you
 
-**Done:** the DNS record is in Route 53, Caddy holds a certificate, and #17 and #18 are merged —
-so the reindex streaming fix is baked into the running image rather than copied into a container.
-**Left: confirm the alarm email** (below), and the verification items under "Still owed".
-
-**1. Add the DNS record.** This is the only thing blocking a working site:
-
-```
-uscode.linkedlegislation.org.   A   52.1.30.78
-```
-
-**2. Once it resolves, restart Caddy** so it retries immediately instead of waiting out its
-backoff. Caddy has been failing ACME against a name that does not exist yet; it backs off
-exponentially (capped at 30 days of retrying), so after DNS is live it could otherwise sit idle
-for up to an hour before trying again:
-
-```bash
-export AWS_PROFILE=uscode-admin AWS_REGION=us-east-1
-aws ssm send-command --instance-ids i-06b433caacd78fd96 \
-  --document-name AWS-RunShellScript \
-  --parameters 'commands=["cd /home/ec2-user/uscode-redesign && docker compose -f docker-compose.prod.yml restart proxy"]'
-```
-
-Then, within a minute or two:
-
-```bash
-curl -sS -o /dev/null -w '%{http_code}\n' https://uscode.linkedlegislation.org/health
-```
-
-The half of this that does not depend on you has already been checked: from off the box, with the
-hostname forced to the Elastic IP, **port 80 answers and redirects correctly**
-(`308 → https://uscode.linkedlegislation.org/health`), which is the path Let's Encrypt's HTTP-01
-challenge uses. So the security group, Caddy's routing and the redirect are all confirmed working
-from the public internet — the certificate is waiting on the DNS record and nothing else. HTTPS
-currently fails the handshake outright, which is what "no certificate yet" looks like rather than a
-misconfiguration:
-
-```bash
-# what was run, and what it said
-curl -sk --resolve uscode.linkedlegislation.org:443:52.1.30.78 ... # status=000 (no cert yet)
-curl -s  --resolve uscode.linkedlegislation.org:80:52.1.30.78  ... # status=308 → https://...
-```
-
-**3. Confirm the alarm email.** AWS sent a subscription confirmation to
-`arihershowitz@gmail.com` for the `uscode-alerts` SNS topic. **Until you click it, every alarm
-is silent** — an unconfirmed topic fails quietly, which looks exactly like nothing being wrong.
-
-All five alarms exist and point at the topic. Four read `OK`; **`uscode-cpu-credits-low` reads
-`ALARM`, and that is the alarm being right rather than a fault** — a t4g.large earns CPU credits
-while idle and spends them under load, and this box has spent the night restoring 22 GB and
-indexing half a million documents. It should clear once the box is only serving pages. If it is
-still in alarm after a quiet day, that is the signal the instance is undersized for what is being
-asked of it. Prove delivery afterwards:
+**One thing: confirm the alarm email.** AWS sent a subscription confirmation to
+`arihershowitz@gmail.com` for the `uscode-alerts` SNS topic. **Until you click it every alarm is
+silent** — an unconfirmed topic fails quietly, which looks exactly like nothing being wrong. Prove
+delivery afterwards:
 
 ```bash
 aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
   --state-value ALARM --state-reason 'testing delivery' --region us-east-1
 ```
 
-**4. Merge the two open PRs** (merging is blocked for the agent by a permission classifier).
-**Merging fires a deploy, and a deploy recreates the `api` container** — so if the superseded
-reindex is still running it will be killed. That is expected and harmless: the pass is additive, so
-whatever it has indexed stays and search keeps working. Either let it finish first
-(`systemctl is-active uscode-reindex.service`) or merge now and re-run it afterwards.
+All five alarms exist and point at the topic. Four read `OK`; **`uscode-cpu-credits-low` reads
+`ALARM`, and that is the alarm being right rather than a fault** — a t4g.large earns CPU credits
+while idle and spends them under load, and this box spent a night restoring 22 GB and indexing half
+a million documents. It should clear now that it only serves pages. If it is still in alarm after a
+quiet day, that is the signal the instance is undersized for what is being asked of it.
 
-- **#17** — deploy as `linkedlegislation-deploy`, least-privilege bootstrap policy, AMI lookup
-  instead of the SSM alias.
-- **#18** — the three fixes the first real deploy found (compose plugin, SSM polling, OIDC trust).
-
-Both are already applied by hand to the live box and the live IAM role; merging makes a rebuild
-reproduce them rather than repeat the debugging.
+Everything else that needed a human is done: the Route 53 A record exists, Caddy holds a
+certificate, and #17 and #18 are merged — so the reindex streaming fix is baked into the running
+image rather than copied into a container.
 
 ## What is already done
 
