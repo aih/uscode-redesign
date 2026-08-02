@@ -3,13 +3,19 @@
 #
 #   AWS_PROFILE=<admin> bash deploy/admin-grant.sh
 #
+# "Admin" here means only the 21 IAM actions this script calls, all of them
+# scoped to uscode-* names — admin-grant-bootstrap-policy.json is exactly that
+# set, for an account where nobody wants to hand out AdministratorAccess to
+# run a setup script. Attach it, run this, detach it: nothing in the ongoing
+# deploy path needs IAM write.
+#
 # Creates the IAM surface deploy/update-corpus.yml, deploy-on-box.sh and
 # update-corpus.sh need, and nothing more:
 #
-#   - group `uscode-deploy` + policy `uscode-deploy-policy`, with the existing
-#     deploy user `weather-deploy` added to it (day-to-day human/CI provisioning
-#     and operational access — EC2, ECR, S3, SSM, CloudWatch/SNS, a scoped
-#     PassRole)
+#   - group `uscode-deploy` + policy `uscode-deploy-policy`, with $DEPLOY_USER
+#     added to it (day-to-day human/CI provisioning and operational access —
+#     EC2, ECR, S3, SSM, CloudWatch/SNS, a scoped PassRole). Defaults to
+#     `linkedlegislation-deploy`; set DEPLOY_USER to point it elsewhere.
 #   - role + instance profile `uscode-site` (ADR-0020's box): SSM core, S3
 #     read on the mirror plus write under usc/* (the site is now the mirror's
 #     one writer per ADR-0013's handoff), ECR pull, CloudWatch agent metrics
@@ -28,7 +34,10 @@ REGION="us-east-1"
 GITHUB_REPO="aih/uscode-redesign"
 DEPLOY_GROUP="uscode-deploy"
 DEPLOY_POLICY_NAME="uscode-deploy-policy"
-DEPLOY_USER="weather-deploy"
+# The IAM user that does day-to-day provisioning and operations. Overridable
+# because the account is shared and the right identity is a per-deployment
+# choice, not a property of this script.
+DEPLOY_USER="${DEPLOY_USER:-linkedlegislation-deploy}"
 SITE_ROLE="uscode-site"
 SITE_INSTANCE_PROFILE="uscode-site"
 SITE_INLINE_POLICY="uscode-site-access"
@@ -511,5 +520,6 @@ echo "       --iam-instance-profile Name=${SITE_INSTANCE_PROFILE}"
 echo "       --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=uscode-site}]'"
 echo "  3. Create the ECR repositories uscode-api / uscode-frontend if the"
 echo "     first deploy.yml run doesn't create them automatically."
-echo "  4. Confirm weather-deploy (in ${DEPLOY_GROUP}) can assume whatever it"
-echo "     needs for day-to-day provisioning; ${GITHUB_ROLE} is CI-only."
+echo "  4. Confirm ${DEPLOY_USER} (in ${DEPLOY_GROUP}) can do day-to-day"
+echo "     provisioning — it needs an access key configured locally as an AWS"
+echo "     profile; ${GITHUB_ROLE} is CI-only and assumed by Actions."
