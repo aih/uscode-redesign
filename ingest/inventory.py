@@ -408,11 +408,33 @@ def poll_source(
         record_source_check(session, source_url=url, ok=False, error=f"{type(exc).__name__}: {exc}")
         return CheckResult(ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}")
 
+    # Computed BEFORE seeding, or seeding would make every label look known.
+    known = {label for label in session.scalars(select(ReleasePoint.label))}
+
+    # A release point never leaves the page. If one we already hold is missing,
+    # this is a truncated response or a changed page — not news — and acting on
+    # it would be destructive rather than merely wrong: `seed_release_points`
+    # renumbers `seq` across the whole table, and a row absent from `entries`
+    # keeps the large temporary offset it was given to avoid a unique-constraint
+    # collision. That silently breaks the global ordering every release
+    # comparison depends on (labels do not sort — gotcha 4). Refuse, and record
+    # it as a failed check, because a page we will not act on is a page we did
+    # not successfully read.
+    seen = {entry.label for entry in entries}
+    vanished = sorted(known - seen)
+    if vanished:
+        error = (
+            f"{len(vanished)} release point(s) this database holds are missing from "
+            f"the page ({', '.join(vanished[:5])}"
+            f"{', …' if len(vanished) > 5 else ''}) — refusing to reseed from a "
+            "page that looks truncated"
+        )
+        record_source_check(session, source_url=url, ok=False, error=error)
+        return CheckResult(ok=False, entries=[], new_labels=(), error=error)
+
     if out_path is not None:
         write_inventory(entries, out_path, source_url=url)
 
-    # Computed BEFORE seeding, or seeding would make every label look known.
-    known = {label for label in session.scalars(select(ReleasePoint.label))}
     new_labels = tuple(entry.label for entry in entries if entry.label not in known)
 
     inserted = updated = 0

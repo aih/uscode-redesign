@@ -83,31 +83,47 @@ def session(loaded_database):
         session.close()
 
 
-def _fake_page(label: str = "999-1") -> str:
+def _entry(label: str, date: str = "01/02/2099") -> str:
+    """One `<li>` in OLRC's markup. The href path is the label with `-` → `/`,
+    which is the real transformation (`ingest.inventory.title_zip_url`)."""
+    path = label.replace("-", "/", 1)
     return (
         '<li class="releasepoint"><a class="releasepoint" '
-        f'href="releasepoints/us/pl/999/1/usc-rp@{label}.htm">'
-        "Public Law 999-1 (01/02/2099), affecting title 16</a></li>"
+        f'href="releasepoints/us/pl/{path}/usc-rp@{label}.htm">'
+        f"Public Law {label} ({date}), affecting title 16</a></li>"
     )
+
+
+def _page_of_known(session, *extra: str) -> str:
+    """A page carrying every release point this database already holds, plus any
+    extras — the shape a real fetch always has, since a release point never
+    leaves OLRC's list."""
+    from sqlalchemy import select
+
+    from db.models import ReleasePoint
+
+    known = list(session.scalars(select(ReleasePoint.label).order_by(ReleasePoint.seq.desc())))
+    return "\n".join(_entry(label) for label in [*extra, *known])
 
 
 @pytest.mark.integration
 def test_a_successful_poll_records_the_check(session, monkeypatch):
-    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: _fake_page())
+    page = _page_of_known(session)
+    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: page)
 
     result = inventory_mod.poll_source(session, out_path=None, seed=False)
     session.flush()
 
     assert result.ok
-    assert result.entries[-1].label == "999-1"
+    assert result.new_labels == ()
 
     from storage.postgres import PostgresRepository
 
     check = PostgresRepository(session).last_source_check()
     assert check is not None
     assert check.ok
-    assert check.release_points_seen == 1
-    assert check.latest_label == "999-1"
+    assert check.release_points_seen == len(result.entries)
+    assert check.latest_label == result.entries[-1].label
     assert not check.is_stale()
 
 
@@ -115,7 +131,8 @@ def test_a_successful_poll_records_the_check(session, monkeypatch):
 def test_a_poll_reports_release_points_the_database_has_never_seen(session, monkeypatch):
     """`999-1` is fabricated, so it is new by construction — which is what the
     daily schedule keys off to decide whether to run the full update."""
-    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: _fake_page())
+    page = _page_of_known(session, "999-1")
+    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: page)
 
     result = inventory_mod.poll_source(session, out_path=None, seed=False)
 
@@ -144,6 +161,33 @@ def test_a_failed_poll_still_records_the_attempt(session, monkeypatch):
     assert check.release_points_seen is None  # not zero — the page never parsed
     assert "connection reset" in (check.error or "")
     assert check.is_stale()
+
+
+@pytest.mark.integration
+def test_a_page_missing_release_points_we_already_hold_is_refused(session, monkeypatch):
+    """A release point never leaves OLRC's page, so one going missing means a
+    truncated response — and acting on it is destructive, not merely wrong.
+
+    `seed_release_points` renumbers `seq` across the whole table; a row absent
+    from the entries keeps the large temporary offset it was given to dodge the
+    unique constraint, which silently breaks the global ordering every release
+    comparison depends on. The fabricated page below lists one release point and
+    the database holds hundreds, which is exactly that shape.
+    """
+    monkeypatch.setattr(
+        inventory_mod, "fetch_inventory_html", lambda url, **kw: _entry("999-1")
+    )
+
+    result = inventory_mod.poll_source(session, out_path=None, seed=True)
+    session.flush()
+
+    assert not result.ok
+    assert "missing from the page" in (result.error or "")
+
+    from storage.postgres import PostgresRepository
+
+    check = PostgresRepository(session).last_source_check()
+    assert check is not None and not check.ok
 
 
 @pytest.mark.integration
