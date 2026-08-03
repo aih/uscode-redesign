@@ -130,6 +130,17 @@ services:
       # the image is the source of truth, unlike the dev bind mount.
       - ${DATA_ROOT:-/var/lib/uscode}/releases:/app/data/releases
       - ${DATA_ROOT:-/var/lib/uscode}/manifests:/app/data/manifests
+      # The demo video (ADR-0038), served same-origin at /static/demo/. It is a
+      # generated artifact and is gitignored, so it is not in the image and
+      # cannot be: the image is built by Actions from a checkout, and the video
+      # is recorded on a workstation against a fully loaded corpus. It arrives
+      # here from S3 instead (`deploy/publish-demo.sh`), which is the same path
+      # the corpus itself takes (ADR-0013).
+      #
+      # Read-only, and empty until someone publishes one — `/app/demo` is
+      # written to degrade to a "download it instead" message rather than a
+      # broken player, so an unpublished video costs a page nothing.
+      - ${DATA_ROOT:-/var/lib/uscode}/demo:/app/static/demo:ro
     restart: unless-stopped
     # No --reload: the image is what runs.
     command:

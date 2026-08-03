@@ -1,0 +1,74 @@
+---
+/**
+ * `/app/demo` — the guide's demo video, on the site it is a video of.
+ *
+ * Same origin, deliberately. The CSP declares no `media-src`, so it falls back
+ * to `default-src 'self'` and a same-origin file plays while a third-party
+ * embed would not (ADR-0030) — and the project has already answered this class
+ * of question once, in ADR-0032, by vendoring 2.4 MB of Swagger UI rather than
+ * loading it from a CDN. A video is the same trade at 3 MB: one origin, no
+ * third party watching the reader, no dependency that can change what it serves.
+ *
+ * The assets are generated (`make demo-video`) and are not in the image: they
+ * arrive on a mounted volume in production and are written straight into
+ * `static/demo/` in development. So this page is written to be worth loading
+ * when they are absent — the fallback inside `<video>` is what a reader gets
+ * before anyone has published one, and it says so rather than showing a broken
+ * player.
+ */
+import Base from "../layouts/Base.astro";
+import { setPublicCache } from "../lib/cache";
+import { APP } from "../lib/url";
+import { chapters } from "../lib/guide";
+
+setPublicCache(Astro.response.headers, null, false);
+
+const MP4 = "/static/demo/uscode-demo.mp4";
+const VTT = "/static/demo/uscode-demo.vtt";
+const POSTER = "/static/demo/poster.png";
+
+const guideChapters = chapters();
+---
+
+<Base title="Watch the demo · U.S. Code">
+  <h1 class="doc-title">Watch the demo</h1>
+
+  <p class="lede">
+    Under three minutes through the site: a citation, a release point, a version history, a
+    redline, the search box, the copy control and a hover preview.
+  </p>
+
+  {/* `preload="none"` because most visitors to this page will read the list
+      below it and leave, and a 3 MB fetch on arrival is the kind of cost a
+      single small box pays for every one of them. The poster is 30 KB. */}
+  <video class="demo__video" controls preload="none" poster={POSTER} width="1280" height="720">
+    <source src={MP4} type="video/mp4" />
+    <track kind="captions" src={VTT} srclang="en" label="English" default />
+    <p>
+      Your browser cannot play this video.
+      <a href={MP4}>Download it</a> instead, or read the same walkthrough in the{" "}
+      <a href={`${APP}/guide`}>user guide</a> — the video is recorded from it.
+    </p>
+  </video>
+
+  <p class="doc-meta">
+    Captions are on by default. Every scene is a walkthrough from the{" "}
+    <a href={`${APP}/guide`}>user guide</a>, and the captions are the guide's own sentences — the
+    video is generated from it, so the two cannot disagree.
+  </p>
+
+  <h2 class="toc-group">What the guide covers</h2>
+
+  <ul class="toc">
+    {
+      guideChapters.map((chapter) => (
+        <li>
+          <a href={chapter.href}>
+            <span class="toc__num">{chapter.order}</span>
+            <span class="toc__heading">{chapter.title}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</Base>

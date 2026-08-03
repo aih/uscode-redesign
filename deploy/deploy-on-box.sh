@@ -60,6 +60,16 @@ docker compose -f docker-compose.prod.yml up -d --wait db opensearch
 echo "=== migrating (new image, before it serves) ==="
 docker compose -f docker-compose.prod.yml run --rm --no-deps api uv run alembic upgrade head
 
+# The demo video (ADR-0038), from S3 onto the volume the api container mounts
+# at /app/static/demo. Before the stack comes up, so a deploy that publishes a
+# new video serves it from the first request rather than the second.
+#
+# Never fatal: the assets are optional, the script says so per file, and
+# `/app/demo` is written to degrade to a download link. A site that failed to
+# deploy because nobody had recorded a demo would be a poor trade.
+echo "=== fetching the demo video, if one is published ==="
+bash deploy/publish-demo.sh --fetch || echo "(no demo video; continuing)"
+
 echo "=== bringing the stack up ==="
 docker compose -f docker-compose.prod.yml up -d --wait
 

@@ -3,10 +3,17 @@
   "site": "http://localhost:8000",
   "scenes": [
     {
+      "id": "title-card",
+      "title": "The United States Code, at any release point",
+      "startMs": 0,
+      "durationMs": 3500,
+      "captions": []
+    },
+    {
       "id": "front-page-titles",
       "title": "Open a title from the front page",
-      "startMs": 0,
-      "durationMs": 11167,
+      "startMs": 3500,
+      "durationMs": 11067,
       "captions": [
         "Every provision of the US Code has an address — at every point in time it has existed.",
         "The front page lists the titles that are loaded."
@@ -15,8 +22,8 @@
     {
       "id": "section-by-address",
       "title": "Open a section by its citation",
-      "startMs": 11167,
-      "durationMs": 9600,
+      "startMs": 14567,
+      "durationMs": 9633,
       "captions": [
         "The citation is the URL. This is 16 U.S.C. § 45f.",
         "The section, with its number and heading as the Code prints them."
@@ -25,8 +32,8 @@
     {
       "id": "provision-in-context",
       "title": "A subsection is shown inside its whole section",
-      "startMs": 20767,
-      "durationMs": 9633,
+      "startMs": 24200,
+      "durationMs": 9600,
       "captions": [
         "Ask for subsection (c)(5) —",
         "— and it is highlighted inside the whole section, never stranded out of context."
@@ -35,7 +42,7 @@
     {
       "id": "neighbors-next",
       "title": "Move to the next section from the sticky bar",
-      "startMs": 30400,
+      "startMs": 33800,
       "durationMs": 12000,
       "captions": [
         "Reading order is preserved, so you can move through a chapter section by section.",
@@ -46,8 +53,8 @@
     {
       "id": "release-pin",
       "title": "Read a section as it stood at a named release point",
-      "startMs": 42400,
-      "durationMs": 12733,
+      "startMs": 45800,
+      "durationMs": 12800,
       "captions": [
         "Add ?release= to any address to read it as it stood at that release point.",
         "The page names the release point it answered from — every page does."
@@ -56,8 +63,8 @@
     {
       "id": "date-resolves",
       "title": "A date resolves to the release point in force then",
-      "startMs": 55133,
-      "durationMs": 10633,
+      "startMs": 58600,
+      "durationMs": 10533,
       "captions": [
         "Or ask by date, and the site finds the release point in force then.",
         "12 July 2026 resolves to release point 119-102not101."
@@ -66,8 +73,8 @@
     {
       "id": "versions-timeline",
       "title": "See every release point at which a section's text changed",
-      "startMs": 65767,
-      "durationMs": 14000,
+      "startMs": 69133,
+      "durationMs": 13867,
       "captions": [
         "The version history: one entry per distinct text, not one per release point.",
         "Each entry says when that text first appeared, and what it stood unchanged through."
@@ -76,8 +83,8 @@
     {
       "id": "diff-real-change",
       "title": "Compare two release points and see what the words did",
-      "startMs": 79767,
-      "durationMs": 12467,
+      "startMs": 83000,
+      "durationMs": 12367,
       "captions": [
         "A redline between any two release points, in the reading text.",
         "Removed words struck through, added words underlined — the amendment, not the markup."
@@ -86,8 +93,8 @@
     {
       "id": "citation-box",
       "title": "Type a citation and land on the provision",
-      "startMs": 92233,
-      "durationMs": 14000,
+      "startMs": 95367,
+      "durationMs": 13667,
       "captions": [
         "One box takes a citation or a phrase — you do not have to say which.",
         "Type a citation in more or less any written form.",
@@ -98,8 +105,8 @@
     {
       "id": "keyword-search",
       "title": "Search the text of the Code",
-      "startMs": 106233,
-      "durationMs": 11667,
+      "startMs": 109033,
+      "durationMs": 11567,
       "captions": [
         "Anything that is not a citation searches the text of the Code.",
         "Matches are highlighted, and each result says where it sits in the Code."
@@ -108,7 +115,7 @@
     {
       "id": "copy-whole-section",
       "title": "Copy a whole section",
-      "startMs": 117900,
+      "startMs": 120600,
       "durationMs": 14167,
       "captions": [
         "Every provision has a copy control, and the whole section has its own button.",
@@ -119,7 +126,7 @@
     {
       "id": "hover-preview",
       "title": "Read a cross reference without losing your place",
-      "startMs": 132067,
+      "startMs": 134767,
       "durationMs": 13033,
       "captions": [
         "Statutory text is full of references to other statutory text.",
@@ -130,7 +137,7 @@
     {
       "id": "theme-toggle",
       "title": "Switch the site to dark",
-      "startMs": 145100,
+      "startMs": 147800,
       "durationMs": 12467,
       "captions": [
         "Light by default at every OS setting — this is a reading site.",
@@ -139,5 +146,5 @@
       ]
     }
   ],
-  "totalMs": 157567
+  "totalMs": 160267
 }

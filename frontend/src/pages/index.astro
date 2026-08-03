@@ -2,7 +2,7 @@
 /** `/app/` — the front page: what is loaded, and the demo citation. */
 import Base from "../layouts/Base.astro";
 import { fetchTitles } from "../lib/api";
-import { appHref } from "../lib/url";
+import { APP, appHref } from "../lib/url";
 
 const titles = await fetchTitles();
 const DEMO = "/us/usc/t16/s45f/c/5?date=07/12/2026";
@@ -29,6 +29,14 @@ function releaseCount(n: number): string {
       </div>
     </div>
   </div>
+
+  {/* The two ways in for someone who has not used the site before: watch it, or
+      read it. Both lead to the same material — the video is recorded from the
+      guide (ADR-0038) — so this is one destination offered at two lengths. */}
+  <p class="frontways">
+    New here? <a href={`${APP}/demo`}>Watch the three-minute demo</a> or read the{" "}
+    <a href={`${APP}/guide`}>user guide</a>.
+  </p>
 
   <p class="toc-group">Titles loaded</p>
   <ul class="toc">

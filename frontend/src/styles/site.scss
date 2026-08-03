@@ -2643,3 +2643,27 @@ main[id] {
 .guide__pagertitle {
   text-decoration: underline;
 }
+
+/* --------------------------------------------------------------- /app/demo
+ *
+ * The video is recorded at 1280×720 and must never be wider than the column it
+ * sits in; `height: auto` keeps the aspect ratio while `width: 100%` takes the
+ * measure, which is what stops a phone scrolling sideways on this page. */
+.demo__video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  background: #000;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  margin: 0 0 0.75rem;
+}
+
+/* The front page's two ways in — watch the demo, or read the guide. Sits
+ * directly under the "Try a citation" box, so it needs to read as a quieter
+ * offer than the box above it rather than as a second call to action. */
+.frontways {
+  margin: 0.75rem 0 1.5rem;
+  color: var(--muted);
+}

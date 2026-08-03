@@ -10,10 +10,18 @@
  *   make demo-video                       # against http://localhost:8000 (make dev-all)
  *   SITE=http://localhost:4321 node scripts/demovideo.mjs
  *
- * Output (`docs/demo/`): `uscode-demo.mp4`, gitignored — a video binary does
- * not belong in a history meant to be read — plus `uscode-demo.vtt` and
- * `scenes.json`, which are committed, so what the video *says* is reviewable in
- * a diff even though the file itself is regenerated.
+ * Output, in two places with two jobs:
+ *
+ *   static/demo/   the servable assets — `uscode-demo.mp4`, `uscode-demo.vtt`,
+ *                  `poster.png`. All generated, all gitignored: a video binary
+ *                  does not belong in a history meant to be read. FastAPI
+ *                  mounts `static/` at `/static`, so a local run is watchable
+ *                  at /static/demo/uscode-demo.mp4 immediately. In production
+ *                  the same three files arrive from S3 onto a mounted volume
+ *                  (`deploy/publish-demo.sh`).
+ *   docs/demo/     `scenes.json`, committed — every scene, its timing and its
+ *                  captions. What the video *says* stays reviewable in a diff
+ *                  even though the video itself is regenerated.
  *
  * Playwright records one webm per browser context and gives no control over
  * where a frame lands in it, so a scene is a context: that is what makes the
@@ -34,8 +42,11 @@ import { chromium } from "playwright";
 import { demoScenes, describeStep } from "./scenarios.mjs";
 
 const SITE = process.env.SITE ?? "http://localhost:8000";
-const OUT = fileURLToPath(new URL("../../docs/demo/", import.meta.url));
-const WORK = fileURLToPath(new URL("../../docs/demo/scenes/", import.meta.url));
+/** The servable assets, under the directory FastAPI mounts at `/static`. */
+const OUT = fileURLToPath(new URL("../../static/demo/", import.meta.url));
+/** The committed record of what the video says. */
+const DOCS = fileURLToPath(new URL("../../docs/demo/", import.meta.url));
+const WORK = fileURLToPath(new URL("../../static/demo/scenes/", import.meta.url));
 
 /** 720p. Big enough to read statutory text in, small enough to attach. */
 const SIZE = { width: 1280, height: 720 };
@@ -46,6 +57,51 @@ const SIZE = { width: 1280, height: 720 };
 const MIN_CAPTION_MS = 2500;
 const PER_CHAR_MS = 60;
 const captionMs = (text) => Math.max(MIN_CAPTION_MS, text.length * PER_CHAR_MS);
+
+/** How long the title card holds before the first scene. */
+const TITLE_MS = 3500;
+
+/**
+ * The title card, rendered in the browser rather than drawn by ffmpeg.
+ *
+ * `drawtext` would need a font path, would not have the site's reading face,
+ * and would put the one frame a viewer judges the whole video by outside the
+ * design system everything after it belongs to. This is the site's own
+ * typography and its own navy, screenshotted — and because it is a page, it
+ * can be looked at in a browser while being worked on.
+ */
+const TITLE_CARD = `
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #ffffff;
+    color: #1b1b1b;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    text-align: center;
+  }
+  .rule { width: 4rem; height: 4px; background: #005ea2; margin: 0 0 2rem; }
+  h1 {
+    font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    font-size: 54px; line-height: 1.15; font-weight: 700;
+    margin: 0 0 1rem; max-width: 22ch;
+  }
+  p { font-size: 24px; color: #565c65; margin: 0; max-width: 40ch; line-height: 1.4; }
+  .foot {
+    position: absolute; bottom: 48px;
+    font-size: 17px; color: #71767a;
+    max-width: none; /* the prose measure above would break this onto two lines */
+  }
+  code { font-size: 0.95em; }
+</style>
+<div class="rule"></div>
+<h1>The United States Code, at any release point</h1>
+<p>Every provision has an address — at every point in time it has existed.</p>
+<p class="foot">uscode.linkedlegislation.org · a conceptual redesign, not an official publication</p>
+`;
 
 /** The caption bar, installed via `addInitScript` so it survives navigation —
  * every scene navigates at least once, and a bar injected per page would blink
@@ -192,9 +248,25 @@ if (wantsCorpus && process.env.GUIDE_CORPUS !== "1") {
 
 await rm(WORK, { recursive: true, force: true });
 await mkdir(WORK, { recursive: true });
+await mkdir(OUT, { recursive: true });
 
 const browser = await chromium.launch();
 const recorded = [];
+
+// The title card first, as a still. It is a screenshot held for a few seconds
+// rather than a recorded scene, because there is nothing in it that moves and
+// a recording of a static page is a much larger file saying the same thing.
+const titlePng = `${WORK}00-title.png`;
+{
+  const context = await browser.newContext({ viewport: SIZE, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  await page.setContent(TITLE_CARD, { waitUntil: "load" });
+  await page.screenshot({ path: titlePng });
+  // The same still is the poster the player shows before you press play.
+  await page.screenshot({ path: `${OUT}poster.png` });
+  await context.close();
+  console.log("▶ 00-title: The United States Code, at any release point");
+}
 
 try {
   for (const [index, scene] of scenes.entries()) {
@@ -253,9 +325,30 @@ if (recorded.length === 0) {
 
 // ------------------------------------------------------------------ stitch
 
-console.log(`\nNormalising ${recorded.length} scene(s)…`);
+console.log(`\nNormalising a title card and ${recorded.length} scene(s)…`);
 
 const parts = [];
+
+// The still, encoded to the same format as everything else so the concat
+// demuxer will take it.
+const titleMp4 = `${WORK}00-title.mp4`;
+ffmpeg([
+  "-y", "-loop", "1", "-i", titlePng,
+  "-t", String(TITLE_MS / 1000),
+  "-r", "30",
+  "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
+  "-pix_fmt", "yuv420p",
+  "-vf", `scale=${SIZE.width}:${SIZE.height}`,
+  "-an", titleMp4,
+]);
+parts.push({
+  id: "title-card",
+  title: "The United States Code, at any release point",
+  mp4: titleMp4,
+  captions: [],
+  duration: TITLE_MS,
+});
+
 for (const [index, scene] of recorded.entries()) {
   const mp4 = `${WORK}${String(index + 1).padStart(2, "0")}-${scene.id}.mp4`;
   // Re-encoded to a common format rather than concatenated as-is: the webm
@@ -275,7 +368,6 @@ for (const [index, scene] of recorded.entries()) {
 const listPath = `${WORK}concat.txt`;
 await writeFile(listPath, parts.map((part) => `file '${part.mp4}'`).join("\n"), "utf8");
 
-await mkdir(OUT, { recursive: true });
 const finalPath = `${OUT}uscode-demo.mp4`;
 ffmpeg(["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", finalPath]);
 
@@ -333,8 +425,9 @@ const vtt = [
 ].join("\n");
 
 await writeFile(`${OUT}uscode-demo.vtt`, vtt, "utf8");
+await mkdir(DOCS, { recursive: true });
 await writeFile(
-  `${OUT}scenes.json`,
+  `${DOCS}scenes.json`,
   `${JSON.stringify(
     {
       note:
@@ -357,5 +450,5 @@ await rm(WORK, { recursive: true, force: true });
 
 console.log(
   `\n${finalPath}\n${Math.round(offset / 1000)}s, ${parts.length} scene(s), ${cues.length} captions` +
-    `\n${OUT}uscode-demo.vtt\n${OUT}scenes.json`,
+    `\n${OUT}uscode-demo.vtt\n${OUT}poster.png\n${DOCS}scenes.json`,
 );

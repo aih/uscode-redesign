@@ -4,7 +4,7 @@ title: What this site is
 order: 1
 summary: A reader for the United States Code where every provision has an address, at every point in time it has existed.
 covers:
-  routes: ["/app/", "/app/about"]
+  routes: ["/app/", "/app/about", "/app/demo"]
   adrs: [37, 38]
 ---
 
@@ -57,6 +57,21 @@ crawler, because the addressable space — 65,938 sections across 382 release po
 between any two of them — is effectively unbounded, and two AI crawlers walking it drove 43,068
 requests in an hour against roughly 48 from human browsers. That is a decision about a demo, and it
 is written down with the traffic that prompted it in ADR-0037.
+
+## Watch it instead
+
+There is a [three-minute demo](/app/demo) of the site — a citation, a release point, a version
+history, a redline, the search box, the copy control and a hover preview. It is recorded from this
+guide: every scene is one of the walkthroughs below, and the captions are the guide's own sentences,
+so the video cannot show you something the guide does not describe.
+
+```scenario
+id: demo-page
+title: The demo video is on the site
+steps:
+  - goto: /app/demo
+  - expect: { selector: "video", visible: true }
+```
 
 ## About this guide
 

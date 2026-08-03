@@ -81,6 +81,21 @@ The step vocabulary is deliberately small — `goto`, `click`, `fill`, `press`, 
 `scroll`, `expect`, `pause` — and the scenarios are journey-level. The hand-written specs keep the
 assertions a DSL should not try to carry.
 
+**The video is served from this origin, and travels there the way the corpus does.** It plays at
+`/app/demo` from `/static/demo/uscode-demo.mp4`, which is the only arrangement that needs no change
+to the CSP: ADR-0030 declares no `media-src`, so media falls back to `default-src 'self'` and a
+same-origin file plays while a YouTube or CloudFront embed would be blocked outright. Relaxing that
+for a demo would be a poor trade, and this project has already answered the same question once —
+ADR-0032 vendored 2.4 MB of Swagger UI rather than load it from a CDN, for the same reason.
+
+The assets cannot be in the image: they are recorded on a workstation against the full corpus,
+Actions has neither the corpus nor ffmpeg nor a running site, and a 3 MB binary regenerated per demo
+does not belong in the history. So they go workstation → S3 → box (`deploy/publish-demo.sh`), which
+is the path the corpus itself already takes under ADR-0013, and the box mounts them read-only at
+`/app/static/demo`. **This needs no new credentials:** the upload uses the mirror identity that
+already has `s3:PutObject` on `usc/*`, and the fetch uses the instance role, which already carries
+`s3:GetObject`/`s3:ListBucket` on the whole bucket for `mirror pull`.
+
 ## Consequences
 
 **Good.** A claim in the guide is executed on every push, so the guide cannot drift from the site
@@ -103,10 +118,17 @@ as a side effect of writing prose, which is the cheapest way it was ever going t
   against the full corpus. A `data: corpus` scenario is therefore a weaker claim than a default
   one, and the guide does not distinguish the two for the reader.
 - **The video is a local artifact, not a CI-reproduced one.** `make demo-video` needs ffmpeg and a
-  running site, and the mp4 is gitignored — video binaries do not belong in a git history that is
-  meant to be read. The scene manifest and the caption track are committed, so what the video says
-  is reviewable in a diff, but whether the current mp4 matches the current guide is not enforced by
-  anything. Regenerating it is a step in the release checklist, not a gate.
+  running site, and everything it writes to `static/demo/` is gitignored — video binaries do not
+  belong in a git history that is meant to be read. `docs/demo/scenes.json` is committed, so what
+  the video says is reviewable in a diff, but whether the deployed mp4 matches the current guide is
+  not enforced by anything. Regenerating and re-publishing it is a step in the release checklist,
+  not a gate — and because it is a manual step, the video is the one part of this design that can
+  still go stale. That is the residual of the problem this ADR set out to solve, and it is named
+  here rather than papered over.
+- **Serving it costs the box bandwidth.** 3 MB per view from a single small instance, which is
+  nothing at demo traffic and would not be at scale. `preload="none"` on the player means a visitor
+  who does not press play pays for a 42 KB poster instead. If it ever matters, the answer is a CDN
+  in front of the same origin, not a third-party embed.
 - **The ratchet will annoy someone.** Adding a reader page now means editing a guide chapter in the
   same commit, and adding an ADR means classifying it. That is the intended cost — it is the only
   mechanism here that survives the author's attention — but it is a real tax on small changes, and
