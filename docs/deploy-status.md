@@ -375,11 +375,33 @@ ran green on `workflow_dispatch`.
 Nothing is genuinely blocking, and exactly one thing is worth doing when someone has an admin
 profile to hand:
 
-- **Set an S3 lifecycle rule on `usc/db/`** — much less urgent than it was (see "The backup follows
-  the data" below), but still unbounded in principle. The box deliberately cannot do this itself:
-  the instance role has `s3:PutObject` on `usc/*` and **no `s3:DeleteObject`**, so the one writer of
-  the corpus of record cannot delete it, which is worth keeping. The deploy user cannot even read
-  the current setting (`s3:GetLifecycleConfiguration` is not in its policy).
+- **Set the S3 lifecycle rule on `usc/db/`** — much less urgent than it was (see "The backup follows
+  the data" below), but still unbounded in principle. The script is written and tested; it just
+  needs an admin profile:
+
+  ```bash
+  AWS_PROFILE=<admin> DRY_RUN=1 bash deploy/mirror-lifecycle.sh   # print, change nothing
+  AWS_PROFILE=<admin> bash deploy/mirror-lifecycle.sh             # apply
+  ```
+
+  Defaults: current dumps expire after 365 days (~30 of them at the new rate, ~66 GB, on the order
+  of $1.50/month), noncurrent versions after 30, incomplete multipart uploads after 7. Override with
+  `EXPIRE_AFTER_DAYS` / `NONCURRENT_AFTER_DAYS`.
+
+  **Why it is a script and not a one-liner:** `put-bucket-lifecycle-configuration` **replaces** a
+  bucket's entire configuration rather than merging into it, and this bucket holds the corpus of
+  record (ADR-0013) beside the dumps. An unscoped expiry rule here would delete the 9.7 GB of
+  release-point zips that make the corpus reproducible at all, and would look like a working
+  retention policy right up until it did. Every rule is scoped to `usc/db/`, and the script refuses
+  to overwrite a configuration it did not write. It also refuses when it cannot *read* the current
+  one — writing it caught that bug in its own first draft, where `|| true` collapsed
+  "no configuration exists" and "AccessDenied" into the same empty string, so run with the deploy
+  profile it announced "none — this will be the first".
+
+  The box deliberately cannot do any of this itself: the instance role has `s3:PutObject` on
+  `usc/*` and **no `s3:DeleteObject`**, so the one writer of the corpus of record cannot delete it.
+  That should stay true — expiry is the bucket's job precisely so that no credential living on the
+  box needs the power to delete.
 
 Alarm delivery, which this list carried until 2026-08-03, is **confirmed working** — the mail
 arrives (see above).
