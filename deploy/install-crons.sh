@@ -9,7 +9,7 @@
 # up from scratch arrives with its schedule instead of arriving without one and
 # looking fine for as long as nobody checks.
 #
-# Three jobs, and the daily one is the reason this file exists (ADR-0036):
+# Two jobs, and the daily one is the reason this file exists (ADR-0036):
 #
 #   * DAILY, the source check. Polls uscode.house.gov's release-points page,
 #     records the attempt in `source_checks`, and runs the full download-and-load
@@ -17,8 +17,15 @@
 #     HTTP request and one row. Daily is the *upper* bound on how often this
 #     site asks — the source publishes release points a few dozen times a year,
 #     and pulling a static page more often than that would be rude for no gain.
-#   * NIGHTLY, the database dump to S3.
 #   * WEEKLY, purge_login_failures — the login-throttle table's only reaper.
+#
+# The database dump used to be a third job, nightly. It is not here any more and
+# that is not an omission: the US Code changes a few dozen times a year, so a
+# nightly dump was ~360 near-identical 2.2 GB copies a year — about 66 GB a
+# month, growing forever — of a corpus that had not moved. It now runs at the
+# end of deploy/update-corpus.sh, gated on load-all having actually written
+# something, which is the event that invalidates the previous dump. Backups
+# follow the data rather than the clock.
 #
 # The weekly full sweep is deliberately NOT here: it lives in
 # .github/workflows/update-corpus.yml and dispatches over SSM, so the two
@@ -31,7 +38,6 @@ set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/home/ec2-user/uscode-redesign}"
 DATA_ROOT="${DATA_ROOT:-/var/lib/uscode}"
-MIRROR_BUCKET="${USC_MIRROR_BUCKET:-uscode-mirror-dreamproit}"
 CRON_FILE=/etc/cron.d/uscode
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -50,8 +56,9 @@ PATH=/usr/local/bin:/usr/bin:/bin
 # else on the box.
 41 6 * * * root cd ${REPO_DIR} && sudo -u ec2-user bash deploy/update-corpus.sh >> ${DATA_ROOT}/logs/check.log 2>&1
 
-# Nightly database dump to the mirror bucket.
-17 4 * * * root cd ${REPO_DIR} && docker compose -f docker-compose.prod.yml exec -T db pg_dump -U uscode -Fc uscode | aws s3 cp - s3://${MIRROR_BUCKET}/usc/db/uscode-\$(date +\%F).dump >> ${DATA_ROOT}/logs/backup.log 2>&1
+# The nightly database dump used to be here. It now runs from
+# deploy/update-corpus.sh when load-all has actually loaded something — see the
+# note at the top of this file.
 
 # Weekly: expire the login-throttle rows. Nothing else calls this.
 23 5 * * 0 root cd ${REPO_DIR} && docker compose -f docker-compose.prod.yml exec -T db psql -U uscode -d uscode -c "select purge_login_failures()" >> ${DATA_ROOT}/logs/purge.log 2>&1

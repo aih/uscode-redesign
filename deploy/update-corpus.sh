@@ -55,6 +55,12 @@ esac
 
 DATA_ROOT="$(grep -E '^DATA_ROOT=' .env 2>/dev/null | cut -d= -f2- || true)"
 DATA_ROOT="${DATA_ROOT:-/var/lib/uscode}"
+MIRROR_BUCKET="$(grep -E '^USC_MIRROR_BUCKET=' .env 2>/dev/null | cut -d= -f2- || true)"
+MIRROR_BUCKET="${MIRROR_BUCKET:-uscode-mirror-dreamproit}"
+
+# Set by run_load below: how many title-releases load-all actually wrote. It is
+# what decides whether there is anything worth dumping.
+LOADED=0
 
 mkdir -p "$DATA_ROOT/logs"
 LOG_FILE="$DATA_ROOT/logs/update-$(date +%F).log"
@@ -109,6 +115,69 @@ print(1 if check is None or check.is_stale() else 0)
         --metric-name SourceCheckStale --value "$stale" --unit None \
         --dimensions "InstanceId=${instance_id}" --region "${AWS_REGION:-us-east-1}" \
         && echo "published USCode/SourceCheckStale=${stale}"
+}
+
+# load-all, with its summary line captured so the rest of this script can know
+# whether the corpus actually changed. It prints
+# `planned N: X loaded, Y skipped, Z failed`, and X is the only honest answer to
+# "is a new backup worth 2.2 GB" — the mode this script was called in is not.
+# A weekly --force sweep reaches this line having loaded nothing at all on most
+# weeks, and a daily poll that found new law reaches it having loaded a handful.
+#
+# Capturing costs no live output: `--quiet` passes on_event=None, so load-all
+# prints its summary at the end and nothing during the run.
+run_load() {
+    echo "=== $(date -u +%FT%TZ) load-all --quiet ==="
+    local out status
+    out="$($COMPOSE exec -T api uv run python -m ingest load-all --quiet 2>&1)"
+    status=$?
+    echo "$out"
+    LOADED="$(printf '%s\n' "$out" \
+        | sed -n 's/.*planned [0-9]*: \([0-9][0-9]*\) loaded.*/\1/p' | tail -1)"
+    # An unparseable summary must not read as "nothing changed" — that is the
+    # direction that silently skips a backup. Assume it loaded.
+    if ! [[ "$LOADED" =~ ^[0-9]+$ ]]; then
+        echo "could not read the loaded count from load-all — assuming it loaded"
+        LOADED=1
+    fi
+    return $status
+}
+
+# The database dump, on the mirror (ADR-0013), taken when the corpus changes
+# rather than on a clock.
+#
+# It used to be a nightly cron, which meant ~360 copies a year of a corpus that
+# OLRC republishes a few dozen times a year: 2.2 GB a night, about 66 GB a
+# month, growing forever. The US Code does not change nightly, so neither
+# should the backup. Hanging it off `load-all` ties it to the event that
+# actually invalidates the last one.
+#
+# It dumps everything, accounts included, deliberately — unlike the seed dump
+# that built this box, which excluded them so 1,301 test users would not land on
+# a public site. Restoring production should restore production.
+#
+# The box cannot prune what it writes: the instance role has s3:PutObject on
+# usc/* and no s3:DeleteObject, so the one writer of the corpus of record cannot
+# delete it. That is worth keeping. Retention therefore belongs in an S3
+# lifecycle rule set by an admin, and at a few dozen dumps a year it is no
+# longer urgent.
+#
+# `set -o pipefail` at the top of this script is load-bearing here, and it is
+# the one thing the nightly cron did not have. `pg_dump | aws s3 cp -` with a
+# pg_dump that dies half way is an `aws` that uploads what it got and exits 0:
+# a truncated dump, stored under a name that says it is a backup, reported as a
+# success. Without pipefail the shell reports the exit status of `aws` alone, so
+# the cron line this replaces could have been doing that for as long as it ran.
+dump_to_mirror() {
+    local key="s3://${MIRROR_BUCKET}/usc/db/uscode-$(date -u +%F).dump"
+    echo "=== $(date -u +%FT%TZ) dumping the database to ${key} ==="
+    if $COMPOSE exec -T db pg_dump -U uscode -Fc uscode | aws s3 cp - "$key"; then
+        echo "dump complete"
+        return 0
+    fi
+    echo "DUMP FAILED — the corpus is still reproducible from the mirror's zips"
+    echo "(ADR-0013), but a restore would have to reload rather than pg_restore."
+    return 1
 }
 
 echo "=== $(date -u +%FT%TZ) corpus update starting (mode: ${MODE}) ==="
@@ -166,7 +235,7 @@ run mirror push || { echo "mirror push failed"; exit 1; }
 # Incremental: resume state is the database (title_versions.sections_loaded),
 # not a second ledger. Search stays in step automatically inside
 # ingest/load.py (sync_sections + retire_versions) — no separate reindex step.
-run load-all --quiet || { echo "load-all failed"; exit 1; }
+run_load || { echo "load-all failed"; exit 1; }
 # Shallow recount; the summary lands in this log rather than a committed
 # report (--deep re-parses every source file and is what `make verify-deep`
 # is for, not a weekly job).
@@ -203,4 +272,18 @@ print('  ok — nothing here that ADR-0021 does not already account for')
 # value from before it started is the wrong one to leave behind.
 publish_staleness
 
+# Back up only what changed, and only after `verify` has said the load is sound
+# — a dump taken before that gate could preserve exactly the corruption the gate
+# exists to catch, and it would be the copy someone restores from.
+DUMP_STATUS=0
+if [ "$LOADED" -gt 0 ]; then
+    dump_to_mirror || DUMP_STATUS=1
+else
+    echo "=== nothing loaded — no dump; the last one is still current ==="
+fi
+
 echo "=== $(date -u +%FT%TZ) corpus update complete ==="
+
+# A failed backup exits non-zero even though the corpus loaded fine, so it shows
+# up as a red weekly run rather than as a line in a log nobody reads.
+exit "$DUMP_STATUS"

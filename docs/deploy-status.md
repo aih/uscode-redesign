@@ -133,12 +133,13 @@ image rather than copied into a container.
 - **Stack up**: api, db, opensearch, frontend, proxy — all healthy, migrations applied.
 - **Alarms**: five on the `uscode-alerts` topic — CPU, CPU credit balance, status check, network
   out, disk. CloudWatch agent installed and publishing disk and memory.
-- **Crons** (`/etc/cron.d/uscode`): nightly `pg_dump` to `s3://uscode-mirror-dreamproit/usc/db/`
-  at 04:17 UTC, and the weekly `purge_login_failures` that nothing had ever scheduled. Both were
-  typed in by hand and existed nowhere else; they are now written by **`deploy/install-crons.sh`**,
-  which `bootstrap-box.sh` calls, so a rebuilt box arrives with its schedule instead of arriving
-  without one and looking fine. The daily source check joins them there (ADR-0036) — **run that
-  script once on the box to pick it up**, since `deploy-on-box.sh` does not touch `/etc/cron.d`.
+- **Crons** (`/etc/cron.d/uscode`): the daily source check (ADR-0036) and the weekly
+  `purge_login_failures` that nothing had ever scheduled. A nightly `pg_dump` was the third until
+  2026-08-03 — it now runs from `update-corpus.sh` when the corpus actually changes ("The backup
+  follows the data", below). The hand-typed ones existed nowhere else; all of it is now written by
+  **`deploy/install-crons.sh`**, which `bootstrap-box.sh` calls, so a rebuilt box arrives with its
+  schedule instead of arriving without one and looking fine. **Run that script on the box after any
+  edit to it**, since `deploy-on-box.sh` does not touch `/etc/cron.d`.
 - **Repo is public** — the box clones it with no credentials. Verified beforehand that no
   secrets are in the tree or in any of the 206 commits of history.
 
@@ -352,15 +353,41 @@ ran green on `workflow_dispatch`.
 
 Nothing is genuinely blocking. Two things are worth doing when someone has an admin profile to hand:
 
-- **The nightly dumps have no expiry.** `s3://uscode-mirror-dreamproit/usc/db/` takes a 2.2 GB
-  `pg_dump` every night at 04:17 UTC and nothing ever removes one — about 66 GB a month, growing
-  linearly, against a cost estimate at the bottom of this file that does not include it. The deploy
-  user cannot even read the current setting (`s3:GetLifecycleConfiguration` is not in its policy), so
-  this needs an admin profile to check and to set. A sane rule is a handful of dailies plus a
-  monthly; the corpus itself is reproducible from the mirror, so these are a convenience rather than
-  the record.
+- **Set an S3 lifecycle rule on `usc/db/`** — much less urgent than it was (see "The backup follows
+  the data" below), but still unbounded in principle. The box deliberately cannot do this itself:
+  the instance role has `s3:PutObject` on `usc/*` and **no `s3:DeleteObject`**, so the one writer of
+  the corpus of record cannot delete it, which is worth keeping. The deploy user cannot even read
+  the current setting (`s3:GetLifecycleConfiguration` is not in its policy).
 - **Prove alarm delivery** with the `set-alarm-state` command above — the subscription is confirmed,
   which is not the same as mail having arrived.
+
+## The backup follows the data, not the clock
+
+**The nightly `pg_dump` is gone.** It wrote a 2.2 GB dump to
+`s3://uscode-mirror-dreamproit/usc/db/` every night at 04:17 UTC — roughly 360 near-identical
+copies a year, about 66 GB a month growing forever, of a corpus that OLRC republishes a few dozen
+times a year. The US Code does not change nightly, so neither should the backup.
+
+The dump now runs at the end of `deploy/update-corpus.sh`, **gated on `load-all` having actually
+written something** — the event that invalidates the previous dump. Not gated on the mode the
+script was called in: the weekly `--force` sweep reaches that point having loaded nothing on most
+weeks (last Monday: `planned 3153: 0 loaded, 3153 skipped`), and that run should not produce a
+backup. It is taken *after* the `verify` gate passes, because a dump taken before it could preserve
+exactly the corruption the gate exists to catch, and it would be the copy someone restores from.
+
+Expected volume: **a few dozen dumps a year instead of 365**, each still a full snapshot including
+accounts — unlike the seed dump that built this box, which excluded them so 1,301 test users would
+not land on a public site. Restoring production should restore production.
+
+**A latent bug went with it.** The cron line ran under `bash` with no `set -o pipefail`, and
+`pg_dump | aws s3 cp -` with a `pg_dump` that dies half way is an `aws` that uploads what it got and
+exits 0 — a truncated dump, stored under a name that says it is a backup, reported as a success.
+`update-corpus.sh` has `set -uo pipefail` at the top, so the pipeline's failure is the script's.
+A failed dump now exits the script non-zero even though the corpus loaded fine, so it shows up as a
+red weekly run rather than as a line in a log nobody reads.
+
+`deploy-on-box.sh` does not touch `/etc/cron.d`, so this needed
+`sudo bash deploy/install-crons.sh` on the box to take effect.
 
 **The daily check has now run unattended**, which is the claim ADR-0036 actually makes and it could
 not be made on 2026-08-02, when every check so far had been one a human typed. From the box's
