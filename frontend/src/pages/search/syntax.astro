@@ -243,34 +243,38 @@ const RELEASE_EXAMPLE = {
     </li>
   </ul>
 
-  {/* The honest limit. It is a summary box rather than a footnote because a
-      reader who does not see it will read an incomplete answer as a complete
-      one — and a search that quietly under-reports is worse in a legal corpus
-      than a search that refuses. */}
+  {/* The limit, as it now stands. It is a summary box rather than a footnote
+      because a reader who does not see it will read an incomplete answer as a
+      complete one — and a search that quietly under-reports is worse in a legal
+      corpus than a search that refuses.
+
+      This box used to say the index held current text alone, which was true
+      when it was written and stopped being true on 2026-08-02, when the
+      superseded pass finished on the box (`docs/deploy-status.md`). It sat here
+      telling readers the site could not do something it does. That is the
+      failure ADR-0038 exists to prevent, and this is the sentence that
+      prompted it. */}
   <div class="usa-summary-box" role="region" aria-labelledby="pit-heading">
     <div class="usa-summary-box__body">
       <h3 class="usa-summary-box__heading" id="pit-heading">
-        Not the whole picture yet
+        What a search at a release point covers
       </h3>
       <div class="usa-summary-box__text">
         <p>
-          The search index currently holds <strong>the text in force</strong> — one
-          document per section, as it reads today. A search at a release point therefore
-          finds the provisions whose current text was <em>already</em> in force then, and
-          it misses text that has since been replaced: a section amended in 2024 cannot be
-          searched as it read in 2019, even though the reader will happily show you that
-          version.
+          The index holds <strong>every version of every section</strong>, not only the
+          text in force — 489,578 documents, of which 423,649 are superseded text. A
+          section amended in 2024 can be searched as it read in 2019, and the answer comes
+          from the text as it stood then rather than from today's.
         </p>
         <p>
-          What is missing is the index, not the feature. Every superseded version is in the
-          database and the indexer knows how to write them —{" "}
-          <code>python -m ingest.reindex_search --all-versions</code> builds them, roughly
-          490,000 documents against the 66,000 the default search reads. It has not been
-          run against this deployment, and until it is, a point-in-time search is answering
-          from current text alone.
+          One known gap, and it is small. Where the source publishes several elements under
+          a single <code>@identifier</code> at a single release point, they share one
+          document and the index keeps one of them — 160 documents across the whole corpus,
+          9 of them in current text. Those provisions are complete in the reader; it is the
+          search index that holds one of the pair.
         </p>
         <p>
-          You can always tell which you got: the results page says either{" "}
+          You can always tell which text you searched: the results page says either{" "}
           <em>“In the text as of release point …”</em> or{" "}
           <em>“Searching the law currently in force.”</em>
         </p>
