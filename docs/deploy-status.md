@@ -60,8 +60,14 @@ because both probe with HEAD by default.
   `Resource: "*"` plus `ListSubscriptionsByTopic` and `GetSubscriptionAttributes`, and those are
   exactly what the re-run added.
 
-**Optional, and never yet done: prove delivery end to end.** The subscription is confirmed, which is
-not the same as an email having arrived. One command, and it sends real mail:
+**Delivery is proven, not just wired.** Ari confirmed on 2026-08-03 that the alarm mail from AWS
+arrives. That closes the loop this file has been tracking since the topic was found with zero
+confirmed subscribers: the alarms exist, they point at the topic, the topic has a confirmed
+subscriber, and a human receives what it sends. Every link has now been checked rather than
+assumed — which is the whole reason `deploy/alerts-status.sh` exists, since five alarms wired to a
+topic nobody is subscribed to look exactly like five working ones.
+
+To re-prove it after any change to the topic or its subscriptions (it sends real mail):
 
 ```bash
 aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
@@ -366,15 +372,17 @@ against the live host — the table at the top of this file *is* their result. `
 green on `workflow_run` a dozen times, which is the automated path proving itself. `update-corpus.yml`
 ran green on `workflow_dispatch`.
 
-Nothing is genuinely blocking. Two things are worth doing when someone has an admin profile to hand:
+Nothing is genuinely blocking, and exactly one thing is worth doing when someone has an admin
+profile to hand:
 
 - **Set an S3 lifecycle rule on `usc/db/`** — much less urgent than it was (see "The backup follows
   the data" below), but still unbounded in principle. The box deliberately cannot do this itself:
   the instance role has `s3:PutObject` on `usc/*` and **no `s3:DeleteObject`**, so the one writer of
   the corpus of record cannot delete it, which is worth keeping. The deploy user cannot even read
   the current setting (`s3:GetLifecycleConfiguration` is not in its policy).
-- **Prove alarm delivery** with the `set-alarm-state` command above — the subscription is confirmed,
-  which is not the same as mail having arrived.
+
+Alarm delivery, which this list carried until 2026-08-03, is **confirmed working** — the mail
+arrives (see above).
 
 ## The backup follows the data, not the clock
 
