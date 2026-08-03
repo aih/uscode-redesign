@@ -41,25 +41,58 @@ command -v aws >/dev/null || { echo "aws CLI not found."; exit 1; }
 if [[ "${1:-}" == "--fetch" ]]; then
   DATA_ROOT="${DATA_ROOT:-/var/lib/uscode}"
   DEST="${DATA_ROOT}/demo"
-  mkdir -p "$DEST"
 
+  # Docker gets here first, and it creates mount points as root.
+  #
+  # `deploy-on-box.sh` runs `compose run api` for the migration before it calls
+  # this, and that instantiates the api service — including its volumes — so
+  # ${DATA_ROOT}/demo already exists, owned by root, by the time this runs on a
+  # box that has never fetched. `mkdir -p` then succeeds (it is already there),
+  # and every write fails with EACCES. That is exactly what happened on the
+  # first deploy of this feature.
+  #
+  # Fixing the ownership here rather than reordering the deploy: the order is
+  # not the guarantee. Any compose command that touches the api service creates
+  # this directory, and a future one placed earlier would silently reintroduce
+  # the same failure.
+  if [[ ! -d "$DEST" ]]; then
+    mkdir -p "$DEST" 2>/dev/null || sudo mkdir -p "$DEST"
+  fi
+  if [[ ! -w "$DEST" ]]; then
+    echo "  ${DEST} is not writable by $(id -un); taking ownership"
+    sudo chown "$(id -un):$(id -gn)" "$DEST"
+  fi
+
+  failed=0
   for asset in "${ASSETS[@]}"; do
+    # Existence and writability are different failures and must not share a
+    # message. The first version of this printed "not published yet" for both,
+    # so a permission error read as "nobody has recorded a demo" — the deploy
+    # log said the reassuring thing while the page 404'd.
+    if ! aws s3api head-object --bucket "$MIRROR_BUCKET" --key "usc/demo/${asset}" >/dev/null 2>&1; then
+      echo "  ${asset} is not published yet — skipping"
+      continue
+    fi
+
     if aws s3 cp "${PREFIX}/${asset}" "${DEST}/${asset}" --only-show-errors; then
       echo "  fetched ${asset}"
     else
-      # A missing video is a page that says "download it instead", not a failed
-      # deploy. This script runs from deploy-on-box.sh, and nothing about the
-      # site depends on the demo existing.
-      echo "  ${asset} is not published yet — skipping"
+      echo "  ERROR: ${asset} is in S3 but could not be written to ${DEST}" >&2
+      failed=1
     fi
   done
 
   # The mount is read-only to the container, so the container cannot be what
-  # fixes ownership; do it here.
+  # fixes the mode; do it here.
   chmod -R a+r "$DEST" 2>/dev/null || true
   echo "demo assets in ${DEST}:"
   ls -la "$DEST"
-  exit 0
+
+  # Non-zero on a real failure. `deploy-on-box.sh` swallows it deliberately —
+  # no demo video should ever fail a deploy — but it will have printed the
+  # ERROR line above, which is the difference between a deploy that says
+  # nothing and one that says the wrong thing.
+  exit "$failed"
 fi
 
 # ------------------------------------------------------------------- upload
