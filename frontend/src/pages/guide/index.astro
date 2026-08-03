@@ -1,0 +1,50 @@
+---
+/**
+ * `/app/guide` — the way into the user guide (ADR-0038).
+ *
+ * An `.astro` page rather than a chapter, because it is a list of the chapters
+ * and a chapter that listed itself would be odd. It wears the same layout so
+ * the guide's chrome does not change when you enter it, and passes
+ * `standalone` so that layout leaves off the chapter pager.
+ */
+import GuideLayout from "../../layouts/GuideLayout.astro";
+import { chapters } from "../../lib/guide";
+
+const CHAPTERS = chapters();
+---
+
+<GuideLayout
+  standalone
+  frontmatter={{
+    title: "User guide",
+    order: 0,
+    summary:
+      "How to read the United States Code on this site: at a citation, at a date, and at every release point in between.",
+  }}>
+  <p>
+    This guide covers what the site does and how to ask it for things — reading a provision,
+    reading it as it stood at an earlier release point, comparing two of them, searching,
+    copying, and getting the same answers out of the API.
+  </p>
+
+  <p>
+    Every behaviour described here carries a <strong>“How this is verified”</strong> box listing
+    the steps that demonstrate it. Those steps are not an illustration: they are run as
+    automated tests on every change to the site, so a claim in this guide that stopped being
+    true would fail the build rather than sit here misleading you.
+  </p>
+
+  <ul class="toc">
+    {
+      CHAPTERS.map((chapter) => (
+        <li>
+          <a href={chapter.href}>
+            <span class="toc__num">{chapter.order}</span>
+            <span class="toc__heading">{chapter.title}</span>
+            {chapter.summary && <span class="doc-meta">{chapter.summary}</span>}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</GuideLayout>

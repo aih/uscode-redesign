@@ -1,0 +1,94 @@
+---
+/**
+ * The shell every user-guide chapter shares (ADR-0038).
+ *
+ * The chapters are `.md` files in `pages/guide/`, which Astro renders against
+ * this layout because their frontmatter names it. That is the whole reason the
+ * guide needs no markdown dependency and no build step: the framework already
+ * renders markdown pages, and this file is what gives them the site's chrome,
+ * its theme and its typography — a guide styled unlike the thing it documents
+ * is a guide the reader has to re-orient inside.
+ *
+ * The chapter list is globbed in `lib/guide.ts` rather than written down here,
+ * so adding a chapter is adding a file.
+ */
+import Base from "./Base.astro";
+import { setPublicCache } from "../lib/cache";
+import { APP } from "../lib/url";
+import { chapters, around, type GuideFrontmatter } from "../lib/guide";
+
+interface Props {
+  frontmatter: GuideFrontmatter;
+  /** Set by `guide/index.astro`, which wears this layout but is not a chapter. */
+  standalone?: boolean;
+}
+
+const { frontmatter, standalone = false } = Astro.props;
+
+/* Static prose about the site, changing when the site does rather than per
+ * request or per reader. Revalidate rather than pin: there is no release point
+ * to make a guide chapter immutable against (ADR-0018). */
+setPublicCache(Astro.response.headers, null, false);
+
+const { previous, next } = around(frontmatter.title);
+const CHAPTERS = chapters();
+---
+
+<Base title={`${frontmatter.title} · User guide · U.S. Code`} wide>
+  <div class="guide">
+    <nav class="guide__nav" aria-label="User guide contents">
+      <p class="toc-group">User guide</p>
+      <ul class="usa-list usa-list--unstyled">
+        <li>
+          <a
+            class="guide__navlink"
+            href={`${APP}/guide`}
+            aria-current={standalone ? "page" : undefined}>Contents</a
+          >
+        </li>
+        {
+          CHAPTERS.map((chapter) => (
+            <li>
+              <a
+                class="guide__navlink"
+                href={chapter.href}
+                aria-current={
+                  !standalone && chapter.title === frontmatter.title ? "page" : undefined
+                }>
+                {chapter.title}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <article class="guide__body">
+      <h1 class="doc-title">{frontmatter.title}</h1>
+      {frontmatter.summary && <p class="lede">{frontmatter.summary}</p>}
+
+      <div class="guide__prose">
+        <slot />
+      </div>
+
+      {
+        !standalone && (
+          <nav class="guide__pager" aria-label="Chapters">
+            <a class="guide__pagerlink" href={previous ? previous.href : `${APP}/guide`}>
+              <span class="guide__pagerdir">← Previous</span>
+              <span class="guide__pagertitle">
+                {previous ? previous.title : "Guide contents"}
+              </span>
+            </a>
+            {next && (
+              <a class="guide__pagerlink guide__pagerlink--next" href={next.href}>
+                <span class="guide__pagerdir">Next →</span>
+                <span class="guide__pagertitle">{next.title}</span>
+              </a>
+            )}
+          </nav>
+        )
+      }
+    </article>
+  </div>
+</Base>
