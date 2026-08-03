@@ -1,5 +1,5 @@
 .PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
-        verify verify-deep load-all shots loadtest test-e2e
+        verify verify-deep load-all shots loadtest test-e2e demo-video
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -75,6 +75,20 @@ test-all:
 # written to docs/screenshots/. Needs the site running (`make dev-all`).
 shots:
 	cd frontend && npm run shots
+
+# The demo video (ADR-0038): replays every scenario in the user guide flagged
+# `demo: true`, in `demoOrder`, with that scenario's own captions burned on
+# screen, and stitches the scenes into docs/demo/uscode-demo.mp4. The captions
+# come from the guide, so the video cannot claim something the guide does not.
+#
+# Needs the site running (`make dev-all`) and ffmpeg (`brew install ffmpeg`).
+# GUIDE_CORPUS=1 because two scenes — a redline with real amendments, a guid
+# permalink — need more than the two release points CI loads.
+#
+# The mp4 is gitignored; docs/demo/scenes.json and uscode-demo.vtt are
+# committed, so what the video says is reviewable in a diff.
+demo-video:
+	cd frontend && GUIDE_CORPUS=1 node scripts/demovideo.mjs
 
 fixtures:
 	uv run python scripts/extract_fixture.py

@@ -377,6 +377,13 @@ main[id] {
   padding: 0 1rem 3rem;
 }
 
+/* The user guide only (ADR-0038): prose *and* a chapter contents column, which
+ * the reading measure was never sized for. Wide enough for both at 64em, and
+ * identical to the plain wrap below it, where the guide is one column anyway. */
+.reader-wrap--wide {
+  max-width: 62rem;
+}
+
 /* Breadcrumbs and the release picker share a contextual bar under the navbar —
  * "where am I" and "as of when", the two questions a versioned reader must
  * answer on every page. */
@@ -2406,4 +2413,257 @@ main[id] {
 
 .syntaxop__try code {
   white-space: nowrap;
+}
+
+/* ------------------------------------------------------------- the user guide
+ *
+ * The chapters are markdown pages (ADR-0038), so everything here styles output
+ * nobody wrote by hand: `.guide__prose` is whatever Astro made of a chapter's
+ * markdown, and `.scenario` is what `scripts/remark-scenario.mjs` makes of a
+ * scenario fence.
+ *
+ * No dark-theme block: every colour below is one of the tokens at the top of
+ * this file, which `[data-theme="dark"]` already redefines (ADR-0027). A guide
+ * that needed its own dark rules would be a guide that had stopped matching the
+ * site it documents. */
+.guide {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 1fr;
+}
+
+/* On a phone the chapter comes first and the contents follow it. The contents
+ * are markup-first because that is their reading order beside the prose at
+ * desktop width; stacked, they are ten links between the reader and the
+ * chapter they already chose. */
+.guide__body {
+  order: 1;
+}
+
+.guide__nav {
+  order: 2;
+  border-top: 1px solid var(--rule);
+  padding-top: 1rem;
+}
+
+/* The contents sit above the chapter on a phone and beside it from 64em, which
+ * is the width at which the reading column stops needing the whole viewport.
+ * `minmax(0, …)` on the body column is what stops a long unbroken identifier in
+ * a scenario step from pushing the page sideways — the failure `make shots`
+ * asserts against at 375px. */
+@media (min-width: 64em) {
+  .guide {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  /* Side by side, the contents belong on the left — which is where the markup
+   * already puts them, so the phone's reordering is undone rather than
+   * repeated. */
+  .guide__nav {
+    order: 0;
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  /* Not sticky, deliberately. The obvious `position: sticky; top: calc(var(
+   * --sticky-h) + 1rem)` puts the contents 320px down the page before you have
+   * scrolled at all: `--sticky-h` is 19rem here, and it is a scroll-margin
+   * budget rather than a measurement of the chrome, so a sticky element
+   * honouring it as a `top` offset starts below where it belongs. The chapter
+   * list is nine short links; it does not need to follow the reader. */
+}
+
+.guide__nav ul {
+  margin: 0;
+  border-left: 2px solid var(--rule);
+}
+
+.guide__navlink {
+  display: block;
+  padding: 0.35rem 0 0.35rem 0.75rem;
+  margin-left: -2px;
+  border-left: 2px solid transparent;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.guide__navlink:hover,
+.guide__navlink:focus {
+  text-decoration: underline;
+}
+
+.guide__navlink[aria-current="page"] {
+  border-left-color: var(--target-edge);
+  font-weight: 700;
+}
+
+.guide__prose {
+  max-width: 42rem;
+}
+
+.guide__prose h2 {
+  font-family: var(--reading);
+  font-size: 1.25rem;
+  margin: 2rem 0 0.5rem;
+}
+
+.guide__prose h3 {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.4rem;
+}
+
+.guide__prose p,
+.guide__prose li {
+  line-height: 1.6;
+}
+
+.guide__prose ul {
+  padding-left: 1.25rem;
+}
+
+.guide__prose li {
+  margin-bottom: 0.4rem;
+}
+
+.guide__prose code {
+  background: var(--panel);
+  padding: 0.05em 0.3em;
+  border-radius: 2px;
+  overflow-wrap: anywhere;
+}
+
+.guide__prose kbd {
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0.05em 0.35em;
+  font-size: 0.85em;
+  background: var(--panel);
+}
+
+/* --------------------------------------------------- "how this is verified"
+ *
+ * Closed by default. The claim in the prose is the thing a reader came for; the
+ * steps proving it are for the reader who doubts it, and that reader will open
+ * a summary that says so. */
+.scenario {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--target-edge);
+  border-radius: 3px;
+  background: var(--panel);
+  margin: 1.25rem 0;
+  padding: 0.5rem 0.75rem;
+}
+
+.scenario__summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.scenario__body {
+  margin-top: 0.5rem;
+}
+
+.scenario__meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.scenario__badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0 0.5em;
+  margin-left: 0.35em;
+  background: var(--page);
+  white-space: nowrap;
+}
+
+.scenario__steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.scenario__steps li {
+  margin-bottom: 0.35rem;
+}
+
+.scenario__step {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
+/* The caption is the sentence the demo video says out loud at this step, so it
+ * reads as prose rather than as part of the mechanism. */
+.scenario__caption {
+  display: block;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* --------------------------------------------------------- the chapter pager */
+.guide__pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+.guide__pagerlink {
+  display: block;
+  max-width: 100%;
+  text-decoration: none;
+}
+
+.guide__pagerlink--next {
+  margin-left: auto;
+  text-align: right;
+}
+
+.guide__pagerdir {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.guide__pagertitle {
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------- /app/demo
+ *
+ * The video is recorded at 1280×720 and must never be wider than the column it
+ * sits in; `height: auto` keeps the aspect ratio while `width: 100%` takes the
+ * measure, which is what stops a phone scrolling sideways on this page. */
+.demo__video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  background: #000;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  margin: 0 0 0.75rem;
+}
+
+/* The front page's two ways in — watch the demo, or read the guide. Sits
+ * directly under the "Try a citation" box, so it needs to read as a quieter
+ * offer than the box above it rather than as a second call to action. */
+.frontways {
+  margin: 0.75rem 0 1.5rem;
+  color: var(--muted);
 }

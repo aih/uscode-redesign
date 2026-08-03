@@ -48,6 +48,12 @@ const { searchValue = null } = Astro.props;
         <li class="usa-nav__primary-item">
           <a class="usa-nav__link" href={`${APP}/provisions`}><span>My Provisions</span></a>
         </li>
+        {/* The guide (ADR-0038). Ahead of the API reference because it is the
+            one thing here written for a reader who does not already know what
+            the site does. */}
+        <li class="usa-nav__primary-item">
+          <a class="usa-nav__link" href={`${APP}/guide`}><span>User guide</span></a>
+        </li>
         {/* `/app/docs`, not FastAPI's `/docs`. The bare Swagger page is a
             different site — no navbar, no footer, no way back — so the reader
             who clicks "API docs" from here has left. The reader page wraps the

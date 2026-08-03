@@ -32,6 +32,16 @@ const PAGES = [
   ["docs", "/app/docs"],
   // Session 15: the page the footer disclaimer now leads to.
   ["about", "/app/about"],
+  // Session 22: the user guide (ADR-0038). A chapter is the widest prose on the
+  // site and its scenario boxes hold long identifiers, so it is exactly the
+  // shape the overflow assertion below exists to catch.
+  ["guide", "/app/guide"],
+  ["guide-chapter", "/app/guide/02-reading"],
+  // A `<video>` is a replaced element with intrinsic dimensions — 1280px of
+  // them — so it is one of the few things on this site that will push a phone
+  // sideways if its CSS is wrong, which is precisely what the assertion below
+  // is for.
+  ["demo-video", "/app/demo"],
 ];
 
 const WIDTHS = [

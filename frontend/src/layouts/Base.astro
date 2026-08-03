@@ -46,6 +46,14 @@ interface Props {
    * first was the wrong one. Prefilling the single box the site already has is
    * the same affordance without the double. */
   searchValue?: string | null;
+  /** Widens the page beyond the 46rem reading measure.
+   *
+   * The measure is set for statutory text and is right for it. The user guide
+   * (ADR-0038) is the one thing here that is not statutory text: it carries a
+   * chapter contents column beside its prose, and inside 46rem those two share
+   * a width meant for one, leaving a 28rem column of prose next to a sidebar
+   * eating the margin. Only the guide passes this. */
+  wide?: boolean;
 }
 
 const {
@@ -55,6 +63,7 @@ const {
   picker = null,
   bar = null,
   searchValue = null,
+  wide = false,
 } = Astro.props;
 const hasContext = crumbs.length > 0 || picker !== null;
 ---
@@ -169,7 +178,7 @@ const hasContext = crumbs.length > 0 || picker !== null;
       {bar && <SectionBar {...bar} release={release} />}
     </div>
 
-    <main id="main" class="reader-wrap">
+    <main id="main" class={wide ? "reader-wrap reader-wrap--wide" : "reader-wrap"}>
       <slot />
     </main>
 

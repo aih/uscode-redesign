@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import node from "@astrojs/node";
 import { defineConfig } from "astro/config";
 
+import { remarkScenario } from "./scripts/remark-scenario.mjs";
+
 /**
  * The reader, at /app (ADR-0010, ADR-0011).
  *
@@ -29,6 +31,13 @@ export default defineConfig({
   adapter: node({ mode: "standalone" }),
   server: { port: 4321, host: true },
   devToolbar: { enabled: false },
+  /* The user guide's chapters are markdown pages (ADR-0038). The only thing
+   * Astro's own markdown handling does not already do for them is render a
+   * `scenario` fence as something a reader wants to look at, which is this
+   * plugin's whole job. */
+  markdown: {
+    remarkPlugins: [remarkScenario],
+  },
   vite: {
     css: {
       preprocessorOptions: {
