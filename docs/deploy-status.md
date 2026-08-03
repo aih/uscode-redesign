@@ -99,6 +99,21 @@ site is a demo, with the shaped version (index the ~66k current-text sections, r
 permutation space) written down in ADR-0037 as the thing to come back to. Check it with
 `curl -s https://uscode.linkedlegislation.org/robots.txt`.
 
+**It worked, and immediately.** Both crawlers fetched the new file within minutes and stopped:
+
+| | before | 3 hours after |
+|---|---|---|
+| requests | ~718/min | **~0.5/min** (16 in 30 minutes) |
+| load average | 2.06 | **0.12** |
+| `api` container CPU | 132% | **0.12%** |
+
+`uscode-cpu-credits-low` was **still in `ALARM`** at the end of that session, with its state
+unchanged since 2026-08-02 — the balance has to climb back over 60 to clear, and on a `t4g` in
+unlimited mode newly earned credits repay the accrued surplus before they rebuild the balance. With
+the box now essentially idle it should clear on its own. **If it is still in alarm after a full quiet
+day, that is worth a second look** — and this time the undersizing reading really would be the one
+left standing.
+
 **Two deployment bugs fell out of shipping it, and both were live before this.**
 
 - **Nothing in the deploy ever restarted the proxy.** `deploy/Caddyfile` is a bind mount, and
