@@ -372,64 +372,75 @@ against the live host — the table at the top of this file *is* their result. `
 green on `workflow_run` a dozen times, which is the automated path proving itself. `update-corpus.yml`
 ran green on `workflow_dispatch`.
 
-Nothing is genuinely blocking, and exactly one thing is worth doing when someone has an admin
-profile to hand:
+**Nothing is outstanding.** The last two items this list carried are both closed:
 
-- **Set the S3 lifecycle rule on `usc/db/`** — much less urgent than it was (see "The backup follows
-  the data" below), but still unbounded in principle. The script is written and tested; what it
-  needs is a permission nobody here currently has.
+- **Alarm delivery is confirmed working** — the mail arrives (see above).
+- **The `usc/db/` lifecycle rules were created in the S3 console on 2026-08-03**, by an account
+  admin, rather than by `deploy/mirror-lifecycle.sh` — because no credential on the development
+  machine can set one (below). The script stays as the reproducible version and as the record of
+  what the rules are meant to say.
 
-  **`uscode-admin` is not an admin.** It is the profile name for the IAM user
-  `linkedlegislation-deploy` (the table at the top of this file says so, and it still catches
-  people). Neither it nor the `uscode` profile — `uscode-mirror-dreamproit-user` — can read or write
-  a bucket lifecycle configuration; both are object-level identities. Checked, 2026-08-03: both get
-  `AccessDenied` on `s3:GetLifecycleConfiguration`.
+**Caveat, stated rather than glossed: this deployment cannot verify its own retention rules.**
+`s3:GetLifecycleConfiguration` is denied to `uscode-admin` (= the IAM user
+`linkedlegislation-deploy`) and to `uscode` (= `uscode-mirror-dreamproit-user`); both are
+object-level identities. So the line above is *reported*, not measured — the only claim in this file
+resting on someone having looked at a console rather than on a command anyone can re-run. With the
+permission, one command settles it:
 
-  So grant it, run it, take it away, in the same shape as `admin-grant.sh`. The first and third
-  commands need an IAM-capable identity — whatever ran `admin-grant.sh` originally:
+```bash
+aws s3api get-bucket-lifecycle-configuration --bucket uscode-mirror-dreamproit
+```
 
-  ```bash
-  aws iam put-user-policy --user-name linkedlegislation-deploy \
-    --policy-name uscode-mirror-lifecycle-bootstrap \
-    --policy-document file://deploy/mirror-lifecycle-bootstrap-policy.json
+Expected: two rules, **both filtered to prefix `usc/db/`** — `expire-db-dumps` (current versions 365
+days, noncurrent versions 30, incomplete multipart uploads 7) and `expire-db-dumps-delete-markers`
+(`ExpiredObjectDeleteMarker`). Two rules and not one because S3 rejects `ExpiredObjectDeleteMarker`
+alongside a day-based expiration in the same rule.
 
-  AWS_PROFILE=uscode-admin DRY_RUN=1 bash deploy/mirror-lifecycle.sh   # print, change nothing
-  AWS_PROFILE=uscode-admin bash deploy/mirror-lifecycle.sh             # apply
+**The thing to check if you check nothing else is the prefix.** A rule scoped to the whole bucket
+expires `usc/releases/` as well — the 9.7 GB ADR-0013 calls the corpus of record — and it would look
+like a working retention policy for about a day. In the console that mistake announces itself: an
+unfiltered rule makes you tick *"I acknowledge that this rule will apply to all objects in the
+bucket"*, so being asked that question is the signal something is wrong.
 
-  aws iam delete-user-policy --user-name linkedlegislation-deploy \
-    --policy-name uscode-mirror-lifecycle-bootstrap
-  ```
+### Why the console, and how to do it from a shell instead
 
-  **The detach is not ceremony.** `s3:PutLifecycleConfiguration` on this bucket is a
-  destroy-the-corpus capability wearing a housekeeping name — one rule with `Expiration.Days: 1` and
-  no prefix deletes the 9.7 GB ADR-0013 calls the corpus of record. Nothing in the ongoing deploy
-  path needs it: a lifecycle rule is set once and then enforced by S3 itself, which is exactly why
-  it is better than a cron that deletes things.
+**`uscode-admin` is not an admin.** It is the profile name for the IAM user
+`linkedlegislation-deploy` — the table at the top of this file says so, and it still caught someone.
+Neither it nor `uscode` can read or write a bucket lifecycle configuration. To use
+`deploy/mirror-lifecycle.sh`, grant the permission, run it, and take it away again, in the same
+attach/run/detach shape as `admin-grant.sh`. The first and third commands need an IAM-capable
+identity — whatever ran `admin-grant.sh` originally:
 
-  Doing it in the S3 console as an account admin is a fine alternative, and avoids the replace trap
-  below because the console shows you the existing rules. Scope it to prefix `usc/db/`.
+```bash
+aws iam put-user-policy --user-name linkedlegislation-deploy \
+  --policy-name uscode-mirror-lifecycle-bootstrap \
+  --policy-document file://deploy/mirror-lifecycle-bootstrap-policy.json
 
-  Defaults: current dumps expire after 365 days (~30 of them at the new rate, ~66 GB, on the order
-  of $1.50/month), noncurrent versions after 30, incomplete multipart uploads after 7. Override with
-  `EXPIRE_AFTER_DAYS` / `NONCURRENT_AFTER_DAYS`.
+AWS_PROFILE=uscode-admin DRY_RUN=1 bash deploy/mirror-lifecycle.sh   # print, change nothing
+AWS_PROFILE=uscode-admin bash deploy/mirror-lifecycle.sh             # apply
 
-  **Why it is a script and not a one-liner:** `put-bucket-lifecycle-configuration` **replaces** a
-  bucket's entire configuration rather than merging into it, and this bucket holds the corpus of
-  record (ADR-0013) beside the dumps. An unscoped expiry rule here would delete the 9.7 GB of
-  release-point zips that make the corpus reproducible at all, and would look like a working
-  retention policy right up until it did. Every rule is scoped to `usc/db/`, and the script refuses
-  to overwrite a configuration it did not write. It also refuses when it cannot *read* the current
-  one — writing it caught that bug in its own first draft, where `|| true` collapsed
-  "no configuration exists" and "AccessDenied" into the same empty string, so run with the deploy
-  profile it announced "none — this will be the first".
+aws iam delete-user-policy --user-name linkedlegislation-deploy \
+  --policy-name uscode-mirror-lifecycle-bootstrap
+```
 
-  The box deliberately cannot do any of this itself: the instance role has `s3:PutObject` on
-  `usc/*` and **no `s3:DeleteObject`**, so the one writer of the corpus of record cannot delete it.
-  That should stay true — expiry is the bucket's job precisely so that no credential living on the
-  box needs the power to delete.
+Defaults: current dumps expire after 365 days (~30 of them at the new rate, ~66 GB, on the order of
+$1.50/month), noncurrent versions after 30, incomplete multipart uploads after 7. Override with
+`EXPIRE_AFTER_DAYS` / `NONCURRENT_AFTER_DAYS`.
 
-Alarm delivery, which this list carried until 2026-08-03, is **confirmed working** — the mail
-arrives (see above).
+**Run it with `DRY_RUN=1` first, now more than before.** `put-bucket-lifecycle-configuration`
+**replaces** a bucket's entire configuration rather than merging into it, and there are now
+console-created rules to lose. The script refuses to overwrite a configuration it does not
+recognise, which from here on is the refusal working rather than a problem. It also refuses when it
+cannot *read* the current one — writing it caught that bug in its own first draft, where `|| true`
+collapsed "no configuration exists" and "AccessDenied" into the same empty string, so run with the
+deploy profile it announced "none — this will be the first".
+
+**The detach is not ceremony.** `s3:PutLifecycleConfiguration` on this bucket is a
+destroy-the-corpus capability wearing a housekeeping name. Nothing in the ongoing deploy path needs
+it, and the box deliberately cannot do any of it: the instance role has `s3:PutObject` on `usc/*`
+and **no `s3:DeleteObject`**, so the one writer of the corpus of record cannot delete it. That
+should stay true — expiry is the bucket's job precisely so that no credential living on the box
+needs the power to delete.
 
 ## The backup follows the data, not the clock
 
