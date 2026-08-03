@@ -86,9 +86,26 @@ if [ "$READ_STATUS" -ne 0 ]; then
         echo
         echo "REFUSING: could not read the bucket's current lifecycle configuration," >&2
         echo "so there is no way to know whether applying ours would delete rules." >&2
-        echo "This needs an admin profile — the deploy user is denied this call." >&2
         echo >&2
         sed 's/^/    /' "$ERR_FILE" >&2
+        echo >&2
+        echo "If that says linkedlegislation-deploy, note that the profile named" >&2
+        echo "\`uscode-admin\` IS that user — the name says admin and the identity is" >&2
+        echo "the deploy user, which is exactly the confusion this message exists for." >&2
+        echo "No day-to-day profile here can set a bucket lifecycle: uscode-admin and" >&2
+        echo "uscode are both object-level identities." >&2
+        echo >&2
+        echo "Grant it temporarily, run this, then take it away again — the same" >&2
+        echo "attach/run/detach shape as admin-grant.sh, and worth the detach because" >&2
+        echo "s3:PutLifecycleConfiguration on this bucket can delete the corpus of" >&2
+        echo "record. With an IAM-capable profile:" >&2
+        echo >&2
+        echo "  aws iam put-user-policy --user-name linkedlegislation-deploy \\" >&2
+        echo "    --policy-name uscode-mirror-lifecycle-bootstrap \\" >&2
+        echo "    --policy-document file://deploy/mirror-lifecycle-bootstrap-policy.json" >&2
+        echo "  AWS_PROFILE=uscode-admin bash deploy/mirror-lifecycle.sh" >&2
+        echo "  aws iam delete-user-policy --user-name linkedlegislation-deploy \\" >&2
+        echo "    --policy-name uscode-mirror-lifecycle-bootstrap" >&2
         exit 1
     fi
 fi

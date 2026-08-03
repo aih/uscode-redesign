@@ -376,13 +376,38 @@ Nothing is genuinely blocking, and exactly one thing is worth doing when someone
 profile to hand:
 
 - **Set the S3 lifecycle rule on `usc/db/`** — much less urgent than it was (see "The backup follows
-  the data" below), but still unbounded in principle. The script is written and tested; it just
-  needs an admin profile:
+  the data" below), but still unbounded in principle. The script is written and tested; what it
+  needs is a permission nobody here currently has.
+
+  **`uscode-admin` is not an admin.** It is the profile name for the IAM user
+  `linkedlegislation-deploy` (the table at the top of this file says so, and it still catches
+  people). Neither it nor the `uscode` profile — `uscode-mirror-dreamproit-user` — can read or write
+  a bucket lifecycle configuration; both are object-level identities. Checked, 2026-08-03: both get
+  `AccessDenied` on `s3:GetLifecycleConfiguration`.
+
+  So grant it, run it, take it away, in the same shape as `admin-grant.sh`. The first and third
+  commands need an IAM-capable identity — whatever ran `admin-grant.sh` originally:
 
   ```bash
-  AWS_PROFILE=<admin> DRY_RUN=1 bash deploy/mirror-lifecycle.sh   # print, change nothing
-  AWS_PROFILE=<admin> bash deploy/mirror-lifecycle.sh             # apply
+  aws iam put-user-policy --user-name linkedlegislation-deploy \
+    --policy-name uscode-mirror-lifecycle-bootstrap \
+    --policy-document file://deploy/mirror-lifecycle-bootstrap-policy.json
+
+  AWS_PROFILE=uscode-admin DRY_RUN=1 bash deploy/mirror-lifecycle.sh   # print, change nothing
+  AWS_PROFILE=uscode-admin bash deploy/mirror-lifecycle.sh             # apply
+
+  aws iam delete-user-policy --user-name linkedlegislation-deploy \
+    --policy-name uscode-mirror-lifecycle-bootstrap
   ```
+
+  **The detach is not ceremony.** `s3:PutLifecycleConfiguration` on this bucket is a
+  destroy-the-corpus capability wearing a housekeeping name — one rule with `Expiration.Days: 1` and
+  no prefix deletes the 9.7 GB ADR-0013 calls the corpus of record. Nothing in the ongoing deploy
+  path needs it: a lifecycle rule is set once and then enforced by S3 itself, which is exactly why
+  it is better than a cron that deletes things.
+
+  Doing it in the S3 console as an account admin is a fine alternative, and avoids the replace trap
+  below because the console shows you the existing rules. Scope it to prefix `usc/db/`.
 
   Defaults: current dumps expire after 365 days (~30 of them at the new rate, ~66 GB, on the order
   of $1.50/month), noncurrent versions after 30, incomplete multipart uploads after 7. Override with

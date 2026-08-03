@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadAndSetLifecycleOnTheMirrorBucketOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetLifecycleConfiguration",
+        "s3:PutLifecycleConfiguration"
+      ],
+      "Resource": "arn:aws:s3:::uscode-mirror-dreamproit"
+    },
+    {
+      "Sid": "ConfirmVersioningSoTheNoncurrentRulesAreKnownToMatter",
+      "Effect": "Allow",
+      "Action": "s3:GetBucketVersioning",
+      "Resource": "arn:aws:s3:::uscode-mirror-dreamproit"
+    }
+  ]
+}
