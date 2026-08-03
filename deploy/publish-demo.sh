@@ -96,14 +96,36 @@ done
 
 cat <<'NEXT'
 
-Uploaded. To put it on the site:
+Uploaded. Now get it onto the box.
 
-  aws ssm send-command \
+USUALLY: nothing. `deploy/deploy-on-box.sh` fetches these assets on every
+deploy, so merging to main is enough — CI passes, .github/workflows/deploy.yml
+runs, and the box pulls the current video as part of it. That is the path to
+use the first time, because the box needs this script and the /app/static/demo
+volume mount before either can do anything, and both arrive with the code.
+
+TO PUBLISH A RE-RECORDED VIDEO WITHOUT A CODE DEPLOY, once the above has
+happened at least once:
+
+  AWS_PROFILE=uscode-admin aws ssm send-command \
+    --instance-ids "$(AWS_PROFILE=uscode-admin aws ec2 describe-instances \
+        --filters Name=tag:Name,Values=uscode-site Name=instance-state-name,Values=running \
+        --query 'Reservations[].Instances[].InstanceId' --output text)" \
     --document-name AWS-RunShellScript \
-    --targets Key=tag:Name,Values=uscode-site \
-    --parameters 'commands=["cd /opt/uscode && bash deploy/publish-demo.sh --fetch && docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api"]'
+    --comment "publish demo video" \
+    --parameters 'commands=["sudo -iu ec2-user bash -c '"'"'cd ~/uscode-redesign && bash deploy/publish-demo.sh --fetch'"'"'"]'
 
-The recreate is needed the first time only, to pick up the new volume mount;
-after that a re-fetch is enough, because the mount is a directory and the
-container reads through it.
+Three things that command gets right and the obvious version does not:
+
+  * the profile. SSM is the *deploy* identity (`uscode-admin`, which is the IAM
+    user `linkedlegislation-deploy` — see docs/deploy-status.md), not the mirror
+    identity that owns the upload above, and not whatever `default` is.
+  * --instance-ids, resolved from the tag rather than --targets. A tag-targeted
+    command reports an empty invocation list, so it looks like it did nothing;
+    .github/workflows/deploy.yml resolves the id first for exactly this reason.
+  * the checkout is ~ec2-user/uscode-redesign, reached with `sudo -iu ec2-user`.
+    SSM runs commands as root, whose home is not where the repository is.
+
+No container restart is needed for a re-fetch: the mount is a directory, so the
+running container reads whatever is in it.
 NEXT

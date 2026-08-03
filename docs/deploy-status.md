@@ -47,8 +47,26 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-**Nothing is blocking.** Both items this section held on 2026-08-02 are done, confirmed on
-2026-08-03:
+**One item, and it is a merge.** The demo video (ADR-0038) is uploaded and waiting; everything else
+in this section is done.
+
+- **The demo video is in S3 and not yet on the box.** `s3://uscode-mirror-dreamproit/usc/demo/`
+  holds `uscode-demo.mp4` (3.2 MB), `uscode-demo.vtt` and `poster.png`, uploaded 2026-08-03 with
+  `AWS_PROFILE=uscode bash deploy/publish-demo.sh`. It reaches the site when
+  `feature/user-guide` merges to main: the box needs `deploy/publish-demo.sh` and the
+  `/app/static/demo` volume mount before it can serve anything, and both arrive with that code.
+  `deploy-on-box.sh` then fetches the assets on every deploy, and compose recreates `api` on its own
+  because adding a volume changes the service definition. Nothing to run by hand.
+
+  **Do not try to push it with a standalone `aws ssm send-command` before that merge** — the script
+  it would call does not exist on the box yet. Afterwards, to publish a *re-recorded* video without
+  a code deploy, `deploy/publish-demo.sh` prints the exact command; it needs
+  `AWS_PROFILE=uscode-admin` (SSM is the deploy identity, not the mirror one that owns the upload,
+  and not `default`, whose credentials on this workstation are invalid), `--instance-ids` resolved
+  from the tag rather than `--targets`, and `sudo -iu ec2-user` because the checkout is
+  `~ec2-user/uscode-redesign` and SSM runs as root.
+
+Both items this section held on 2026-08-02 are done, confirmed on 2026-08-03:
 
 - **The alarm email is confirmed.** `deploy/alerts-status.sh` now reports
   `confirmed: 1, pending: 0, deleted: 0` and exits 0. Someone will actually receive an alarm from
