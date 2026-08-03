@@ -6,7 +6,8 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-08-02, second session — the alarm-email diagnosis and ADR-0036's daily check.
+**Last updated:** 2026-08-03 — the crawl that had the box pinned, and the daily check proving itself
+unattended.
 
 ## The box
 
@@ -46,49 +47,75 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-**One thing, still: confirm the alarm email.** Checked on 2026-08-02 and the topic reads
-`SubscriptionsConfirmed: 0, SubscriptionsPending: 1, SubscriptionsDeleted: 1` — **nobody has ever
-received an alarm from this site.** The `Deleted: 1` is the first confirmation link expiring: AWS
-drops an unconfirmed subscription after three days, so "I'll click it later" silently became "I need
-a new one". A fresh confirmation was sent to `arihershowitz@gmail.com` on 2026-08-02 at 16:00 UTC.
+**Nothing is blocking.** Both items this section held on 2026-08-02 are done, confirmed on
+2026-08-03:
 
-It comes from `no-reply@sns.amazonaws.com`, subject **"AWS Notification - Subscription
-Confirmation"**, and Gmail files it under Promotions or Spam as often as not. It expires in three
-days.
+- **The alarm email is confirmed.** `deploy/alerts-status.sh` now reports
+  `confirmed: 1, pending: 0, deleted: 0` and exits 0. Someone will actually receive an alarm from
+  this site, for the first time. Re-check any time with
+  `AWS_PROFILE=uscode-admin bash deploy/alerts-status.sh`; if it ever reads 0 again, re-send with
+  `ALERT_EMAIL=arihershowitz@gmail.com RESEND=1` in front of it.
+- **The SNS grant is in place.** `deploy/admin-grant.sh` was re-run under an admin profile — proven
+  by the fact that `alerts-status.sh` above works at all, since it needs `sns:ListTopics` on
+  `Resource: "*"` plus `ListSubscriptionsByTopic` and `GetSubscriptionAttributes`, and those are
+  exactly what the re-run added.
 
-Check that it took, and re-send it if it lapsed again:
-
-```bash
-AWS_PROFILE=uscode-admin bash deploy/alerts-status.sh
-# and if it says nobody is receiving them:
-ALERT_EMAIL=arihershowitz@gmail.com RESEND=1 AWS_PROFILE=uscode-admin bash deploy/alerts-status.sh
-```
-
-That script exists because of this failure: five alarms wired to a real topic look identical whether
-or not anyone is subscribed, so the broken state was indistinguishable from the working one. It exits
-non-zero when nothing is confirmed. Prove delivery once it is:
+**Optional, and never yet done: prove delivery end to end.** The subscription is confirmed, which is
+not the same as an email having arrived. One command, and it sends real mail:
 
 ```bash
 aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
   --state-value ALARM --state-reason 'testing delivery' --region us-east-1
 ```
 
-**One IAM re-run needs an admin profile (not the deploy user).** `deploy/admin-grant.sh` now grants
-`sns:ListSubscriptionsByTopic` and `sns:GetSubscriptionAttributes`, and moves `sns:ListTopics` to
-`Resource: "*"` — that call is account-wide and does not support resource-level permissions, so
-scoping it to `uscode-*` denied it outright, which is how the diagnosis above started with an
-`AccessDenied` for a permission the policy appeared to grant. Re-run it (idempotent; it adds a new
-policy version) to pick that up:
+`uscode-cpu-credits-low` has been reading `ALARM`, and until 2026-08-03 that was recorded here as
+*"the alarm being right — if it is still in alarm after a quiet day, the instance is undersized"*.
+It was in alarm after a quiet day, and the instance is not undersized: **it was serving a crawl**
+(see below). Expect it to clear as the crawlers back off; if it does not, that is when the
+undersizing reading becomes the right one.
 
-```bash
-AWS_PROFILE=<admin> bash deploy/admin-grant.sh
-```
+## The crawl (ADR-0037)
 
-All five alarms exist and point at the topic. Four read `OK`; **`uscode-cpu-credits-low` reads
-`ALARM`, and that is the alarm being right rather than a fault** — a t4g.large earns CPU credits
-while idle and spends them under load, and this box spent a night restoring 22 GB and indexing half
-a million documents. It should clear now that it only serves pages. If it is still in alarm after a
-quiet day, that is the signal the instance is undersized for what is being asked of it.
+**The box was pinned by ClaudeBot and GPTBot, and there was no `robots.txt` at all.** One hour of
+the proxy log on 2026-08-03:
+
+| | |
+|---|---|
+| requests | **43,068** (~12/s sustained) |
+| ClaudeBot | 33,937 (79%) |
+| GPTBot | 9,079 (21%) |
+| everything from a human browser | **~48** |
+| carrying `?release=` | 36,465 (**85%**) |
+| requests for `/robots.txt` | 5, all 404 |
+
+The 85% is the tell: the crawlers had found the version dimension, and behind it are 65,938 sections
+× 382 release points ≈ 25 million reader pages, plus 96,185,732 `?id=` guids. No crawl budget
+finishes that, so the load had no natural end — load average 2.06 on 2 vCPUs with nobody reading
+the site, which is what kept `uscode-cpu-credits-low` in alarm and, on a `t4g` in unlimited mode,
+what was being billed.
+
+Fixed by serving `robots.txt` from the Caddyfile with `Disallow: /` — blunt on purpose while the
+site is a demo, with the shaped version (index the ~66k current-text sections, refuse the
+permutation space) written down in ADR-0037 as the thing to come back to. Check it with
+`curl -s https://uscode.linkedlegislation.org/robots.txt`.
+
+**Two deployment bugs fell out of shipping it, and both were live before this.**
+
+- **Nothing in the deploy ever restarted the proxy.** `deploy/Caddyfile` is a bind mount, and
+  `compose up -d` recreates a container when its *service definition* changes — a mounted file's
+  bytes are not that. Caddy reads its config once, at start. So every Caddyfile change since the
+  box was built would have reached it (`git checkout --force`) and then sat there unserved, under a
+  green deploy.
+- **`caddy reload` is the obvious fix and does not work.** A single-file bind mount binds an
+  *inode*, not a path, and `git checkout` replaces the file rather than rewriting it — so the new
+  bytes land on an inode nothing in the container is looking at. Measured: `docker inspect` still
+  lists the mount while `/etc/caddy/Caddyfile` is *gone* inside the container. Reload would have
+  reloaded the wrong file and exited 0. `deploy-on-box.sh` now force-recreates the proxy and then
+  greps the served `robots.txt` over `--resolve` to prove the running config is the repository's.
+
+Also: the Caddyfile is now validated in CI (`caddy validate`) beside the compose file. A syntax
+error in it is caught by no image build and no compose parse, and would surface as a proxy that will
+not start — taking both surfaces down *after* the deploy replaced the running config.
 
 Everything else that needed a human is done: the Route 53 A record exists, Caddy holds a
 certificate, and #17 and #18 are merged — so the reindex streaming fix is baked into the running
@@ -323,8 +350,38 @@ against the live host — the table at the top of this file *is* their result. `
 green on `workflow_run` a dozen times, which is the automated path proving itself. `update-corpus.yml`
 ran green on `workflow_dispatch`.
 
-What is genuinely outstanding is above: **the alarm subscription**, and the admin re-run of
-`admin-grant.sh`.
+Nothing is genuinely blocking. Two things are worth doing when someone has an admin profile to hand:
+
+- **The nightly dumps have no expiry.** `s3://uscode-mirror-dreamproit/usc/db/` takes a 2.2 GB
+  `pg_dump` every night at 04:17 UTC and nothing ever removes one — about 66 GB a month, growing
+  linearly, against a cost estimate at the bottom of this file that does not include it. The deploy
+  user cannot even read the current setting (`s3:GetLifecycleConfiguration` is not in its policy), so
+  this needs an admin profile to check and to set. A sane rule is a handful of dailies plus a
+  monthly; the corpus itself is reproducible from the mirror, so these are a convenience rather than
+  the record.
+- **Prove alarm delivery** with the `set-alarm-state` command above — the subscription is confirmed,
+  which is not the same as mail having arrived.
+
+**The daily check has now run unattended**, which is the claim ADR-0036 actually makes and it could
+not be made on 2026-08-02, when every check so far had been one a human typed. From the box's
+`source_checks`:
+
+| checked_at (UTC) | ok | release points | what ran it |
+|---|---|---|---|
+| 2026-08-03 10:54:21 | t | 382 | the weekly Actions sweep's own `inventory` step |
+| 2026-08-03 10:52:53 | t | 382 | the weekly Actions sweep (Monday, `--force`) |
+| **2026-08-03 06:41:04** | **t** | **382** | **the box's cron, unattended** |
+| 2026-08-02 16:26:53 | t | 382 | by hand, when the cron was installed |
+
+`/var/lib/uscode/logs/check.log` for the 06:41 run reads `nothing new since the last check` /
+`no new release points` / `nothing to do`, start to finish in **6 seconds** — one HTTP request and
+one row, which is exactly the cheap path ADR-0036 designed for the ~360 days a year when OLRC has
+published nothing. The two rows 88 seconds apart at 10:52 are ADR-0036's named cost ("two source
+checks are recorded on days when the full chain runs"), here caused by the weekly `--force` sweep
+rather than by new law.
+
+The weekly sweep also ran green **on its own schedule** for the first time (run `30807277322`,
+10m30s), having previously only been proven by `workflow_dispatch`.
 
 **The box side of ADR-0036 is done and proven**, 2026-08-02 16:26 UTC:
 
