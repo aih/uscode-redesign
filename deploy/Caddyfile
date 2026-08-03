@@ -69,6 +69,40 @@
 	# from the code that relies on it. Narrowing `--forwarded-allow-ips` to a
 	# literal range instead was rejected: the compose network's CIDR is assigned
 	# by Docker and changes. See ADR-0029.
+	# robots.txt is a property of the *host*, not of either surface, and this
+	# file is the only thing that owns the host — so serving it here is what
+	# makes one answer true for /app and /api/v1 alike, including for a request
+	# that arrives while one of them is restarting.
+	#
+	# It exists because the site was measured being crawled into the ground.
+	# One hour of the proxy log on 2026-08-03: 43,068 requests, of which 33,937
+	# were ClaudeBot and 9,079 GPTBot — 99.9% — against roughly 48 from human
+	# browsers. 36,465 of them (85%) carried `?release=`, which is the tell:
+	# the crawlers had found the version dimension, and the space behind it is
+	# 65,938 sections x 382 release points, about 25 million reader pages,
+	# before counting the 96,185,732 `?id=` guids that also resolve. There is no
+	# crawl budget that finishes that, so the load has no natural end — the box
+	# sat at load average 2.06 on 2 vCPUs with nobody reading it, which is what
+	# kept `uscode-cpu-credits-low` in alarm and, on a t4g in unlimited mode,
+	# what was being paid for.
+	#
+	# The site had no robots.txt at all: five requests for one in that hour, all
+	# 404. So this is not a tightening of a policy, it is the first statement of
+	# one, and it is deliberately the blunt version while the demo is being
+	# shown to the audience it was built for. `Disallow: /` is advisory and only
+	# binds well-behaved crawlers — which is exactly what the measured traffic
+	# is, both bots declaring themselves and both honouring robots.txt.
+	# Shaping the crawl instead (index the ~66k current-text sections, disallow
+	# the permutation space) is the setting to come back to when the site should
+	# be discoverable; it is a change to this block and nothing else.
+	handle /robots.txt {
+		header Content-Type "text/plain; charset=utf-8"
+		respond <<ROBOTS
+			User-agent: *
+			Disallow: /
+			ROBOTS 200
+	}
+
 	handle /app* {
 		reverse_proxy frontend:4321 {
 			header_up X-Forwarded-For {remote_host}
