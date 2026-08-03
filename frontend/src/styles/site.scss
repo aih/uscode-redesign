@@ -2432,6 +2432,20 @@ main[id] {
   grid-template-columns: 1fr;
 }
 
+/* On a phone the chapter comes first and the contents follow it. The contents
+ * are markup-first because that is their reading order beside the prose at
+ * desktop width; stacked, they are ten links between the reader and the
+ * chapter they already chose. */
+.guide__body {
+  order: 1;
+}
+
+.guide__nav {
+  order: 2;
+  border-top: 1px solid var(--rule);
+  padding-top: 1rem;
+}
+
 /* The contents sit above the chapter on a phone and beside it from 64em, which
  * is the width at which the reading column stops needing the whole viewport.
  * `minmax(0, …)` on the body column is what stops a long unbroken identifier in
@@ -2441,6 +2455,15 @@ main[id] {
   .guide {
     grid-template-columns: 14rem minmax(0, 1fr);
     align-items: start;
+  }
+
+  /* Side by side, the contents belong on the left — which is where the markup
+   * already puts them, so the phone's reordering is undone rather than
+   * repeated. */
+  .guide__nav {
+    order: 0;
+    border-top: 0;
+    padding-top: 0;
   }
 
   /* Not sticky, deliberately. The obvious `position: sticky; top: calc(var(

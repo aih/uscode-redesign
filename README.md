@@ -24,6 +24,13 @@ preview on hover rather than costing you your place. Accounts and watchlists are
 but switched off, and the site says so where the controls would be
 ([ADR-0034](docs/adr/0034-features-built-and-switched-off-say-so.md)).
 
+All of that is written up in a **user guide at `/app/guide`**, and the guide is executable
+([ADR-0038](docs/adr/0038-the-user-guide-is-executable.md)): every behavioural claim in it carries a
+scenario block that is simultaneously the walkthrough a reader follows, a Playwright test that runs
+on every push, and a captioned scene of the demo video `make demo-video` records. A claim that stops
+being true fails the build instead of sitting on a page misleading people — which is exactly what the
+search guide did for a fortnight, and the reason the design exists.
+
 ## Documents
 
 | File | Purpose |
