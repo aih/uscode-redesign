@@ -191,7 +191,7 @@ jobs:
           if-no-files-found: ignore
 
   compose:
-    name: docker-compose.prod.yml validates
+    name: deploy config validates
     runs-on: ubuntu-latest
 
     # Nothing currently parses the prod compose file before a deploy. Cheap
@@ -207,6 +207,18 @@ jobs:
       - uses: actions/checkout@v5
 
       - run: docker compose -f docker-compose.prod.yml config -q
+
+      # The Caddyfile had the same gap and a worse consequence: it is a bind
+      # mount, so a syntax error in it is not caught by building an image or
+      # by the compose parse above — it surfaces as a proxy that will not
+      # start, taking both surfaces with it, after the deploy has already
+      # replaced the running config. `validate` adapts the Caddyfile to JSON
+      # and provisions the modules without binding a port.
+      - name: deploy/Caddyfile validates
+        run: |
+          docker run --rm -e SITE_ADDRESS \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
   slow:
     name: make test-slow (full samples)
