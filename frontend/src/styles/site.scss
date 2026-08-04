@@ -1406,6 +1406,7 @@ main[id] {
   color: var(--muted);
 }
 
+
 /* Notes and the source credit collapse behind `<details>` — no JS (Day 4).
  * Closed is the real, honest default (also what a phone gets): a source
  * credit is citation apparatus, not the text of the law. Desktop overrides the
@@ -1727,6 +1728,21 @@ main[id] {
   border-left: 4px solid var(--rule);
   margin: 0.8rem 0 0.8rem 1rem;
   padding-left: 0.8rem;
+}
+
+/* `<note>` and `<quotedContent>` are block apparatus most of the time and part
+ * of a sentence the rest of it, so `uslm.ts` decides per occurrence and marks
+ * the inline ones. This undoes the box without needing a class per element.
+ *
+ * It sits *after* both `.uslm-note` and `.uslm-quotedContent` deliberately —
+ * same specificity, so source order is what decides, and above either of them
+ * this rule would lose to the block it exists to cancel. */
+.uslm-inlined {
+  display: inline;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
 }
 
 /* Wide tables scroll inside themselves rather than making the page scroll. */
