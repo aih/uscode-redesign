@@ -14,8 +14,36 @@ NAME="uscode-site"
 INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.large}"
 DATA_VOLUME_GB="${DATA_VOLUME_GB:-120}"
 ROOT_VOLUME_GB="${ROOT_VOLUME_GB:-20}"
-# AL2023 arm64, resolved through SSM so the AMI id is never stale in this file.
-AMI_ALIAS="resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
+# AL2023 arm64, looked up rather than pinned, so the id is never stale here.
+#
+# Not `--image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/...`: that
+# alias makes RunInstances call ssm:GetParameters on an AWS-owned public
+# parameter, a permission the deploy identity has no other reason to hold, and
+# the failure (SsmAccessDenied) names SSM rather than the AMI. describe-images
+# needs nothing beyond the EC2 read access provisioning already requires.
+#
+# Several AMIs share the newest publication date and differ only by kernel, so
+# the name is the tiebreak — descending, which takes the highest kernel — and
+# the choice is echoed rather than left to whatever order the API returns.
+
+if [ -n "${AMI_ID:-}" ]; then
+    echo "==> AMI $AMI_ID (from AMI_ID)"
+else
+    echo "==> resolving the newest AL2023 arm64 AMI"
+    AMI_ID="$(aws ec2 describe-images --region "$REGION" --owners amazon \
+        --filters "Name=name,Values=al2023-ami-2023*-arm64" \
+                  "Name=state,Values=available" \
+                  "Name=architecture,Values=arm64" \
+        --query 'reverse(sort_by(Images,&CreationDate))[0:8].[Name,ImageId]' \
+        --output text | sort -r | head -1 | awk '{print $2}')"
+    if [ -z "$AMI_ID" ]; then
+        echo "could not resolve an AL2023 arm64 AMI in $REGION" >&2
+        exit 1
+    fi
+    AMI_NAME="$(aws ec2 describe-images --region "$REGION" --image-ids "$AMI_ID" \
+        --query 'Images[0].Name' --output text)"
+    echo "    $AMI_ID ($AMI_NAME)"
+fi
 
 echo "==> security group $NAME"
 SG="$(aws ec2 describe-security-groups --region "$REGION" \
@@ -50,7 +78,7 @@ if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
     # DeleteOnTermination=false on the data volume: the instance is
     # replaceable, the loaded corpus is not.
     INSTANCE_ID="$(aws ec2 run-instances --region "$REGION" \
-        --image-id "$AMI_ALIAS" \
+        --image-id "$AMI_ID" \
         --instance-type "$INSTANCE_TYPE" \
         --iam-instance-profile "Name=$NAME" \
         --security-group-ids "$SG" \

@@ -3,11 +3,16 @@
 #
 #   AWS_PROFILE=<admin> bash deploy/admin-grant.sh
 #
-# "Admin" here means only the 21 IAM actions this script calls, all of them
-# scoped to uscode-* names — admin-grant-bootstrap-policy.json is exactly that
-# set, for an account where nobody wants to hand out AdministratorAccess to
-# run a setup script. Attach it, run this, detach it: nothing in the ongoing
-# deploy path needs IAM write.
+# "Admin" here means only the IAM actions this script calls, all of them scoped
+# to uscode-* names — admin-grant-bootstrap-policy.json is exactly that set,
+# for an account where nobody wants to hand out AdministratorAccess to run a
+# setup script. Attach it, run this, detach it: nothing in the ongoing deploy
+# path needs IAM write.
+#
+# That policy also carries iam:PassRole on uscode-site, which no line below
+# calls by name: AddRoleToInstanceProfile requires it implicitly. Deriving the
+# permission list by reading the `aws iam` calls here will miss it — and the
+# failure arrives late, after the group, the role and the profile all exist.
 #
 # Creates the IAM surface deploy/update-corpus.yml, deploy-on-box.sh and
 # update-corpus.sh need, and nothing more:
