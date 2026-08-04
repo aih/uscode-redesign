@@ -48,6 +48,8 @@ interface Props {
    * first was the wrong one. Prefilling the single box the site already has is
    * the same affordance without the double. */
   searchValue?: string | null;
+  /** Set by a page that fills the `rail` slot. See `hasRail` below. */
+  rail?: boolean;
   /** Widens the page beyond the 46rem reading measure.
    *
    * The measure is set for statutory text and is right for it. The user guide
@@ -66,9 +68,20 @@ const {
   picker = null,
   bar = null,
   searchValue = null,
+  rail = false,
   wide = false,
 } = Astro.props;
 const hasContext = crumbs.length > 0 || current !== null || picker !== null;
+/** Whether this page is supplying the `rail` slot, and so wants the two-column
+ *  reading layout. The guide asks for `wide` directly; a rail implies it.
+ *
+ *  A prop rather than `Astro.slots.has("rail")`, which does not answer this
+ *  question: a page whose slot content is behind a condition
+ *  (`{rail && <ChapterRail slot="rail" …/>}`) reports `true` from `has()` even
+ *  when the condition is false, so every table-of-contents page took the
+ *  two-column layout and the wide measure with nothing in the first column. */
+const hasRail = rail;
+const mainClass = wide || hasRail ? "reader-wrap reader-wrap--wide" : "reader-wrap";
 ---
 
 <html lang="en">
@@ -164,7 +177,7 @@ const hasContext = crumbs.length > 0 || current !== null || picker !== null;
         (`site.scss`). Anything that sticks has to be paid for in
         `--sticky-h`, which drives `scroll-margin-top` — otherwise a deep link
         to a provision lands *behind* this. */}
-    <div class="topbar">
+    <div class={hasRail ? "topbar topbar--wide" : "topbar"}>
       <SiteHeader searchValue={searchValue} />
 
       {
@@ -181,8 +194,23 @@ const hasContext = crumbs.length > 0 || current !== null || picker !== null;
       {bar && <SectionBar {...bar} release={release} />}
     </div>
 
-    <main id="main" class={wide ? "reader-wrap reader-wrap--wide" : "reader-wrap"}>
-      <slot />
+    {/* A page supplying the `rail` slot gets two columns from 64em and the wider
+        measure to hold them, the same arrangement `.guide__nav` uses. Without
+        the slot the markup is unchanged — one column, one `<slot />` — so no
+        page that does not ask for a rail pays for one. */}
+    <main id="main" class={mainClass}>
+      {
+        hasRail ? (
+          <div class="reader-layout">
+            <slot name="rail" />
+            <div class="reader-col">
+              <slot />
+            </div>
+          </div>
+        ) : (
+          <slot />
+        )
+      }
     </main>
 
     <SiteFooter />

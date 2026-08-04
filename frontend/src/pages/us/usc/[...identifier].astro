@@ -12,6 +12,7 @@
  */
 import Base from "../../../layouts/Base.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
+import ChapterRail from "../../../components/ChapterRail.astro";
 import CitePreview from "../../../components/CitePreview.astro";
 import CopyColumn from "../../../components/CopyColumn.astro";
 import KeyboardNav from "../../../components/KeyboardNav.astro";
@@ -25,6 +26,7 @@ import {
   fetchLabels,
   fetchNeighbors,
   fetchReleases,
+  fetchToc,
   releaseParams,
 } from "../../../lib/api";
 import { REVALIDATE, setPublicCache } from "../../../lib/cache";
@@ -81,6 +83,9 @@ let crumbs: Entry[] = [];
 let releases: Release[] = [];
 let selected = "";
 let neighbors: NeighborsBody | null = null;
+/** The parent subdivision's table of contents, which feeds the `ChapterRail`.
+ *  Null when the section has no parent, or when the call failed. */
+let parentToc: Toc | null = null;
 let labels: Labels = {};
 let sectionHtml = "";
 /** One rendered body per further occurrence the source published under this same
@@ -119,20 +124,25 @@ if (body && isToc(body)) {
   // page, not one per occurrence.
   const dupFragments = (section.duplicates ?? []).map((d) => parseFragment(d.xml));
 
-  // Three calls, all server-side and all on localhost: the labels this page's
-  // citations need (batched, `fetchLabels`), the neighbours, and the release
-  // points a picker can offer. There used to be a fourth — the parent node's
-  // whole table of contents, fetched to keep two fields of it — which is the
-  // Day-6 debt carried over from the Jinja reader. The breadcrumb now rides on
-  // the section itself (PLAN Day 6b).
+  // Four calls, all server-side and all on localhost: the labels this page's
+  // citations need (batched, `fetchLabels`), the neighbours, the release points
+  // a picker can offer, and the parent's table of contents.
   //
-  // The labels are the one call allowed to fail. They are hover text over
+  // The parent TOC is the call this page dropped in Day 6b, when the breadcrumb
+  // moved onto the section itself and only two fields of a whole TOC were still
+  // wanted. ADR-0043 puts it back and spends the whole of it: it is the
+  // `ChapterRail`, which is a use for the sections list rather than for two
+  // fields of the node.
+  //
+  // The labels are one of two calls allowed to fail. They are hover text over
   // citations that are already links, and the section's own words are in hand
   // before this runs — so losing them costs a tooltip, while `Promise.all`
   // rejecting costs the reader the statute. 3 U.S.C. § 301 is where that bill
   // came due: 242 cross references, one over-long request, 422, and a page
-  // that 500ed with its text sitting in memory.
-  [labels, neighbors, releases] = await Promise.all([
+  // that 500ed with its text sitting in memory. The parent TOC is the other,
+  // for the same reason: without it the reader loses the rail and still has the
+  // section, the sticky bar and the neighbours.
+  [labels, neighbors, releases, parentToc] = await Promise.all([
     fetchLabels(
       citedIdentifiers([fragment, ...dupFragments].flatMap((f) => hrefs(f))),
       selected,
@@ -142,6 +152,12 @@ if (body && isToc(body)) {
     }),
     fetchNeighbors(section.identifier, selected),
     fetchReleases(titleNum),
+    section.parent_identifier
+      ? fetchToc(section.parent_identifier, selected).catch((error) => {
+          console.error(`rail for ${section.identifier} at ${selected}:`, error);
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
 
   crumbs = section.ancestors ?? [];
@@ -193,6 +209,17 @@ const bar = section
       up: upNode,
     }
   : null;
+
+/** `fetchReleases` answers newest first, so the head of the list is the newest
+ *  release point this title has. Used to decide whether the rail has to warn
+ *  that its structure and the text on screen may be from different releases. */
+const isNewest = releases.length === 0 || releases[0].label === selected;
+/** The rail's own data. Only a section gets one: a table of contents already
+ *  *is* the list a rail would show. */
+const rail =
+  section && parentToc && parentToc.sections.length > 0
+    ? { parent: parentToc.node, entries: parentToc.sections }
+    : null;
 ---
 
 <Base
@@ -202,7 +229,21 @@ const bar = section
   release={selected}
   picker={picker}
   bar={bar}
+  rail={rail !== null}
 >
+  {
+    rail && (
+      <ChapterRail
+        slot="rail"
+        parent={rail.parent}
+        entries={rail.entries}
+        current={section!.identifier}
+        release={selected}
+        isNewest={isNewest}
+      />
+    )
+  }
+
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
   {

@@ -445,11 +445,127 @@ main[id] {
   padding: 0 1rem 3rem;
 }
 
-/* The user guide only (ADR-0038): prose *and* a chapter contents column, which
- * the reading measure was never sized for. Wide enough for both at 64em, and
- * identical to the plain wrap below it, where the guide is one column anyway. */
+/* Prose *and* a second column, which the reading measure was never sized for.
+ * Wide enough for both at 64em, and identical to the plain wrap below it, where
+ * both users of this — the guide (ADR-0038) and a section page carrying a
+ * `ChapterRail` — are one column anyway. */
 .reader-wrap--wide {
   max-width: 62rem;
+}
+
+/* A section page with a rail. The rail is second in the markup and moves to the
+ * left column at 64em, so on a phone it sits after the text rather than between
+ * the reader and the section they asked for. Same arrangement, and the same
+ * reasoning, as `.guide__nav`. */
+.reader-layout {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 1fr;
+}
+
+/* `min-width: 0` is what stops a long unbroken identifier in the statutory text
+ * from widening the grid column and pushing the page sideways — the failure
+ * `make shots` asserts against at 320 CSS px. */
+.reader-col {
+  order: 1;
+  min-width: 0;
+}
+
+.rail {
+  order: 2;
+  border-top: 1px solid var(--rule);
+  padding-top: 1rem;
+  font-size: 0.9rem;
+}
+
+@media (min-width: 64em) {
+  .reader-layout {
+    grid-template-columns: 16rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .rail {
+    order: 0;
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+
+.rail__title {
+  margin: 0;
+}
+
+.rail__parent {
+  text-decoration: none;
+}
+
+.rail__parent:hover,
+.rail__parent:focus {
+  text-decoration: underline;
+}
+
+.rail__parentheading {
+  margin: 0.15rem 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rail__item {
+  margin: 0;
+}
+
+.rail__link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-left: 3px solid transparent;
+  text-decoration: none;
+  color: var(--link);
+}
+
+.rail__link:hover,
+.rail__link:focus {
+  text-decoration: underline;
+}
+
+/* The section being read. Marked three ways, because colour alone is not a
+ * distinction (WCAG 1.4.1): the left edge, the weight, and `aria-current` for
+ * anything not reading the pixels. */
+.rail__item--here .rail__link {
+  border-left-color: var(--edge);
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.rail__num {
+  font-family: var(--reading);
+  flex: none;
+}
+
+/* The heading wraps rather than eliding: this column is 16rem and a section
+ * heading is a sentence, so a single clipped line would name almost nothing. */
+.rail__heading {
+  color: var(--muted);
+  min-width: 0;
+}
+
+.rail__item--here .rail__heading {
+  color: var(--ink);
+}
+
+.rail__note {
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 /* Breadcrumbs and the release picker share a contextual bar under the navbar —
@@ -458,6 +574,15 @@ main[id] {
 .contextbar {
   background: var(--panel);
   border-bottom: 1px solid var(--rule);
+}
+
+/* The sticky chrome spans whatever `<main>` spans. A page carrying a rail is
+ * 62rem wide; leaving its breadcrumb and section bar at the 46rem reading
+ * measure would centre them over the reading column and leave them visibly
+ * offset from the page they belong to. */
+.topbar--wide .contextbar__inner,
+.topbar--wide .sectionbar__inner {
+  max-width: 62rem;
 }
 
 .contextbar__inner {
@@ -489,6 +614,21 @@ main[id] {
 
 .usa-breadcrumb--wrap .usa-breadcrumb__list-item:nth-last-child(2) .usa-breadcrumb__link::before {
   content: none;
+}
+
+/* USWDS puts the `›` separator inside `at-media($theme-breadcrumb-min-width)` —
+ * 480px — because below that its own breadcrumb shows a single back link, which
+ * needs no separator. `--wrap` shows the whole trail at every width, so under
+ * 480px the items ran together with nothing between them:
+ * `Title 16CHAPTER 1SUBCHAPTER VI`. A text separator rather than USWDS's masked
+ * SVG, which is sized against tokens this file does not reach into; `--muted` on
+ * `--panel` is already a measured pair (`scripts/contrast.py`). */
+@media (max-width: 29.99em) {
+  .usa-breadcrumb--wrap .usa-breadcrumb__list-item:not(:last-child)::after {
+    content: "›";
+    margin: 0 0.35rem;
+    color: var(--muted);
+  }
 }
 
 /* The trail's last item — the thing on screen. USWDS's breadcrumb package

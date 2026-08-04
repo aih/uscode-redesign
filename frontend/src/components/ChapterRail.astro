@@ -1,0 +1,91 @@
+---
+/**
+ * The sections either side of this one, in the subdivision that contains it.
+ *
+ * `SectionBar` and `Neighbors` give the reader one step in each direction. This
+ * gives them the neighbourhood: where in the chapter they are, how much is left,
+ * and — because repealed and omitted sections keep their place in reading order
+ * (gotcha 9) — which of the neighbours are gaps. The badge is on the rail rather
+ * than only on the section it belongs to, so a repealed § 46 is visible before
+ * it is clicked rather than after.
+ *
+ * Placed after the text in the markup and moved to the left column at 64em, the
+ * arrangement `.guide__nav` already uses. A `<details>` above the text would be
+ * tidier on a phone and is not available: CSS can force the panel visible at
+ * desktop width but cannot open the element, so the summary would report itself
+ * collapsed while its content was on screen. Below 64em the rail is simply at
+ * the foot of the page, where it costs a reader nothing to scroll past.
+ *
+ * Not sticky, and that is the same trap `.guide__nav` names: `position: sticky;
+ * top: calc(var(--sticky-h) + 1rem)` looks right and is not, because
+ * `--sticky-h` is a scroll-margin budget rather than a measurement of the
+ * chrome — 19rem at this breakpoint — so a sticky rail honouring it starts a
+ * third of the way down the page before anything has scrolled.
+ *
+ * The list comes from `structure_nodes`, which holds one row per node and not
+ * one per release point (ADR-0006). At an older release point the rail is
+ * therefore the newest loaded release's view of the subdivision, and says so.
+ */
+import StatusBadge from "./StatusBadge.astro";
+import type { Entry } from "../lib/types";
+import { appHref, trimNum } from "../lib/url";
+
+interface Props {
+  /** The subdivision whose sections these are — a subchapter, usually. */
+  parent: Entry;
+  entries: Entry[];
+  /** Identifier of the section being read, marked `aria-current`. */
+  current: string;
+  release?: string | null;
+  /** False when an older release point is being read, which is when the
+   *  unversioned structure can disagree with the text on screen. */
+  isNewest?: boolean;
+}
+
+const { parent, entries, current, release = null, isNewest = true } = Astro.props;
+
+/** `SUBCHAPTER VI—` → `SUBCHAPTER VI`. The trailing dash joins a number to its
+ * heading in print and has nothing after it here. */
+const parentLabel =
+  trimNum(parent.num).replace(/[—–-]\s*$/u, "").trim() || parent.identifier;
+---
+
+{
+  entries.length > 0 && (
+    <nav class="rail" aria-label={`Sections in ${parentLabel}`}>
+      <p class="toc-group rail__title">
+        <a class="rail__parent" href={appHref(parent.identifier, release)}>
+          {parentLabel}
+        </a>
+      </p>
+      {parent.heading && <p class="rail__parentheading">{parent.heading}</p>}
+
+      <ol class="rail__list">
+        {entries.map((entry) => {
+          const here = entry.identifier === current;
+          return (
+            <li class={here ? "rail__item rail__item--here" : "rail__item"}>
+              <a
+                class="rail__link"
+                href={appHref(entry.identifier, release)}
+                aria-current={here ? "true" : undefined}
+              >
+                <span class="rail__num">{trimNum(entry.num)}</span>
+                <span class="rail__heading">{entry.heading}</span>
+                <StatusBadge status={entry.status} />
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+
+      {!isNewest && (
+        <p class="rail__note">
+          This list is the structure of the newest release point loaded, not of {release}.
+          The text on this page is {release}; a section added or renumbered since then can
+          appear here.
+        </p>
+      )}
+    </nav>
+  )
+}
