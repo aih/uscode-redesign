@@ -5,7 +5,7 @@ order: 9
 summary: How to verify that what you are reading is what the OLRC published, and what this site does not guarantee.
 covers:
   routes: []
-  adrs: [7, 13]
+  adrs: [7, 13, 39]
 ---
 
 This is not an official publication. This chapter explains how to verify the text against official sources.
@@ -48,8 +48,32 @@ incomplete loads.** The result is committed to the repository as a file.
 The six count mismatches it does report are the source publishing several elements under one
 identifier at one release point, which is [shown rather than smoothed away](/app/guide/02-reading).
 
+## Accessibility
+
+The reader is scanned against WCAG 2.1 Level AA on every push. The scan covers every route in a
+declared matrix at three widths — 320, 375 and 1280 pixels — in both themes, once with forced
+colours, and in six interactive states: a citation preview opened by keyboard, the same preview
+dismissed with Escape, the copy control after use, the theme immediately after toggling, the
+redline with its source pane rendered, and the search box holding a query. The results are
+committed to the repository as a file.
+
+Violations that are known and not yet fixed are listed with the task that owns each. The list
+currently holds contrast failures in the dark-mode navigation, in the copy column, and in one of
+this guide's code blocks; two horizontally scrollable regions with no keyboard route into them; and
+the citation preview, which while open is in the tab order and hidden from assistive technology at
+the same time. The Swagger UI and ReDoc pages carry further violations from the bundles the site
+vendors.
+
+Two further checks run at the same time: every page in the screenshot set must lay out without
+scrolling sideways at 320 pixels, and again at 1280 pixels with the page zoomed to 200%.
+
+Automated scanning answers about half of WCAG 2.1 AA. It does not see focus order, reading
+sequence, whether a live region announces, or whether a visible label and its accessible name
+agree.
+
 ## Limitations
 
+- **The site claims no accessibility conformance yet.** The known defects are listed above.
 - **It is not official.** For the official text or the official currency of a title, go to
   [uscode.house.gov](https://uscode.house.gov/).
 - **Structural history is not versioned.** The text is versioned at every release point; however, the hierarchy
