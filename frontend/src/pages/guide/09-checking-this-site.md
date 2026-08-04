@@ -62,5 +62,4 @@ identifier at one release point, which is [shown rather than smoothed away](/app
 
 The source, every design decision, and a session-by-session build log are public at
 [github.com/aih/uscode-redesign](https://github.com/aih/uscode-redesign). The decisions are
-individually written up — including the costs each one incurred — so what this site got wrong is as
-readable as what it got right.
+individually written up as ADRs, and the code is MIT-licensed.
