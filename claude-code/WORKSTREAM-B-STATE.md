@@ -19,7 +19,7 @@ All suites green as of the last commit:
 |---|---|
 | `make test` | 486 |
 | `make test-web` | 227 |
-| `make test-e2e` | 371 (251 of them the a11y scan) |
+| `make test-e2e` | 373 (251 of them the a11y scan) |
 | `make shots` | reflow clean at 320 CSS px and 1280@200% |
 
 `docs/verification/a11y.json`: **8 route/rule pairs over 1,780 nodes** — unchanged from the ADR-0039

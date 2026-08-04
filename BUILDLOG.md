@@ -1060,7 +1060,7 @@ Session-by-session record of how this site was built. One entry per working sess
 - **Verified:**
   - `make test` — 486 passed. `make test-web` — 227 passed, including the ADR-0038 ratchet, which is
     what forced chapters 02 and 03 to claim ADR-0043 and ADR-0044.
-  - `make test-e2e` — 371 passed, 251 of them the a11y scan. `docs/verification/a11y.json` is **8
+  - `make test-e2e` — 373 passed, 251 of them the a11y scan. `docs/verification/a11y.json` is **8
     route/rule pairs over 1,780 nodes**, the same as the ADR-0039 baseline, and everything in it is
     still `docs/a11y/known-violations.json`'s.
   - `make shots` — no horizontal overflow at 320 CSS px or 1280 at 200% zoom, apart from the known
