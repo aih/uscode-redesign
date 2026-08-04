@@ -36,6 +36,7 @@
     { "id": "title", "path": "/app/us/usc/t16", "name": "title TOC" },
     { "id": "chapter", "path": "/app/us/usc/t16/ch1", "name": "chapter TOC" },
     { "id": "section", "path": "/app/us/usc/t16/s45f", "name": "section" },
+    { "id": "section-repealed", "path": "/app/us/usc/t16/s688", "name": "repealed section, carrying a status badge" },
     { "id": "provision", "path": "/app/us/usc/t16/s45f/c/5", "name": "provision anchored in section" },
     { "id": "section-at-release", "path": "/app/us/usc/t16/s45f?release=119-99", "name": "section at an older release point" },
     { "id": "section-by-date", "path": "/app/us/usc/t16/s45f?date=07/12/2026", "name": "section by date (not-law exception visible)" },
