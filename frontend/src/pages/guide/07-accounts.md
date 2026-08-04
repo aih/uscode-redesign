@@ -30,7 +30,7 @@ it.
 
 ## Features that don't require an account
 
-The core features that do not require acounts:
+The core features that do not require accounts:
 
 - reading any provision at any of 382 release points;
 - seeing which titles each release point changed;

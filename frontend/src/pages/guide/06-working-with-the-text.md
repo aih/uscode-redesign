@@ -68,7 +68,7 @@ steps:
 
 ## Citing an exact text
 
-A section page carries two addresses. one is the **citation URL**
+A section page carries two addresses. One is the **citation URL**
 (`/us/usc/t16/s45f/c/5`) — stable across release points, and what you want in a brief that means
 "this provision, as it stands".
 
