@@ -43,9 +43,9 @@ steps:
     caption: 12 July 2026 resolves to release point 119-102not101.
 ```
 
-## What every page tells you
+## Release Point information
 
-Three facts sit in the reading column, never in a tooltip:
+Every page tells you three things about the text you are looking at:
 
 **The release point and its date** — what you are looking at.
 
@@ -62,10 +62,8 @@ steps:
 ```
 
 **Where the answer came from.** Most release points republish a title without changing it, so this
-site does not store 382 copies of an unchanged section. If you ask for a release point that was
-never separately ingested, the answer comes from the newest one at or before it — which is the
-right text — and **the page tells you that it did**. An answer that is right for a reason you
-cannot see is not much better than a wrong one.
+site does not store multiple copies of an unchanged section. If you ask for a release point that was
+not separately ingested, the answer comes from the newest one at or before it, and **the page tells you that it did**.
 
 ## Every release point, and how current the site is
 
@@ -83,9 +81,7 @@ steps:
 
 The same page says when the site last looked for a new release point — *“Checked uscode.house.gov
 for new release points 3 hours ago.”* It is a plain line when everything is current and a warning
-when it is not, including when the last check **failed**. A mirror that has quietly stopped
-updating looks exactly like one with nothing to update, and the only difference a reader can see is
-whether the site is willing to say when it last checked. The API answers the same question at
+when it is not, including when the last check **failed**. This makes the site's update status visible to readers. The API answers the same question at
 `/api/v1/status`.
 
 ## A note on caching
