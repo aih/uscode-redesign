@@ -18,6 +18,15 @@ const SITE = process.env.SITE ?? "http://localhost:8000";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  // The accessibility scan (ADR-0039) spreads across worker processes, so each
+  // scan writes a shard and these merge them into docs/verification/a11y.json.
+  // Both are no-ops when no scan ran, which keeps them out of the way of every
+  // other spec here. They live in `scripts/` because a global hook *inside*
+  // testDir is loaded as part of the config, and every spec under that
+  // directory is then loaded in the config's context — where `test.describe()`
+  // throws and the suite collects as zero tests.
+  globalSetup: "./scripts/a11y-setup.ts",
+  globalTeardown: "./scripts/a11y-teardown.ts",
   // A flaky assertion about hover timing is a bug in the assertion. Retries
   // would hide exactly the thing this suite exists to measure.
   retries: 0,
