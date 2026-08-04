@@ -36,7 +36,7 @@ lists every one of them with a worked example, and each example there prints the
 resolves to. That list is generated from the parser's own table, so it cannot describe a form the
 site does not accept.
 
-Two things will catch you out, and both are on that page: a bare section number with no title
+Two things to look out for: a bare section number with no title
 (`523`) is searched rather than resolved, because it is not a citation; and an appendix citation
 like `5 U.S.C. App. 3` parses but resolves to nothing, because the OLRC publishes nothing at that
 flat address.
@@ -52,9 +52,9 @@ steps:
 
 ## Searching the text
 
-The search **matches the words you typed** without applying fuzzy matching or stemming by default. In a legal corpus, a different word often denotes a different rule.
+The search **matches the words you typed** without applying fuzzy matching or stemming by default.
 
-If you do want that, ask: `conservtion~1` allows one edit. The other operators — `"exact phrase"`,
+If you want more flexibility, use search operators: `conservtion~1` allows one character change. The other operators — `"exact phrase"`,
 `-exclude`, `either | or`, `truncat*`, and parentheses for grouping — are listed with examples on
 the [syntax guide](/app/search/syntax#operators).
 

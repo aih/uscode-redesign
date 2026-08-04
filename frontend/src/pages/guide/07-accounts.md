@@ -28,9 +28,9 @@ The accounts system has been built but currently lacks an email integration for 
 point, so you can come back to *this section as it stood then* in one click, with your own note on
 it.
 
-## What works without one
+## Features that don't require an account
 
-Everything else, and it will keep working without one:
+The core features that do not require acounts:
 
 - reading any provision at any of 382 release points;
 - seeing which titles each release point changed;
@@ -38,6 +38,5 @@ Everything else, and it will keep working without one:
 - search, and going straight to a citation;
 - the whole API.
 
-In the meantime, URLs do the work an account would. A pinned address (`?release=`) is a bookmark to
-an exact text, a guid is a permanent citation to one, and the version-history page for a section is
-a standing answer to "has this changed".
+In the meantime, you can use URLs to keep track of things. A pinned address (`?release=`) is a bookmark to
+an exact text, a guid is a permanent citation to one, and the version-history page for a section tracks how the section changed.

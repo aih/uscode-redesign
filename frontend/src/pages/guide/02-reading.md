@@ -10,7 +10,7 @@ covers:
 
 ## The address of a provision
 
-A citation is a path. Title 16, section 45f is `/us/usc/t16/s45f`; subsection (c)(5) of it is
+A citation corresponds to a url path. Title 16, section 45f is `/us/usc/t16/s45f`; subsection (c)(5) of it is
 `/us/usc/t16/s45f/c/5`. Chapters and subchapters work the same way — `/us/usc/t16/ch1` is a table
 of contents rather than a section, served at the same kind of address.
 
@@ -27,9 +27,6 @@ steps:
 ```
 
 Ask for a subsection and you get **the whole section, with that subsection highlighted in place**.
-That is deliberate: a provision read out of its section is a provision read without its
-definitions, its exceptions and its chapeau, and the reader should never have to reconstruct the
-context it was quoted out of.
 
 ```scenario
 id: provision-in-context
@@ -61,9 +58,9 @@ From a script, the same address answers with JSON — `curl -L` follows the redi
 `-H 'Accept: application/json'` is what makes it land on the API rather than the reader. See
 [The API](/app/guide/08-api).
 
-## Moving around
+## Site navigation
 
-Three ways, all of them doing the same thing:
+Three ways to navigate the site:
 
 - The **sticky bar** at the top of a section carries previous, next, and up-one-level, and stays
   put while you scroll.

@@ -8,13 +8,13 @@ covers:
   adrs: [16, 26]
 ---
 
-## When did this change?
+## Tracking change in the Code
 
 Every section page links to its **version history**: one entry per distinct text, oldest first,
 each showing the release point where that text first appeared and the release points it stood
 unchanged through.
 
-This timeline shows when changes actually occurred. Because the Code republishes every title at every release point whether or not anything changed, a full list of release points would mostly show unchanged states.
+This timeline shows when changes actually occurred. Because the Code republishes every title at every release point whether or not anything changed, this list shows only changed entries.
 
 ```scenario
 id: versions-timeline
@@ -33,10 +33,7 @@ steps:
 From the timeline, or from the From/To picker at the foot of it, you get a **redline** between any
 two release points: removed words struck through, added words underlined, in the reading text.
 
-The redline is of the **reading text**, not of the source XML. That is the difference between a
-tool that shows you an amendment and one that shows you 51 changed attributes: the source
-regenerates every `@id` guid at every release point by design, so a diff of the raw XML reports
-enormous churn on a section whose words nobody touched.
+The redline is of the **reading text**, not of the source XML. The user can also show the redline of the source XML, which includes changes to the @id and other metadata.
 
 ```scenario
 id: diff-real-change
@@ -51,13 +48,9 @@ steps:
     caption: Removed words struck through, added words underlined — the amendment, not the markup.
 ```
 
-### When nothing changed, it says which kind of nothing
+### Summary of changes
 
-An empty redline is ambiguous, and the ambiguity matters. It could mean the two release points
-serve the same stored text; or that the XML differs only in guids, which pin a provision to a
-release point and say nothing about the law; or that it differs by more than guids — whitespace, a
-`@temporalId` — none of which is a word. The page says which of the three it is rather than letting
-"identical" stand for all of them.
+The textual changes are shown on the diff page. If there are non-textual metadata changes (e.g. a change in @id or @temporalId, or a change in whitespace), the page says what has been changed.
 
 ```scenario
 id: diff-nothing-changed

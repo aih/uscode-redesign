@@ -39,7 +39,7 @@ One consequence you can see: a deduplicated fragment carries the guids of the re
 its text first appeared. The guid the site resolves for a `(provision, release point)` pair is
 still correct, but the guids *inside* a shared fragment belong to that first release.
 
-## What is checked, and how
+## Automated verification
 
 `make verify --deep` independently recounts every title-release against the source XML. It has been
 run over the whole corpus: **3,153 of 3,153 title-versions recounted, 0 source mismatches, 0

@@ -19,19 +19,17 @@ names the release point its text came from and links to the source file it was p
 
 Every provision of the United States Code has an address, at every point in time it has existed.
 
-The address is the citation you already know. Section 45f of Title 16 is at `/us/usc/t16/s45f`,
-and subsection (c)(5) of it is at `/us/usc/t16/s45f/c/5`. That path is not a scheme invented for
-this site — it is the `@identifier` the OLRC puts on the element in its own XML, so the URL and the
-official markup say the same thing.
+The address corresponds directly to the citation. For example, section 45f of Title 16 is at `/us/usc/t16/s45f`,
+and subsection (c)(5) of it is at `/us/usc/t16/s45f/c/5`. That path follows the official `@identifier` scheme in USLM.
 
-The second half — *at every point in time* — is what the rest of this guide is mostly about. The
+The site also allows you to trace the history of a provision. The
 Code is republished in full at each **release point**, named for the last public law it includes.
 Add `?release=` or `?date=` to any address and you get that provision as it stood then, rather than
 as it stands now.
 
-## What is here
+## Landing page
 
-The front page lists the titles that are loaded, and how many release points each one is held at.
+The landing or front page lists the titles that are loaded, and how many release points each one is held at.
 
 ```scenario
 id: front-page-titles
@@ -53,12 +51,11 @@ Their controls are still visible on the page to explain their intended functiona
 
 The site also serves a `robots.txt` disallowing search engine crawlers. The addressable space is effectively unbounded, so this prevents automated crawling from consuming excessive resources.
 
-## Watch it instead
+## Video demonstration
 
 There is a [three-minute demo](/app/demo) of the site — a citation, a release point, a version
 history, a redline, the search box, the copy control and a hover preview. It is recorded from this
-guide: every scene is one of the walkthroughs below, and the captions are the guide's own sentences,
-so the video cannot show you something the guide does not describe.
+guide: every scene is one of the walkthroughs below, and the captions are the guide's own sentences, and is kept in sync with the Guide through automated CI/CD.
 
 ```scenario
 id: demo-page
@@ -70,10 +67,10 @@ steps:
 
 ## About this guide
 
-Every behavioural claim in these chapters carries a **“How this is verified”** box listing the
+Every feature in these chapters carries a **“How this is verified”** box listing the
 steps that demonstrate it. Those steps run as Playwright tests on every push, and the ones marked
 *in the demo video* are also the script the demo recording follows. A claim here that stopped being
-true would turn the build red.
+true would fail in testing.
 
 This approach ensures that the documentation remains accurate as the application evolves.
 

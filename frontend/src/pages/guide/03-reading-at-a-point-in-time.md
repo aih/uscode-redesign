@@ -43,9 +43,9 @@ steps:
     caption: 12 July 2026 resolves to release point 119-102not101.
 ```
 
-## What every page tells you
+## Release Point information
 
-Three facts sit in the reading column, never in a tooltip:
+Every page tells you three things about the text you are looking at:
 
 **The release point and its date** — what you are looking at.
 
