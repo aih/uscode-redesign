@@ -9,10 +9,10 @@
   "scans": 244,
   "routesWithViolations": 34,
   "totals": {
-    "violations": 41,
-    "nodes": 2251,
+    "violations": 40,
+    "nodes": 2250,
     "critical": 1,
-    "serious": 40,
+    "serious": 39,
     "moderate": 0,
     "minor": 0
   },
@@ -555,16 +555,6 @@
             "/app/us/usc/t16/s45f at 320px in dark",
             "/app/us/usc/t16/s45f at 375px in dark",
             "state: immediately after the theme toggle (ADR-0027)"
-          ]
-        },
-        {
-          "id": "aria-hidden-focus",
-          "impact": "serious",
-          "nodes": 1,
-          "firstTarget": "#cite-preview",
-          "help": "ARIA hidden element must not be focusable or contain focusable elements",
-          "seenAt": [
-            "state: citation preview opened by keyboard focus (ADR-0024)"
           ]
         }
       ]

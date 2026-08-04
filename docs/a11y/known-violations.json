@@ -101,14 +101,6 @@
       "reason": "Horizontally scrollable regions with no keyboard route into them: the per-endpoint parameter tables on /app/docs at 320px and 375px, and the source-XML redline pane on /app/diff. A keyboard user cannot scroll either."
     },
     {
-      "rule": "aria-hidden-focus",
-      "routes": ["section"],
-      "owner": "A6",
-      "recorded": "2026-08-03",
-      "waiveSeverity": "serious",
-      "reason": "The citation preview card carries aria-hidden=\"true\" and tabindex=\"0\" at the same time, so while it is open it is in the tab order and hidden from assistive technology at once. Found by the preview-focus state, which is why the states are in the matrix."
-    },
-    {
       "rule": "nested-interactive",
       "routes": ["apidocs-swagger"],
       "owner": "A10",
