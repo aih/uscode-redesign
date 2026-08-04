@@ -166,6 +166,20 @@ const picker =
     ? { action: appHref(section ? section.identifier : toc!.node.identifier), options: releases, selected }
     : null;
 const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
+/** The last crumb: the thing on screen, unlinked. `ancestors` stops at the
+ *  parent, so without this the trail names everything except the section. */
+const currentCrumb: Entry | null = section
+  ? {
+      identifier: section.identifier,
+      level: "section",
+      num: section.num,
+      heading: section.heading,
+      status: section.status,
+      is_section: true,
+    }
+  : toc
+    ? toc.node
+    : null;
 /** The sticky row's contents (Day 7). Only a section gets one: a table of
  * contents has no reading order to step through, and its own breadcrumbs
  * already say where it is. */
@@ -181,7 +195,14 @@ const bar = section
   : null;
 ---
 
-<Base title={title} crumbs={crumbs} release={selected} picker={picker} bar={bar}>
+<Base
+  title={title}
+  crumbs={crumbs}
+  current={currentCrumb}
+  release={selected}
+  picker={picker}
+  bar={bar}
+>
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
   {

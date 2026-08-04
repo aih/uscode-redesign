@@ -2,6 +2,11 @@
 /**
  * Where in the Code this page is — USWDS breadcrumbs, carrying the release point.
  *
+ * The trail ends at the thing being read, not at its parent. `current` is
+ * rendered as a `usa-current` item with `aria-current="page"` and no link:
+ * without it, `/us/usc/t16/s45f` showed `Title 16 › CHAPTER 1 › SUBCHAPTER VI`
+ * and stopped, so the trail named everything except the section on screen.
+ *
  * `--wrap` is not cosmetic. USWDS's default breadcrumb hides every item but the
  * second-to-last on small screens, on the theory that a phone wants a back link;
  * a one-item trail (`Title 16`) therefore renders as *nothing at all*. In a
@@ -12,23 +17,37 @@ import { appHref, trimNum } from "../lib/url";
 
 interface Props {
   crumbs: Entry[];
+  /** The node being read. Rendered last, unlinked. */
+  current?: Entry | null;
   release?: string | null;
 }
 
-const { crumbs, release = null } = Astro.props;
+const { crumbs, current = null, release = null } = Astro.props;
+
+/** `SUBCHAPTER VI—` → `SUBCHAPTER VI`. USLM carries the dash that joins a
+ * number to its heading in print; the trail shows numbers alone, so the dash
+ * would be trailing punctuation with nothing after it. */
+function label(entry: Entry): string {
+  return trimNum(entry.num).replace(/[—–-]\s*$/u, "").trim() || entry.identifier;
+}
 ---
 
 {
-  crumbs.length > 0 && (
+  (crumbs.length > 0 || current) && (
     <nav class="usa-breadcrumb usa-breadcrumb--wrap" aria-label="Breadcrumbs">
       <ol class="usa-breadcrumb__list">
         {crumbs.map((crumb) => (
           <li class="usa-breadcrumb__list-item">
             <a class="usa-breadcrumb__link" href={appHref(crumb.identifier, release)}>
-              <span>{trimNum(crumb.num) || crumb.identifier}</span>
+              <span>{label(crumb)}</span>
             </a>
           </li>
         ))}
+        {current && (
+          <li class="usa-breadcrumb__list-item usa-current" aria-current="page">
+            <span>{label(current)}</span>
+          </li>
+        )}
       </ol>
     </nav>
   )

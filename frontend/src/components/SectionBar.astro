@@ -18,10 +18,12 @@
  * and the breadcrumb trail scroll away, because at 375px they are ~110px of a
  * ~660px viewport and the point of the exercise is reading.
  *
- * The arrows are labelled with `aria-label` rather than visually-hidden spans:
- * USWDS's `.usa-sr-only` lives in `uswds-utilities`, which `site.scss`
- * deliberately does not forward, and an icon link's accessible name is exactly
- * what `aria-label` is for.
+ * Each step names its neighbour — `← § 45e`, not `←` — from 40em up; below that
+ * the number is hidden and the arrow stands alone, because this row may not
+ * wrap. The accessible name is the `aria-label` in both cases and contains the
+ * visible text, so the two agree at every width (WCAG 2.5.3). `aria-label`
+ * rather than a visually-hidden span because USWDS's `.usa-sr-only` lives in
+ * `uswds-utilities`, which `site.scss` deliberately does not forward.
  */
 import StatusBadge from "./StatusBadge.astro";
 import type { Entry } from "../lib/types";
@@ -75,7 +77,10 @@ const upLabel = shortNum(up);
           rel="prev"
           aria-label={`Previous section, ${shortNum(previous)}`}
         >
-          ←
+          <span aria-hidden="true">←</span>
+          <span class="sectionbar__step-label" aria-hidden="true">
+            {shortNum(previous)}
+          </span>
         </a>
       ) : (
         <span class="sectionbar__step sectionbar__step--off" aria-hidden="true">
@@ -116,7 +121,10 @@ const upLabel = shortNum(up);
           rel="next"
           aria-label={`Next section, ${shortNum(next)}`}
         >
-          →
+          <span class="sectionbar__step-label" aria-hidden="true">
+            {shortNum(next)}
+          </span>
+          <span aria-hidden="true">→</span>
         </a>
       ) : (
         <span class="sectionbar__step sectionbar__step--off" aria-hidden="true">

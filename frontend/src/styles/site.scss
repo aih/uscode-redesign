@@ -491,6 +491,16 @@ main[id] {
   content: none;
 }
 
+/* The trail's last item — the thing on screen. USWDS's breadcrumb package
+ * carries no rule for `.usa-current`; it is a semantic marker there and nothing
+ * else, so left alone the current node renders as unstyled body text among
+ * underlined links. Weight rather than colour, because `--muted` against the
+ * context bar is a contrast pair `scripts/contrast.py` would have to be told
+ * about. */
+.usa-breadcrumb__list-item.usa-current {
+  font-weight: 700;
+}
+
 /* iOS zooms the page when a control's text is under 16px; tap targets follow
  * the 44px guidance. Both were BUILDLOG 008 findings. */
 .picker {
@@ -1190,6 +1200,18 @@ main[id] {
   white-space: nowrap;
 }
 
+/* The neighbour's number beside its arrow. A section number is short (`§ 45e`),
+ * so this is capped well below `__up-label`: the row's job is the section being
+ * read, and the two steps must not crowd it out. */
+.sectionbar__step-label {
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-family: var(--reading);
+}
+
 /* `min-width: 0` is what actually lets the heading truncate: a flex item's
  * default `min-width: auto` refuses to shrink below its content, so without it
  * the row overflows instead of eliding. */
@@ -1220,7 +1242,8 @@ main[id] {
 
 @media (max-width: 39.99em) {
   .sectionbar__heading,
-  .sectionbar__up-label {
+  .sectionbar__up-label,
+  .sectionbar__step-label {
     display: none;
   }
 }
