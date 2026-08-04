@@ -118,6 +118,13 @@ async function runStep(page: Page, step: Step, where: string): Promise<void> {
       await page.locator(step.value.selector).first().fill(step.value.value);
       return;
 
+    // `fill` cannot drive a `<select>`; the release switcher is one, and
+    // "switching release keeps the provision you were reading" is a claim the
+    // guide has to be able to walk (ADR-0044).
+    case "select":
+      await page.locator(step.value.selector).first().selectOption(step.value.value);
+      return;
+
     case "press":
       // Sent to the body rather than to a focused control: the keyboard
       // shortcuts this exercises are document-level listeners, and typing into

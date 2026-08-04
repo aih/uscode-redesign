@@ -2,17 +2,17 @@
 layout: ../../layouts/GuideLayout.astro
 title: Reading at a point in time
 order: 3
-summary: Release points, the two ways to ask for one, and the three facts every page tells you about the text you are looking at.
+summary: Release points, the three ways to ask for one, and the four facts every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36]
+  adrs: [18, 36, 44]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
 `119-99`, `118-22u1`, `119-102not101`. There are 382 of them, from July 2013 to July 2026, and this
 site holds the text at each one.
 
-## Two ways to ask
+## Three ways to ask
 
 **By release point**, when you know which one you want:
 
@@ -24,7 +24,7 @@ demoOrder: 50
 steps:
   - goto: /app/us/usc/t16/s45f?release=119-99
     caption: Add ?release= to any address to read it as it stood at that release point.
-  - expect: { selector: ".doc-meta__rp", contains: "119-99" }
+  - expect: { selector: ".releasebar__rp", contains: "119-99" }
     caption: The page names the release point it answered from — every page does.
 ```
 
@@ -39,15 +39,51 @@ demoOrder: 60
 steps:
   - goto: /app/us/usc/t16/s45f?date=07/12/2026
     caption: Or ask by date, and the site finds the release point in force then.
-  - expect: { selector: ".doc-meta__rp", contains: "119-102not101" }
+  - expect: { selector: ".releasebar__rp", contains: "119-102not101" }
     caption: 12 July 2026 resolves to release point 119-102not101.
 ```
 
-## Release Point information
+**By neither**, which is the default: an address with no `?release=` and no `?date=` answers with
+the newest release point this site holds, and follows new ones as they are loaded.
 
-Every page tells you three things about the text you are looking at:
+Every page that shows a provision carries all three as controls, under the section's address:
+a **Release point** menu whose first entry is *Newest — follows new releases*, and an **As of date**
+box. Both keep the provision you are reading. Switching release on
+`/app/us/usc/t16/s45f/c/5` returns `(c)(5)` at the release point you chose, not the top of § 45f.
+
+```scenario
+id: switch-keeps-provision
+title: Switching release point keeps the provision you were reading
+demo: true
+demoOrder: 65
+steps:
+  - goto: /app/us/usc/t16/s45f/c/5?release=119-99
+    caption: Reading subsection (c)(5) of § 45f, pinned to release point 119-99.
+  - select: { selector: "#release", value: "119-102not101" }
+    caption: Choose a different release point.
+  - click: "form:has(#release) button[type=submit]"
+    caption: The address keeps the provision — you move in time, not in the text.
+  - expect: { url: "/app/us/usc/t16/s45f/c/5?release=119-102not101" }
+    caption: Still (c)(5), now at release point 119-102not101.
+```
+
+## What every page tells you about the text
+
+Four facts, in one band above the section:
 
 **The release point and its date** — what you are looking at.
+
+**Whether it is the newest.** A page pinned to an older release point and a page showing the law in
+force are otherwise identical. The band says `newest`, or `not the newest` with a link to the
+current text.
+
+```scenario
+id: not-newest-is-marked
+title: An older release point is marked as such
+steps:
+  - goto: /app/us/usc/t16/s45f?release=119-99
+  - expect: { selector: ".releasebar__older", contains: "not the newest" }
+```
 
 **The caveat, on a `not` release point.** A label like `119-102not101` means *current through Public
 Law 119-102, except 119-101*. The date alone would tell you the text is current through 12 July
@@ -58,12 +94,16 @@ id: not-label-caveat
 title: A "not" release point says which law it is missing
 steps:
   - goto: /app/us/usc/t16/s45f?release=119-102not101
-  - expect: { selector: ".caveat", contains: "except" }
+  - expect: { selector: ".releasebar__caveat", contains: "except" }
 ```
 
 **Where the answer came from.** Most release points republish a title without changing it, so this
 site does not store multiple copies of an unchanged section. If you ask for a release point that was
 not separately ingested, the answer comes from the newest one at or before it, and **the page tells you that it did**.
+
+The [version history](/app/versions/us/usc/t16/s45f) and [redline](/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101)
+pages carry no release band. The first spans every release point at which the section changed and
+the second is about two of them, so neither is reading one.
 
 ## Every release point, and how current the site is
 

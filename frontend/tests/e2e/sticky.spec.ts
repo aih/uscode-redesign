@@ -170,7 +170,9 @@ test.describe("what sticks at each width", () => {
     await expect(page.locator(BAR)).toBeInViewport();
   });
 
-  test("a desktop keeps the navbar, the breadcrumbs and the bar", async ({ page }) => {
+  test("a desktop keeps the navbar, the breadcrumbs, the release point and the bar", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(SECTION);
     await page.evaluate(() => window.scrollTo(0, 2000));
@@ -178,7 +180,53 @@ test.describe("what sticks at each width", () => {
 
     await expect(page.locator(".usa-header")).toBeInViewport();
     await expect(page.locator(".usa-breadcrumb")).toBeInViewport();
-    await expect(page.locator(".picker")).toBeInViewport();
+    // The release point, not the switcher. `.picker` used to be here and moved
+    // out of the sticky stack in ADR-0044: the date field it grew did not fit
+    // in the headroom `--sticky-h` had left. What has to stay pinned is the
+    // *answer* to "as of when", and that is this.
+    await expect(page.locator(".contextbar__rp")).toBeInViewport();
+    await expect(page.locator(".contextbar__rp")).toContainText("119-102not101");
     await expect(page.locator(BAR)).toBeInViewport();
   });
+});
+
+test.describe("what moving the switcher out of the sticky stack bought", () => {
+  /**
+   * The reason `.picker` is no longer pinned (ADR-0044). `--sticky-h` is what
+   * `scroll-margin-top` spends, so every rem the chrome takes is a rem of the
+   * viewport a deep-linked provision starts below. The switcher grew a date
+   * field; rather than raise the token in a band the backlog already flags for
+   * carrying 19rem of chrome, the control moved down to the release facts.
+   *
+   * Asserted as headroom rather than as a number: the point is that the stack
+   * fits inside the token with room to spare, and a future addition that eats
+   * all of it should have to argue for raising the token deliberately.
+   */
+  for (const size of [
+    { name: "wrapping nav", width: 700, height: 900, headroom: 60 },
+    { name: "desktop", width: 1280, height: 900, headroom: 60 },
+  ]) {
+    test(`at ${size.name} (${size.width}px) the chrome leaves ${size.headroom}px spare`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await page.goto(SECTION);
+      await page.evaluate(() => window.scrollTo(0, 3000));
+      await page.waitForTimeout(300);
+
+      const spare = await page.evaluate(() => {
+        let bottom = 0;
+        for (const element of document.querySelectorAll("body *")) {
+          const style = getComputedStyle(element);
+          if (style.position !== "sticky" && style.position !== "fixed") continue;
+          const box = element.getBoundingClientRect();
+          if (box.height > 0 && box.top < 400 && box.bottom > bottom) bottom = box.bottom;
+        }
+        const token = getComputedStyle(document.documentElement).getPropertyValue("--sticky-h");
+        return parseFloat(token) * 16 - bottom;
+      });
+
+      expect(spare).toBeGreaterThanOrEqual(size.headroom);
+    });
+  }
 });

@@ -35,6 +35,7 @@ export const STEP_VERBS = [
   "goto",
   "click",
   "fill",
+  "select",
   "press",
   "hover",
   "focus",
@@ -215,9 +216,9 @@ function validateStep(step, where) {
 
   const value = step[verb];
 
-  if (verb === "fill") {
+  if (verb === "fill" || verb === "select") {
     if (!value?.selector || typeof value.value !== "string") {
-      throw new Error(`${where}: fill needs { selector, value }`);
+      throw new Error(`${where}: ${verb} needs { selector, value }`);
     }
   }
 
@@ -258,6 +259,8 @@ export function describeStep(step) {
       return `Click ${step.value}`;
     case "fill":
       return `Type “${step.value.value}” into ${step.value.selector}`;
+    case "select":
+      return `Choose “${step.value.value}” in ${step.value.selector}`;
     case "press":
       return `Press ${step.value}`;
     case "hover":

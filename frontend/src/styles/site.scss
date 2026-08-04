@@ -642,11 +642,17 @@ main[id] {
 /* The trail's last item — the thing on screen. USWDS's breadcrumb package
  * carries no rule for `.usa-current`; it is a semantic marker there and nothing
  * else, so left alone the current node renders as unstyled body text among
- * underlined links. Weight rather than colour, because `--muted` against the
- * context bar is a contrast pair `scripts/contrast.py` would have to be told
- * about. */
+ * underlined links.
+ *
+ * The colour is not optional. Unlinked text in this bar had never existed
+ * before, so nothing had ever set it from a token: it took USWDS's own
+ * breadcrumb ink, which is derived from `$theme-breadcrumb-background-color` and
+ * assumes a light page. In dark theme that put it at serious `color-contrast` on
+ * every reader page, which is how ADR-0039's scan found it. `--ink` on `--panel`
+ * is a declared pair in `scripts/contrast.py`. */
 .usa-breadcrumb__list-item.usa-current {
   font-weight: 700;
+  color: var(--ink);
 }
 
 /* The release point, in the sticky bar, as text. `--muted` on `--panel` is a
