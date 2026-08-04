@@ -47,8 +47,37 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-**Nothing is blocking.** Both items this section held on 2026-08-02 are done, confirmed on
-2026-08-03:
+**Nothing is blocking.** The demo video (ADR-0038) is live; everything else in this section was
+already done.
+
+- **The demo video is live**, at
+  [`/app/demo`](https://uscode.linkedlegislation.org/app/demo). `s3://uscode-mirror-dreamproit/usc/demo/`
+  holds `uscode-demo.mp4` (3.2 MB), `uscode-demo.vtt` and `poster.png`; the box has them at
+  `/var/lib/uscode/demo`, mounted read-only at `/app/static/demo`. Verified in a browser against the
+  live host on 2026-08-03: 160 s, `readyState` 4, playing, with all 32 caption cues loaded and
+  showing, and the mp4 answering a range request with `206` so seeking works.
+
+  **It did not work on the first deploy, and the reason is worth keeping.** `deploy-on-box.sh` runs
+  `compose run api` for the migration *before* it fetches the video, and that instantiates the api
+  service — including its volumes — so Docker created `/var/lib/uscode/demo` **owned by root**. The
+  fetch runs as `ec2-user`, `mkdir -p` succeeded because the directory already existed, and every
+  write failed with `EACCES`. The page rendered and all three assets 404'd.
+
+  What made it slow to see was the reporting, not the permission: the fetch treated *every* failure
+  as "not published yet — skipping", so the deploy log said reassuringly that nobody had recorded a
+  demo while the truth was that it could not write the one it had just downloaded. Both are fixed —
+  the fetch now takes ownership when the directory is not writable, and distinguishes a missing
+  object (`s3api head-object`) from a failed write, which is an `ERROR` line and a non-zero exit.
+  Ownership on the box was corrected in place, so this does not recur there; the fix is for the next
+  box.
+
+  To publish a *re-recorded* video without a code deploy, `deploy/publish-demo.sh` prints the exact
+  command. It needs `AWS_PROFILE=uscode-admin` (SSM is the deploy identity, not the mirror one that
+  owns the upload, and not `default`, whose credentials on this workstation are invalid),
+  `--instance-ids` resolved from the tag rather than `--targets`, and `sudo -iu ec2-user` because
+  the checkout is `~ec2-user/uscode-redesign` and SSM runs as root.
+
+Both items this section held on 2026-08-02 are done, confirmed on 2026-08-03:
 
 - **The alarm email is confirmed.** `deploy/alerts-status.sh` now reports
   `confirmed: 1, pending: 0, deleted: 0` and exits 0. Someone will actually receive an alarm from
