@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -290,5 +292,98 @@ describe("copyableIdentifiers — what the copy column offers a control for", ()
       "/us/usc/t16/s45f",
       "/us/usc/t16/s45f/a",
     ]);
+  });
+});
+
+/**
+ * The inline/block partition, driven by a measurement rather than a memory.
+ *
+ * `docs/verification/inline-elements.json` is produced by
+ * `scripts/inline_elements.py`, which counts how often each USLM element sits
+ * beside a non-whitespace text node across the committed samples. Anything it
+ * finds in running prose has to render inline; the table below is read from
+ * that file, so re-running the script is what adds a case here.
+ *
+ * `<date>` was in neither the inline set nor anyone's memory of it, and it
+ * occurs in running prose 20,513 times and isolated zero times — every date in
+ * every editorial note rendered as a block in the middle of its sentence.
+ */
+describe("elements that occur in running prose render inline", () => {
+  const measured = JSON.parse(
+    readFileSync(new URL("../../docs/verification/inline-elements.json", import.meta.url), "utf8"),
+  );
+
+  /** Elements measured in prose that are still deliberately blocks, with the
+   * ratio that justifies each. Adding to this list is the escape hatch, and it
+   * is meant to be a diff someone has to argue for. */
+  const DELIBERATE_BLOCKS: Record<string, string> = {
+    p: "50 of 58,865 — the source being odd",
+    table: "26 of 822",
+    list: "8 of 36",
+    heading: "3 of 87,190 — a span here would cost the outline",
+    proviso: "2 of 5",
+    num: "1,933 of 128,991, and already a <span> via its own branch",
+    br: "5 of 776, and already <br/>",
+  };
+
+  const wrap = (inner: string): string =>
+    `<content ${NS}>The Act of ${inner} reserving lands.</content>`;
+
+  const html = (inner: string): string =>
+    render(parseFragment(wrap(inner)), { target: null, release: null, labels: {} });
+
+  for (const element of measured.elements as { name: string; inline: number }[]) {
+    const { name } = element;
+    if (name in DELIBERATE_BLOCKS) continue;
+
+    it(`<${name}> does not become a block inside a sentence (${element.inline} occurrences)`, () => {
+      const out = html(`<${name}>X</${name}>`);
+      // The failure this catches is a `<div>` — the fallback at the bottom of
+      // renderElement — landing between two halves of a sentence.
+      expect(out, `<${name}> rendered as a block`).not.toMatch(
+        new RegExp(`<div[^>]*class="[^"]*uslm-${name}\\b`, "u"),
+      );
+      expect(out).toContain("The Act of");
+      expect(out).toContain("reserving lands.");
+    });
+  }
+
+  it("keeps <date> in the sentence rather than breaking the line", () => {
+    const out = html("<date date=\"1970-10-21\">October 21, 1970</date>");
+    expect(out).toContain('<span class="uslm-date"');
+    expect(out).not.toContain('<div class="uslm-date"');
+  });
+
+  it("renders a <note> as a block when it is one, and inline when it is not", () => {
+    const block = render(
+      parseFragment(`<notes ${NS}><note><p>An editorial note.</p></note></notes>`),
+      { target: null, release: null, labels: {} },
+    );
+    expect(block, "an isolated note is apparatus and keeps its box").toMatch(
+      /<div[^>]*class="uslm-note"/u,
+    );
+
+    const inline = html("<note>1 See References in Text note below.</note>");
+    expect(inline, "a note inside a sentence is part of it").toMatch(
+      /<span[^>]*class="uslm-note uslm-inlined"/u,
+    );
+  });
+
+  it("covers every element the measurement found, as inline or as a listed block", () => {
+    const named = new Set([...Object.keys(DELIBERATE_BLOCKS)]);
+    const unaccounted = (measured.elements as { name: string }[])
+      .map((e) => e.name)
+      .filter((name) => !named.has(name))
+      .filter((name) => {
+        const out = html(`<${name}>X</${name}>`);
+        return new RegExp(`<div[^>]*class="[^"]*uslm-${name}\\b`, "u").test(out);
+      });
+
+    expect(
+      unaccounted,
+      "these elements occur in running prose and still render as a block — add them to " +
+        "INLINE_TAGS or CONTEXTUAL_TAGS in src/lib/uslm.ts, or to DELIBERATE_BLOCKS here " +
+        "with the ratio that justifies it",
+    ).toEqual([]);
   });
 });
