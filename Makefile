@@ -1,5 +1,5 @@
 .PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
-        verify verify-deep load-all shots loadtest test-e2e demo-video
+        verify verify-deep load-all shots loadtest test-e2e test-a11y demo-video
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -63,6 +63,19 @@ test-web:
 # rather than a second and lying copy of it.
 test-e2e:
 	cd frontend && npm install && npx playwright test
+
+# The accessibility scan alone (ADR-0039) — the same spec `test-e2e` already
+# runs, on its own, because it is the one that regenerates a committed
+# artifact. Every route in docs/a11y/routes.json against axe-core's WCAG 2.1 AA
+# tag set, at three viewports, in both themes, once under forced-colors, plus
+# the interactive states; results to docs/verification/a11y.json.
+#
+# It fails on any violation whose (route, rule) pair is not in
+# docs/a11y/known-violations.json, and on any serious or critical violation
+# whose entry does not name that severity. Needs the site running
+# (`make dev-all`).
+test-a11y:
+	cd frontend && npm install && npx playwright test a11y.spec.ts
 
 test-slow:
 	uv run pytest -m slow
