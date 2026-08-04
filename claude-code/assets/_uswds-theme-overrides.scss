@@ -1,0 +1,71 @@
+// Brand layer over USWDS — token overrides only.
+// Written against USWDS 3.x token names. VERIFY every name against
+// node_modules/@uswds/uswds/packages/uswds-core/_index.scss before trusting this file;
+// names drift between minors. Import BEFORE the USWDS entry point.
+
+// ---- Type ---------------------------------------------------------------
+$theme-font-type-sans:   'archivo';   // interface
+$theme-font-type-serif:  'spectral';  // statute text
+$theme-font-role-ui:     'sans';
+$theme-font-role-heading:'sans';
+$theme-font-role-body:   'serif';
+$theme-font-role-code:   'mono';
+
+$theme-font-sans-custom-src-path: '/fonts';
+$theme-font-serif-custom-src-path: '/fonts';
+// Register the two self-hosted variable faces via USWDS's custom font stack settings
+// ($theme-font-sans-custom-*, $theme-font-serif-custom-*) — one weight range each, WOFF2 only.
+
+$theme-body-font-size:   'md';
+$theme-body-line-height: 6;      // ~1.6
+$theme-heading-line-height: 3;
+$theme-text-measure:     4;      // ~66ch; USWDS measure scale, confirm mapping
+
+// ---- Colour -------------------------------------------------------------
+// USWDS wants hex for palette tokens; these are the oklch values in assets/brand.md
+// converted. Regenerate them from the source oklch rather than hand-editing, and
+// regenerate docs/verification/contrast.json after any change.
+$theme-color-base-family:      'gray-warm';
+$theme-color-base-lightest:    #f7f6f3;
+$theme-color-base-lighter:     #e6e4e1;
+$theme-color-base-light:       #c9c7c4;
+$theme-color-base:             #71706e;
+$theme-color-base-dark:        #4a4a49;
+$theme-color-base-darker:      #2b2b2c;
+$theme-color-base-ink:         #23242b;   // ink
+
+$theme-color-primary:          #3f4c9a;   // indigo 265
+$theme-color-primary-dark:     #2f3a7c;
+$theme-color-primary-darker:   #232c61;
+$theme-color-primary-light:    #9aa3d1;
+$theme-color-primary-lighter:  #e4e6f3;
+
+// Secondary is reserved for version semantics (current release, timeline, insertions).
+$theme-color-secondary:        #1f7a55;   // forest 155
+$theme-color-secondary-dark:   #17603f;
+$theme-color-secondary-light:  #a8d7c2;
+$theme-color-secondary-lighter:#e2f2ea;
+
+$theme-color-error:            #9a3f3f;   // also redline deletions
+$theme-color-warning:          #8a6a1f;
+$theme-color-info:             #3f4c9a;
+
+// ---- Focus & links ------------------------------------------------------
+$theme-focus-color:      $theme-color-primary;
+$theme-focus-width:      0.5;
+$theme-focus-offset:     0.25;
+$theme-link-color:       $theme-color-primary;
+$theme-link-visited:     #5a4a8a;
+$theme-link-hover-color: $theme-color-primary-dark;
+$theme-link-active-color:$theme-color-primary-darker;
+
+// ---- Project-level custom properties -----------------------------------
+// Not USWDS tokens: consumed by the project components documented at /app/design.
+:root {
+  --usc-reading-measure: 66ch;
+  --usc-ladder-step: 1.25rem;      // subsection indent, one step per level
+  --usc-ladder-step-narrow: 0.75rem; // <=480px
+  --usc-sticky-height: 0px;        // set by the sticky-chrome island; scroll-margin-top reads it
+  --usc-ins: #{$theme-color-secondary};
+  --usc-del: #{$theme-color-error};
+}

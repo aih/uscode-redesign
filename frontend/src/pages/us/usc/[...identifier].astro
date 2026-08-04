@@ -17,7 +17,6 @@ import CitePreview from "../../../components/CitePreview.astro";
 import CopyColumn from "../../../components/CopyColumn.astro";
 import KeyboardNav from "../../../components/KeyboardNav.astro";
 import Neighbors from "../../../components/Neighbors.astro";
-import Provenance from "../../../components/Provenance.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import WatchButton from "../../../components/WatchButton.astro";
 import {
@@ -177,9 +176,12 @@ if (body && isToc(body)) {
 }
 
 const remainder = section ? identifier.slice(section.identifier.length) : "";
+/** The form posts back to the identifier that was *asked for*, not to the
+ *  section that answered. Built from `section.identifier`, switching release on
+ *  `/us/usc/t16/s45f/c/5` dropped the `/c/5` and landed on the whole section. */
 const picker =
   releases.length > 0 && body
-    ? { action: appHref(section ? section.identifier : toc!.node.identifier), options: releases, selected }
+    ? { action: appHref(identifier), options: releases, selected }
     : null;
 const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
 /** The last crumb: the thing on screen, unlinked. `ancestors` stops at the
@@ -220,6 +222,19 @@ const rail =
   section && parentToc && parentToc.sections.length > 0
     ? { parent: parentToc.node, entries: parentToc.sections }
     : null;
+
+/** The four facts about the text on screen (ADR-0044). `served_from` is the
+ *  release point that actually answered, which is not always the one asked for
+ *  (gotcha 10); `note` is the API's own sentence saying so. */
+const served = section?.served_from ?? toc?.served_from ?? null;
+const releaseContext = served
+  ? {
+      served,
+      isNewest,
+      newestHref: isNewest ? null : appHref(identifier),
+      note: section?.note ?? toc?.note ?? null,
+    }
+  : null;
 ---
 
 <Base
@@ -227,6 +242,7 @@ const rail =
   crumbs={crumbs}
   current={currentCrumb}
   release={selected}
+  releaseContext={releaseContext}
   picker={picker}
   bar={bar}
   rail={rail !== null}
@@ -260,8 +276,6 @@ const rail =
             Version history — every release point where this text changed
           </a>
         </p>
-
-        <Provenance served={section.served_from} note={section.note} />
 
         {/* Same reasoning as the navbar's account control: an island that can
             only ever be told 401 is a request per page view for nothing. */}
@@ -379,8 +393,6 @@ const rail =
           {toc.node.heading}
           <StatusBadge status={toc.node.status} />
         </h1>
-
-        <Provenance served={toc.served_from} note={toc.note} />
 
         {toc.children.length === 0 && toc.sections.length === 0 && (
           <p class="lede">Nothing is listed under this node at {selected}.</p>

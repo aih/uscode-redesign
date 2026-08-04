@@ -463,6 +463,14 @@ main[id] {
   grid-template-columns: 1fr;
 }
 
+/* Every page goes through `.reader-layout` so the release band and the page's
+ * own content share one wrapper. Without a rail there is nothing to lay out, so
+ * the grid is switched off rather than run with a single column — one less
+ * formatting context between `<main>` and the statutory text. */
+.reader-layout--single {
+  display: block;
+}
+
 /* `min-width: 0` is what stops a long unbroken identifier in the statutory text
  * from widening the grid column and pushing the page sideways — the failure
  * `make shots` asserts against at 320 CSS px. */
@@ -641,12 +649,107 @@ main[id] {
   font-weight: 700;
 }
 
+/* The release point, in the sticky bar, as text. `--muted` on `--panel` is a
+ * measured pair (`scripts/contrast.py`). */
+.contextbar__rp {
+  margin: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.contextbar__rplabel {
+  color: var(--muted);
+}
+
+/* Below 40em the context bar scrolls away with the rest of the chrome (only
+ * `.sectionbar` pins), so this repeats the release band a few pixels above it
+ * and buys nothing. It earns its line only where it stays on screen. */
+@media (max-width: 39.99em) {
+  .contextbar__rp {
+    display: none;
+  }
+}
+
+/* Which text this is, and how to ask for a different one — one block, directly
+ * under the chrome, above the page's own heading. */
+.releaseblock {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.releasebar__line {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  font-size: 0.95rem;
+}
+
+.releasebar__what,
+.releasebar__date {
+  color: var(--muted);
+}
+
+.releasebar__rp {
+  font-family: var(--reading);
+  font-weight: 700;
+}
+
+/* "newest" and "not the newest" are the same fact answered two ways, and a
+ * reader scanning for it should not have to read the word to know which. The
+ * border carries it as well as the colour (WCAG 1.4.1) — and `--edge` is the
+ * token held to 3:1 against both backgrounds (ADR-0042). */
+.releasebar__newest,
+.releasebar__older {
+  font-size: 0.8rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--edge);
+  border-radius: 0.15rem;
+}
+
+.releasebar__older {
+  font-weight: 700;
+}
+
+.releasebar__caveat,
+.releasebar__note {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 /* iOS zooms the page when a control's text is under 16px; tap targets follow
  * the 44px guidance. Both were BUILDLOG 008 findings. */
 .picker {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem 2rem;
+  margin-top: 1rem;
+}
+
+.picker__form {
+  display: flex;
   align-items: flex-end;
   gap: 0.5rem;
+}
+
+.picker__form--date {
+  flex-wrap: wrap;
+}
+
+.picker__date {
+  margin-top: 0;
+  max-width: 9rem;
+}
+
+.picker__hint {
+  flex-basis: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .picker__select,
