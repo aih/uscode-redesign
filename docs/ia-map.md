@@ -29,8 +29,8 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 | `/app/` | `index.astro` | The titles loaded, in numeric order (ADR-0025) | `SiteHeader:36,43`, `SiteFooter:29`, `ErrorPage:42`, `AccountsOff:32` | a title TOC, `/app/demo`, `/app/guide` | header, footer |
 | `/app/us/usc/…` | `us/usc/[...identifier].astro` | A section with the named provision anchored in place, or a structural node's TOC | `index.astro:46`, `releases.astro:87`, `search.astro:181`, `provisions.astro:64`, `goto.astro:66,116`, `Neighbors`, `SectionBar`, `KeyboardNav`, `CopyColumn`, `Breadcrumbs`, every `<ref>` in the text | prev/next/up, `/app/versions`, `/app/diff`, the API in JSON or XML, the citation URL | breadcrumb, release context + switcher, sticky bar, chapter rail |
 | `/app/us/usc/?id=…` | `us/usc/index.astro` | Guid lookup in a browser; 307s to the identifier it pins | the `Cite this exact text` link on a section page | the section it resolved to | header, footer |
-| `/app/versions/…` | `versions/[...identifier].astro` | Every release point at which this section's text changed | `us/usc/[...identifier].astro:197`, `diff/[...identifier].astro:176` | the text at any listed release, a diff between any two | breadcrumb, release context |
-| `/app/diff/…` | `diff/[...identifier].astro` | A reading-text redline between two release points (ADR-0026) | `versions/[...identifier].astro:88`, its own from/to picker | back to the text, `/app/versions`, the source redline, the API diff | breadcrumb, release context |
+| `/app/versions/…` | `versions/[...identifier].astro` | Every release point at which this section's text changed | `us/usc/[...identifier].astro:197`, `diff/[...identifier].astro:176` | the text at any listed release, a diff between any two | breadcrumb only — the page spans every release point, so it is reading none |
+| `/app/diff/…` | `diff/[...identifier].astro` | A reading-text redline between two release points (ADR-0026) | `versions/[...identifier].astro:88`, its own from/to picker | back to the text, `/app/versions`, the source redline, the API diff | breadcrumb only — the page is about two release points, so a bar naming one would mislead |
 | `/app/releases` | `releases.astro` | Every release point, its currency date, and when the source was last checked (ADR-0036) | `SiteHeader:46`, `SiteFooter:30`, `about.astro:70`, `search/syntax.astro:219`, `AccountsOff:37` | a title at a chosen release point | header, footer |
 | `/app/goto` | `goto.astro` | The one search box's target: routes a citation to its provision, anything else to `/app/search` | `SiteSearch:57` (form action), `search.astro:102,158`, `search/syntax.astro:91,288`, its own examples | the provision, or `/app/search` | header, footer, prefilled box |
 | `/app/search` | `search.astro` | Keyword results (ADR-0028), strict by default (ADR-0031) | `goto.astro:45,58,123`, `search/syntax.astro` examples, its own pager | a section per result, `/app/search/syntax`, `/app/goto` | header, footer, prefilled box |
@@ -90,7 +90,9 @@ names its format.
 
 ## The chrome
 
-One set of components, in one order, on every page that is a place in the Code.
+One set of components, in one order, on every page that is a place in the Code — ADR-0043 and
+ADR-0044. Before those, only `us/usc/[...identifier].astro` passed `crumbs`, `release` or `bar` to
+`Base`; every other page got the header and footer and nothing else.
 
 1. **`SiteHeader`** — brand, primary nav, the single search-and-citation box (ADR-0023), the theme
    toggle. `SiteSearch` is mounted here and nowhere else; a page showing results prefills it through
@@ -99,7 +101,9 @@ One set of components, in one order, on every page that is a place in the Code.
    link, carrying `aria-current="page"`.
 3. **`ReleaseContext`** — which release point is being read, its currency date, whether it is the
    newest, the exception on a `not` label, and the release the answer actually came from when that
-   differs from the one asked for. Beside it, the switcher.
+   differs from the one asked for. Under it, `ReleasePicker`: the newest, a date, or a named release
+   point, each preserving the provision. Both sit at the top of the content rather than in the
+   sticky stack, for the measured reason in ADR-0044.
 4. **`SectionBar`** — sticky: the section's own number, heading and status, with prev/next naming
    the neighbour and an up link to the parent.
 5. **`ChapterRail`** — the sections either side of this one in the parent subdivision, in reading

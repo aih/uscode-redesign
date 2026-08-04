@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40]
+  adrs: [9, 10, 21, 25, 40, 43]
 ---
 
 ## The address of a provision
@@ -60,10 +60,45 @@ From a script, the same address answers with JSON — `curl -L` follows the redi
 
 ## Site navigation
 
-Three ways to navigate the site:
+**The breadcrumb** at the top of every page runs from the title down to the provision on screen:
+`Title 16 › CHAPTER 1 › SUBCHAPTER VI › § 45f`. Every level above the current one is a link, and the
+current one is marked as the page you are on. It carries the release point you are reading with it,
+so moving up a level does not move you back to the present.
 
-- The **sticky bar** at the top of a section carries previous, next, and up-one-level, and stays
-  put while you scroll.
+```scenario
+id: breadcrumb-ends-here
+title: The breadcrumb names the provision you are reading
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - expect: { selector: ".usa-breadcrumb__list-item.usa-current", contains: "45f" }
+```
+
+**The chapter rail** lists the sections around this one, in reading order, from the subdivision that
+contains it. The section you are reading is marked. Beside a wide window it sits to the left of the
+text; on a narrow one it is below the section.
+
+The rail is drawn from the newest release point this site holds, and the text beside it is whatever
+release point you asked for. When those differ the rail says so.
+
+```scenario
+id: chapter-rail
+title: The sections around this one, with their status
+demo: true
+demoOrder: 35
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: Beside the section, the rest of the subchapter in reading order.
+  - expect: { selector: ".rail__item--here", contains: "45f" }
+    caption: The section you are reading is marked in the list.
+  - expect: { selector: ".rail .usa-tag", visible: true }
+    caption: Repealed and transferred sections show their status here, before you click one.
+```
+
+Three more ways to move:
+
+- The **sticky bar** at the top of a section carries previous, next and up-one-level, and stays put
+  while you scroll. Each step names its neighbour — `← § 45e`, `§ 45g →` — except on a narrow
+  screen, where the row has space for the arrows alone.
 - **Previous / next cards** at the foot of the section show what is either side, with headings.
 - The **keyboard**: <kbd>←</kbd> or <kbd>j</kbd> for the previous section, <kbd>→</kbd> or
   <kbd>k</kbd> for the next, <kbd>u</kbd> to go up a level. Keys typed into a search box are left

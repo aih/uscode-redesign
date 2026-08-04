@@ -1017,3 +1017,76 @@ Session-by-session record of how this site was built. One entry per working sess
 - **Named costs, in the ADR.** The pair list is hand-declared: a changed hex is caught because the values are read from the stylesheet, but **a new token painted on a new surface is a pair nobody added**, and the script does not know to look — the axe scan is the backstop, and only on routes the matrix covers. Four badge colours are now **hard-coded** rather than tokenised, deliberately (they must not move with the theme) and therefore outside `contrast.py`'s reach. `--rule` failing 1.4.11 on paper is a judgement a reviewer can argue with, and the numbers to argue with are in the artifact. **`forced-color-adjust: none` is used twice**, on the badge and the highlighted provision — both override a reader's chosen palette, which is what the property is for and is still an override.
 - **Candidate task found, not fixed (scope discipline).** The scan matrix had no route carrying a status badge for the whole of A1 and A6. Adding `/app/us/usc/t16/s688` fixed that one case, but nothing systematically checks that the matrix *exercises every component the reader can render* — a component-level inventory against the matrix would be the real fix, and would have caught this without a token audit.
 - **Left owed:** A3, A4, A5, A8, A9, A10. Five entries in `docs/a11y/known-violations.json`, all vendored bundles or A4's two.
+
+## 045 — 2026-08-04 — Session 27: the chrome was on one page out of seven
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Workstream B (`claude-code/prompts/B-navigation-ia.md`) — navigation, information
+  architecture, retrieval. Scope agreed at the start of the session: **B1 and B2 together**, because
+  B1's breadcrumb bullet is literally "with the release context pinned to its right", which is B2's
+  requirement, and splitting them means editing the same components twice. TOC rail agreed as a left
+  rail from 64em with a disclosure below. B3–B6 deferred.
+- **Decided:**
+  - **ADR-0043 — one navigation chrome.** `docs/ia-map.md` first, derived from the guide ratchet's
+    own `readerRoutes()` rather than from memory, with every inbound link recorded as file:line.
+    From it: the breadcrumb ends at the provision on screen (`usa-current`, `aria-current="page"`);
+    `SectionBar`'s steps name their neighbour from 40em up; a new `ChapterRail` shows the parent
+    subdivision's sections in reading order with status badges in place; `/app/versions` and
+    `/app/diff` get the trail they never had.
+  - **ADR-0044 — release context in the chrome.** `ReleaseContext` replaces `Provenance` and adds the
+    fact it never stated: whether the release point being read is the newest. `ReleasePicker` becomes
+    two GET forms offering all three ways to ask — newest, a date, a named release point — and posts
+    to the *requested* identifier, so the provision survives the switch.
+  - **The switcher left the sticky stack, and that is measured, not assumed.** Before: 19px of
+    headroom under `--sticky-h` at 700px, 55px at 1280px; the date field costs about eighty.
+    `--sticky-h` is what `scroll-margin-top` spends and `docs/backlog.md` already flags that band for
+    carrying 19rem of chrome, so the control moved down to the facts it changes and the release point
+    stayed pinned as text. After: 89px and 85px, asserted in `sticky.spec.ts`.
+  - **`/app/versions` and `/app/diff` get no release band** — the first spans every release point, the
+    second is about two. A narrower reading of B2's "every reader page" than asked for, taken
+    deliberately and recorded in ADR-0044.
+  - **B1 asked for deletions and there were none to make.** `/app/goto` vs `/app/search`, the three
+    prev/next affordances and the two from/to pickers were each checked and are each one path;
+    recorded in the map so the question is not re-opened. The real defect was the opposite —
+    `/app/settings` reachable from no rendered page, `/app/diff` two hops from the text it compares.
+  - **The guide's scenario DSL gained a `select` verb.** `fill` cannot drive a `<select>`, and
+    "switching release keeps the provision you were reading" is the claim that most needed executing.
+- **Produced:** `docs/ia-map.md`; `docs/adr/0043`, `docs/adr/0044`;
+  `frontend/src/components/{ChapterRail,ReleaseContext}.astro`; `Provenance.astro` deleted;
+  `Breadcrumbs`, `SectionBar`, `ReleasePicker`, `Base.astro`, `middleware.ts`, `site.scss`, the
+  section/versions/diff pages; guide chapters 02 and 03; `scripts/scenarios.mjs` +
+  `tests/e2e/guide.spec.ts` (`select`); `tests/e2e/sticky.spec.ts`;
+  `claude-code/WORKSTREAM-B-STATE.md`. Branch `workstream-b-navigation-ia`, 6 commits from `387ff3a`.
+- **Verified:**
+  - `make test` — 486 passed. `make test-web` — 227 passed, including the ADR-0038 ratchet, which is
+    what forced chapters 02 and 03 to claim ADR-0043 and ADR-0044.
+  - `make test-e2e` — 371 passed, 251 of them the a11y scan. `docs/verification/a11y.json` is **8
+    route/rule pairs over 1,780 nodes**, the same as the ADR-0039 baseline, and everything in it is
+    still `docs/a11y/known-violations.json`'s.
+  - `make shots` — no horizontal overflow at 320 CSS px or 1280 at 200% zoom, apart from the known
+    3px on `/app/docs` that A4 owns.
+  - The switcher, end to end against `make dev-all`, from `/app/us/usc/t16/s45f/c/5?release=119-99`:
+    picking a release gives `/app/us/usc/t16/s45f/c/5?release=119-102not101`; picking a date gives
+    `…/c/5?date=06/12/2026`; picking Newest gives `…/c/5` with no parameter. The
+    `switch-keeps-provision` scenario in guide chapter 03 is the standing version of that check.
+  - **One real bug the scan caught, not me:** the unlinked breadcrumb item was the first non-link
+    text ever put in that bar, so it inherited USWDS's own breadcrumb ink — derived from
+    `$theme-breadcrumb-background-color`, which assumes a light page — and failed `color-contrast`
+    in dark theme on **every reader page**. Same shape as ADR-0042's `.usa-nav__link`. Fixed to
+    `--ink` on `--panel`, a pair `scripts/contrast.py` already measures.
+- **Candidate tasks found, deliberately not done:**
+  - **`/app/settings` has no inbound link from any rendered page.** `AuthNav:49` is its only linker
+    and `SiteHeader` does not render `AuthNav` while `ACCOUNTS_ENABLED` is false (ADR-0034). Guide
+    chapter 06 links it in prose; that is the only way in.
+  - **`previewHref` in `lib/url.ts` has no caller.** `CitePreview.astro:176` builds
+    `` `/app/preview${identifier}` `` inline in browser JavaScript — a reader href built outside
+    `url.ts`, against architecture rule 5, and the exact inlining `previewHref`'s docstring says it
+    exists to replace.
+  - **`us/usc/index.astro:22` calls `fetch` with its own `process.env.API_BASE_URL`** instead of
+    going through `lib/api`.
+  - **The release menu carries every release point for the title** — 115 options against the local
+    corpus, 381 corpus-wide, in the markup of every section page.
+  - **The deployed box returned one transient 502** on `/app/` while checking B3's prerequisites,
+    then 200 on every subsequent request. Worth a look when B3 measures it.
+  - `docs/verification/loadtest.json` is now stale for a fourth reason — ADR-0043's extra API call
+    per section view — on top of ADR-0029, ADR-0026 and ADR-0037. B3 owns it.
