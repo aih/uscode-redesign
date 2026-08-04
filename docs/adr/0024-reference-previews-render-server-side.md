@@ -1,6 +1,7 @@
 # ADR-0024 — Reference previews render server-side as HTML fragments
 
-- **Status:** Accepted
+- **Status:** Accepted; decision 4 amended by
+  [ADR-0041](0041-the-preview-card-is-reachable-and-says-when-it-fails.md)
 - **Date:** 2026-07-29
 - **Context:** Session 10 (UI refresh before deploy), BUILDLOG 024
 
@@ -54,7 +55,10 @@ Hoverable is the clause most hover previews fail, and the one a scrollable card
 cannot do without. Focus opens the card too — 1.4.13 covers focus as well as
 hover, and a keyboard reader has the same question about a cross reference.
 
-**4. The card is `aria-hidden="true"`.** Its content duplicates the link's own
+**4. The card is `aria-hidden="true"`.** — **Superseded by
+[ADR-0041](0041-the-preview-card-is-reachable-and-says-when-it-fails.md).** It was applied alongside
+`tabindex="0"`, which made the card focusable and hidden from assistive technology at once, and the
+reasoning below turns out to describe `aria-describedby` rather than this. Its content duplicates the link's own
 `title` and is one click away in full. A screen reader announcing a paragraph of
 statutory text on every reference in a forty-reference section would be worse
 than useless.

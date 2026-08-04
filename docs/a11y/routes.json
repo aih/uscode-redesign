@@ -1,0 +1,80 @@
+{
+  "_comment": [
+    "The route matrix scanned by frontend/tests/e2e/a11y.spec.ts (ADR-0039).",
+    "Seeded from claude-code/assets/a11y-routes.json and reconciled against the real route",
+    "inventory: the guide ratchet's readerRoutes() in frontend/tests/guide.test.ts, plus the two",
+    "API documentation pages FastAPI serves from main.py. Every path here answered 200 on a",
+    "running site except /app/404, which answers 404 and renders the error page on purpose.",
+    "Everything here is reachable from the CI fixture corpus: Title 16 at 119-99 and 119-102not101."
+  ],
+  "viewports": [
+    { "width": 320, "height": 768 },
+    { "width": 375, "height": 812 },
+    { "width": 1280, "height": 900 }
+  ],
+  "themes": ["light", "dark"],
+  "modes": ["forced-colors"],
+  "axeTags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+
+  "routes": [
+    { "id": "home", "path": "/app/", "name": "home / title list" },
+    { "id": "about", "path": "/app/about", "name": "about" },
+    { "id": "demo", "path": "/app/demo", "name": "demo video" },
+    { "id": "docs", "path": "/app/docs", "name": "API reference (reader's own)" },
+    { "id": "goto", "path": "/app/goto", "name": "citation box landing" },
+    { "id": "releases", "path": "/app/releases", "name": "release points / currency" },
+    { "id": "settings", "path": "/app/settings", "name": "reading settings" },
+    { "id": "syntax", "path": "/app/search/syntax", "name": "search operators" },
+    { "id": "search-results", "path": "/app/search?q=conservation", "name": "search results" },
+    { "id": "search-zero", "path": "/app/search?q=zzzzqqqqxxxx", "name": "search zero results" },
+    { "id": "guide-index", "path": "/app/guide", "name": "user guide index" },
+    { "id": "guide-chapters", "expand": "guide-chapters", "name": "every guide chapter" },
+    { "id": "login", "path": "/app/login", "name": "sign in (ACCOUNTS_ENABLED=false)" },
+    { "id": "signup", "path": "/app/signup", "name": "sign up (ACCOUNTS_ENABLED=false)" },
+    { "id": "provisions", "path": "/app/provisions", "name": "watchlist (ACCOUNTS_ENABLED=false)" },
+    { "id": "notfound", "path": "/app/404", "name": "not found", "expectStatus": 404 },
+    { "id": "title", "path": "/app/us/usc/t16", "name": "title TOC" },
+    { "id": "chapter", "path": "/app/us/usc/t16/ch1", "name": "chapter TOC" },
+    { "id": "section", "path": "/app/us/usc/t16/s45f", "name": "section" },
+    { "id": "section-repealed", "path": "/app/us/usc/t16/s688", "name": "repealed section, carrying a status badge" },
+    { "id": "provision", "path": "/app/us/usc/t16/s45f/c/5", "name": "provision anchored in section" },
+    { "id": "section-at-release", "path": "/app/us/usc/t16/s45f?release=119-99", "name": "section at an older release point" },
+    { "id": "section-by-date", "path": "/app/us/usc/t16/s45f?date=07/12/2026", "name": "section by date (not-law exception visible)" },
+    { "id": "versions", "path": "/app/versions/us/usc/t16/s45f", "name": "version timeline" },
+    { "id": "diff", "path": "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101", "name": "reading-text redline" },
+    { "id": "apidocs-swagger", "path": "/docs", "name": "Swagger UI (vendored, ADR-0032)" },
+    { "id": "apidocs-redoc", "path": "/redoc", "name": "ReDoc (vendored, ADR-0032)" }
+  ],
+
+  "_statesComment": [
+    "Interactive states. The id is the contract: a.11y.spec.ts maps each id to a setup function and",
+    "fails if one declared here has no setup, so a state cannot be listed and quietly not scanned.",
+    "Scanned at 1280x900, light theme — the state, not the palette, is what these add."
+  ],
+  "states": [
+    { "id": "preview-focus", "name": "citation preview opened by keyboard focus (ADR-0024)" },
+    { "id": "preview-escape", "name": "citation preview dismissed with Escape (ADR-0024)" },
+    { "id": "copy-active", "name": "copy control used, status announced (ADR-0033)" },
+    { "id": "theme-toggled", "name": "immediately after the theme toggle (ADR-0027)" },
+    { "id": "diff-source-expanded", "name": "redline with the source-XML details open (ADR-0026)" },
+    { "id": "search-box-filled", "name": "search-and-citation box focused with a query (ADR-0023)" }
+  ],
+
+  "_excludedComment": "Reachable addresses deliberately not in the matrix, and why.",
+  "excluded": [
+    { "path": "/app/us/usc", "reason": "answers 400 by design — the route needs an identifier" },
+    { "path": "/app/us/usc/t5a/s3", "reason": "answers 404 in the reader; appendix titles are unreachable by the flat citation form (CLAUDE.md open debts)" },
+    { "path": "/app/healthz", "reason": "not a page — a health endpoint" },
+    { "path": "/app/preview/*", "reason": "not a page — the fragment endpoint behind the hover preview; covered by the preview-focus state" },
+    { "path": "/static/apidocs/", "reason": "an asset directory, not a page. The pages those assets render are /docs and /redoc, both in the matrix" },
+    { "path": "/app/design", "reason": "not built yet — task C2" },
+    { "path": "/app/accessibility", "reason": "not built yet — task A10; add to this matrix in the same commit that adds the page" }
+  ],
+
+  "_notScannedComment": [
+    "A 429 rate-limited response is in the seed matrix and is not here. Forcing one in CI means",
+    "hammering the middleware's own budget (ADR-0029) from inside the suite that shares it, which",
+    "makes every other test in the run flaky. The 429 degradation is asserted behaviourally in",
+    "tasks A6 and A8 instead."
+  ]
+}

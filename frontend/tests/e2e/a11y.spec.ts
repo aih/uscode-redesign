@@ -1,0 +1,304 @@
+/**
+ * The accessibility ratchet (ADR-0039).
+ *
+ * Every route in `docs/a11y/routes.json`, scanned by axe-core against
+ * `wcag2a`, `wcag2aa`, `wcag21a` and `wcag21aa`, at three viewports, in both
+ * themes (ADR-0027), and once with `forced-colors: active` — plus the
+ * interactive states, because a violation that only exists while a preview is
+ * open is not visible to a scanner that only ever loads pages.
+ *
+ * It is a ratchet rather than a pass/fail gate on a clean build. A violation
+ * whose (route, rule) pair is listed in `docs/a11y/known-violations.json` is
+ * allowed through; anything else fails. Serious and critical violations fail
+ * even when listed, unless the entry carries an explicit `waived` block naming
+ * an owner task and a date — so the default for a serious regression is a red
+ * build, and every exception to that is a line somebody chose to write.
+ *
+ * Each scan writes a shard to `test-results/a11y/`; `a11y-report.ts` merges them
+ * into `docs/verification/a11y.json` when the whole matrix has run. Sharding is
+ * what makes the artifact correct under `fullyParallel` — the workers are
+ * separate processes and cannot share an accumulator.
+ *
+ * Needs the site running: `make dev-all`, then `make test-a11y`.
+ */
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+
+import { SHARD_DIR, type Finding, type Shard } from "./a11y-report";
+
+const MATRIX = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../../../docs/a11y/routes.json", import.meta.url)), "utf8"),
+);
+const KNOWN = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL("../../../docs/a11y/known-violations.json", import.meta.url)),
+    "utf8",
+  ),
+);
+
+const GUIDE_DIR = fileURLToPath(new URL("../../src/pages/guide/", import.meta.url));
+
+/** `usc-theme`, the one key ADR-0027's toggle writes. */
+const THEME_KEY = "usc-theme";
+
+interface Route {
+  id: string;
+  path: string;
+  name: string;
+  expectStatus?: number;
+}
+
+/**
+ * The declared routes, with `expand: "guide-chapters"` resolved from disk.
+ *
+ * Reading the chapter list from the filesystem rather than naming nine paths
+ * means a tenth chapter is scanned the day it lands, without anyone editing
+ * this matrix — the same reason `guide.test.ts` walks `src/pages` instead of
+ * asking the bundler.
+ */
+function routes(): Route[] {
+  const out: Route[] = [];
+  for (const entry of MATRIX.routes) {
+    if (entry.expand === "guide-chapters") {
+      for (const file of readdirSync(GUIDE_DIR).sort()) {
+        if (!file.endsWith(".md")) continue;
+        const slug = file.replace(/\.md$/, "");
+        out.push({ id: `guide-${slug}`, path: `/app/guide/${slug}`, name: `guide: ${slug}` });
+      }
+      continue;
+    }
+    if (!entry.path) throw new Error(`route ${entry.id} has neither a path nor an expand rule`);
+    out.push(entry as Route);
+  }
+  return out;
+}
+
+const ROUTES = routes();
+
+/** Impacts that fail even when the pair is listed, absent an explicit waiver. */
+const BLOCKING = new Set(["serious", "critical"]);
+
+interface KnownEntry {
+  rule: string;
+  routes: string[];
+  owner: string;
+  reason: string;
+  recorded: string;
+  /**
+   * The impact this entry is allowed to carry. A serious or critical violation
+   * fails even when listed unless this names its exact impact, so a rule that
+   * was moderate when it was recorded and has since become critical still turns
+   * the build red.
+   */
+  waiveSeverity?: string;
+}
+
+function matched(routeId: string, rule: string): KnownEntry | undefined {
+  return (KNOWN.entries as KnownEntry[]).find(
+    (e) => e.rule === rule && (e.routes.includes("*") || e.routes.includes(routeId)),
+  );
+}
+
+/**
+ * The gate. Everything this spec asserts goes through here, so the rules about
+ * what is and is not allowed live in exactly one place.
+ */
+function assertNoNewViolations(routeId: string, where: string, findings: Finding[]): void {
+  const unexpected: string[] = [];
+
+  for (const f of findings) {
+    const entry = matched(routeId, f.id);
+    if (!entry) {
+      unexpected.push(
+        `${f.id} (${f.impact}, ${f.nodes} nodes, first at \`${f.target}\`) — not in ` +
+          `docs/a11y/known-violations.json. Fix it, or add an entry for route "${routeId}" ` +
+          `with an owner task and a reason.`,
+      );
+      continue;
+    }
+    if (BLOCKING.has(f.impact ?? "") && entry.waiveSeverity !== f.impact) {
+      unexpected.push(
+        `${f.id} is ${f.impact} on "${routeId}" (${f.nodes} nodes, first at \`${f.target}\`). ` +
+          `It is listed as known (owner ${entry.owner}), but its entry ` +
+          `${entry.waiveSeverity ? `waives "${entry.waiveSeverity}", not "${f.impact}"` : `waives no severity`}. ` +
+          `A ${f.impact} violation passes only when its entry sets ` +
+          `"waiveSeverity": "${f.impact}".`,
+      );
+    }
+  }
+
+  expect(unexpected, `accessibility violations at ${where}`).toEqual([]);
+}
+
+/** Run axe, shard the result, and gate on it. */
+async function scan(page: Page, routeId: string, where: string, key: string): Promise<void> {
+  const result = await new AxeBuilder({ page }).withTags(MATRIX.axeTags).analyze();
+
+  const findings: Finding[] = result.violations.map((v) => ({
+    id: v.id,
+    impact: v.impact ?? null,
+    nodes: v.nodes.length,
+    target: v.nodes[0]?.target?.join(" ") ?? "",
+    help: v.help,
+  }));
+
+  const shard: Shard = { key, routeId, where, findings };
+  mkdirSync(SHARD_DIR, { recursive: true });
+  writeFileSync(join(SHARD_DIR, `${key}.json`), JSON.stringify(shard, null, 2));
+
+  assertNoNewViolations(routeId, where, findings);
+}
+
+/** Load a route with the theme decided before the first paint. */
+async function open(page: Page, route: Route, theme?: string): Promise<void> {
+  if (theme) {
+    await page.addInitScript(
+      ([key, value]) => {
+        try {
+          localStorage.setItem(key, value);
+        } catch {
+          /* a browser refusing storage is not this test's subject */
+        }
+      },
+      [THEME_KEY, theme] as const,
+    );
+  }
+  const response = await page.goto(route.path, { waitUntil: "load" });
+  const expected = route.expectStatus ?? 200;
+  expect(response?.status(), `${route.path} answered unexpectedly`).toBe(expected);
+  // The islands settle after paint — the watch widget resolves to one button,
+  // the copy column injects itself. Scanning before that measures a page no
+  // reader ever sees. `make shots` waits for the same reason.
+  await page.waitForTimeout(400);
+}
+
+function slug(...parts: (string | number)[]): string {
+  return parts.join("--").replace(/[^a-zA-Z0-9-]+/g, "_");
+}
+
+for (const viewport of MATRIX.viewports as { width: number; height: number }[]) {
+  for (const theme of MATRIX.themes as string[]) {
+    test.describe(`axe ${viewport.width}px ${theme}`, () => {
+      test.use({ viewport });
+
+      for (const route of ROUTES) {
+        test(`${route.id} — ${route.name}`, async ({ page }) => {
+          await open(page, route, theme);
+          await scan(
+            page,
+            route.id,
+            `${route.path} at ${viewport.width}px in ${theme}`,
+            slug(route.id, viewport.width, theme),
+          );
+        });
+      }
+    });
+  }
+}
+
+test.describe("axe forced-colors", () => {
+  test.use({ viewport: { width: 1280, height: 900 }, forcedColors: "active" });
+
+  for (const route of ROUTES) {
+    test(`${route.id} — ${route.name}`, async ({ page }) => {
+      await open(page, route);
+      await scan(page, route.id, `${route.path} with forced-colors: active`, slug(route.id, "fc"));
+    });
+  }
+});
+
+/**
+ * The interactive states.
+ *
+ * Keyed by the ids declared in `routes.json`. The `states` test below asserts
+ * that the two lists agree, so declaring a state and forgetting to implement it
+ * is a failure rather than a silent gap in coverage.
+ */
+const SECTION = "/app/us/usc/t16/s45f";
+const DIFF = "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101";
+
+const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Promise<void> }> = {
+  "preview-focus": {
+    routeId: "section",
+    setup: async (page) => {
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator("a[data-cite]").first().focus();
+      await expect(page.locator("#cite-preview")).toBeVisible({ timeout: 5000 });
+    },
+  },
+  "preview-escape": {
+    routeId: "section",
+    setup: async (page) => {
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator("a[data-cite]").first().hover();
+      await expect(page.locator("#cite-preview")).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#cite-preview")).toBeHidden();
+    },
+  },
+  "copy-active": {
+    routeId: "section",
+    setup: async (page) => {
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator(".copybtn").first().waitFor({ timeout: 5000 });
+      await page.locator(".copybtn").nth(1).click();
+      await expect(page.locator("[data-copy-status]")).not.toBeEmpty();
+    },
+  },
+  "theme-toggled": {
+    routeId: "section",
+    setup: async (page) => {
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator("[data-theme-toggle]").click();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    },
+  },
+  "diff-source-expanded": {
+    routeId: "diff",
+    setup: async (page) => {
+      // The source redline is a round trip rather than a `<details>` — the cost
+      // is in computing it, so `?source=1` is the state, not a disclosure
+      // widget on an already-rendered page (ADR-0026).
+      await page.goto(`${DIFF}&source=1#source`, { waitUntil: "load" });
+      await page.locator(".diff-view--source").waitFor({ timeout: 15000 });
+    },
+  },
+  "search-box-filled": {
+    routeId: "section",
+    setup: async (page) => {
+      await page.goto(SECTION, { waitUntil: "load" });
+      const box = page.locator("input[name='q']").first();
+      await box.waitFor({ timeout: 5000 });
+      await box.click();
+      await box.fill("conservation");
+    },
+  },
+};
+
+test.describe("axe interactive states", () => {
+  test.use({
+    viewport: { width: 1280, height: 900 },
+    permissions: ["clipboard-read", "clipboard-write"],
+  });
+
+  test("every state declared in routes.json has a setup here", () => {
+    const declared = (MATRIX.states as { id: string }[]).map((s) => s.id).sort();
+    expect(Object.keys(STATE_SETUP).sort(), "declared states and implemented states disagree").toEqual(
+      declared,
+    );
+  });
+
+  for (const state of MATRIX.states as { id: string; name: string }[]) {
+    test(`${state.id} — ${state.name}`, async ({ page }) => {
+      const implementation = STATE_SETUP[state.id];
+      expect(implementation, `no setup for declared state "${state.id}"`).toBeTruthy();
+      await implementation.setup(page);
+      await page.waitForTimeout(200);
+      await scan(page, implementation.routeId, `state: ${state.name}`, slug("state", state.id));
+    });
+  }
+});

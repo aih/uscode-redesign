@@ -30,27 +30,38 @@
  *
  * ## Two decisions worth arguing with
  *
- * **`aria-hidden` on the card.** Its content duplicates the link's own `title`,
- * one click away in full. A screen reader announcing a paragraph of statutory
- * text on every reference in a forty-reference section would be worse than
- * useless. The alternative — `aria-describedby` pointing at the live card — is
- * defensible and was rejected for that reason; recorded in ADR-0024.
+ * **The card is a non-modal dialog, reachable from the trigger.** It used to
+ * carry `aria-hidden="true"` *and* `tabindex="0"` — focusable and hidden from
+ * assistive technology at the same time, which is the one combination that is
+ * unambiguously wrong (axe `aria-hidden-focus`, found by the open-state scan in
+ * ADR-0039). `aria-hidden` is gone. Nothing announces on open, because nothing
+ * moves focus on open and there is no live region — so ADR-0024's worry, that a
+ * forty-reference section would read forty paragraphs of statutory text at
+ * somebody, does not happen. What changed is that a reader who *wants* the card
+ * can now reach it: Tab from the trigger moves in, Escape moves back out.
+ * Amended in ADR-0041.
  *
  * **Touch navigates.** The whole feature is behind
  * `(hover: hover) and (pointer: fine)`. Hover does not exist on a phone, and
  * every workaround (first-tap-opens, long-press) fights either the OS or the
- * reader's expectation that a link is a link.
+ * reader's expectation that a link is a link. A tap opens the citation.
  */
 ---
 
 {/* One card, reused for every reference on the page. `manual` rather than
     `auto` because `auto` light-dismisses on any outside pointerdown, which
-    includes the scrollbar of the card's own scroll area. */}
+    includes the scrollbar of the card's own scroll area.
+
+    `tabindex="0"` stays: the body scrolls, and a scrollable region with no
+    focusable children is unreachable by keyboard without it (axe
+    `scrollable-region-focusable`). `aria-label` is set per reference when the
+    card opens, so focus arriving here announces what is being previewed
+    rather than "dialog". */}
 <div
   id="cite-preview"
   class="cite-preview"
   popover="manual"
-  aria-hidden="true"
+  role="dialog"
   tabindex="0"
 ></div>
 
@@ -73,11 +84,20 @@
       let closeTimer = null;
       let inFlight = null;
       let anchor = null;
+      /** The reference whose card the reader explicitly dismissed.
+       *
+       * Without this, Escape is useless from the keyboard: `hide()` returns
+       * focus to the trigger, `focusin` fires on the trigger, and the card the
+       * reader just dismissed reopens 300ms later. Cleared as soon as attention
+       * moves to a different reference. */
+      let dismissed = null;
 
       const cancelTimers = () => {
         clearTimeout(openTimer);
         clearTimeout(closeTimer);
       };
+
+      const isOpen = () => card.matches(":popover-open");
 
       function hide() {
         cancelTimers();
@@ -89,6 +109,30 @@
           /* already closed */
         }
       }
+
+      /**
+       * Close, and put focus back where the reader left it.
+       *
+       * Separate from `hide()` on purpose: `hide()` also runs on mouseout and on
+       * scroll, and moving focus in either case would yank a keyboard reader
+       * somewhere they never asked to be. Only a deliberate dismissal restores.
+       */
+      function dismiss() {
+        const trigger = anchor;
+        const hadFocus = card.contains(document.activeElement) || document.activeElement === card;
+        if (trigger) dismissed = trigger;
+        hide();
+        // Only if focus was inside the card. Escape pressed with focus still on
+        // the link should close the card and leave the reading position exactly
+        // where it is, which it already is.
+        if (hadFocus && trigger) trigger.focus({ preventScroll: true });
+      }
+
+      /** Everything inside the card a Tab could land on. */
+      const focusables = () =>
+        [...card.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])')].filter(
+          (el) => el.offsetParent !== null || el === document.activeElement,
+        );
 
       function scheduleHide() {
         clearTimeout(closeTimer);
@@ -131,10 +175,37 @@
         const url =
           `/app/preview${identifier}` + (release ? `?release=${encodeURIComponent(release)}` : "");
         const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) throw new Error(String(response.status));
+        if (!response.ok) {
+          // 429 in particular: the preview endpoint is rate-limited per caller
+          // (ADR-0029), and a reader moving down a dense section will meet it.
+          const failure = new Error(String(response.status));
+          failure.status = response.status;
+          throw failure;
+        }
         const html = await response.text();
         cache.set(key, html);
         return html;
+      }
+
+      /**
+       * What the card says when the fragment could not be fetched.
+       *
+       * Never nothing. A card that silently declines to open is
+       * indistinguishable from a feature that is broken, or from a citation
+       * with no text behind it — and the reader is left with no next step. This
+       * one names the failure and offers the link, which is the fallback that
+       * was always there and was never said out loud.
+       */
+      function failureHtml(link, status) {
+        const href = link.getAttribute("href") ?? "#";
+        const reason =
+          status === 429
+            ? "Preview unavailable — too many previews just now."
+            : "Preview unavailable.";
+        return (
+          `<p class="cite-preview__note">${reason}</p>` +
+          `<p class="cite-preview__foot"><a href="${href}">Open the citation →</a></p>`
+        );
       }
 
       async function show(link) {
@@ -145,15 +216,21 @@
         let html;
         try {
           html = await load(identifier, release);
-        } catch {
-          // A failed preview is not an error the reader needs to see: the link
-          // still works, which is the whole fallback.
-          return;
+        } catch (error) {
+          // An aborted request is this island superseding itself — the pointer
+          // moved on and that answer is no longer wanted. Everything else is a
+          // failure the reader is entitled to see.
+          if (error?.name === "AbortError") return;
+          html = failureHtml(link, error?.status);
         }
         // The pointer may have left while that was in flight.
         if (!link.matches(":hover") && document.activeElement !== link) return;
 
         card.innerHTML = html;
+        card.setAttribute(
+          "aria-label",
+          `Preview: ${link.getAttribute("title") || link.textContent?.trim() || "cited provision"}`,
+        );
         anchor = link;
         place(link);
         try {
@@ -164,6 +241,9 @@
       }
 
       function scheduleShow(link) {
+        // A card the reader dismissed stays dismissed until they look elsewhere.
+        if (link === dismissed) return;
+        dismissed = null;
         cancelTimers();
         openTimer = setTimeout(() => show(link), OPEN_DELAY);
       }
@@ -188,7 +268,12 @@
       });
 
       document.addEventListener("mouseout", (event) => {
-        if (referenceFrom(event)) scheduleHide();
+        const link = referenceFrom(event);
+        if (!link) return;
+        // Leaving a dismissed reference clears the dismissal: "not now" is
+        // about this look at it, not about this citation forever.
+        if (link === dismissed) dismissed = null;
+        scheduleHide();
       });
 
       // Keyboard parity: focusing a reference opens the same card. SC 1.4.13
@@ -201,7 +286,13 @@
       });
 
       document.addEventListener("focusout", (event) => {
-        if (referenceFrom(event)) scheduleHide();
+        const link = referenceFrom(event);
+        if (!link) return;
+        // Focus moving *into* the card is not focus leaving the reference —
+        // without this the card schedules its own close as the reader arrives.
+        if (card.contains(event.relatedTarget)) return;
+        if (link === dismissed && event.relatedTarget !== card) dismissed = null;
+        scheduleHide();
       });
 
       // Hoverable: moving onto the card keeps it open, which is what makes a
@@ -212,7 +303,33 @@
 
       // Dismissible, without moving the pointer.
       document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") hide();
+        if (event.key === "Escape") {
+          if (isOpen()) dismiss();
+          return;
+        }
+        // Tab from the trigger goes *into* the card rather than past it. The
+        // card is a popover in the top layer at the end of the document, so
+        // without this its content is not in the reader's tab order in any
+        // useful sense — the next Tab would land on the following sentence.
+        if (event.key !== "Tab" || event.shiftKey) return;
+        if (!isOpen() || event.target !== anchor) return;
+        event.preventDefault();
+        (focusables()[0] ?? card).focus({ preventScroll: true });
+      });
+
+      // And back out again. Leaving the card in either direction closes it and
+      // returns the reader to the reference they came from, so the card is
+      // never something to escape from by tabbing through statutory text.
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab") return;
+        const stops = focusables();
+        const first = stops[0] ?? card;
+        const last = stops[stops.length - 1] ?? card;
+        const leavingBackwards = event.shiftKey && (document.activeElement === first || stops.length === 0);
+        const leavingForwards = !event.shiftKey && (document.activeElement === last || stops.length === 0);
+        if (!leavingBackwards && !leavingForwards) return;
+        event.preventDefault();
+        dismiss();
       });
 
       // A card anchored to a link that has scrolled away is worse than no card.

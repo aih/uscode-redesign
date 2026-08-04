@@ -5,7 +5,7 @@ order: 6
 summary: Copying a provision with its citation, reading a cross reference without losing your place, citing an exact text, and the two settings the reader keeps.
 covers:
   routes: ["/app/settings"]
-  adrs: [3, 24, 27, 33]
+  adrs: [3, 24, 27, 33, 41]
 ---
 
 ## Copying a provision
@@ -52,6 +52,29 @@ a link to the whole thing. You find out whether you need to go there without goi
 The card is hoverable (you can move the pointer into it), dismissible with <kbd>Escape</kbd>, and
 stays while you are pointing at it. On a touchscreen, tapping a citation simply follows the link rather than opening the hover card.
 
+**From the keyboard**, focusing a citation opens the same card. <kbd>Tab</kbd> moves into it, so the
+"Open full section" link and any citations inside are reachable; <kbd>Escape</kbd> closes it and puts
+you back on the citation you started from, at the same place on the page. Tabbing past the end of
+the card does the same. A card you have dismissed stays closed until you look at another reference.
+
+```scenario
+id: preview-keyboard
+title: Reach a preview and leave it again from the keyboard
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: Every citation in the text opens its preview on focus, not only on hover.
+  - focus: a[data-cite]
+    caption: Focus a citation and the card opens.
+  - expect: { selector: "#cite-preview", visible: true }
+  - press: Escape
+    caption: Escape closes it and returns you to the citation.
+  - expect: { selector: "#cite-preview", visible: false }
+```
+
+**When a preview cannot be fetched** the card says so and offers the citation instead of appearing
+empty. Previews are rate-limited, so moving quickly down a section with many references can reach
+the limit; the message says that is what happened.
+
 ```scenario
 id: hover-preview
 title: Read a cross reference without losing your place
@@ -68,7 +91,7 @@ steps:
 
 ## Citing an exact text
 
-A section page carries two addresses. one is the **citation URL**
+A section page carries two addresses. One is the **citation URL**
 (`/us/usc/t16/s45f/c/5`) — stable across release points, and what you want in a brief that means
 "this provision, as it stands".
 

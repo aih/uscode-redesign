@@ -23,6 +23,10 @@ export interface UslmNode {
   nodeType: number;
   nodeValue: string | null;
   childNodes: ArrayLike<UslmNode>;
+  /** Needed by `inRunningProse`: whether an element sits in a sentence is a
+   * fact about its siblings, not about the element. */
+  previousSibling?: UslmNode | null;
+  nextSibling?: UslmNode | null;
 }
 
 export interface UslmElement extends UslmNode {
@@ -130,7 +134,22 @@ const LEVEL_TAGS = new Set([
  * spacing without a `uslm-{tag}` div wrapper pretending to be a section. */
 const PARAGRAPH_TAGS = new Set(["content", "continuation", "proviso", "chapeau"]);
 
-/** Inline formatting — never a block, never renumbers the heading outline. */
+/**
+ * Inline formatting — never a block, never renumbers the heading outline.
+ *
+ * Every element here was measured to occur in running prose rather than
+ * guessed at from the schema: `scripts/inline_elements.py` counts, across the
+ * committed samples, how often each element sits beside a non-whitespace text
+ * node. `docs/verification/inline-elements.json` is the result, and
+ * `tests/uslm.test.ts` walks it element by element.
+ *
+ * `date` and `footnote` occur that way **20,513 and 1,051 times and never
+ * otherwise** — zero isolated occurrences between them. Both used to fall
+ * through to the `<div>` at the bottom of `renderElement`, which put a block in
+ * the middle of a sentence throughout the editorial notes. That is WCAG 1.3.2:
+ * a block reorders the sequence a screen reader announces, mid-sentence, in the
+ * one part of the page a drafter reads for amendment history.
+ */
 const INLINE_TAGS: Record<string, string> = {
   i: "i",
   b: "b",
@@ -139,7 +158,36 @@ const INLINE_TAGS: Record<string, string> = {
   span: "span",
   inline: "span",
   a: "span",
+  date: "span",
+  footnote: "span",
 };
+
+/**
+ * Elements the source uses both ways, decided per occurrence.
+ *
+ * `<note>` is an editorial note 30,981 times and an inline footnote marker 883
+ * times ("…the Act of March 1, 1872, *1 See References in Text note below.*
+ * reserving lands for park purposes…"). `<quotedContent>` is a block quotation
+ * 875 times and a quoted phrase inside a sentence 2,701 times. Neither can be
+ * classified by name, so `inRunningProse` asks the markup: an element with a
+ * non-whitespace text node immediately beside it is in a sentence, whatever it
+ * is called.
+ *
+ * `<p>` (50 of 58,865), `<table>` (26 of 822), `<list>` (8 of 36), `<heading>`
+ * (3 of 87,190) and `<proviso>` (2 of 5) also appear beside text, and are
+ * deliberately not here: at well under 1% those are the source being odd, and a
+ * heading rendered as a span would cost the outline that A4 depends on more
+ * than three sentences are worth.
+ */
+const CONTEXTUAL_TAGS = new Set(["note", "quotedContent"]);
+
+/** A non-whitespace text node immediately before or after — the same test
+ * `scripts/inline_elements.py` counts with. */
+function inRunningProse(el: UslmElement): boolean {
+  const filled = (node: UslmNode | null | undefined): boolean =>
+    node?.nodeType === TEXT_NODE && (node.nodeValue ?? "").trim() !== "";
+  return filled(el.previousSibling) || filled(el.nextSibling);
+}
 
 /** Real HTML table semantics, not `<div class="uslm-table">` soup. */
 const TABLE_TAGS: Record<string, string> = {
@@ -190,6 +238,9 @@ function renderElement(el: UslmElement, opts: RenderOptions, depth: number): str
     return wrapTag(`h${level}`, el, opts, elDepth, ["uslm-heading"]);
   }
   if (tag === "ref") return renderRef(el, opts);
+  if (CONTEXTUAL_TAGS.has(tag) && inRunningProse(el)) {
+    return wrapTag("span", el, opts, elDepth, [`uslm-${tag}`, "uslm-inlined"]);
+  }
   if (tag === "sourceCredit") return wrapDetails(el, opts, elDepth, "uslm-sourceCredit", "Source");
   if (tag === "notes") return wrapDetails(el, opts, elDepth, "uslm-notes", "Notes");
   if (tag === "br") return "<br/>";
@@ -393,7 +444,13 @@ function collectBlocks(
     const tag = tagOf(child);
     if (tag.includes(":") || SKIP_TAGS.has(tag)) continue;
 
-    if (LINE_BREAK_TAGS.has(tag)) {
+    if (CONTEXTUAL_TAGS.has(tag) && inRunningProse(child)) {
+      // The same judgement the renderer makes, for the same reason: a `<note>`
+      // that is a footnote marker inside a sentence is part of that sentence.
+      // Left to `LINE_BREAK_TAGS` below it would flush, and one sentence would
+      // redline as three blocks.
+      line += inlineText(child);
+    } else if (LINE_BREAK_TAGS.has(tag)) {
       // Flush *before* descending, and keep accumulating after: a
       // `<continuation>` that follows a nested paragraph belongs after that
       // paragraph, not merged into the line that introduced it.
