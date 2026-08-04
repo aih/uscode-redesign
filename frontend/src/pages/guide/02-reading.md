@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25]
+  adrs: [9, 10, 21, 25, 40]
 ---
 
 ## The address of a provision
@@ -103,6 +103,20 @@ editorialising.
 
 **Notes and source credit** are collapsed under the text on a narrow screen and open beside it on a
 wide one. They come from the source XML unchanged.
+
+Dates inside a note read as part of the sentence they sit in. The source marks every date as its
+own element, and the amendment histories are largely made of them — "Pub. L. 95–625 struck out
+subsec. (c) effective November 10, 1978" is one sentence, and it is read as one.
+
+```scenario
+id: dates-read-inline
+title: A date in a note stays in its sentence
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: A section whose notes carry amendment dates.
+  - expect: { selector: "span.uslm-date", visible: true }
+    caption: Each date is part of the running text, not a line of its own.
+```
 
 **Occurrence 1 of 2.** Occasionally the source publishes more than one element under a single
 identifier at a single release point. The site shows **every** occurrence, in the order they appear
