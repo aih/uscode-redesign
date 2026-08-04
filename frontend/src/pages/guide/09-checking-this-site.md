@@ -5,7 +5,7 @@ order: 9
 summary: How to verify that what you are reading is what the OLRC published, and what this site does not guarantee.
 covers:
   routes: []
-  adrs: [7, 13, 39]
+  adrs: [7, 13, 39, 42]
 ---
 
 This is not an official publication. This chapter explains how to verify the text against official sources.
@@ -58,11 +58,19 @@ redline with its source pane rendered, and the search box holding a query. The r
 committed to the repository as a file.
 
 Violations that are known and not yet fixed are listed with the task that owns each. The list
-currently holds contrast failures in the dark-mode navigation, in the copy column, and in one of
-this guide's code blocks; two horizontally scrollable regions with no keyboard route into them; and
-the citation preview, which while open is in the tab order and hidden from assistive technology at
-the same time. The Swagger UI and ReDoc pages carry further violations from the bundles the site
-vendors.
+currently holds two horizontally scrollable regions with no keyboard route into them, the API
+reference pages missing a language attribute, and the Swagger UI and ReDoc pages, which carry
+violations from the bundles the site vendors.
+
+Colour is checked separately, because a scan only sees the pages it is pointed at. Every pair of
+colours the design defines — text on its background, a link, a form control's edge, the focus ring —
+is computed in both themes and committed as a file. Text meets 4.5:1 and controls and focus rings
+meet 3:1; dividers are reported without being held to a ratio, and the numbers are in the file
+either way.
+
+Status badges do not rely on colour. A repealed section says "repealed", and each status is drawn
+with a different border, so the distinction survives a monochrome print. The site also honours the
+system's high-contrast and reduced-motion settings.
 
 Two further checks run at the same time: every page in the screenshot set must lay out without
 scrolling sideways at 320 pixels, and again at 1280 pixels with the page zoomed to 200%.
