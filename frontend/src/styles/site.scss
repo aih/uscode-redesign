@@ -91,6 +91,19 @@
   --target: rgba(255, 190, 46, 0.28);
   --target-edge: #c05600;
   --danger: #b50909;
+  /* Text painted *on* `--danger` — the repealed/omitted badge. USWDS paints
+   * `.usa-tag` white, which is right on the light theme's deep red and 2.25:1
+   * on the dark theme's pale one, so it is a token rather than an assumption
+   * (measured in docs/verification/contrast.json). */
+  --danger-ink: #ffffff;
+  /* The boundary of a control — an input, a select, a textarea.
+   *
+   * Deliberately not `--rule`. SC 1.4.11 asks 3:1 of "visual information
+   * required to identify user interface components", which is exactly a field's
+   * edge and exactly not a decorative divider. Holding both to 3:1 would mean
+   * every hairline on the site at #949494 or darker, which is a heavy reader
+   * for no conformance gain; holding neither means an input you cannot find. */
+  --edge: #565c65;
 }
 
 @media (min-width: 40em) {
@@ -171,6 +184,10 @@
   --target: rgba(255, 190, 46, 0.22);
   --target-edge: #ffbe2e;
   --danger: #f2938c;
+  /* Dark's `--danger` is a *pale* red, chosen to be readable as text on a dark
+   * page. White on it is 2.25:1. Ink on it is what the badge needs. */
+  --danger-ink: #16150f;
+  --edge: #8d9297;
 
   body {
     background: var(--page);
@@ -201,7 +218,58 @@
   .usa-textarea {
     background-color: var(--field);
     color: var(--ink);
-    border-color: var(--rule);
+    border-color: var(--edge);
+  }
+
+  /* USWDS keeps its light-theme colours on everything the dark block never
+   * names, and these four are where that showed up as measured failures
+   * (docs/verification/a11y.json, ADR-0039).
+   *
+   * The nav one was on *every reader page* and only below 64em, where the bar
+   * collapses into a panel — #565c65 on #1c1d1f, 2.5:1. Desktop dark was clean,
+   * which is why it went a long time unseen. */
+  .usa-nav,
+  .usa-nav__primary a,
+  .usa-nav__link,
+  .usa-nav__link span,
+  .usa-nav__submenu a {
+    color: var(--ink);
+  }
+
+  .usa-nav,
+  .usa-nav__submenu {
+    background-color: var(--panel);
+  }
+
+  /* An outline button is border-and-text in USWDS's primary blue, which is a
+   * link colour for a light page. The copy column's "copy the section" control
+   * is one: #005ea2 on #16150f, 2.71:1. */
+  .usa-button--outline {
+    color: var(--link);
+    box-shadow: inset 0 0 0 2px var(--link);
+  }
+
+  .usa-button--outline:hover {
+    color: var(--ink);
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+
+  /* Alerts keep a pale USWDS background, so a dark-theme link inside one is
+   * light-on-light. The zero-result panel's "try it as a citation" link is the
+   * case the scan caught.
+   *
+   * The background is on `__body`, not on `.usa-alert` — the same shape as the
+   * footer note further up, and the same mistake made twice: setting it on the
+   * outer element leaves the pale slab exactly where the text is. */
+  .usa-alert,
+  .usa-alert__body {
+    background-color: var(--panel);
+    color: var(--ink);
+  }
+
+  .usa-alert__text,
+  .usa-alert__heading {
+    color: var(--ink);
   }
 
   /* The `<select>` chevron is a background SVG in USWDS's ink colour, which on
@@ -1001,11 +1069,56 @@ main[id] {
 .status-tag {
   vertical-align: 0.15em;
   margin-left: 0.4em;
+  /* The shape cue, and the reason it is a border rather than an icon.
+   *
+   * SC 1.4.1 asks that colour not be the only thing carrying meaning. The
+   * badge's *text* already carries it — "repealed" and "omitted" are different
+   * words, printed verbatim, and that is the information. What colour adds is
+   * emphasis, and in monochrome that emphasis is what disappears: a red badge
+   * and a grey one print identically.
+   *
+   * So each status gets a border treatment as well. A border is never
+   * announced, where CSS `content` is announced by some screen readers — an
+   * icon here would read as "× repealed" to the one group of readers who
+   * needed no help distinguishing them. */
+  border: 2px solid transparent;
 }
 
 .status-tag--repealed,
 .status-tag--omitted {
   background-color: var(--danger);
+  color: var(--danger-ink);
+}
+
+.status-tag--repealed {
+  border-style: solid;
+  border-color: var(--danger-ink);
+}
+
+.status-tag--omitted {
+  border-style: dashed;
+  border-color: var(--danger-ink);
+}
+
+/* Gotcha 13: the status set is not closed — USLM 2.x adds `renumbered`, and a
+ * subchapter can be `reserved`. These three are the ones the source is known to
+ * emit; anything else keeps the plain pill, still with its word printed, which
+ * is the part that actually carries the meaning. */
+.status-tag--transferred,
+.status-tag--renumbered,
+.status-tag--reserved {
+  background-color: transparent;
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.status-tag--reserved {
+  border-style: dashed;
+}
+
+.status-tag--renumbered {
+  border-style: double;
+  border-width: 3px;
 }
 
 /* Gotcha 5: the caveat is not a footnote. `119-102not101` is *not* fully current
@@ -2263,19 +2376,29 @@ main[id] {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--panel);
-  background: var(--muted);
+  /* Not `--panel`. These badges are painted on their own saturated colours,
+   * which do not change between themes — so text taken from a token that
+   * *does* invert reads as near-black on dark green in the dark theme (2.96:1,
+   * measured). The badge's own background is fixed, so its ink is too. */
+  color: #f0f0f0;
+  /* Fixed for the same reason as the ink above: a badge whose background moves
+   * with the theme while its text does not is a contrast failure waiting for
+   * one of the two to change. `--muted` in dark is #a9aeb1, which puts this
+   * text at 1.97:1. */
+  background: #4d5259;
   border-radius: 3px;
 }
 
 .endpoint__method--get {
-  background: var(--link);
+  background: #005ea2;
 }
 
+/* #2e7d32 was 4.49:1 against the badge's #f0f0f0 text — a miss by one
+ * hundredth, which is still a miss (docs/verification/a11y.json). */
 .endpoint__method--post,
 .endpoint__method--put,
 .endpoint__method--patch {
-  background: #2e7d32;
+  background: #2b7530;
 }
 
 .endpoint__method--delete {
@@ -2682,4 +2805,113 @@ main[id] {
 .frontways {
   margin: 0.75rem 0 1.5rem;
   color: var(--muted);
+}
+
+/* Control boundaries, in both themes.
+ *
+ * The dark block sets these too, and this is not redundant: without it the
+ * light theme keeps USWDS's own border colour, and `--edge`'s light row in
+ * docs/verification/contrast.json would be describing a value nothing paints.
+ * A verification artifact that measures a token no rule uses is worse than no
+ * artifact. */
+.usa-input,
+.usa-select,
+.usa-textarea,
+.usa-combo-box__input {
+  border-color: var(--edge);
+}
+
+/* Shiki paints the `<pre>`: `class="astro-code github-dark"` carries an inline
+ * `background-color:#24292e` and a light `color`. USWDS separately gives every
+ * `<code>` a pale background, and that `<code>` is *inside* the `<pre>` — so the
+ * light syntax colours landed on #f0f0f0 at 1.11:1, which is invisible rather
+ * than merely low. The block's background belongs to the block. */
+.astro-code code {
+  background: transparent;
+  color: inherit;
+}
+
+/* ------------------------------------------------ forced colours and motion */
+
+/* Windows High Contrast and its kin replace every colour on the page with the
+ * reader's own small palette. Everything below is about what survives that.
+ *
+ * The rule of thumb is that a forced-colors reader loses backgrounds and keeps
+ * text, so anything whose meaning lives in a *painted* surface has to say the
+ * same thing again in a border or in `currentColor`. */
+@media (forced-colors: active) {
+  /* The status badge is the sharpest case: its two states are a fill and the
+   * absence of one, and forced colours flatten both. The border treatments set
+   * further up already distinguish them, but they are drawn in tokens that no
+   * longer exist here, so they are restated against the system palette. */
+  .status-tag {
+    border-color: currentColor;
+    forced-color-adjust: none;
+    color: CanvasText;
+    background-color: Canvas;
+  }
+
+  .status-tag--repealed,
+  .status-tag--omitted {
+    color: Canvas;
+    background-color: CanvasText;
+  }
+
+  /* USWDS draws the `<select>` chevron as a background image, and a background
+   * image is exactly what a forced-colors reader may not get. The control is
+   * still a `<select>` and still announces as one; what is lost is the visual
+   * hint that it opens. A border makes it look like a control again without
+   * relying on the image at all. */
+  .usa-select {
+    border: 1px solid ButtonText;
+  }
+
+  /* The highlighted provision is a wash of colour and nothing else — remove
+   * the colour and a deep link lands on a page with no indication of where.
+   * `Highlight`/`HighlightText` is the system's own pairing for exactly this. */
+  .target,
+  [class*="uslm-"].target {
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  /* The redline's insertions and deletions are already `<ins>`/`<del>` with
+   * underline and strike-through, so they read here without help. The change
+   * bars beside them are painted, and do not. */
+  .diff-view ins,
+  .diff-view del {
+    border: 1px solid currentColor;
+  }
+
+  /* The copy buttons are quiet on purpose — 45% opacity, no border. That is a
+   * deliberate visual weight that forced colours cannot express, and a control
+   * you cannot see is worse than a loud one. */
+  .copybtn {
+    opacity: 1;
+    border: 1px solid ButtonText;
+  }
+}
+
+/* Reduced motion, everywhere rather than at the two places it was already
+ * honoured (`.copybtn`'s fade and the source-redline spinner).
+ *
+ * The sticky chrome and the version timeline are the ones this criterion is
+ * about here: both move while the reader is reading, which is the case
+ * `prefers-reduced-motion` exists for. `scroll-behavior` matters as much as the
+ * transitions — a smooth-scrolled anchor jump is motion the reader did not ask
+ * for, on every deep link. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
