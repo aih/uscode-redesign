@@ -14,9 +14,7 @@ Every section page links to its **version history**: one entry per distinct text
 each showing the release point where that text first appeared and the release points it stood
 unchanged through.
 
-That is the useful shape. A list of all 382 release points would be true and useless — the Code
-republishes every title at every release point whether or not anything changed, so most entries
-would say nothing happened. What the timeline lists is the *changes*.
+This timeline shows when changes actually occurred. Because the Code republishes every title at every release point whether or not anything changed, a full list of release points would mostly show unchanged states.
 
 ```scenario
 id: versions-timeline
@@ -76,10 +74,9 @@ behind `?source=1` rather than open by default — computing it is the expensive
 readers want the words. The API returns the same comparison as JSON; see
 [The API](/app/guide/08-api).
 
-## Two things the redline will not show you
+## Notes on redlines
 
 **Cross-reference links are dropped inside the redline.** The comparison is over text, so a
 citation that is a link in the section view is plain text here.
 
-**A change in whitespace alone is invisible**, since the redline compares displayed text and the
-display does not distinguish it. The source view will show it.
+**A change in whitespace alone is not shown in the reading redline**, since it compares displayed text. The source view will show whitespace changes.

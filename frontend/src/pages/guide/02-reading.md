@@ -95,10 +95,7 @@ steps:
   - expect: { url: "/us/usc/t16/s45e" }
 ```
 
-**Repealed and omitted sections keep their place in reading order.** They are not skipped and not
-hidden — a section that was repealed is part of the shape of the chapter around it, and being
-unable to find it is its own kind of wrong answer. They appear in prev/next with a badge saying
-what happened to them.
+**Repealed and omitted sections keep their place in reading order.** They are not skipped or hidden. A section that was repealed remains part of the structure of the chapter around it. They appear in prev/next with a badge saying what happened to them.
 
 ## What the markings mean
 
@@ -112,10 +109,9 @@ wide one. They come from the source XML unchanged.
 
 **Occurrence 1 of 2.** Occasionally the source publishes more than one element under a single
 identifier at a single release point. The site shows **every** occurrence, in the order they appear
-in the file, with a note saying how many there are. Picking one and discarding the other would be
-a silent editorial decision about which of two published texts is the law.
+in the file, with a note saying how many there are.
 
-## Two things that will catch you out
+## Notes on formatting
 
 **Section numbers use an en dash, not a hyphen.** The OLRC writes `45a–1` with U+2013 — 5,697
 sections in the corpus contain one, and not a single one contains an ASCII hyphen. No keyboard has

@@ -58,14 +58,11 @@ curl -L -H 'Accept: application/json' https://uscode.linkedlegislation.org/us/us
 Without `-L` you get the 307 itself; without the `Accept` header you get whatever the default is
 for your client, which for a browser is the reader.
 
-## Two things to know before you build on it
+## Notes for developers
 
 **Caching.** A response to a request that pinned a release point is immutable and safe to cache
-forever — that text cannot change. A response without one, or one resolved by `?date=`, carries a
+forever. A response without one, or one resolved by `?date=`, carries a
 short revalidation window instead. Pin the release point in anything you store.
 
-**Rate limits.** The expensive routes are throttled per caller — the diff most tightly, because it
-is CPU-bound and a handful of concurrent requests can take the whole site down with it. Over the
-limit you get `429` with a `Retry-After` header saying how long to wait. Honour it and you will not
-be refused again; the limits are set well above what reading looks like and well below what a crawl
-does.
+**Rate limits.** More demanding routes are throttled per caller, with the diff route being the most restricted. Over the
+limit you get a `429` with a `Retry-After` header saying how long to wait. The limits are set well above normal reading patterns and well below automated crawling.

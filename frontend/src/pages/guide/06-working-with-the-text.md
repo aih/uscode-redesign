@@ -23,8 +23,7 @@ The mode is remembered. For the one-off exception, hold a modifier as you click:
 for the citation, <kbd>Alt</kbd> for both, <kbd>Ctrl</kbd>/<kbd>⌘</kbd> for a link — for that click
 only, without disturbing the setting.
 
-There is also a **Whole section** button, which is a named button rather than a gutter icon,
-because copying an entire section is a different act from copying a paragraph of it.
+There is also a **Whole section** button to copy the entirety of a section at once.
 
 ```scenario
 id: copy-whole-section
@@ -53,9 +52,7 @@ the keyboard — opens a small card with the cited provision's heading, status a
 a link to the whole thing. You find out whether you need to go there without going there.
 
 The card is hoverable (you can move the pointer into it), dismissible with <kbd>Escape</kbd>, and
-stays while you are pointing at it. On a touchscreen there is no card at all: tapping a citation
-simply follows it, because a tap is not a hover and pretending otherwise is how a link becomes
-unreliable.
+stays while you are pointing at it. On a touchscreen, tapping a citation simply follows the link rather than opening the hover card.
 
 ```scenario
 id: hover-preview
@@ -96,10 +93,7 @@ steps:
 
 ## Two settings
 
-**Light or dark.** One control in the header. Light is the default at every operating-system
-setting — this is a reading site, and the choice is the reader's rather than their laptop's. The
-choice is kept in the browser and applied before the page paints, so moving between pages does not
-flash.
+**Light or dark.** There is one control in the header to toggle the theme. Light is the default setting. The choice is kept in the browser and applied before the page paints, preventing flashes between pages.
 
 ```scenario
 id: theme-toggle
@@ -108,7 +102,7 @@ demo: true
 demoOrder: 130
 steps:
   - goto: /app/us/usc/t16/s45f
-    caption: Light by default at every OS setting — this is a reading site.
+    caption: Light is the default setting.
   - click: .theme-toggle
     caption: One control in the header switches it.
   - expect: { selector: ".theme-toggle__label", contains: "Light" }

@@ -8,15 +8,14 @@ covers:
   adrs: [7, 13]
 ---
 
-This is not an official publication, so the right posture toward it is verification rather than
-trust. This chapter is about how to do that.
+This is not an official publication. This chapter explains how to verify the text against official sources.
 
 ## Follow any page back to its source
 
 Every section page names the release point its text came from and links to the OLRC file it was
 parsed from. `?format=xml` on the API returns the source USLM **verbatim** — not a
-re-serialisation, the stored fragment as published — so you can compare what you are reading with
-what the OLRC put out, byte for byte, without taking this site's word for anything.
+re-serialisation, but the stored fragment as published — so you can compare what you are reading directly with
+what the OLRC put out, byte for byte.
 
 Every ingest also writes a provenance manifest: the source URL, the download timestamp, the sha256
 of the zip, and per-title element counts. Anyone can re-download the same zip and confirm the hash.
@@ -44,21 +43,18 @@ still correct, but the guids *inside* a shared fragment belong to that first rel
 
 `make verify --deep` independently recounts every title-release against the source XML. It has been
 run over the whole corpus: **3,153 of 3,153 title-versions recounted, 0 source mismatches, 0
-incomplete loads.** The result is committed to the repository as a file, not asserted in prose,
-because a reliability claim that is not a re-runnable command is an opinion.
+incomplete loads.** The result is committed to the repository as a file.
 
 The six count mismatches it does report are the source publishing several elements under one
 identifier at one release point, which is [shown rather than smoothed away](/app/guide/02-reading).
 
-## What this site does not promise
+## Limitations
 
 - **It is not official.** For the official text or the official currency of a title, go to
   [uscode.house.gov](https://uscode.house.gov/).
-- **Structural history is not versioned.** The text is, at every release point; the hierarchy
-  around it — which chapter a section sits in — is held as the newest loaded view rather than
-  per release point.
-- **The corpus stops where the OLRC's electronic publication does**, in July 2013. There is no
-  earlier release point to ask for.
+- **Structural history is not versioned.** The text is versioned at every release point; however, the hierarchy
+  around it — which chapter a section sits in — is held as the newest loaded view.
+- **The corpus stops where the OLRC's electronic publication does**, in July 2013.
 - **Two titles' appendix sections are unreachable by a flat citation**, as described in
   [Reading the Code](/app/guide/02-reading).
 

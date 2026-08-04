@@ -11,8 +11,7 @@ covers:
 This is a conceptual redesign of the [Office of the Law Revision Counsel](https://uscode.house.gov/)'s
 United States Code website, built entirely from the official USLM downloads.
 
-**It is not an official publication of the United States government.** Nothing here amends,
-replaces or interprets what the OLRC publishes. If you need the official text, or the official
+This site is not an official publication of the United States government. If you need the official text, or the official
 currency of a title, go to [uscode.house.gov](https://uscode.house.gov/). Every page on this site
 names the release point its text came from and links to the source file it was parsed from.
 
@@ -46,17 +45,13 @@ steps:
     caption: The front page lists the titles that are loaded.
 ```
 
-## What it is not
+## Inactive features and indexing
 
-Two things this guide describes are built but switched off: **accounts** and **bulk downloads**.
-Their controls are still on the page and explain themselves rather than failing — see
+Two features described in this guide are currently inactive: **accounts** and **bulk downloads**.
+Their controls are still visible on the page to explain their intended functionality — see
 [Accounts and watchlists](/app/guide/07-accounts).
 
-The site is also **not indexed by search engines**. It serves `robots.txt` disallowing every
-crawler, because the addressable space — 65,938 sections across 382 release points, plus a diff
-between any two of them — is effectively unbounded, and two AI crawlers walking it drove 43,068
-requests in an hour against roughly 48 from human browsers. That is a decision about a demo, and it
-is written down with the traffic that prompted it in ADR-0037.
+The site also serves a `robots.txt` disallowing search engine crawlers. The addressable space is effectively unbounded, so this prevents automated crawling from consuming excessive resources.
 
 ## Watch it instead
 
@@ -80,10 +75,7 @@ steps that demonstrate it. Those steps run as Playwright tests on every push, an
 *in the demo video* are also the script the demo recording follows. A claim here that stopped being
 true would turn the build red.
 
-That is not documentation zeal for its own sake. The site's own search guide spent a fortnight
-telling readers it could only search current text, months after the full index was built — a true
-sentence that quietly became a false one because nothing was checking it. ADR-0038 records the
-design that followed.
+This approach ensures that the documentation remains accurate as the application evolves.
 
 ```scenario
 id: about-disclaimer

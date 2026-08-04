@@ -52,9 +52,7 @@ steps:
 
 ## Searching the text
 
-The search **matches the words you typed**. It does not quietly spend two character edits looking
-for something near them — in a legal corpus a different word is a different rule, and a search for
-`compare` returning `compact` and `company` is a search that has answered a question nobody asked.
+The search **matches the words you typed** without applying fuzzy matching or stemming by default. In a legal corpus, a different word often denotes a different rule.
 
 If you do want that, ask: `conservtion~1` allows one edit. The other operators — `"exact phrase"`,
 `-exclude`, `either | or`, `truncat*`, and parentheses for grouping — are listed with examples on
@@ -83,9 +81,7 @@ currently in force.”* — so you can tell from the answer which question was a
 
 ### Asking what cites a provision
 
-Prefixing a query with `cites` — `cites 26 usc 501` — searches for the text of that citation. It is
-a keyword search, not a citation index, and the results page says so plainly rather than implying a
-completeness it does not have. A real reverse-citation index is designed and not built.
+Prefixing a query with `cites` — `cites 26 usc 501` — searches for the text of that citation. Note that this is a keyword search rather than a structured reverse-citation index.
 
 ```scenario
 id: cites-is-honest
