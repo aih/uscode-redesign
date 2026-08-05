@@ -21,6 +21,40 @@
  * 4 KB is nothing on the wire and about a screenful and a half to scroll. */
 export const PREVIEW_CHARS = 4000;
 
+/**
+ * The placeholder `previewFailureHtml` leaves where the citation's URL goes.
+ *
+ * The card is built here, on the server, and used in two places: `/app/design`
+ * renders it directly, and `CitePreview`'s island — which is `is:inline` and so
+ * can import nothing — receives it as a string and substitutes the href of
+ * whichever reference failed. One token, one `replaceAll`, one copy of the
+ * markup.
+ */
+export const PREVIEW_HREF = "%HREF%";
+
+/**
+ * What the hover card says when the fragment could not be fetched.
+ *
+ * Never nothing. A card that silently declines to open is indistinguishable
+ * from a feature that is broken, or from a citation with no text behind it, and
+ * the reader is left with no next step. This names the failure and offers the
+ * link (ADR-0041).
+ *
+ * 429 is called out by name because the preview endpoint is rate-limited per
+ * caller (ADR-0029) and a reader working down a dense section will meet it —
+ * "too many previews just now" is a wait, where "unavailable" reads as broken.
+ */
+export function previewFailureHtml(href: string, status?: number): string {
+  const reason =
+    status === 429
+      ? "Preview unavailable — too many previews just now."
+      : "Preview unavailable.";
+  return (
+    `<p class="cite-preview__note">${reason}</p>` +
+    `<p class="cite-preview__foot"><a href="${href}">Open the citation →</a></p>`
+  );
+}
+
 /** Splits rendered HTML into top-level chunks: whole elements, void elements,
  * and runs of text. Non-greedy on the body, anchored on a backreference to the
  * opening tag name, so a `<div>` containing `<div>` is one chunk. */

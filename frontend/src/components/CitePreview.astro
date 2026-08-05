@@ -46,6 +46,20 @@
  * every workaround (first-tap-opens, long-press) fights either the OS or the
  * reader's expectation that a link is a link. A tap opens the citation.
  */
+import { PREVIEW_HREF, previewFailureHtml } from "../lib/preview";
+
+/** The failure card, rendered here and handed to the island as a string.
+ *
+ * An `is:inline` script can import nothing, so anything it builds is markup no
+ * other page can render and no test can call. `/app/design` shows this card as
+ * one of the reader's message states, and it shows the card itself rather than
+ * a hand-written likeness of it because the two variants below are the only
+ * copy of it. `PREVIEW_HREF` is replaced with the failed reference's own href.
+ */
+const FAILURES = {
+  "429": previewFailureHtml(PREVIEW_HREF, 429),
+  other: previewFailureHtml(PREVIEW_HREF),
+};
 ---
 
 {/* One card, reused for every reference on the page. `manual` rather than
@@ -64,6 +78,15 @@
   role="dialog"
   tabindex="0"
 ></div>
+
+{/* `type="application/json"` so the browser does not execute it and the CSP has
+    no opinion about it — the same arrangement `CopyColumn` uses to hand its
+    island server-computed data. */}
+<script
+  type="application/json"
+  data-preview-failures
+  set:html={JSON.stringify(FAILURES)}
+/>
 
 <script is:inline>
   {
@@ -195,17 +218,20 @@
        * with no text behind it — and the reader is left with no next step. This
        * one names the failure and offers the link, which is the fallback that
        * was always there and was never said out loud.
+       *
+       * The markup comes from `lib/preview.ts` through the JSON block above,
+       * with the reference's own href substituted for the token: this script is
+       * inline and can import nothing, and a card built here would be markup
+       * `/app/design` could not show and no test could call.
        */
+      const failures = JSON.parse(
+        document.querySelector("[data-preview-failures]")?.textContent || "{}",
+      );
+
       function failureHtml(link, status) {
         const href = link.getAttribute("href") ?? "#";
-        const reason =
-          status === 429
-            ? "Preview unavailable — too many previews just now."
-            : "Preview unavailable.";
-        return (
-          `<p class="cite-preview__note">${reason}</p>` +
-          `<p class="cite-preview__foot"><a href="${href}">Open the citation →</a></p>`
-        );
+        const template = failures[String(status)] ?? failures.other ?? "";
+        return template.replaceAll("%HREF%", href);
       }
 
       async function show(link) {
