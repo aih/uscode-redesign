@@ -231,6 +231,14 @@ gain time on a job already running.
 
 ## Search index
 
+**Owed as of 2026-08-05 (session 29, ADR-0049): the deployed index carries the old mapping.**
+B4 added `title_num`, `chapter`, `sort_key`, `num.text` and `id_collision`, and OpenSearch will
+not add a field type to a live index (ADR-0028). Until `python -m ingest.reindex_search --recreate`
+runs on the box, `title:`, `chapter:`, `status:`, `?sort=citation` and the collision flag return
+nothing rather than failing — the query is valid, the field is simply absent. The deploy does not
+do this on its own. `--recreate` alone (current text, 66k documents) is enough to restore what the
+default search reads; `--all-versions` has the memory problem described below.
+
 **Current text is built and live: 65,938 documents in `uscode_sections`, 9,916 in
 `uscode_structure`.** A query for "conservation" returns 199 hits (`/us/usc/t16/s2903`
 "Conservation plans", `/us/usc/t16/s3831` "Conservation reserve"). That retires CLAUDE.md's

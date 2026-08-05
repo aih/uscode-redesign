@@ -1310,3 +1310,98 @@ Session-by-session record of how this site was built. One entry per working sess
   150 MB bound. It is not run by `make test`, so no session's own suite catches it. This branch
   touches nothing under `ingest/` or `storage/`, and the failure predates it by five days. Owed to
   whoever picks up the parser next.
+
+## 049 — 2026-08-05 — Session 29: B4, search relevance measured and the query scoped
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Workstream B task B4. Propose and *measure* a scoring model rather than shipping a
+  hunch — field weighting, phrase proximity, current-release boost, collapse of superseded
+  versions — against a committed relevance judgement set scored by nDCG@10 before and after. Add
+  explicit sort control. Note the ADR-0021 identifier-collision caveat in the results UI where it
+  can bite. Audit the operator set against what a drafter asks for and document each with an
+  executable scenario. Add facets, reflected in the URL so a search is citable. Mid-session: pin
+  the section page's chapter rail so it does not scroll with the text.
+- **Decided:**
+  - **[ADR-0049](docs/adr/0049-search-relevance-measured-and-scoped.md)** — the ranking is chosen
+    by measured nDCG@10 over `docs/verification/search-judgements.json`, and the query gains six
+    `field:value` scopes lifted out before the cluster sees them, so ADR-0031's choice of the
+    parser that never throws stands. Facets edit the query rather than adding a parameter beside
+    it. One query builder (`storage/searchquery.py`) serves both the API and the harness.
+  - **[ADR-0050](docs/adr/0050-the-chapter-rail-is-pinned.md)** — the rail is pinned from 64em with
+    a bounded height and its own scrollbar, reversing ADR-0043's standing decision. The height is
+    the half the first attempt was missing: `top` alone pins the rail and lets it run past the
+    bottom of the viewport.
+  - **`all-versions` measured and declined.** It scores highest (0.7192 against 0.7159) and changes
+    what a result *is* — a section whose current text no longer carries the words becomes a hit.
+    The default keeps ADR-0028's `is_current` filter and reports the rest as "also matched in N
+    earlier versions", counted by a second size-0 request bounded by the page.
+- **Produced:** commits `3f79851`, `36978d5`, `c1d4a12`, `e3dab92`, `9188bc2` on
+  `workstream-b-search-relevance`. New: `storage/searchquery.py`, `scripts/search_eval.py`,
+  `frontend/src/lib/searchscope.ts`, `frontend/src/components/SearchFacets.astro`,
+  `tests/test_searchquery.py`, `frontend/tests/searchscope.test.ts`,
+  `docs/verification/search-judgements.json`, `docs/verification/search-relevance.json`,
+  ADR-0049, ADR-0050.
+- **Verified:**
+  - **The old heading weight was not the one written down.** The mapping carried a deprecated
+    index-time `boost: 2.0` on `heading` *and* the query said `heading^2`; OpenSearch multiplies
+    them. Explained on the pre-B4 index as a BM25 `boost` factor of 4.4 = 2.2 (`k1+1`) × 2.0, and
+    `heading^4` against a boost-free mapping reproduces the old ranking **and its scores exactly**
+    on all ten queries tried, where `heading^2` reproduces neither. That is why the baseline
+    profile is `heading^4`.
+  - **nDCG@10 over 37 queries and 573 graded documents**, pooled from every candidate profile
+    before grading: deployed **0.6894** → shipping **0.7159**; recall@10 **0.7672** → **0.8016**.
+    Thirteen queries improve, nine get worse, fifteen do not move. Re-check:
+    `uv run python scripts/search_eval.py score`.
+  - **The parameters were swept, not picked**: phrase boost 2/4/8/16 (16 is much worse at 0.6519),
+    slop 0/2/6, heading weight 6/10/16/24, `num.text` 0/2/8.
+  - **Two counting defects found and fixed.** `hits.total` stopped at OpenSearch's default 10,000
+    and reported the cap as the answer, so `q=land` claimed 10,000 and now reports 4,593; and under
+    collapse it counted versions while the page listed sections, so `q=conservation&release=119-99`
+    claimed 10,000 and now reports 2,963.
+  - **A parser bug in both languages.** The tokenizer only recognised a quoted run at the *start*
+    of a token, so `heading:"wild horses"` matched `heading:"wild` then `horses"` — a valid query
+    meaning something else. Caught by `frontend/tests/searchscope.test.ts`, fixed in
+    `storage/searchquery.py` and `frontend/src/lib/searchscope.ts`.
+  - **The ADR-0021 collision count is now a number**: 160 (identifier, first-release) pairs across
+    **49 identifiers in 14 titles**, from `_colliding_doc_ids`. Flagged on the document and shown
+    on the result row.
+  - **Suites:** `make test` **527** passed (was 486), `make test-web` **271** (was 253),
+    `make test-e2e` **386** passed / 2 skipped (was 373). `make shots` reflow-clean at 320 CSS px
+    and 1280@200% apart from A4's known 3px on `/app/docs`. `make test-a11y` **258 scans, 8
+    violation/route pairs over 1,794 nodes** — unchanged from the ADR-0039 baseline, with a
+    filtered-and-sorted search added to the matrix so the filled facet and sort pills are scanned
+    at all. `uv run python scripts/contrast.py` — 18 pairs, 36 checks, the new
+    `--danger-ink` on `--link` at 6.72:1 light and 8.13:1 dark.
+  - **The local index was rebuilt** with `--all-versions`: 489,738 section versions and 9,916
+    structure nodes, which is what made the `all-versions` profile measurable rather than
+    hypothetical.
+
+### Owed before this deploys
+
+- **The deployed OpenSearch index must be rebuilt.** The mapping is not additive (ADR-0028), so
+  `python -m ingest.reindex_search --recreate` has to run on the box or `title:`, `chapter:`,
+  `status:`, `?sort=citation` and the collision flag are all silently empty. The deploy does not do
+  this on its own.
+- `docs/verification/loadtest.json` is now stale for `/api/v1/search` and `/app/search` as well as
+  for the reasons already listed: the query carries a phrase clause, two aggregations and an
+  uncapped count, and there is a second request per default search.
+
+### Candidate tasks found and deliberately not done
+
+- **`/app/search/syntax` has a heading reading "Two things that will catch you out"**, which is
+  both a teaser heading and a presumption about the reader — two of the prose rules in
+  `~/.claude/CLAUDE.md`. Pre-existing, on a page this session edited, left alone under scope
+  discipline.
+- **`?sort=citation` puts every chapter and subchapter heading of a title ahead of every section of
+  it.** Structure nodes have no `seq_in_title`, so they all take position `000000`. A true position
+  means deriving one from the first section beneath each node — a join `reindex_search` does not do.
+  Named in the guide and in ADR-0049 rather than hidden.
+- **`num.text` is unmeasured by the subject queries.** nDCG is identical at weight 0, 2 and 8. Two
+  number-bearing queries were added and it moves those; a judgement set that exercised
+  section-number lookup properly would be a task of its own.
+- **The relevance ceiling is heading-shaped.** Every one of the six worst queries is a provision
+  whose heading does not contain the words searched for — FOIA is *Public information; agency
+  rules…*, § 1956 is *Laundering of monetary instruments*, § 2 is *Monopolizing trade a felony*.
+  Term matching cannot close that; the `embedding` field ADR-0028 declared is where it would go.
+- **The earlier-version count is only as good as what is indexed.** CI builds a current-only index,
+  so no scenario can assert "also matched in N earlier versions" without `data: corpus`.
