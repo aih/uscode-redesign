@@ -1541,3 +1541,73 @@ Session-by-session record of how this site was built. One entry per working sess
   - **`brand.md`'s condensed Archivo is not shipped.** `wdth` is pinned to 100 and the axis dropped;
     the release-point labels it was wanted for (`119-102not101`) get no condensed cut.
   - **There is no `claude-code/WORKSTREAM-C-STATE.md`** to match A's and B's.
+
+## 052 — 2026-08-05 — Session 30b: workstream C task C2, a living style guide
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Task C2. One page at `/app/design`, generated from the same tokens, showing the type
+  scale in both faces with the reading measure, the palette with computed contrast ratios, focus
+  states, the status badge set including an unknown status rendered legibly rather than thrown on
+  (gotcha 13), breadcrumb, TOC rail, timeline, redline, copy control, search result row, and every
+  message state — zero results, 429, served-from, the appendix explanation. Make it the regression
+  surface: `make shots` covers it, axe scans it, the guide ratchet accounts for it.
+- **Decided:**
+  - **[ADR-0053](docs/adr/0053-a-living-style-guide-at-app-design.md)** — the page renders
+    components, not likenesses. Four blocks that were inline markup in a page became components
+    first (`Timeline`, `SearchResult`, `NoResults`, `CitationNotFound`), used by `/app/versions`,
+    `/app/search` and `/app/goto` as well as here; `diffSummary` moved into `lib/diffdoc.ts`; the
+    hover preview's failure card moved into `lib/preview.ts` and reaches `CitePreview`'s island as
+    a string with a token where the href goes, because an `is:inline` script can import nothing.
+  - **The page reaches no data.** No API call, no release point, so it renders the same on an empty
+    machine as on the deployed box — which is what lets `make shots` and the axe matrix treat it as
+    a fixed target, where every other route's appearance depends on what the corpus holds. The cost
+    is the specimen: title 0, which OLRC does not publish, so its citations resolve to nothing.
+    Borrowing a real identifier for words the Code does not contain was the alternative.
+  - **The contrast table computes itself in the browser**, from the tokens the page resolved rather
+    than from the artifact. The pair list moved out of `scripts/contrast.py` into
+    `frontend/src/data/color-pairs.json`, which the script now reads and the page imports — it has
+    to live under `frontend/src/` because `frontend/Dockerfile`'s build context is `./frontend`, so
+    nothing under `docs/` exists when the image is built. Two implementations of one formula is the
+    cost; `tests/e2e/design.spec.ts` compares every pair in both themes against
+    `docs/verification/contrast.json`, and the page's half is the one that can see a colour painted
+    from something other than the token — ADR-0042's `.usa-nav__link`.
+  - **Two defects the page rendered into view, both components that were right in one place.** An
+    unrecognised `@status` fell through to USWDS's `.usa-tag`: a filled badge in `base-dark`, a
+    colour the palette does not name and `contrast.json` never measured, carrying `repealed`'s
+    emphasis. The neutral pill is now the default. And `.usa-breadcrumb`'s transparent background
+    was scoped to `.contextbar`, which was every use of it until this page rendered one outside the
+    sticky chrome — USWDS's own background is a compile-time light-page value, so in dark the trail
+    came back as a white slab with `--ink` written on it.
+  - **The pairs table is `table-layout: fixed` with no `white-space: nowrap`.** Four columns, one of
+    them two token names and one a sentence; at 320 CSS pixels there are 288 to spend, and nothing
+    in it may declare a minimum. It overflowed by 95px before that.
+- **Produced:** commits on `workstream-c-design-system`, branched from `workstream-c-brand-tokens` —
+  `4994f05` extract the four blocks, `d130315` the preview card built once, `163a3e6` the colour-pair
+  list moved, `56731d3` the page itself, `9ad6f9d` the two defects fixed, `8f8d8d1` the route under
+  its ratchets, `7394c59` ADR-0053 and the guide, `3931164` the screenshots. New:
+  `frontend/src/pages/design.astro`, four components, `frontend/src/data/color-pairs.json`,
+  `frontend/tests/e2e/design.spec.ts`, `docs/adr/0053`, four `design-*.png`.
+- **Verified:**
+  - `make test` — 545 Python tests, unchanged.
+  - `make test-web` — **278**, up one: the guide ratchet now has a route and an ADR to account for.
+  - `make test-e2e` — **405**, up 12: four in `design.spec.ts`, seven axe scans for the new route,
+    one guide scenario. The a11y run is **265 scans**, still 8 violation/route pairs over 1,794
+    nodes — the new page adds none.
+  - `make shots` — 48 PNGs, no horizontal overflow at 375, 1280, 320 or 1280-at-200%.
+  - `uv run python scripts/contrast.py` — 20 pairs, 40 checks, 0 failures, unchanged by the move.
+  - The page's own numbers are the check: `design.spec.ts` fails if any ratio it computes differs
+    from `contrast.json` by more than 0.01, if a declared token has no swatch, or if the page asks
+    the API for anything.
+- **Candidate tasks, not done here:**
+  - **Seven components are not on the page**, so nothing said above covers them: `SearchFacets`,
+    `SectionBar`, `Neighbors`, `SiteSearch`, `ReleasePicker`, `WatchButton`, `ComingSoon`. The rule
+    ADR-0053 states is only enforced for what is on the page.
+  - **`CLAUDE.md` carried two stale counts** before this session: `docs/verification/a11y.json` was
+    already 1,794 nodes rather than 1,780, and `make shots` was 44 PNGs rather than 48. The first is
+    corrected in this session's CLAUDE.md edit; the second is now true by arithmetic.
+  - **The focus section cannot show a focus ring without a keyboard.** It renders real controls and
+    asks the reader to Tab. A `:focus-visible` specimen drawn in CSS would be a second copy of the
+    ring, which is the thing this page exists not to do; a scripted one would be a focus trap.
+  - **`previewHref` in `lib/url.ts` still has no caller** — `CitePreview.astro:199` still builds the
+    preview URL inline. Untouched here; the failure card was the only part of that island this task
+    needed.
