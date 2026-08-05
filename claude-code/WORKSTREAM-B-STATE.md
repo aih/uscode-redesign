@@ -10,8 +10,8 @@ Paste `00-CONVENTIONS.md` above any task prompt, then this file, then the task y
 
 ## Where the work is
 
-Branch **`workstream-b-navigation-ia`**, cut from `main` at `387ff3a` (workstream A merged).
-Working tree clean apart from untracked `claude-code/`.
+**Merged.** B1–B3 landed on `main` in PR #24 (`8e7a21c`) and deployed. Work continues on `main`
+until the next branch is cut. Working tree clean apart from untracked `claude-code/`.
 
 All suites green as of the last commit:
 
@@ -106,9 +106,23 @@ Three fixes taken, one declined, in the order the numbers put them rather than B
   host. What is missing is a shared cache to read those headers, and a cache on the box addresses the
   27% of a reader's wait that is the origin rather than the 73% that is the network.
 
-`docs/verification/b3-fixes.md` holds the commands. **The deployed re-measurement is still owed** —
-all three measuring commands measure the box, and the fixes are not on the box until this branch
-deploys, so the artifacts in `docs/verification/` remain the *before* picture.
+`docs/verification/b3-fixes.md` holds the commands and the before/after. **The re-measurement is
+done** — PR #24 merged, the deploy ran, and all three artifacts were regenerated against the box:
+
+- **The spine's plans**, the one result attributable to B3 alone since nothing else in the deploy
+  touches Postgres: `get_section` 1.649 → **0.348 ms**, `resolve_id` over the 96 M-row `guid_map`
+  1.388 → **0.119 ms**, and no watched table sequentially scanned by any of the thirteen calls.
+- **Under load:** reader TOC page 14.4 → **35.0 rps**, 525.5 → **183.7 ms** p50; reader section page
+  11.0 → **15.6 rps**, 702.4 → **480.0 ms**.
+- **One reader:** the spine's four clicks 823 → 801 ms, of which the **origin is 221 → 159 ms**. The
+  network share is unchanged and still dominates — ADR-0047's argument, restated by its own
+  re-measurement.
+
+**It is not a clean A/B, for two reasons the artifact states.** The previous deploy was `387ff3a`,
+the commit this branch was cut from, so the *before* box had none of B1, B2 or B3 — the after box's
+section page carries a rail, a release band and a switcher it did not have, and makes five API calls
+where it made four. And the twelve untouched routes drifted to a median 1.073× their before p50, so
+the gains are understated by about that much.
 
 **A measurement error from the measure half, corrected here:** the reader calls
 `/api/v1/releases?**ingested_title**=`, and both scripts had asked for `?title=`. Different work

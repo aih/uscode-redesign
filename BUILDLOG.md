@@ -1260,3 +1260,53 @@ Session-by-session record of how this site was built. One entry per working sess
   - **Inline scripts ship their comments.** 25,474 bytes of inline script on a section page, much of
     it explanatory prose that only the browser downloads and nobody reads. Minifying inline islands at
     build time is a real saving and a real loss of the thing that makes them readable in `view-source`.
+
+## 048 — 2026-08-05 — Session 28c: the deployed re-measurement
+
+- **Tool/model:** Claude Code, Opus 5. Continues BUILDLOG 046 and 047.
+- **Asked:** Open a PR and deploy. Merging turned out to *be* the deploy, which was reported before
+  anything was pushed; the human merged, and this entry is the re-measurement that B3 still owed.
+- **Decided:**
+  - **`api_cost_ms` counts only the calls a page makes per view.** ADR-0045 stopped the release list
+    being fetched per view, and the attribution arithmetic did not know: it credited a table of
+    contents page with 41.2 ms of API time when the whole page took 22.1 ms, and printed a **negative**
+    figure for Astro's own share on two rows. `FANOUT` entries now carry a `cached` list — still timed,
+    still reported, with `per_view: false` — excluded from the critical path. The corrected
+    attribution was **re-derived from the same stored measurements** rather than re-measured, and the
+    artifact says so.
+- **Produced:** regenerated `docs/verification/{navprofile,loadtest,spine-explain}.json`;
+  `docs/verification/b3-fixes.md` gained a "Before and after" section; `scripts/navprofile.py`.
+  Commits `9c35538` and this entry, on `main`.
+- **Verified:**
+  - **The deploy landed.** Alembic head on the box is `d5c81f27a930`, `ix_structure_nodes_identifier`
+    exists, and the plan there is an Index Scan at 0.057 ms.
+  - **The release cache works in production**, counted from the API's own access log on the box:
+    eight concurrent section views produce **one** `/api/v1/releases`.
+  - **The spine's plans, which is the one result attributable to B3 alone** — nothing else in the
+    deploy touches Postgres. `get_section` 1.649 → **0.348 ms**, `get_toc` chapter rail 1.769 →
+    **0.446 ms**, `resolve_id` over the 96 M-row `guid_map` 1.388 → **0.119 ms**, and
+    `seq_scans_on_large_tables` is empty for all thirteen calls. Calls that never touched
+    `structure_nodes` are flat: `neighbors` 0.291 → 0.308 ms.
+  - **Under load, 8 concurrent:** reader TOC page 14.4 → **35.0 rps** and 525.5 → **183.7 ms** p50;
+    reader section page 11.0 → **15.6 rps** and 702.4 → **480.0 ms**. The TOC page gains most, which
+    is what the fan-out predicts — it made two calls and the release list was the slower one.
+  - **One reader, no contention:** four clicks down the spine 823 → 801 ms at the edge, of which the
+    **origin is 221 → 159 ms**. The network share is unchanged and still dominates, which is
+    ADR-0047's argument restated by its own re-measurement.
+- **Two reasons this is not a clean A/B, both recorded in `b3-fixes.md`:**
+  - **The previous deploy was `387ff3a`** — the commit this branch was cut from — so the *before* box
+    was running main with **none of B1, B2 or B3**. The after box's section page carries a
+    `ChapterRail`, a `ReleaseContext` band and a `ReleasePicker` it did not have, and makes **five**
+    API calls where it made four. The reader-page rows are "workstream B, all of it". That the page
+    got faster while doing more is the honest reading, and a stronger one than a like-for-like would
+    have been.
+  - **The twelve untouched routes drifted to a median 1.073× their before p50** (range 0.995–1.123),
+    same laptop and link at a different hour. The gains above are understated by about that much.
+  - Related: `releases the picker can offer` reads 30.6 → 23.1 rps, but that row **changed URL** — it
+    now measures `?ingested_title=`, the parameter the reader uses, rather than the cheaper `?title=`.
+    The endpoint did not get slower; the measurement got correct.
+- **Found, not caused, and not fixed here:** **the nightly `make test-slow` has failed every night
+  since at least 2026-07-31** — `test_parsing_32_mb_stays_memory_bounded`, peak RSS 552 MB against a
+  150 MB bound. It is not run by `make test`, so no session's own suite catches it. This branch
+  touches nothing under `ingest/` or `storage/`, and the failure predates it by five days. Owed to
+  whoever picks up the parser next.
