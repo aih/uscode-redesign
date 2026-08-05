@@ -94,7 +94,7 @@ id: search-scope-heading
 title: Search headings rather than the whole text
 steps:
   - goto: /app/search?q=heading%3Aconservation
-  - expect: { selector: ".searchresult__title", contains: "onservation" }
+  - expect: { selector: ".searchresult__title em", visible: true }
 ```
 
 ```scenario
@@ -110,7 +110,7 @@ id: search-scope-chapter
 title: Restrict a search to one chapter
 steps:
   - goto: /app/search?q=conservation+title%3A16+chapter%3A1
-  - expect: { selector: ".searchresults", visible: true }
+  - expect: { selector: ".searchresult", visible: true }
 ```
 
 ```scenario
@@ -128,7 +128,7 @@ id: search-exact-phrase
 title: Search for an exact phrase
 steps:
   - goto: /app/search?q=%22national+park%22
-  - expect: { selector: ".searchresults", visible: true }
+  - expect: { selector: ".searchresult", visible: true }
 ```
 
 ### Narrowing what you got back
@@ -145,10 +145,10 @@ demo: true
 demoOrder: 104
 steps:
   - goto: /app/search?q=conservation
-    caption: The counts say which titles the matches are in.
-  - click: .facets__value
+    caption: The counts say which titles and statuses the matches fall into.
+  - click: .facets__value--status
     caption: Selecting one narrows the search.
-  - expect: { url: "title" }
+  - expect: { url: "status" }
     caption: The filter is written into the query, so the URL is the whole search.
 ```
 

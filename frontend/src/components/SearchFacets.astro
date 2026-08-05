@@ -86,7 +86,11 @@ const show = worthShowing("title", titles) || worthShowing("status", statuses);
               return (
                 <li>
                   <a
-                    class:list={["facets__value", on && "facets__value--on"]}
+                    class:list={[
+                      "facets__value",
+                      "facets__value--title",
+                      on && "facets__value--on",
+                    ]}
                     href={href("title", facet.value)}
                     aria-current={on ? "true" : undefined}
                   >
@@ -111,7 +115,11 @@ const show = worthShowing("title", titles) || worthShowing("status", statuses);
               return (
                 <li>
                   <a
-                    class:list={["facets__value", on && "facets__value--on"]}
+                    class:list={[
+                      "facets__value",
+                      "facets__value--status",
+                      on && "facets__value--on",
+                    ]}
                     href={href("status", facet.value)}
                     aria-current={on ? "true" : undefined}
                   >
