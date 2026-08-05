@@ -5,7 +5,7 @@ order: 3
 summary: Release points, the three ways to ask for one, and the four facts every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36, 44]
+  adrs: [18, 36, 44, 45]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
@@ -50,6 +50,11 @@ Every page that shows a provision carries all three as controls, under the secti
 a **Release point** menu whose first entry is *Newest — follows new releases*, and an **As of date**
 box. Both keep the provision you are reading. Switching release on
 `/app/us/usc/t16/s45f/c/5` returns `(c)(5)` at the release point you chose, not the top of § 45f.
+
+The **Release point** menu is rebuilt at most every five minutes, so a release point loaded within
+the last few minutes may not be listed yet. Typing its label into the address as `?release=` reaches
+it immediately, and the release point a page is reading is always read fresh — the menu is the only
+thing on that schedule. `/app/releases` lists every release point this site holds.
 
 ```scenario
 id: switch-keeps-provision

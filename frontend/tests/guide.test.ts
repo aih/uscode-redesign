@@ -72,6 +72,8 @@ const INFRASTRUCTURE_ADRS = new Set([
   22, // USWDS retained, no client framework
   30, // browser security headers
   35, // images from ECR, deploys from Actions
+  46, // the per-route JavaScript byte budget — a test harness
+  47, // declining a shared cache in front of the spine — a deployment decision
 ]);
 
 const chapters = readChapters();
