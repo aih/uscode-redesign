@@ -59,7 +59,7 @@ ROUTES=(
   "parent TOC (the ChapterRail's call, ADR-0043)|$BASE/api/v1$PARENT?release=$RELEASE|$N|$C|0|||none"
   "neighbors|$BASE/api/v1/sections$SECTION/neighbors?release=$RELEASE|$N|$C|0|||none"
   "versions timeline|$BASE/api/v1/sections$VERSIONED/versions|$N|$C|0|||none"
-  "releases for one title (on every section page)|$BASE/api/v1/releases?title=16|$N|$C|0|||none"
+  "releases the picker can offer (on every section and TOC page)|$BASE/api/v1/releases?ingested_title=16|$N|$C|0|||none"
   "titles (the front page)|$BASE/api/v1/titles|$N|$C|0|||none"
   "reader section page (SSR, 5 API calls)|$BASE/app/us/usc/t16/s45f?release=$RELEASE|$N|$C|0|||none"
   "reader TOC page (SSR, 2 API calls)|$BASE/app/us/usc/t16/ch1?release=$RELEASE|$N|$C|0|||none"

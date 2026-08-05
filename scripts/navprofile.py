@@ -187,12 +187,12 @@ FANOUT: list[dict] = [
     {
         "page": "title TOC",
         "sequential": 1,
-        "calls": ["/api/v1{t_toc}", "/api/v1/releases?title={t}"],
+        "calls": ["/api/v1{t_toc}", "/api/v1/releases?ingested_title={t}"],
     },
     {
         "page": "chapter TOC",
         "sequential": 1,
-        "calls": ["/api/v1{parent}", "/api/v1/releases?title={t}"],
+        "calls": ["/api/v1{parent}", "/api/v1/releases?ingested_title={t}"],
     },
     {
         # One sequential call, then four in parallel — ADR-0043 put the parent
@@ -204,7 +204,7 @@ FANOUT: list[dict] = [
             "/api/v1{sec}",
             "/api/v1/labels?identifier={sec}",
             "/api/v1/sections{sec}/neighbors",
-            "/api/v1/releases?title={t}",
+            "/api/v1/releases?ingested_title={t}",
             "/api/v1{parent}",
         ],
     },

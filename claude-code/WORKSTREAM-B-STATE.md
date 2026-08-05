@@ -69,7 +69,7 @@ gives 0.4 ms and 11.1 ms.
 **The two open questions from session 27 are answered.**
 
 - **ADR-0043's fourth call is free in wall clock.** The parent TOC costs 16 ms and runs in the same
-  `Promise.all` as `/api/v1/releases?title=` at 20 ms, so it adds nothing to the page. Under load it
+  `Promise.all` as the release list at 27 ms, so it adds nothing to the page. Under load it
   is the *fastest* API row: 61.9 rps, 116.9 ms p50, 2,168 wire bytes. The 156 rps / p95 83 ms figure
   it replaces was a laptop against a partial corpus.
 - **The transient 502 did not recur** in 813 timed requests plus a full load test.
@@ -78,9 +78,10 @@ gives 0.4 ms and 11.1 ms.
 
 1. **The reader page under concurrency** — 195 ms for one reader, **702 ms p50 at 11.0 rps with 8
    concurrent** on 2 vCPUs. The JSON routes hold up; the SSR page does not.
-2. **`/api/v1/releases?title=N`** — 247 ms p50, 30.6 rps, the slowest unlimited API route, fetched on
-   every section page *and* every TOC page to fill a picker with 381 options. This is the release-menu
-   debt already in "Candidate tasks" below, now with a cost attached.
+2. **`/api/v1/releases?ingested_title=N`** — 27.0 ms at the API container and ~247 ms p50 at 8
+   concurrent, the slowest unlimited API route, fetched on every section page *and* every TOC page to
+   fill a picker with 381 options. **ADR-0045 fixed this**; the throughput figure was measured against
+   `?title=`, which is the cheaper parameter, so it understates what was being paid.
 3. **The API diff: 5.1 s per request.** The limiter sheds correctly (23 × 429 at C=10) but the
    requests it *admits* still exceed a 20 s client timeout. B5 owns this.
 4. **`structure_nodes` has no index on `identifier` alone** — the unique constraint is
