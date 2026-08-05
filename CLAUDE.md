@@ -96,7 +96,30 @@ focus restore fires `focusin` on the trigger and the card the reader just closed
 A fetch failure renders "Preview unavailable" plus the citation instead of nothing, and a 429 says so
 by name; an `AbortError` stays silent, because that is the island superseding its own request.
 
-`make test` = **527** Python tests; `make test-web` = **271** frontend tests; `make test-e2e` = **386**
+**The brand is token overrides on USWDS and nothing else** (ADR-0052). Statutory text is **Spectral**,
+the interface **Archivo**, monospace the system stack; both faces are Latin-subset WOFF2 in
+`frontend/public/fonts`, built by `scripts/fonts.py` from pinned `google/fonts` commits into
+`docs/verification/fonts.json` — **six files, 125,720 bytes, 45,872 of it preloaded**, and the build is
+byte-reproducible only because the instancer is told to stop stamping the clock into `head.modified`.
+The `@font-face` rules are hand-written: USWDS emits one per static weight, which **cannot express a
+variable face**, and hard-codes `font-display: fallback`. Cap heights (**343 Archivo, 330 Spectral**)
+are read out of the binaries, since USWDS normalises its type scale against them — the unit is cap
+height in px at 500px, recovered from the two faces USWDS ships whose declared values match their
+files. The palette is indigo `#31509d`, `#90302e` for repeal and error, `--version` `#036639` for
+version semantics **and nothing else**, amber for the provision you asked for; `contrast.json` is now
+**20 pairs, 40 checks, 0 failures**. Two traps: **USWDS's colour functions take a token name, not a
+hex** — `get-color-token-from-bg` hands its result to `color()`, which fails the compile — so the
+neutrals are `gray-warm` tokens and only the hues are the proposal's; and **`opacity` on text is a
+contrast ratio no token can state** (`.soon__tag` at 0.85 over `--muted` was 4.4:1, invisible to
+`contrast.py` and caught by axe). `--measure` replaces the `46rem` written out in five rules: **42rem,
+a median 68 characters**, measured by `frontend/scripts/measure.mjs` (`make measure`) rather than
+estimated. The face swap alone left line length identical and made pages
+slightly **shorter** (§45f at 1280px: Georgia 8,829px → Spectral 8,798px); the narrower column is
+what costs the scroll, **8,798 → 9,117, +3.6%**. The focus ring is still USWDS blue: the brand
+assigns it the indigo, and `$theme-focus-color` is one compile-time value while the theme is chosen at
+runtime.
+
+`make test` = **545** Python tests; `make test-web` = **277** frontend tests; `make test-e2e` = **393**
 Playwright tests, 258 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -340,6 +363,13 @@ uv run python scripts/contrast.py
                 # compute every declared colour pair from site.scss's token block, both
                 # themes → docs/verification/contrast.json (ADR-0042). Exits non-zero on a
                 # failure, so it is a check as well as a generator.
+uv run --with "fonttools[woff]" python scripts/fonts.py
+                # rebuild the two self-hosted faces from pinned google/fonts commits →
+                # frontend/public/fonts/ + docs/verification/fonts.json (ADR-0052). Byte
+                # reproducible; fontTools is deliberately not a project dependency.
+make measure    # characters per rendered line of statutory text at 375/768/1280, and the
+                # scroll length of three sections → docs/verification/measure.json
+                # (ADR-0052). Needs `make dev-all` running.
 uv run python scripts/search_eval.py score
                 # score every scoring profile in storage/searchquery.py against
                 # docs/verification/search-judgements.json → search-relevance.json

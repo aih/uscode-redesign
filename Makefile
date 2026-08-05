@@ -1,6 +1,6 @@
 .PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
         verify verify-deep load-all shots loadtest navprofile spine-explain \
-        test-e2e test-a11y demo-video
+        test-e2e test-a11y demo-video measure
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -89,6 +89,13 @@ test-all:
 # written to docs/screenshots/. Needs the site running (`make dev-all`).
 shots:
 	cd frontend && npm run shots
+
+# Characters per line of statutory text, at three widths, counted from where the
+# browser broke the lines (ADR-0052) -> docs/verification/measure.json. Also the
+# scroll length of three sections, which is what the measure costs. Needs the
+# site running (`make dev-all`).
+measure:
+	cd frontend && node scripts/measure.mjs
 
 # The demo video (ADR-0038): replays every scenario in the user guide flagged
 # `demo: true`, in `demoOrder`, with that scenario's own captions burned on

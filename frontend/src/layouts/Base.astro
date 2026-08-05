@@ -110,7 +110,35 @@ const mainClass = wide || hasRail ? "reader-wrap reader-wrap--wide" : "reader-wr
         the mark is three letters and a square — it should be sharp on a 4K tab
         strip and legible at 16px, and one vector file is both. */}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="mask-icon" href="/favicon.svg" color="#1a4480" />
+    <link rel="mask-icon" href="/favicon.svg" color="#31509d" />
+
+    {/* The two faces every page paints text in before it paints anything else:
+        Archivo for the chrome, Spectral for the provision (ADR-0052). A webfont
+        is discovered only when the stylesheet that names it has parsed, which is
+        one round trip too late; these ask for them alongside the CSS.
+
+        Only the roman faces. Italic and bold are real files and are declared in
+        `site.scss`, but a page that needs neither should not pay 66 KB for the
+        possibility. `crossorigin` is required even same-origin — a font is
+        fetched in CORS mode, and a preload without it fetches the file twice.
+
+        Not built through `lib/url.ts`: that module addresses reader *routes*,
+        and these are static files out of `public/`, the same way the favicon
+        above is. Their existence is asserted by `tests/fonts.test.ts`. */}
+    <link
+      rel="preload"
+      href="/app/fonts/archivo-latin-var.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/app/fonts/spectral-latin-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
 
     {/* The theme, before first paint.
 

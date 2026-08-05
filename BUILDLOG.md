@@ -1461,3 +1461,83 @@ Session-by-session record of how this site was built. One entry per working sess
   tree. The numbering runs 0001–0051 with that one gap, so `docs/adr/` holds 50 files. Noticed while
   counting them for CLAUDE.md; left alone, because renumbering would break every link that already
   names an ADR by number.
+
+## 051 — 2026-08-05 — Session 30: workstream C task C1, the brand as tokens
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Workstream C task C1. Audit what the project already sets on USWDS; land
+  `claude-code/assets/brand.md` as token overrides only, adapted to the installed USWDS; self-host
+  both faces as Latin-subset WOFF2 with `font-display: swap`, preloaded, no font CDN; verify with
+  `make shots`, the contrast table and the JS byte budget; write the ADR with its costs.
+- **Decided:**
+  - **[ADR-0052](docs/adr/0052-a-brand-layer-over-uswds-expressed-only-as-tokens.md)** — the brand
+    is design-token overrides and nothing else. Spectral for statutory text, Archivo for the
+    interface, the system stack for monospace; indigo, a reserved green for version semantics, warm
+    neutrals, and `--measure`.
+  - **The audit split, which the ADR carries as a table.** Token changes: the two faces, the
+    palette, the measure. Not token changes and therefore not done here: `text-wrap: pretty`, the
+    subsection ladder, the print stylesheet, the visual separation of quoted amending text from
+    operative text (all C3), the wordmark and `/app/design` (C2).
+  - **`@font-face` written by hand rather than generated.** USWDS emits one rule per static weight
+    from a map of filenames, which cannot express a variable face's weight range, and hard-codes
+    `font-display: fallback`.
+  - **The neutral ramp is USWDS's `gray-warm`, not the proposal's oklch ramp.** Not a preference:
+    `get-color-token-from-bg` — which the table, the summary box and the alert all use — resolves a
+    component's text colour from its background and needs a palette token *by name*. Handed a hex it
+    returns one, and the `color()` call downstream fails the compile. The hues go through
+    `set-theme-color`, which does take a hex, and are the proposal's.
+  - **The measure moved 46rem → 42rem**, because 46rem held a median 82 characters against the
+    brand's 62–70. Below 64em `--measure-wide` collapses to `--measure`: neither second column is
+    beside the prose there, so the wide wrap has nothing to be wide for.
+  - **The focus ring stays USWDS blue.** The brand assigns focus to the indigo, which is 2.4:1 on
+    the dark page; `$theme-focus-color` is one compile-time Sass value and the theme is chosen at
+    runtime. A per-theme focus colour is a rule, not a setting — C2's.
+  - **The mono role became a system stack**, which removed six `@font-face` rules pointing at
+    `/app/uswds/fonts/roboto-mono/…` that this site does not serve and no rule ever asked for.
+- **Produced:** commits on `workstream-c-brand-tokens` —
+  `41526d4` build the webfonts, `63cc47a` land the brand as tokens, `3c5dcc1` reshoot the
+  screenshots, `de211e0` ADR-0052 and the guide. New: `scripts/fonts.py`,
+  `frontend/scripts/measure.mjs`, `frontend/tests/fonts.test.ts`, `frontend/public/fonts/` (6 WOFF2
+  + 2 OFL licences), `docs/verification/fonts.json`, `docs/verification/measure.json`, ADR-0052,
+  `make measure`.
+- **Verified:**
+  - **`make test` 545 passed, `make test-web` 277 passed, `make test-e2e` 391 passed / 2 skipped.**
+    (The Python and Playwright counts were already 545 and 393 before this session; CLAUDE.md said
+    527 and 386 and has been corrected. The +6 in Vitest is `tests/fonts.test.ts`.)
+  - **Fonts, byte-reproducible.** `uv run --with "fonttools[woff]" python scripts/fonts.py` twice
+    gives identical sha256s — which it did not until `--no-recalc-timestamp` stopped the instancer
+    stamping the wall clock into `head.modified`. Six files, 125,720 bytes, 45,872 preloaded.
+  - **Cap heights read out of the binaries** — 343 Archivo, 330 Spectral. USWDS's unit is cap height
+    in px at a 500px font size, which is documented nowhere and was recovered from the two faces
+    USWDS ships whose declared values match their files (Public Sans 361.5→362, Merriweather
+    371.5→371). Its own Source Sans Pro and Roboto Mono values do not match theirs.
+  - **`uv run python scripts/contrast.py`** — 20 pairs × 2 themes, 0 failures. `--version` was added
+    to the declared pairs rather than left unchecked.
+  - **`make measure`** — median 68 characters at 768 and 1280, p10–p90 62–73; 38 at 375, where the
+    viewport is narrower than the measure. Counted from where the browser broke the lines.
+  - **`make shots`** at 320/375/1280/1280-at-200% — no new horizontal scroll; the only reflow is
+    A4's known 3px on `/app/docs`.
+  - **`docs/verification/js-bytes.json` is byte-identical.** This task adds no script.
+  - **`docs/verification/a11y.json` is byte-identical** — 258 scans, 8 violation/route pairs over
+    1,794 nodes, the same eight ADR-0039 owns. One new violation appeared during the work and was
+    fixed rather than listed: `.soon__tag` carried `opacity: 0.85` over `--muted`, 4.4:1 against the
+    4.5 the same colour passes at on its own. A translucent text colour is a ratio that exists only
+    in the browser, so `contrast.py` reads the token as passing and axe is the only thing that can
+    see it.
+  - **The anticipated cost did not occur.** C1 predicted a serif at the reading size would raise
+    line height and lengthen the page. Measured in three states, container rebuilt for each, §45f at
+    1280px: Georgia at 46rem **8,829px**, Spectral at 46rem **8,798px**, Spectral at 42rem
+    **9,117px** — and the line length identical at a median 82 characters between the first two. The
+    face swap alone made pages *shorter*; all of the added scroll is the narrower column. +3.3% on
+    §45f and +3.7% on §1801 at 1280px, nothing at 375px where the viewport is narrower than either
+    measure.
+- **Candidate tasks found and not done here:**
+  - **Green and red do not yet mean only "changed".** `/app/docs` paints its method badges green for
+    POST and red for DELETE (`.endpoint__method--post`, `--delete`), against ADR-0052's own
+    discipline. Restyling them is a component change with its own contrast question.
+  - **Three colour washes are still `rgba()` literals** — the redline's insertion and deletion
+    fills and the highlight — written from `--version`, `--danger` and the amber and able to drift
+    from them. `color-mix()` would tokenise them and degrade to no wash at all where it is absent.
+  - **`brand.md`'s condensed Archivo is not shipped.** `wdth` is pinned to 100 and the axis dropped;
+    the release-point labels it was wanted for (`119-102not101`) get no condensed cut.
+  - **There is no `claude-code/WORKSTREAM-C-STATE.md`** to match A's and B's.
