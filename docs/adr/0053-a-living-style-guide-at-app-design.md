@@ -65,15 +65,28 @@ that regenerates them.
 
 ## Consequences
 
-- **A component that is not on this page is covered by none of this.** `make shots` renders
-  `/app/design` at 375, 1280, 320 and 1280-at-200%, failing on horizontal overflow; the axe matrix
-  scans it at three viewports, in both themes, and under forced colours; the guide ratchet requires
-  a chapter to account for it. That is the rule this page exists to make enforceable, and it is
-  enforced for whatever is on it and nothing else. `SearchFacets`, `SectionBar`, `Neighbors`,
-  `SiteSearch`, `ReleasePicker`, `WatchButton` and `ComingSoon` are not on it yet.
+- **Coverage through this page is unconditional; coverage through any other route is not.**
+  `make shots` renders `/app/design` at 375, 1280, 320 and 1280-at-200%, failing on horizontal
+  overflow; the axe matrix scans it at three viewports, in both themes, and under forced colours;
+  the guide ratchet requires a chapter to account for it. A component scanned only through the
+  route that renders it is scanned in whatever state the corpus puts it in — `SearchFacets` was
+  covered only because "conservation" returns hits in the CI fixtures, and `SectionBar`'s and
+  `Neighbors`' end-of-subdivision state, where a step has nothing to point at, rendered on no
+  scanned route at all. Both are now specimens here.
+- **`WatchButton` is the one component this page does not cover**, and deliberately. Accounts are
+  switched off in the UI (ADR-0034) so it renders on no page, and its island calls `/auth/me` on
+  mount, which would break the no-data property above and fail the test that enforces it. The
+  property is worth more than the coverage; an exception to it would be worth less than either.
+  `SiteSearch` and `ComingSoon` are on the page already, through `SiteHeader`.
 - **Four page-inline blocks became components.** Their markup is unchanged and their pages are
   shorter, but the extraction is a real edit to three live routes and its only test is the existing
   suites.
+- **Three defects the page rendered into view**, all of them components that were correct in
+  exactly one place: an unrecognised `@status` falling through to USWDS's filled `.usa-tag`;
+  `.usa-breadcrumb`'s transparent background scoped to `.contextbar`, so outside the sticky chrome
+  a dark page got a white slab; and `Neighbors` dropping the space between a section's number and
+  its heading — `§ 45eViolations of park regulations` on every section page, for as long as that
+  component has existed.
 - **The page carries a 20 KB inline-script budget** (`docs/js-budgets.json`), most of it
   `CopyColumn`'s island, which is on the page because the copy control is part of the system. The
   colour table's own script is about 4 KB.

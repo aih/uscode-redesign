@@ -1599,15 +1599,12 @@ Session-by-session record of how this site was built. One entry per working sess
     from `contrast.json` by more than 0.01, if a declared token has no swatch, or if the page asks
     the API for anything.
 - **Candidate tasks, not done here:**
-  - **Five components are not on the page**: `SearchFacets`, `SectionBar`, `Neighbors`,
-    `ReleasePicker`, `WatchButton`. (`SiteSearch` and `ComingSoon` are on it, through `SiteHeader`.)
-    Four of the five are still scanned through the routes that render them, but *conditionally* —
-    on the corpus holding the data that renders them. `SearchFacets` is scanned only because
-    "conservation" returns hits in the CI fixtures, and **`SectionBar`'s and `Neighbors`'
-    end-of-subdivision state — no previous or next — renders on no scanned route at all**.
-    `WatchButton` is the one covered by nothing: `ACCOUNTS_ENABLED` is false, so it renders on no
-    page, and its island calls `/auth/me` on mount, which is why putting it on a page that reaches
-    no data is not free.
+  - **`WatchButton` is the one component the page does not cover**, and deliberately:
+    `ACCOUNTS_ENABLED` is false so it renders on no page, and its island calls `/auth/me` on mount,
+    which would break the no-data property and fail the test that enforces it. `SearchFacets`,
+    `SectionBar`, `Neighbors` and `ReleasePicker` **were** the other four and are now on the page —
+    see the follow-up below. `SiteSearch` and `ComingSoon` were on it all along, through
+    `SiteHeader`; the first draft of this entry said otherwise and was wrong.
   - **`CLAUDE.md` carried two stale counts** before this session: `docs/verification/a11y.json` was
     already 1,794 nodes rather than 1,780, and `make shots` was 44 PNGs rather than 48. The first is
     corrected in this session's CLAUDE.md edit; the second is now true by arithmetic.
@@ -1617,3 +1614,26 @@ Session-by-session record of how this site was built. One entry per working sess
   - **`previewHref` in `lib/url.ts` still has no caller** — `CitePreview.astro:199` still builds the
     preview URL inline. Untouched here; the failure card was the only part of that island this task
     needed.
+  - **`docs/a11y/routes.json` has no state for `ComingSoon`'s open panel.** Its markup is in the
+    DOM on every page, but axe skips hidden content, so the panel has never been scanned open. It
+    belongs in the `states` list beside `preview-focus` — an A-workstream edit.
+
+### Follow-up, same session — the four components added
+
+Asked, after reading the coverage note above: add the four. Done in `SectionBar` (two specimens:
+mid-subdivision, and the only section in its subdivision, which renders both `--off` arrows),
+`Neighbors` (both exits, and the last section of a subdivision), `ReleasePicker` and `SearchFacets`
+(with `title:16` applied, so the filled pill — the site's only `--danger-ink` on `--link` — is on
+screen). `.spec .sectionbar` is `position: static`: below 40em that row is the one thing on a
+reader page that sticks, so a specimen of it would have detached and followed the reader down this
+page.
+
+**A third live defect surfaced, and this one had shipped.** `Neighbors` renders
+`{trimNum(num)} {heading}`, and alone inside an element the text node between two expressions does
+not survive the compiler — so **every section page has read `§ 45eViolations of park regulations;
+penalty`** for as long as the component has existed. `{" "}` fixes it. `Timeline` uses the same
+shape and does *not* lose the space, because there is literal text beside the expressions; nothing
+here distinguishes the two cases, so the pattern is worth avoiding rather than reasoning about.
+Verified on the running site: `/app/us/usc/t16/s45f` now serves `§ 45e Violations of park
+regulations; penalty`. Re-ran all three suites (545 / 278 / 405) and `make shots`; the byte budget
+is unchanged at 20,412 against 21,000, since none of the four ships script.

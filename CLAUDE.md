@@ -139,9 +139,12 @@ pair against `contrast.json`. Two defects it rendered into view, both components
 exactly one place: an **unrecognised `@status` fell through to USWDS's `.usa-tag`** — a filled badge
 in a colour the palette does not name and `contrast.json` never measured — and
 **`.usa-breadcrumb`'s transparent background was scoped to `.contextbar`**, so outside the sticky
-chrome the dark trail came back as a white slab. Seven components are still not on the page
-(`SearchFacets`, `SectionBar`, `Neighbors`, `SiteSearch`, `ReleasePicker`, `WatchButton`,
-`ComingSoon`) and are covered by none of this.
+chrome the dark trail came back as a white slab; and **`Neighbors` dropped the space between a
+section's number and its heading** — `§ 45eViolations of park regulations` on every section page,
+because alone inside an element the text node between two expressions does not survive the Astro
+compiler. **`WatchButton` is the one component the page does not cover**: accounts are off so it
+renders nowhere, and its island calls `/auth/me` on mount, which the page's no-data property and
+the test enforcing it will not have.
 
 `make test` = **545** Python tests; `make test-web` = **278** frontend tests; `make test-e2e` = **405**
 Playwright tests, 265 of which are the accessibility scan (**all three are required** — reader
