@@ -1599,9 +1599,15 @@ Session-by-session record of how this site was built. One entry per working sess
     from `contrast.json` by more than 0.01, if a declared token has no swatch, or if the page asks
     the API for anything.
 - **Candidate tasks, not done here:**
-  - **Seven components are not on the page**, so nothing said above covers them: `SearchFacets`,
-    `SectionBar`, `Neighbors`, `SiteSearch`, `ReleasePicker`, `WatchButton`, `ComingSoon`. The rule
-    ADR-0053 states is only enforced for what is on the page.
+  - **Five components are not on the page**: `SearchFacets`, `SectionBar`, `Neighbors`,
+    `ReleasePicker`, `WatchButton`. (`SiteSearch` and `ComingSoon` are on it, through `SiteHeader`.)
+    Four of the five are still scanned through the routes that render them, but *conditionally* —
+    on the corpus holding the data that renders them. `SearchFacets` is scanned only because
+    "conservation" returns hits in the CI fixtures, and **`SectionBar`'s and `Neighbors`'
+    end-of-subdivision state — no previous or next — renders on no scanned route at all**.
+    `WatchButton` is the one covered by nothing: `ACCOUNTS_ENABLED` is false, so it renders on no
+    page, and its island calls `/auth/me` on mount, which is why putting it on a page that reaches
+    no data is not free.
   - **`CLAUDE.md` carried two stale counts** before this session: `docs/verification/a11y.json` was
     already 1,794 nodes rather than 1,780, and `make shots` was 44 PNGs rather than 48. The first is
     corrected in this session's CLAUDE.md edit; the second is now true by arithmetic.
