@@ -24,12 +24,12 @@ import {
   fetchIdentifier,
   fetchLabels,
   fetchNeighbors,
-  fetchReleases,
   fetchToc,
   releaseParams,
 } from "../../../lib/api";
 import { REVALIDATE, setPublicCache } from "../../../lib/cache";
 import { ACCOUNTS_ENABLED } from "../../../lib/features";
+import { cachedReleases } from "../../../lib/releasecache";
 import { citedIdentifiers } from "../../../lib/refs";
 import type {
   Entry,
@@ -106,7 +106,7 @@ if (body && isToc(body)) {
   // node rather than one per release point (ADR-0006), so it revalidates rather
   // than being pinned even when the URL named a release point.
   Astro.response.headers.set("Cache-Control", REVALIDATE);
-  releases = await fetchReleases(titleNum);
+  releases = await cachedReleases(titleNum);
   title = `${trimNum(toc.node.num)} ${toc.node.heading ?? ""} · ${selected} · U.S. Code`;
 } else if (body) {
   section = body;
@@ -126,6 +126,12 @@ if (body && isToc(body)) {
   // Four calls, all server-side and all on localhost: the labels this page's
   // citations need (batched, `fetchLabels`), the neighbours, the release points
   // a picker can offer, and the parent's table of contents.
+  //
+  // Three of them reach the API every time. The release points usually do not:
+  // `cachedReleases` holds one answer per title for five minutes, because the
+  // list is the same for every section of a title and changes only when the
+  // ingest chain loads something (ADR-0045). It was the slowest of these four
+  // at 27.0 ms, so it set the whole group's cost; it is now a hit.
   //
   // The parent TOC is the call this page dropped in Day 6b, when the breadcrumb
   // moved onto the section itself and only two fields of a whole TOC were still
@@ -150,7 +156,7 @@ if (body && isToc(body)) {
       return {};
     }),
     fetchNeighbors(section.identifier, selected),
-    fetchReleases(titleNum),
+    cachedReleases(titleNum),
     section.parent_identifier
       ? fetchToc(section.parent_identifier, selected).catch((error) => {
           console.error(`rail for ${section.identifier} at ${selected}:`, error);
