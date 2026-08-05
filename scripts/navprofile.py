@@ -187,12 +187,14 @@ FANOUT: list[dict] = [
     {
         "page": "title TOC",
         "sequential": 1,
-        "calls": ["/api/v1{t_toc}", "/api/v1/releases?ingested_title={t}"],
+        "calls": ["/api/v1{t_toc}"],
+        "cached": ["/api/v1/releases?ingested_title={t}"],
     },
     {
         "page": "chapter TOC",
         "sequential": 1,
-        "calls": ["/api/v1{parent}", "/api/v1/releases?ingested_title={t}"],
+        "calls": ["/api/v1{parent}"],
+        "cached": ["/api/v1/releases?ingested_title={t}"],
     },
     {
         # One sequential call, then four in parallel — ADR-0043 put the parent
@@ -204,11 +206,19 @@ FANOUT: list[dict] = [
             "/api/v1{sec}",
             "/api/v1/labels?identifier={sec}",
             "/api/v1/sections{sec}/neighbors",
-            "/api/v1/releases?ingested_title={t}",
             "/api/v1{parent}",
         ],
+        "cached": ["/api/v1/releases?ingested_title={t}"],
     },
 ]
+
+#: Calls a page needs but does not make per view. ADR-0045 holds the release
+#: list for five minutes, so on all but the first view of a title it costs the
+#: page nothing. They are still timed and still reported — the endpoint's cost is
+#: real, and paid once per title per interval — but they are left out of the
+#: per-view critical path, because counting them there credited a table of
+#: contents page with more API time than the page took in total, and printed a
+#: negative figure for Astro's own share.
 
 #: What `params.py` and `frontend/src/middleware.ts` limit — capacity, refill
 #: per second — so the artifact can say which rows sit inside their budget.
@@ -433,10 +443,16 @@ def measure(vantage: str) -> dict:
     if api_base:
         for page in FANOUT:
             calls = []
-            for template in page["calls"]:
+            for template in page["calls"] + page.get("cached", []):
                 url = api_base + template.format(**warm_ctx)
                 samples = [curl([url], extra)[0] for _ in range(WARM)][1:]
-                calls.append({"call": template, **summarise(samples)})
+                calls.append(
+                    {
+                        "call": template,
+                        "per_view": template in page["calls"],
+                        **summarise(samples),
+                    }
+                )
             # Declaration order is load-bearing: the first `sequential` entries
             # are the calls the page awaits before the rest fan out, so sorting
             # here would make the arithmetic in `attribute` add up the wrong
@@ -549,12 +565,19 @@ def attribute(by_vantage: dict[str, dict]) -> list[dict]:
             row["caddy_own_ms"] = round(caddy - astro, 1)
         page = fan.get(step)
         if page and astro is not None:
-            calls = [c for c in page["calls"] if c.get("total_p50_ms") is not None]
+            calls = [
+                c
+                for c in page["calls"]
+                if c.get("total_p50_ms") is not None and c.get("per_view", True)
+            ]
             if calls:
                 first = page["sequential"]
                 parallel = [c["total_p50_ms"] for c in calls[first:]]
                 api_cost = sum(c["total_p50_ms"] for c in calls[:first]) + max(parallel or [0])
                 row["api_calls"] = len(calls)
+                row["api_calls_cached"] = sum(
+                    1 for c in page["calls"] if not c.get("per_view", True)
+                )
                 row["api_cost_ms"] = round(api_cost, 1)
                 row["astro_own_ms"] = round(astro - api_cost, 1)
                 row["slowest_parallel_call"] = max(

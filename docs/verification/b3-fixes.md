@@ -2,14 +2,11 @@
 
 What each of task B3's accepted fixes changed, as commands anyone can re-run.
 
-These are **local** verifications against `make dev-all`. The deployed re-measurement —
-`make navprofile`, `BASE=… make loadtest`, `make spine-explain` — has to wait until the branch is
-deployed, because the fixes are not on the box; the artifacts beside this file are still the
-before picture and say so in their `generated_at`.
+The deployed re-measurement is done — PR #24 merged, `deploy.yml` ran, and all three artifacts beside
+this file were regenerated against the box. The comparison is in "Before and after" at the end.
 
-Two of the three fixes can be verified faithfully here anyway, for reasons given under each. The
-third, ADR-0046's byte budget, is a ratchet in `make test-web` rather than a number, and re-running
-that suite is its verification.
+The local checks below are kept because two of them isolate a single fix, which the deployed
+comparison cannot: the deploy carried B1 and B2 as well.
 
 ## Fix 4 — the `structure_nodes.identifier` index
 
@@ -86,3 +83,65 @@ removed.
 ## Fix 1 — declined
 
 ADR-0047, with the measurement that declines it.
+
+## Before and after, on the deployed box
+
+**What the two runs actually compare.** The previous deploy was `387ff3a`, which is the commit this
+branch was cut from — so the *before* box was running main with **none of B1, B2 or B3**, and the
+*after* box has all three. This is not a clean A/B for B3. The after box's section page carries a
+whole `ChapterRail`, a `ReleaseContext` band and a `ReleasePicker` that the before box did not, and
+it makes **five** API calls where the before page made four (`fetchToc` for the rail is new; the
+release list is now usually a cache hit). Read the reader-page rows as "workstream B, all of it",
+not as "B3's fixes".
+
+**And there is a headwind.** Across the twelve routes this session did not touch and whose URL did
+not change, the after run's p50 is a median **1.073×** the before run's (range 0.995–1.123) — same
+laptop, same link, different hour. Nothing in this session touches those routes, so that is ambient
+drift, and the gains below are understated by roughly that much.
+
+### The spine's query plans (`spine-explain.json`)
+
+Every call that resolves a path through `structure_nodes`, before → after:
+
+| repository call | before | after |
+|---|---|---|
+| `get_section` | 1.649 ms | **0.348 ms** |
+| `get_section`, unpinned | 1.602 ms | **0.345 ms** |
+| `get_section`, provision | 1.662 ms | **0.390 ms** |
+| `get_toc`, chapter rail | 1.769 ms | **0.446 ms** |
+| `get_toc`, title | 1.760 ms | **0.541 ms** |
+| `resolve_id` (96 M-row `guid_map`) | 1.388 ms | **0.119 ms** |
+
+`seq_scans_on_large_tables` is now empty for all thirteen calls. The calls that never touched
+`structure_nodes` are unchanged: `neighbors` 0.291 → 0.308 ms, `list_titles` 1.518 → 1.591 ms.
+
+This one **is** attributable to B3 alone — nothing else in the deploy touches Postgres.
+
+### The reader's pages under load (`loadtest.json`, 8 concurrent)
+
+| route | before | after |
+|---|---|---|
+| reader section page | 11.0 rps, 702.4 ms p50 | **15.6 rps, 480.0 ms** |
+| reader TOC page | 14.4 rps, 525.5 ms p50 | **35.0 rps, 183.7 ms** |
+
+The table of contents page gained most, which is what the fan-out predicts: it made two API calls and
+the release list was the slower of them, so removing it from the per-view path removes most of the
+page's API cost. The section page gained less because its critical path still contains four calls.
+
+`releases the picker can offer` moved 30.6 rps → 23.1 rps, but that row changed URL: it now measures
+`?ingested_title=`, the parameter the reader actually uses, rather than the cheaper `?title=`. The
+endpoint did not get slower; the measurement got correct.
+
+### One reader, no contention (`navprofile.json`, warm p50)
+
+Four clicks down the spine: **823 ms → 801 ms at the edge**, of which the origin is **221 ms →
+159 ms**. The network share is unchanged and still dominates, which is ADR-0047's whole argument.
+
+Per step, origin only: title TOC 57.8 → 30.3 ms, chapter TOC 56.5 → 26.4 ms, section 77.8 → 71.2 ms.
+
+**The attribution arithmetic had to be corrected for this run.** `api_cost_ms` counted every call a
+page makes, and after ADR-0045 a page does not make the release call — counting it credited a table
+of contents page with 41.2 ms of API time when the whole page took 22.1 ms, and printed a *negative*
+figure for Astro's own share. `FANOUT` entries now carry a `cached` list, timed and reported with
+`per_view: false` but excluded from the critical path. The corrected attribution was re-derived from
+the same stored measurements rather than re-measured.
