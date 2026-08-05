@@ -93,7 +93,20 @@ def search_client():
 
 
 def _body(search_client):
-    return search_client.search.call_args.kwargs["body"]
+    """The body of the *first* search, which is the result list.
+
+    A default search makes two requests: the ranked one, and a size-0 aggregation
+    counting how many superseded versions of the sections on the page also match
+    (ADR-0049). `call_args` is the last call, so reading it here would assert
+    against the counting query and find no `highlight` on it — which is exactly
+    how this helper failed when the second request was added.
+    """
+    return search_client.search.call_args_list[0].kwargs["body"]
+
+
+def _earlier_body(search_client):
+    """The body of the earlier-version count, the second request."""
+    return search_client.search.call_args_list[1].kwargs["body"]
 
 
 def test_search_returns_full_identifiers(client, search_client):

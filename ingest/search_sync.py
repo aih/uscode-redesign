@@ -16,11 +16,15 @@ the document, which is what makes incremental sync cheap: a release republishing
 a section unchanged touches nothing at all.
 """
 
+import copy
+import hashlib
+import json
 import logging
 import os
 from typing import Any, Iterable
 import re
 from opensearchpy import helpers
+from storage.postgres import title_sort_key
 from storage.search import (
     SECTIONS_INDEX,
     STRUCTURE_INDEX,
@@ -82,15 +86,97 @@ def doc_id(identifier: str, first_release_id: int) -> str:
     return f"{identifier}@{first_release_id}"
 
 
+_TITLE_IN_IDENTIFIER = re.compile(r"^/us/usc/t([0-9]+[a-zA-Z]?)(?:/|$)")
+_CHAPTER_IN_IDENTIFIER = re.compile(r"/ch([^/]+)")
+
+
+def title_num_of(identifier: str | None) -> str | None:
+    """`/us/usc/t16/s45f` → `16`, `/us/usc/t5a/pl/92/463/s1` → `5a`.
+
+    Read off the identifier rather than joined from `titles`, so it is available
+    to every caller — including `retire_versions`, which has only the key.
+    Appendix titles are their own titles (gotcha 7), so `5a` stays `5a`.
+    """
+    if not identifier:
+        return None
+    match = _TITLE_IN_IDENTIFIER.match(identifier)
+    return match.group(1) if match else None
+
+
+def chapter_num_of(parent_identifier: str | None) -> str | None:
+    """`/us/usc/t16/ch1/schVI` → `1`.
+
+    A section's identifier does not carry its chapter, so this reads the parent
+    subdivision recorded on `section_release_map` (ADR-0008 — placement is the
+    release point's, not the deduped text's). A section directly under the title
+    has no chapter and gets None.
+    """
+    if not parent_identifier:
+        return None
+    match = _CHAPTER_IN_IDENTIFIER.search(parent_identifier)
+    return match.group(1) if match else None
+
+
+def citation_sort_key(identifier: str | None, seq_in_title: int | None) -> str | None:
+    """A single sortable string putting the corpus in citation order.
+
+    Two parts. The title comes from `title_sort_key`, the same `'5a'` → `(5, 'a')`
+    split the front page sorts by (gotcha 16), zero-padded to four digits so the
+    comparison stays correct as a string. The position within the title is
+    `section_release_map.seq_in_title` — document order as published, which is
+    what prev/next already walks — rather than the section number, because
+    section numbers are not orderable text: `45a–1` carries an en dash (gotcha
+    17) and `2000e-2` sorts nowhere near `2000`.
+
+    A title with no suffix pads with `0`, which sorts before `a`, so title 5
+    precedes title 5a as the Code prints them.
+
+    Structure nodes have no `seq_in_title`. They all take position `000000`,
+    which puts every chapter and subchapter heading of a title ahead of every
+    section of it, rather than each one immediately before the sections it
+    contains. Giving them a true position means deriving one from the first
+    section beneath each node, and that is a join this pass does not do. The
+    sort control says so.
+    """
+    title = title_num_of(identifier)
+    if title is None:
+        return None
+    number, suffix = title_sort_key(title)
+    return f"{number:04d}{suffix or '0'}|{(seq_in_title or 0):06d}"
+
+
 SECTIONS_MAPPING: dict[str, Any] = {
     "mappings": {
         "properties": {
             "identifier": {"type": "keyword"},
-            "num": {"type": "keyword"},
-            "heading": {"type": "text", "boost": 2.0},
+            # `num` is a keyword so it can be filtered and aggregated, with a
+            # text subfield so `45f` is findable as a word. Without the subfield
+            # a search for a section number matched only where the number also
+            # appeared in prose.
+            "num": {"type": "keyword", "fields": {"text": {"type": "text"}}},
+            # No index-time `boost` here. It was 2.0, and OpenSearch multiplies
+            # it into the query-time weight rather than replacing it, so
+            # `heading^2` in the handler was really weighting headings 4×.
+            # Weighting is the scoring model's business (ADR-0049), stated in
+            # one place, and measured.
+            "heading": {"type": "text"},
             "xml_text": {"type": "text"},
             "status": {"type": "keyword"},
             "version_id": {"type": "integer"},
+            # Title and chapter, so a search can be scoped to one (`title:16`,
+            # `chapter:1`) and faceted by title. `title_num` is read off the
+            # identifier; `chapter` comes from the parent subdivision recorded
+            # on `section_release_map`.
+            "title_num": {"type": "keyword"},
+            "chapter": {"type": "keyword"},
+            # Citation order as one sortable string — `?sort=citation`.
+            "sort_key": {"type": "keyword"},
+            # The source published more than one element under this identifier
+            # at this release point (ADR-0021), so this document is one of two
+            # that share an `_id` and the index kept one. Flagged rather than
+            # smoothed over: it is the one case where a result is knowingly
+            # incomplete.
+            "id_collision": {"type": "boolean"},
             # The release this text first appeared at, as an inventory seq —
             # `release_id` (a row id) was neither ordered nor stable.
             "first_release_id": {"type": "integer"},
@@ -121,7 +207,11 @@ STRUCTURE_MAPPING: dict[str, Any] = {
             "identifier": {"type": "keyword"},
             "level": {"type": "keyword"},
             "num_value": {"type": "keyword"},
-            "heading": {"type": "text", "boost": 2.0},
+            "heading": {"type": "text"},
+            "status": {"type": "keyword"},
+            "title_num": {"type": "keyword"},
+            "chapter": {"type": "keyword"},
+            "sort_key": {"type": "keyword"},
             # structure_nodes is unversioned — one row holding the newest loaded
             # release's view (CLAUDE.md). Carrying the field anyway keeps the
             # default `is_current` filter from silently excluding this index.
@@ -132,8 +222,126 @@ STRUCTURE_MAPPING: dict[str, Any] = {
 }
 
 
+INDEX_MAPPINGS: dict[str, dict[str, Any]] = {
+    SECTIONS_INDEX: SECTIONS_MAPPING,
+    STRUCTURE_INDEX: STRUCTURE_MAPPING,
+}
+"""What each index name means. `SECTIONS_INDEX` and `STRUCTURE_INDEX` are
+*aliases* pointing at a physical index named for the mapping it was built from —
+see `mapping_fingerprint`."""
+
+
+def mapping_fingerprint(mapping: dict[str, Any]) -> str:
+    """A short, stable hash of a mapping.
+
+    This is what makes "the deployed index is out of date" a question a script
+    can answer. The mapping is not additive (ADR-0028): OpenSearch will not add
+    a field type to a live index, so a mapping change that nobody rebuilds for
+    leaves the new fields **absent rather than broken** — `title:16` returns no
+    results, which reads exactly like a title with nothing in it.
+
+    Computed over the mapping as declared, before `_meta` is attached, so
+    stamping the fingerprint into the index does not change the fingerprint.
+    """
+    canonical = json.dumps(mapping, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+
+def physical_index(alias: str, fingerprint: str | None = None) -> str:
+    """`uscode_sections` → `uscode_sections_a1b2c3d4e5f6`.
+
+    The name carries the mapping it was built from, so two generations can exist
+    at once — which is what lets a rebuild finish before anything starts reading
+    from it.
+    """
+    if fingerprint is None:
+        fingerprint = mapping_fingerprint(INDEX_MAPPINGS[alias])
+    return f"{alias}_{fingerprint}"
+
+
+def _body_with_meta(alias: str) -> dict[str, Any]:
+    body = copy.deepcopy(INDEX_MAPPINGS[alias])
+    body.setdefault("mappings", {})["_meta"] = {
+        "fingerprint": mapping_fingerprint(INDEX_MAPPINGS[alias]),
+        "alias": alias,
+    }
+    return body
+
+
+def indexed_fingerprint(client, alias: str) -> str | None:
+    """The mapping fingerprint of whatever `alias` currently resolves to.
+
+    None when the alias resolves to nothing, or to an index built before
+    fingerprints existed — both of which mean "rebuild".
+    """
+    try:
+        mappings = client.indices.get_mapping(index=alias)
+    except Exception:
+        return None
+    for body in mappings.values():
+        meta = body.get("mappings", {}).get("_meta") or {}
+        return meta.get("fingerprint")
+    return None
+
+
+def stale_aliases(client) -> list[str]:
+    """Which indices were built from a mapping this code no longer declares."""
+    return [
+        alias
+        for alias in INDEX_MAPPINGS
+        if indexed_fingerprint(client, alias) != mapping_fingerprint(INDEX_MAPPINGS[alias])
+    ]
+
+
+def create_index(client, alias: str) -> str:
+    """Create a fresh physical index for `alias`'s current mapping, and return
+    its name. Does not point the alias at it — see `promote`."""
+    name = physical_index(alias)
+    if not client.indices.exists(index=name):
+        client.indices.create(index=name, body=_body_with_meta(alias))
+    return name
+
+
+def promote(client, alias: str, physical: str) -> None:
+    """Point `alias` at `physical`, and delete whatever it pointed at before.
+
+    The alias move is one `update_aliases` call, so readers never see the name
+    resolve to nothing: a search issued during a rebuild reads the old index
+    until this returns and the new one after, and there is no moment in between.
+
+    The exception is the first run against a box where `uscode_sections` is a
+    *concrete index* rather than an alias, which is every deployment built before
+    this existed. An index and an alias cannot share a name, so the old index has
+    to be deleted before the alias can take it — a gap of one round trip, once,
+    and only on that migration.
+    """
+    old = []
+    if client.indices.exists_alias(name=alias):
+        old = [name for name in client.indices.get_alias(name=alias) if name != physical]
+    elif client.indices.exists(index=alias):
+        logger.info("replacing the concrete index %s with an alias", alias)
+        client.indices.delete(index=alias)
+
+    actions = [{"remove": {"index": name, "alias": alias}} for name in old]
+    actions.append({"add": {"index": physical, "alias": alias}})
+    client.indices.update_aliases(body={"actions": actions})
+
+    for name in old:
+        try:
+            client.indices.delete(index=name)
+        except Exception as exc:
+            # The alias already points at the new index, so the site is correct
+            # either way; this only leaves disk in use.
+            logger.warning("could not delete the superseded index %s: %s", name, exc)
+
+
 def create_indices():
-    """Create OpenSearch indices if they do not exist."""
+    """Create the indices if they are missing. Called on every load.
+
+    Deliberately not a rebuild: a load must not decide to spend twenty minutes
+    reindexing because the mapping moved. `python -m ingest.reindex_search
+    --if-changed` is what does that, and the deploy runs it.
+    """
     if _disabled():
         return
 
@@ -141,38 +349,65 @@ def create_indices():
     if client is None:
         return
     try:
-        if not client.indices.exists(index=SECTIONS_INDEX):
-            client.indices.create(index=SECTIONS_INDEX, body=SECTIONS_MAPPING)
-        if not client.indices.exists(index=STRUCTURE_INDEX):
-            client.indices.create(index=STRUCTURE_INDEX, body=STRUCTURE_MAPPING)
+        for alias in INDEX_MAPPINGS:
+            if client.indices.exists(index=alias) or client.indices.exists_alias(name=alias):
+                continue
+            promote(client, alias, create_index(client, alias))
     except Exception as e:
         logger.warning(f"Could not create OpenSearch indices: {e}")
 
 
 def recreate_indices():
-    """Drop and rebuild both indices. Mapping changes need this — OpenSearch will
-    not add a field type to a live index, and a `create_indices` that only ever
-    creates-if-absent would leave the old mapping in place forever."""
+    """Drop and rebuild both indices, in place. Used by `--recreate`.
+
+    This is the destructive path: the alias resolves to nothing while the
+    rebuild runs, so search answers 503 until it finishes. `--if-changed` builds
+    beside the live index instead and is what a deploy should use.
+    """
     if _disabled():
         return
     client = _client()
     if client is None:
         return
-    for index in (SECTIONS_INDEX, STRUCTURE_INDEX):
-        try:
-            if client.indices.exists(index=index):
-                client.indices.delete(index=index)
-        except Exception as e:
-            logger.warning(f"Could not delete index {index}: {e}")
+    for alias in INDEX_MAPPINGS:
+        for name in _every_index_for(client, alias):
+            try:
+                client.indices.delete(index=name)
+            except Exception as e:
+                logger.warning(f"Could not delete index {name}: {e}")
     create_indices()
 
 
-def sync_sections(versions: list[dict[str, Any]]):
+def _every_index_for(client, alias: str) -> list[str]:
+    """The alias's target, plus any physical index named after it — including
+    one a previous rebuild left behind."""
+    names = set()
+    try:
+        if client.indices.exists_alias(name=alias):
+            names.update(client.indices.get_alias(name=alias))
+        elif client.indices.exists(index=alias):
+            names.add(alias)
+        names.update(client.indices.get(index=f"{alias}_*", ignore_unavailable=True))
+    except Exception as e:
+        logger.warning(f"Could not list indices for {alias}: {e}")
+    return sorted(names)
+
+
+def sync_sections(versions: list[dict[str, Any]], index: str | None = None):
     """Bulk index a list of section versions.
+
+    `index` writes into a named physical index instead of through the alias,
+    which is what a rebuild does: it fills the new generation while every reader
+    is still being served by the old one.
 
     Each dict needs `identifier`, `first_release_id`, `first_release_seq` and
     `is_current`; `first_release_label`, `num`, `heading`, `xml`, `status`,
-    `version_id` are optional.
+    `version_id`, `parent_identifier`, `seq_in_title` and `id_collision` are
+    optional.
+
+    `title_num`, `chapter` and `sort_key` are derived here rather than asked of
+    every caller: `load.py` and `reindex_search.py` both index sections, and a
+    field computed twice is a field that eventually disagrees with itself.
     """
     if _disabled():
         return
@@ -183,16 +418,21 @@ def sync_sections(versions: list[dict[str, Any]]):
     actions = []
     for v in versions:
         first_release_id = v["first_release_id"]
+        identifier = v["identifier"]
         actions.append({
-            "_index": SECTIONS_INDEX,
-            "_id": doc_id(v["identifier"], first_release_id),
+            "_index": index or SECTIONS_INDEX,
+            "_id": doc_id(identifier, first_release_id),
             "_source": {
-                "identifier": v["identifier"],
+                "identifier": identifier,
                 "num": v.get("num"),
                 "heading": v.get("heading"),
                 "xml_text": strip_xml_tags(v.get("xml")),
                 "status": v.get("status"),
                 "version_id": v.get("version_id"),
+                "title_num": title_num_of(identifier),
+                "chapter": chapter_num_of(v.get("parent_identifier")),
+                "sort_key": citation_sort_key(identifier, v.get("seq_in_title")),
+                "id_collision": bool(v.get("id_collision", False)),
                 "first_release_id": first_release_id,
                 "first_release_seq": v["first_release_seq"],
                 "first_release_label": v.get("first_release_label"),
@@ -238,8 +478,9 @@ def retire_versions(keys: Iterable[tuple[str, int]]):
             logger.warning(f"Failed to retire section versions: {e}")
 
 
-def sync_structure_nodes(nodes: list[dict[str, Any]]):
-    """Bulk index structure nodes."""
+def sync_structure_nodes(nodes: list[dict[str, Any]], index: str | None = None):
+    """Bulk index structure nodes. `index` writes into a named physical index
+    rather than through the alias — see `sync_sections`."""
     if _disabled():
         return
 
@@ -248,14 +489,24 @@ def sync_structure_nodes(nodes: list[dict[str, Any]]):
         return
     actions = []
     for n in nodes:
+        identifier = n["identifier"]
         actions.append({
-            "_index": STRUCTURE_INDEX,
-            "_id": n["identifier"],
+            "_index": index or STRUCTURE_INDEX,
+            "_id": identifier,
             "_source": {
-                "identifier": n["identifier"],
+                "identifier": identifier,
                 "level": n.get("level"),
                 "num_value": n.get("num_value"),
                 "heading": n.get("heading"),
+                "status": n.get("status"),
+                "title_num": title_num_of(identifier),
+                # A chapter's own identifier carries its number, so this reads
+                # the node rather than a parent — `/us/usc/t16/ch1/schVI` is in
+                # chapter 1 as much as its sections are.
+                "chapter": chapter_num_of(identifier),
+                # No `seq_in_title` on a structure node, so it takes position 0
+                # and sorts ahead of the sections beneath it.
+                "sort_key": citation_sort_key(identifier, None),
                 "is_current": True,
                 "first_release_seq": n.get("first_release_seq"),
             }

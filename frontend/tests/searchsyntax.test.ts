@@ -33,19 +33,32 @@ describe("fuzzify", () => {
 });
 
 describe("the documented operator list", () => {
-  it("gives every operator a flag, an example and an explanation", () => {
-    // The guide's table renders all four; a blank cell would be a promise the
+  it("gives every operator a syntax, an example and an explanation", () => {
+    // The guide's list renders all three; a blank one would be a promise the
     // page makes and does not keep.
     for (const operator of SEARCH_OPERATORS) {
-      expect(operator.flag).toBeTruthy();
       expect(operator.syntax).toBeTruthy();
       expect(operator.example).toBeTruthy();
       expect(operator.explanation.length).toBeGreaterThan(20);
     }
   });
 
-  it("documents each flag exactly once", () => {
-    const flags = SEARCH_OPERATORS.map((operator) => operator.flag);
+  it("says of each operator who implements it, and only once", () => {
+    // An operator is either a `simple_query_string` flag the cluster honours or
+    // a `field:` scope this site lifts out of the query itself (ADR-0049), and
+    // the two are checked against different code. One carrying neither is
+    // checked against nothing, which is how a documented operator that never
+    // worked would survive both ratchets in `tests/test_search_syntax.py`.
+    for (const operator of SEARCH_OPERATORS) {
+      const kinds = [operator.flag, operator.scope].filter(Boolean);
+      expect(kinds).toHaveLength(1);
+    }
+  });
+
+  it("documents each flag and each scope exactly once", () => {
+    const flags = SEARCH_OPERATORS.map((o) => o.flag).filter(Boolean);
     expect(new Set(flags).size).toBe(flags.length);
+    const scopes = SEARCH_OPERATORS.map((o) => o.scope).filter(Boolean);
+    expect(new Set(scopes).size).toBe(scopes.length);
   });
 });

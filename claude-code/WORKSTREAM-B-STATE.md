@@ -4,7 +4,7 @@ Paste `00-CONVENTIONS.md` above any task prompt, then this file, then the task y
 
 **To resume in a new session, one line:**
 
-> Read `CLAUDE.md` and `claude-code/WORKSTREAM-B-STATE.md`, then do task B4.
+> Read `CLAUDE.md` and `claude-code/WORKSTREAM-B-STATE.md`, then do task B5.
 
 ---
 
@@ -17,12 +17,12 @@ All suites green as of the last commit:
 
 | suite | count |
 |---|---|
-| `make test` | 486 |
-| `make test-web` | 253 |
-| `make test-e2e` | 373 (251 of them the a11y scan) |
+| `make test` | 527 |
+| `make test-web` | 271 |
+| `make test-e2e` | 386 passed, 2 skipped (258 of them the a11y scan) |
 | `make shots` | reflow clean at 320 CSS px and 1280@200% |
 
-`docs/verification/a11y.json`: **8 route/rule pairs over 1,780 nodes** — unchanged from the ADR-0039
+`docs/verification/a11y.json`: **8 route/rule pairs over 1,794 nodes** — unchanged from the ADR-0039
 baseline, and everything in it is still `docs/a11y/known-violations.json`'s.
 
 ## Done: B1, B2
@@ -130,11 +130,41 @@ the gains are understated by about that much.
 in Python) and different cost — **27.0 ms against 20.1 ms**. The release list was a worse offender
 than the measure half reported.
 
-## Remaining: B4, B5, B6
+## Done: B4 (session 29)
 
-**B4** (search relevance and operators), **B5** ("Compare with…" on the section header — `/app/diff`
-is still two hops from the text it compares, and the **5.1 s** API diff is its cost problem),
-**B6** (dead ends).
+**Ranking is measured** (ADR-0049). `docs/verification/search-judgements.json` is 37 queries and
+529 graded documents (312 of them graded relevant), pooled from every candidate profile before grading; `scripts/search_eval.py`
+scores them. deployed **0.6894** → shipping **0.7159** nDCG@10, recall@10 **0.7672** → **0.8016**.
+Thirteen queries better, nine worse, fifteen unmoved.
+
+**The heading weight was never the one written down** — a deprecated index-time `boost: 2.0` in the
+mapping multiplied with the query's `heading^2`, so the real weight was 4. The baseline profile is
+`heading^4` on that evidence, and it reproduces the old scores exactly.
+
+**`all-versions` scored highest and was declined**, because it changes what a result is. The default
+still reads the text in force and reports the rest as "also matched in N earlier versions".
+
+**Six scopes** — `heading:`, `title:`, `chapter:`, `status:`, `release:`, `date:` — lifted out of
+the query before the cluster sees it, so ADR-0031's forgiving parser stands. **Facets edit the
+query**, so a filtered search is citable by its URL alone. **`?sort=`** offers relevance, citation
+order and most-recently-amended.
+
+Two counting defects fixed on the way: `hits.total` was capped at 10,000, and under collapse it
+counted versions while the page listed sections.
+
+**The rail is pinned** (ADR-0050) — asked for mid-session, and it reverses standing decision 3
+below.
+
+**The index rebuilds itself on a mapping change** (ADR-0051). The names are aliases now, over a
+physical index named for its mapping's fingerprint; `reindex_search --if-changed` rebuilds only what
+drifted and builds beside the live index, so search stays up. `deploy-on-box.sh` runs it. The
+failure it prevents is silent — a field the new code queries and the old index lacks is *absent, not
+broken*, so `title:16` returns an empty page that looks like a title with nothing in it.
+
+## Remaining: B5, B6
+
+**B5** ("Compare with…" on the section header — `/app/diff` is still two hops from the text it
+compares, and the **5.1 s** API diff is its cost problem), **B6** (dead ends).
 
 ## Standing decisions — do not silently reverse these
 
@@ -147,9 +177,15 @@ is still two hops from the text it compares, and the **5.1 s** API diff is its c
 2. **`/app/versions` and `/app/diff` get the breadcrumb but no release band.** The first spans every
    release point, the second is about two. This is a narrower reading of B2's "every reader page"
    than the task asked for, taken deliberately and recorded in ADR-0044.
-3. **The rail is not sticky, and is not a `<details>`.** Both were tried. Sticky honouring
-   `--sticky-h` as a `top` offset starts a third of the way down the page, which is the trap
-   `.guide__nav` already records. `<details>` cannot be forced open by CSS, so at desktop width the
+3. ~~**The rail is not sticky**~~ — **reversed in session 29 (ADR-0050)**, on request. It is pinned
+   from 64em with `max-height: calc(100vh - var(--sticky-h) - 1.5rem)` and its own scrollbar. The
+   bounded height is what the earlier attempt was missing: `top` alone pins the rail and then lets
+   it run past the bottom of the viewport, so its tail is unreachable without scrolling the
+   document. Asserted in `sticky.spec.ts`, which also had to stop counting the rail as chrome —
+   left in, it is the tallest sticky thing on the page and made two headroom probes measure it
+   instead.
+
+   **It is still not a `<details>`.** CSS cannot force the element open, so at desktop width the
    summary would report itself collapsed with its content visible.
 4. **The map found no duplicated navigation route.** `/app/goto` vs `/app/search`, the three
    prev/next affordances, and the two from/to pickers were each checked and are each one path. B1
@@ -213,8 +249,16 @@ docs/verification/loadtest.json          throughput, every row naming its limite
 docs/verification/spine-explain.json     the spine's query plans on the real corpus
 scripts/navprofile.py                    ships itself to the box over SSM
 scripts/spine_explain.py                 explains what the repository sent, never transcribed SQL
+docs/verification/search-judgements.json 37 queries, 529 graded documents
+docs/verification/search-relevance.json  nDCG@10 per profile, per query
+scripts/search_eval.py                   pool | score — the harness, over the shipping query
+storage/searchquery.py                   the parser, the profiles and the request body
+frontend/src/lib/searchscope.ts          the same scopes, read and written by the facet links
 docs/adr/0043                           one navigation chrome
 docs/adr/0044                           release context, and the switcher that keeps your place
+docs/adr/0049                           the measured ranking, and the scopes
+docs/adr/0050                           the pinned rail
+docs/adr/0051                           the index rebuilds itself (there is no ADR-0048)
 frontend/src/layouts/Base.astro         where the chrome is assembled
 frontend/src/components/ChapterRail.astro
 frontend/src/components/ReleaseContext.astro   replaces the deleted Provenance.astro

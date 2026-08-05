@@ -16,11 +16,11 @@
  * collapsed while its content was on screen. Below 64em the rail is simply at
  * the foot of the page, where it costs a reader nothing to scroll past.
  *
- * Not sticky, and that is the same trap `.guide__nav` names: `position: sticky;
- * top: calc(var(--sticky-h) + 1rem)` looks right and is not, because
- * `--sticky-h` is a scroll-margin budget rather than a measurement of the
- * chrome — 19rem at this breakpoint — so a sticky rail honouring it starts a
- * third of the way down the page before anything has scrolled.
+ * From 64em it is pinned and scrolls inside its own box (ADR-0050), so the
+ * neighbourhood stays on screen while the section is read. `top` alone is what
+ * ADR-0043 tried and rejected: `--sticky-h` is 19rem here, so the rail starts
+ * 304px down and then runs past the bottom of the viewport with no way to reach
+ * its tail. The bounded height in `site.scss` is the half that was missing.
  *
  * The list comes from `structure_nodes`, which holds one row per node and not
  * one per release point (ADR-0006). At an older release point the rail is

@@ -199,11 +199,11 @@ export async function lookupCitation(
  */
 export async function fetchSearch(
   query: string,
-  opts: { offset?: number; limit?: number } & ReleaseParams = {},
+  opts: { offset?: number; limit?: number; sort?: string | null } & ReleaseParams = {},
 ): Promise<SearchResponse> {
-  const { offset, limit, ...release } = opts;
+  const { offset, limit, sort, ...release } = opts;
   return getJson<SearchResponse>(
-    `${API}/search${qs({ q: query, offset, limit, ...release })}`,
+    `${API}/search${qs({ q: query, offset, limit, sort, ...release })}`,
   );
 }
 

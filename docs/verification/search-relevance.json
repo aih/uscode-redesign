@@ -1,0 +1,2336 @@
+{
+  "generated_by": "uv run python scripts/search_eval.py score",
+  "judgements": {
+    "file": "docs/verification/search-judgements.json",
+    "queries": 37,
+    "graded_documents": 529,
+    "relevant_documents": 312
+  },
+  "index": {
+    "documents": 489578,
+    "current": 65929,
+    "superseded": 423649
+  },
+  "metric": {
+    "name": "nDCG@10",
+    "gain": "2**grade - 1",
+    "unjudged": "counted as 0"
+  },
+  "profiles": [
+    {
+      "profile": "deployed",
+      "fields": [
+        "heading^4",
+        "xml_text"
+      ],
+      "phrase_boost": 0.0,
+      "heading_phrase_boost": 0.0,
+      "scope": "current",
+      "current_boost": 0.0,
+      "mean_ndcg@10": 0.6894,
+      "mean_recall@10": 0.7672,
+      "queries": [
+        {
+          "q": "wild horses and burros",
+          "ndcg@10": 0.8623,
+          "recall@10": 0.9091,
+          "top": [
+            "/us/usc/t18/s47",
+            "/us/usc/t16/ch30",
+            "/us/usc/t16/s1333"
+          ]
+        },
+        {
+          "q": "navigable waters",
+          "ndcg@10": 0.6019,
+          "recall@10": 0.625,
+          "top": [
+            "/us/usc/t48/s749",
+            "/us/usc/t33/s494a",
+            "/us/usc/t33/s407"
+          ]
+        },
+        {
+          "q": "endangered species critical habitat",
+          "ndcg@10": 0.98,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1533",
+            "/us/usc/t16/s1532",
+            "/us/usc/t16/s410aaa\u201381b"
+          ]
+        },
+        {
+          "q": "freedom of information",
+          "ndcg@10": 0.3412,
+          "recall@10": 0.7273,
+          "top": [
+            "/us/usc/t22/s4415",
+            "/us/usc/t22/s7814",
+            "/us/usc/t25/s3077"
+          ]
+        },
+        {
+          "q": "habeas corpus",
+          "ndcg@10": 0.5563,
+          "recall@10": 0.7692,
+          "top": [
+            "/us/usc/t25/s1303",
+            "/us/usc/t8/s1226a",
+            "/us/usc/t28/s2263"
+          ]
+        },
+        {
+          "q": "minimum wage",
+          "ndcg@10": 0.8501,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t29/s206",
+            "/us/usc/t41/s6704",
+            "/us/usc/t20/s1095a"
+          ]
+        },
+        {
+          "q": "national park service",
+          "ndcg@10": 0.282,
+          "recall@10": 0.3529,
+          "top": [
+            "/us/usc/t18/s1865",
+            "/us/usc/t54/s102304",
+            "/us/usc/t54/s101919"
+          ]
+        },
+        {
+          "q": "national ambient air quality standards",
+          "ndcg@10": 0.926,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s7409",
+            "/us/usc/t42/s7410",
+            "/us/usc/t42/s7619"
+          ]
+        },
+        {
+          "q": "whistleblower protection",
+          "ndcg@10": 0.6995,
+          "recall@10": 0.7143,
+          "top": [
+            "/us/usc/t51/s30502",
+            "/us/usc/t15/s2087",
+            "/us/usc/t50/s2702"
+          ]
+        },
+        {
+          "q": "just compensation",
+          "ndcg@10": 0.589,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s2221",
+            "/us/usc/t40/s3116",
+            "/us/usc/t42/s2075"
+          ]
+        },
+        {
+          "q": "social security disability insurance",
+          "ndcg@10": 0.5879,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s901",
+            "/us/usc/t42/s423",
+            "/us/usc/t42/s903"
+          ]
+        },
+        {
+          "q": "automatic stay",
+          "ndcg@10": 0.9707,
+          "recall@10": 0.875,
+          "top": [
+            "/us/usc/t11/s362",
+            "/us/usc/t48/s2194",
+            "/us/usc/t11/s922"
+          ]
+        },
+        {
+          "q": "fair use",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t17/s107",
+            "/us/usc/t15/s643",
+            "/us/usc/t42/s3616a"
+          ]
+        },
+        {
+          "q": "patent term extension",
+          "ndcg@10": 0.8512,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t35/s156",
+            "/us/usc/t35/s41",
+            "/us/usc/t35/s271"
+          ]
+        },
+        {
+          "q": "asylum",
+          "ndcg@10": 0.8603,
+          "recall@10": 0.9,
+          "top": [
+            "/us/usc/t8/s1158",
+            "/us/usc/t8/s1802",
+            "/us/usc/t8/s1808"
+          ]
+        },
+        {
+          "q": "medicare reimbursement",
+          "ndcg@10": 0.3221,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t42/s1395b\u20136",
+            "/us/usc/t42/s1395w\u201323",
+            "/us/usc/t42/s1395i\u20134"
+          ]
+        },
+        {
+          "q": "money laundering",
+          "ndcg@10": 0.3325,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t12/s5908",
+            "/us/usc/t12/s5907",
+            "/us/usc/t31/s5341"
+          ]
+        },
+        {
+          "q": "insider trading",
+          "ndcg@10": 0.9907,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t15/s78u\u20131",
+            "/us/usc/t15/s78t\u20131",
+            "/us/usc/t15/s7244"
+          ]
+        },
+        {
+          "q": "controlled substances schedules",
+          "ndcg@10": 0.8404,
+          "recall@10": 0.8571,
+          "top": [
+            "/us/usc/t21/s812",
+            "/us/usc/t21/s952",
+            "/us/usc/t21/s953"
+          ]
+        },
+        {
+          "q": "tribal trust land",
+          "ndcg@10": 0.4173,
+          "recall@10": 0.3846,
+          "top": [
+            "/us/usc/t25/ch51",
+            "/us/usc/t43/s1629h",
+            "/us/usc/t25/s2216"
+          ]
+        },
+        {
+          "q": "veterans disability compensation",
+          "ndcg@10": 0.5703,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t38/s546",
+            "/us/usc/t38/s1161",
+            "/us/usc/t10/s1414"
+          ]
+        },
+        {
+          "q": "wire fraud",
+          "ndcg@10": 0.8882,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t18/s1343",
+            "/us/usc/t18/s2516",
+            "/us/usc/t15/s45e"
+          ]
+        },
+        {
+          "q": "employment discrimination",
+          "ndcg@10": 0.4013,
+          "recall@10": 0.5,
+          "top": [
+            "/us/usc/t38/s319",
+            "/us/usc/t42/s1981a",
+            "/us/usc/t42/s12112"
+          ]
+        },
+        {
+          "q": "environmental impact statement",
+          "ndcg@10": 0.3774,
+          "recall@10": 0.8,
+          "top": [
+            "/us/usc/t54/s306111",
+            "/us/usc/t42/s10247",
+            "/us/usc/t21/s379o"
+          ]
+        },
+        {
+          "q": "grazing permits",
+          "ndcg@10": 0.696,
+          "recall@10": 0.6154,
+          "top": [
+            "/us/usc/t16/s460uu\u20133",
+            "/us/usc/t43/s1752",
+            "/us/usc/t16/s580l"
+          ]
+        },
+        {
+          "q": "commodity futures",
+          "ndcg@10": 0.6318,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t7/s15b",
+            "/us/usc/t7/s21",
+            "/us/usc/t7/s6k"
+          ]
+        },
+        {
+          "q": "coastal zone management",
+          "ndcg@10": 0.497,
+          "recall@10": 0.5455,
+          "top": [
+            "/us/usc/t16/s1456a",
+            "/us/usc/t16/s1462",
+            "/us/usc/t16/s1456b"
+          ]
+        },
+        {
+          "q": "hazardous substance liability",
+          "ndcg@10": 0.7564,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t33/s1321",
+            "/us/usc/t26/s9507",
+            "/us/usc/t42/s9656"
+          ]
+        },
+        {
+          "q": "monopolization",
+          "ndcg@10": 0.4467,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t7/s292",
+            "/us/usc/t15/s522",
+            "/us/usc/t15/s1311"
+          ]
+        },
+        {
+          "q": "fishery management council",
+          "ndcg@10": 0.764,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s460ss\u20132",
+            "/us/usc/t16/s1852",
+            "/us/usc/t16/s1853"
+          ]
+        },
+        {
+          "q": "nuclear reactor license",
+          "ndcg@10": 0.6912,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s2232",
+            "/us/usc/t42/s2242",
+            "/us/usc/t42/s16024"
+          ]
+        },
+        {
+          "q": "crop insurance",
+          "ndcg@10": 0.8459,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t7/s1508",
+            "/us/usc/t7/s2008f",
+            "/us/usc/t7/s1508c"
+          ]
+        },
+        {
+          "q": "\"national wildlife refuge system\"",
+          "ndcg@10": 0.954,
+          "recall@10": 0.8333,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t22/s277d\u201339",
+            "/us/usc/t16/s459h\u20136"
+          ]
+        },
+        {
+          "q": "posse comitatus",
+          "ndcg@10": 0.834,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t6/s466",
+            "/us/usc/t18/s1385",
+            "/us/usc/t25/s219 to 226"
+          ]
+        },
+        {
+          "q": "1331 wild horses",
+          "ndcg@10": 0.6309,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t43/s1901",
+            "/us/usc/t16/s1331",
+            "/us/usc/t16/s460dddd"
+          ]
+        },
+        {
+          "q": "668dd refuge system",
+          "ndcg@10": 0.9577,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t16/s410hhh\u20134",
+            "/us/usc/t16/s3212"
+          ]
+        },
+        {
+          "q": "civil forfeiture",
+          "ndcg@10": 0.7047,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t18/s2254",
+            "/us/usc/t18/s981",
+            "/us/usc/t18/s985"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "heading-6",
+      "fields": [
+        "heading^6",
+        "num.text^2",
+        "xml_text"
+      ],
+      "phrase_boost": 0.0,
+      "heading_phrase_boost": 0.0,
+      "scope": "current",
+      "current_boost": 0.0,
+      "mean_ndcg@10": 0.6995,
+      "mean_recall@10": 0.7693,
+      "queries": [
+        {
+          "q": "wild horses and burros",
+          "ndcg@10": 0.8623,
+          "recall@10": 0.9091,
+          "top": [
+            "/us/usc/t18/s47",
+            "/us/usc/t16/ch30",
+            "/us/usc/t16/s1333"
+          ]
+        },
+        {
+          "q": "navigable waters",
+          "ndcg@10": 0.5339,
+          "recall@10": 0.625,
+          "top": [
+            "/us/usc/t48/s749",
+            "/us/usc/t33/s494a",
+            "/us/usc/t33/s407"
+          ]
+        },
+        {
+          "q": "endangered species critical habitat",
+          "ndcg@10": 0.98,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1533",
+            "/us/usc/t16/s1532",
+            "/us/usc/t16/s410aaa\u201381b"
+          ]
+        },
+        {
+          "q": "freedom of information",
+          "ndcg@10": 0.3412,
+          "recall@10": 0.7273,
+          "top": [
+            "/us/usc/t22/s4415",
+            "/us/usc/t22/s7814",
+            "/us/usc/t25/s3077"
+          ]
+        },
+        {
+          "q": "habeas corpus",
+          "ndcg@10": 0.5692,
+          "recall@10": 0.7692,
+          "top": [
+            "/us/usc/t25/s1303",
+            "/us/usc/t8/s1226a",
+            "/us/usc/t28/ptVI/ch153"
+          ]
+        },
+        {
+          "q": "minimum wage",
+          "ndcg@10": 0.8501,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t29/s206",
+            "/us/usc/t41/s6704",
+            "/us/usc/t20/s1095a"
+          ]
+        },
+        {
+          "q": "national park service",
+          "ndcg@10": 0.282,
+          "recall@10": 0.3529,
+          "top": [
+            "/us/usc/t18/s1865",
+            "/us/usc/t54/s102304",
+            "/us/usc/t54/s101919"
+          ]
+        },
+        {
+          "q": "national ambient air quality standards",
+          "ndcg@10": 0.926,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s7409",
+            "/us/usc/t42/s7410",
+            "/us/usc/t42/s7619"
+          ]
+        },
+        {
+          "q": "whistleblower protection",
+          "ndcg@10": 0.6995,
+          "recall@10": 0.7143,
+          "top": [
+            "/us/usc/t51/s30502",
+            "/us/usc/t15/s2087",
+            "/us/usc/t50/s2702"
+          ]
+        },
+        {
+          "q": "just compensation",
+          "ndcg@10": 0.589,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s2221",
+            "/us/usc/t40/s3116",
+            "/us/usc/t42/s2075"
+          ]
+        },
+        {
+          "q": "social security disability insurance",
+          "ndcg@10": 0.5032,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s901",
+            "/us/usc/t42/s903",
+            "/us/usc/t42/s423"
+          ]
+        },
+        {
+          "q": "automatic stay",
+          "ndcg@10": 0.9707,
+          "recall@10": 0.875,
+          "top": [
+            "/us/usc/t11/s362",
+            "/us/usc/t48/s2194",
+            "/us/usc/t11/s922"
+          ]
+        },
+        {
+          "q": "fair use",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t17/s107",
+            "/us/usc/t15/s643",
+            "/us/usc/t42/s3616a"
+          ]
+        },
+        {
+          "q": "patent term extension",
+          "ndcg@10": 0.8512,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t35/s156",
+            "/us/usc/t35/s41",
+            "/us/usc/t35/s271"
+          ]
+        },
+        {
+          "q": "asylum",
+          "ndcg@10": 0.8603,
+          "recall@10": 0.9,
+          "top": [
+            "/us/usc/t8/s1158",
+            "/us/usc/t8/s1802",
+            "/us/usc/t8/s1808"
+          ]
+        },
+        {
+          "q": "medicare reimbursement",
+          "ndcg@10": 0.3213,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t42/s1395b\u20136",
+            "/us/usc/t42/s1395w\u201323",
+            "/us/usc/t42/s1395i\u20134"
+          ]
+        },
+        {
+          "q": "money laundering",
+          "ndcg@10": 0.3748,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t12/s5908",
+            "/us/usc/t12/s5907",
+            "/us/usc/t31/s5341"
+          ]
+        },
+        {
+          "q": "insider trading",
+          "ndcg@10": 0.9907,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t15/s78u\u20131",
+            "/us/usc/t15/s78t\u20131",
+            "/us/usc/t15/s7244"
+          ]
+        },
+        {
+          "q": "controlled substances schedules",
+          "ndcg@10": 0.8404,
+          "recall@10": 0.8571,
+          "top": [
+            "/us/usc/t21/s812",
+            "/us/usc/t21/s952",
+            "/us/usc/t21/s953"
+          ]
+        },
+        {
+          "q": "tribal trust land",
+          "ndcg@10": 0.4173,
+          "recall@10": 0.3846,
+          "top": [
+            "/us/usc/t25/ch51",
+            "/us/usc/t43/s1629h",
+            "/us/usc/t25/s2216"
+          ]
+        },
+        {
+          "q": "veterans disability compensation",
+          "ndcg@10": 0.5942,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t38/s546",
+            "/us/usc/t38/s1161",
+            "/us/usc/t38/s1114"
+          ]
+        },
+        {
+          "q": "wire fraud",
+          "ndcg@10": 0.8882,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t18/s1343",
+            "/us/usc/t18/s2516",
+            "/us/usc/t15/s45e"
+          ]
+        },
+        {
+          "q": "employment discrimination",
+          "ndcg@10": 0.4328,
+          "recall@10": 0.5,
+          "top": [
+            "/us/usc/t38/s319",
+            "/us/usc/t29/ch14",
+            "/us/usc/t42/s1981a"
+          ]
+        },
+        {
+          "q": "environmental impact statement",
+          "ndcg@10": 0.3774,
+          "recall@10": 0.8,
+          "top": [
+            "/us/usc/t54/s306111",
+            "/us/usc/t42/s10247",
+            "/us/usc/t21/s379o"
+          ]
+        },
+        {
+          "q": "grazing permits",
+          "ndcg@10": 0.7138,
+          "recall@10": 0.6923,
+          "top": [
+            "/us/usc/t16/s460uu\u20133",
+            "/us/usc/t43/s1752",
+            "/us/usc/t16/s580l"
+          ]
+        },
+        {
+          "q": "commodity futures",
+          "ndcg@10": 0.6318,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t7/s15b",
+            "/us/usc/t7/s21",
+            "/us/usc/t7/s6k"
+          ]
+        },
+        {
+          "q": "coastal zone management",
+          "ndcg@10": 0.5106,
+          "recall@10": 0.5455,
+          "top": [
+            "/us/usc/t16/s1456a",
+            "/us/usc/t16/s1462",
+            "/us/usc/t16/ch33"
+          ]
+        },
+        {
+          "q": "hazardous substance liability",
+          "ndcg@10": 0.7564,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t33/s1321",
+            "/us/usc/t26/s9507",
+            "/us/usc/t42/s9656"
+          ]
+        },
+        {
+          "q": "monopolization",
+          "ndcg@10": 0.4467,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t7/s292",
+            "/us/usc/t15/s522",
+            "/us/usc/t15/s1311"
+          ]
+        },
+        {
+          "q": "fishery management council",
+          "ndcg@10": 0.764,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s460ss\u20132",
+            "/us/usc/t16/s1852",
+            "/us/usc/t16/s1853"
+          ]
+        },
+        {
+          "q": "nuclear reactor license",
+          "ndcg@10": 0.6899,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s2232",
+            "/us/usc/t42/s2242",
+            "/us/usc/t42/s16024"
+          ]
+        },
+        {
+          "q": "crop insurance",
+          "ndcg@10": 0.8619,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t7/s1508",
+            "/us/usc/t7/s2008f",
+            "/us/usc/t7/ch36"
+          ]
+        },
+        {
+          "q": "\"national wildlife refuge system\"",
+          "ndcg@10": 0.954,
+          "recall@10": 0.8333,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t22/s277d\u201339",
+            "/us/usc/t16/s459h\u20136"
+          ]
+        },
+        {
+          "q": "posse comitatus",
+          "ndcg@10": 0.834,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t6/s466",
+            "/us/usc/t18/s1385",
+            "/us/usc/t25/s219 to 226"
+          ]
+        },
+        {
+          "q": "1331 wild horses",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1331",
+            "/us/usc/t43/s1901",
+            "/us/usc/t16/s460dddd"
+          ]
+        },
+        {
+          "q": "668dd refuge system",
+          "ndcg@10": 0.9577,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t16/s410hhh\u20134",
+            "/us/usc/t16/s3212"
+          ]
+        },
+        {
+          "q": "civil forfeiture",
+          "ndcg@10": 0.7047,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t18/s2254",
+            "/us/usc/t18/s981",
+            "/us/usc/t18/s985"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "heading-10",
+      "fields": [
+        "heading^10",
+        "num.text^2",
+        "xml_text"
+      ],
+      "phrase_boost": 0.0,
+      "heading_phrase_boost": 0.0,
+      "scope": "current",
+      "current_boost": 0.0,
+      "mean_ndcg@10": 0.7071,
+      "mean_recall@10": 0.7688,
+      "queries": [
+        {
+          "q": "wild horses and burros",
+          "ndcg@10": 0.9289,
+          "recall@10": 0.9091,
+          "top": [
+            "/us/usc/t16/ch30",
+            "/us/usc/t18/s47",
+            "/us/usc/t16/s1333"
+          ]
+        },
+        {
+          "q": "navigable waters",
+          "ndcg@10": 0.5411,
+          "recall@10": 0.625,
+          "top": [
+            "/us/usc/t48/s749",
+            "/us/usc/t33/s494a",
+            "/us/usc/t33/s407"
+          ]
+        },
+        {
+          "q": "endangered species critical habitat",
+          "ndcg@10": 0.98,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1533",
+            "/us/usc/t16/s1532",
+            "/us/usc/t16/s410aaa\u201381b"
+          ]
+        },
+        {
+          "q": "freedom of information",
+          "ndcg@10": 0.3412,
+          "recall@10": 0.7273,
+          "top": [
+            "/us/usc/t22/s4415",
+            "/us/usc/t22/s7814",
+            "/us/usc/t25/s3077"
+          ]
+        },
+        {
+          "q": "habeas corpus",
+          "ndcg@10": 0.6056,
+          "recall@10": 0.7692,
+          "top": [
+            "/us/usc/t25/s1303",
+            "/us/usc/t28/ptVI/ch153",
+            "/us/usc/t8/s1226a"
+          ]
+        },
+        {
+          "q": "minimum wage",
+          "ndcg@10": 0.8501,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t29/s206",
+            "/us/usc/t41/s6704",
+            "/us/usc/t20/s1095a"
+          ]
+        },
+        {
+          "q": "national park service",
+          "ndcg@10": 0.4262,
+          "recall@10": 0.4118,
+          "top": [
+            "/us/usc/t18/s1865",
+            "/us/usc/t54/s102304",
+            "/us/usc/t54/s101919"
+          ]
+        },
+        {
+          "q": "national ambient air quality standards",
+          "ndcg@10": 0.926,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s7409",
+            "/us/usc/t42/s7410",
+            "/us/usc/t42/s7619"
+          ]
+        },
+        {
+          "q": "whistleblower protection",
+          "ndcg@10": 0.7012,
+          "recall@10": 0.7143,
+          "top": [
+            "/us/usc/t51/s30502",
+            "/us/usc/t15/s2087",
+            "/us/usc/t50/s2702"
+          ]
+        },
+        {
+          "q": "just compensation",
+          "ndcg@10": 0.589,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s2221",
+            "/us/usc/t40/s3116",
+            "/us/usc/t42/s2075"
+          ]
+        },
+        {
+          "q": "social security disability insurance",
+          "ndcg@10": 0.4544,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s901",
+            "/us/usc/t42/s903",
+            "/us/usc/t42/s1320b\u201313"
+          ]
+        },
+        {
+          "q": "automatic stay",
+          "ndcg@10": 0.9707,
+          "recall@10": 0.875,
+          "top": [
+            "/us/usc/t11/s362",
+            "/us/usc/t48/s2194",
+            "/us/usc/t11/s922"
+          ]
+        },
+        {
+          "q": "fair use",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t17/s107",
+            "/us/usc/t15/s643",
+            "/us/usc/t42/s3616a"
+          ]
+        },
+        {
+          "q": "patent term extension",
+          "ndcg@10": 0.8512,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t35/s156",
+            "/us/usc/t35/s41",
+            "/us/usc/t35/s271"
+          ]
+        },
+        {
+          "q": "asylum",
+          "ndcg@10": 0.8603,
+          "recall@10": 0.9,
+          "top": [
+            "/us/usc/t8/s1158",
+            "/us/usc/t8/s1802",
+            "/us/usc/t8/s1808"
+          ]
+        },
+        {
+          "q": "medicare reimbursement",
+          "ndcg@10": 0.3213,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t42/s1395b\u20136",
+            "/us/usc/t42/s1395w\u201323",
+            "/us/usc/t42/s1395i\u20134"
+          ]
+        },
+        {
+          "q": "money laundering",
+          "ndcg@10": 0.3786,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t12/s5908",
+            "/us/usc/t12/s5907",
+            "/us/usc/t21/ch28A/schII"
+          ]
+        },
+        {
+          "q": "insider trading",
+          "ndcg@10": 0.9907,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t15/s78u\u20131",
+            "/us/usc/t15/s78t\u20131",
+            "/us/usc/t15/s7244"
+          ]
+        },
+        {
+          "q": "controlled substances schedules",
+          "ndcg@10": 0.8404,
+          "recall@10": 0.8571,
+          "top": [
+            "/us/usc/t21/s812",
+            "/us/usc/t21/s952",
+            "/us/usc/t21/s953"
+          ]
+        },
+        {
+          "q": "tribal trust land",
+          "ndcg@10": 0.3948,
+          "recall@10": 0.3077,
+          "top": [
+            "/us/usc/t25/ch51",
+            "/us/usc/t43/s1629h",
+            "/us/usc/t25/s2216"
+          ]
+        },
+        {
+          "q": "veterans disability compensation",
+          "ndcg@10": 0.6367,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t38/s1161",
+            "/us/usc/t38/s546",
+            "/us/usc/t38/s1114"
+          ]
+        },
+        {
+          "q": "wire fraud",
+          "ndcg@10": 0.8882,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t18/s1343",
+            "/us/usc/t18/s2516",
+            "/us/usc/t15/s45e"
+          ]
+        },
+        {
+          "q": "employment discrimination",
+          "ndcg@10": 0.4371,
+          "recall@10": 0.5,
+          "top": [
+            "/us/usc/t38/s319",
+            "/us/usc/t29/ch14",
+            "/us/usc/t42/s1981a"
+          ]
+        },
+        {
+          "q": "environmental impact statement",
+          "ndcg@10": 0.3774,
+          "recall@10": 0.8,
+          "top": [
+            "/us/usc/t54/s306111",
+            "/us/usc/t42/s10247",
+            "/us/usc/t21/s379o"
+          ]
+        },
+        {
+          "q": "grazing permits",
+          "ndcg@10": 0.7138,
+          "recall@10": 0.6923,
+          "top": [
+            "/us/usc/t16/s460uu\u20133",
+            "/us/usc/t43/s1752",
+            "/us/usc/t16/s580l"
+          ]
+        },
+        {
+          "q": "commodity futures",
+          "ndcg@10": 0.6318,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t7/s15b",
+            "/us/usc/t7/s21",
+            "/us/usc/t7/s6k"
+          ]
+        },
+        {
+          "q": "coastal zone management",
+          "ndcg@10": 0.5106,
+          "recall@10": 0.5455,
+          "top": [
+            "/us/usc/t16/s1456a",
+            "/us/usc/t16/s1462",
+            "/us/usc/t16/ch33"
+          ]
+        },
+        {
+          "q": "hazardous substance liability",
+          "ndcg@10": 0.7564,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t33/s1321",
+            "/us/usc/t26/s9507",
+            "/us/usc/t42/s9656"
+          ]
+        },
+        {
+          "q": "monopolization",
+          "ndcg@10": 0.4467,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t7/s292",
+            "/us/usc/t15/s522",
+            "/us/usc/t15/s1311"
+          ]
+        },
+        {
+          "q": "fishery management council",
+          "ndcg@10": 0.764,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s460ss\u20132",
+            "/us/usc/t16/s1852",
+            "/us/usc/t16/s1853"
+          ]
+        },
+        {
+          "q": "nuclear reactor license",
+          "ndcg@10": 0.6899,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s2232",
+            "/us/usc/t42/s2242",
+            "/us/usc/t42/s16024"
+          ]
+        },
+        {
+          "q": "crop insurance",
+          "ndcg@10": 0.907,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t7/s1508",
+            "/us/usc/t7/ch36",
+            "/us/usc/t7/s2008f"
+          ]
+        },
+        {
+          "q": "\"national wildlife refuge system\"",
+          "ndcg@10": 0.954,
+          "recall@10": 0.8333,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t22/s277d\u201339",
+            "/us/usc/t16/s459h\u20136"
+          ]
+        },
+        {
+          "q": "posse comitatus",
+          "ndcg@10": 0.834,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t6/s466",
+            "/us/usc/t18/s1385",
+            "/us/usc/t25/s219 to 226"
+          ]
+        },
+        {
+          "q": "1331 wild horses",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1331",
+            "/us/usc/t43/s1901",
+            "/us/usc/t16/s460dddd"
+          ]
+        },
+        {
+          "q": "668dd refuge system",
+          "ndcg@10": 0.9577,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t16/s410hhh\u20134",
+            "/us/usc/t16/s3212"
+          ]
+        },
+        {
+          "q": "civil forfeiture",
+          "ndcg@10": 0.7047,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t18/s2254",
+            "/us/usc/t18/s981",
+            "/us/usc/t18/s985"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "heading-16",
+      "fields": [
+        "heading^16",
+        "num.text^2",
+        "xml_text"
+      ],
+      "phrase_boost": 0.0,
+      "heading_phrase_boost": 0.0,
+      "scope": "current",
+      "current_boost": 0.0,
+      "mean_ndcg@10": 0.7086,
+      "mean_recall@10": 0.7663,
+      "queries": [
+        {
+          "q": "wild horses and burros",
+          "ndcg@10": 0.8882,
+          "recall@10": 0.8182,
+          "top": [
+            "/us/usc/t16/ch30",
+            "/us/usc/t18/s47",
+            "/us/usc/t16/s1333"
+          ]
+        },
+        {
+          "q": "navigable waters",
+          "ndcg@10": 0.5583,
+          "recall@10": 0.625,
+          "top": [
+            "/us/usc/t48/s749",
+            "/us/usc/t33/s494a",
+            "/us/usc/t33/s407"
+          ]
+        },
+        {
+          "q": "endangered species critical habitat",
+          "ndcg@10": 0.98,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1533",
+            "/us/usc/t16/s1532",
+            "/us/usc/t16/s410aaa\u201381b"
+          ]
+        },
+        {
+          "q": "freedom of information",
+          "ndcg@10": 0.3412,
+          "recall@10": 0.7273,
+          "top": [
+            "/us/usc/t22/s4415",
+            "/us/usc/t22/s7814",
+            "/us/usc/t25/s3077"
+          ]
+        },
+        {
+          "q": "habeas corpus",
+          "ndcg@10": 0.6056,
+          "recall@10": 0.7692,
+          "top": [
+            "/us/usc/t25/s1303",
+            "/us/usc/t28/ptVI/ch153",
+            "/us/usc/t8/s1226a"
+          ]
+        },
+        {
+          "q": "minimum wage",
+          "ndcg@10": 0.8501,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t29/s206",
+            "/us/usc/t41/s6704",
+            "/us/usc/t20/s1095a"
+          ]
+        },
+        {
+          "q": "national park service",
+          "ndcg@10": 0.4622,
+          "recall@10": 0.4118,
+          "top": [
+            "/us/usc/t18/s1865",
+            "/us/usc/t54/s102304",
+            "/us/usc/t54/s101919"
+          ]
+        },
+        {
+          "q": "national ambient air quality standards",
+          "ndcg@10": 0.926,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s7409",
+            "/us/usc/t42/s7410",
+            "/us/usc/t42/s7619"
+          ]
+        },
+        {
+          "q": "whistleblower protection",
+          "ndcg@10": 0.7032,
+          "recall@10": 0.7143,
+          "top": [
+            "/us/usc/t51/s30502",
+            "/us/usc/t15/s2087",
+            "/us/usc/t50/s2702"
+          ]
+        },
+        {
+          "q": "just compensation",
+          "ndcg@10": 0.589,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s2221",
+            "/us/usc/t40/s3116",
+            "/us/usc/t42/s2075"
+          ]
+        },
+        {
+          "q": "social security disability insurance",
+          "ndcg@10": 0.4544,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s901",
+            "/us/usc/t42/s903",
+            "/us/usc/t42/s1320b\u201313"
+          ]
+        },
+        {
+          "q": "automatic stay",
+          "ndcg@10": 0.9707,
+          "recall@10": 0.875,
+          "top": [
+            "/us/usc/t11/s362",
+            "/us/usc/t48/s2194",
+            "/us/usc/t11/s922"
+          ]
+        },
+        {
+          "q": "fair use",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t17/s107",
+            "/us/usc/t15/s643",
+            "/us/usc/t42/s3616a"
+          ]
+        },
+        {
+          "q": "patent term extension",
+          "ndcg@10": 0.8512,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t35/s156",
+            "/us/usc/t35/s41",
+            "/us/usc/t35/s271"
+          ]
+        },
+        {
+          "q": "asylum",
+          "ndcg@10": 0.8603,
+          "recall@10": 0.9,
+          "top": [
+            "/us/usc/t8/s1158",
+            "/us/usc/t8/s1802",
+            "/us/usc/t8/s1808"
+          ]
+        },
+        {
+          "q": "medicare reimbursement",
+          "ndcg@10": 0.3213,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t42/s1395b\u20136",
+            "/us/usc/t42/s1395w\u201323",
+            "/us/usc/t42/s1395i\u20134"
+          ]
+        },
+        {
+          "q": "money laundering",
+          "ndcg@10": 0.3812,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t12/s5908",
+            "/us/usc/t12/s5907",
+            "/us/usc/t21/ch28A/schII"
+          ]
+        },
+        {
+          "q": "insider trading",
+          "ndcg@10": 0.9907,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t15/s78u\u20131",
+            "/us/usc/t15/s78t\u20131",
+            "/us/usc/t15/s7244"
+          ]
+        },
+        {
+          "q": "controlled substances schedules",
+          "ndcg@10": 0.8404,
+          "recall@10": 0.8571,
+          "top": [
+            "/us/usc/t21/s812",
+            "/us/usc/t21/s952",
+            "/us/usc/t21/s953"
+          ]
+        },
+        {
+          "q": "tribal trust land",
+          "ndcg@10": 0.3948,
+          "recall@10": 0.3077,
+          "top": [
+            "/us/usc/t25/ch51",
+            "/us/usc/t43/s1629h",
+            "/us/usc/t25/s2216"
+          ]
+        },
+        {
+          "q": "veterans disability compensation",
+          "ndcg@10": 0.6367,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t38/s1161",
+            "/us/usc/t38/s546",
+            "/us/usc/t38/s1114"
+          ]
+        },
+        {
+          "q": "wire fraud",
+          "ndcg@10": 0.8882,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t18/s1343",
+            "/us/usc/t18/s2516",
+            "/us/usc/t15/s45e"
+          ]
+        },
+        {
+          "q": "employment discrimination",
+          "ndcg@10": 0.4774,
+          "recall@10": 0.5,
+          "top": [
+            "/us/usc/t29/ch14",
+            "/us/usc/t38/s319",
+            "/us/usc/t42/s1981a"
+          ]
+        },
+        {
+          "q": "environmental impact statement",
+          "ndcg@10": 0.3774,
+          "recall@10": 0.8,
+          "top": [
+            "/us/usc/t54/s306111",
+            "/us/usc/t42/s10247",
+            "/us/usc/t21/s379o"
+          ]
+        },
+        {
+          "q": "grazing permits",
+          "ndcg@10": 0.7138,
+          "recall@10": 0.6923,
+          "top": [
+            "/us/usc/t16/s460uu\u20133",
+            "/us/usc/t43/s1752",
+            "/us/usc/t16/s580l"
+          ]
+        },
+        {
+          "q": "commodity futures",
+          "ndcg@10": 0.6318,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t7/s15b",
+            "/us/usc/t7/s21",
+            "/us/usc/t7/s6k"
+          ]
+        },
+        {
+          "q": "coastal zone management",
+          "ndcg@10": 0.5106,
+          "recall@10": 0.5455,
+          "top": [
+            "/us/usc/t16/s1456a",
+            "/us/usc/t16/s1462",
+            "/us/usc/t16/ch33"
+          ]
+        },
+        {
+          "q": "hazardous substance liability",
+          "ndcg@10": 0.7564,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t33/s1321",
+            "/us/usc/t26/s9507",
+            "/us/usc/t42/s9656"
+          ]
+        },
+        {
+          "q": "monopolization",
+          "ndcg@10": 0.4467,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t7/s292",
+            "/us/usc/t15/s522",
+            "/us/usc/t15/s1311"
+          ]
+        },
+        {
+          "q": "fishery management council",
+          "ndcg@10": 0.764,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s460ss\u20132",
+            "/us/usc/t16/s1852",
+            "/us/usc/t16/s1853"
+          ]
+        },
+        {
+          "q": "nuclear reactor license",
+          "ndcg@10": 0.6899,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s2232",
+            "/us/usc/t42/s2242",
+            "/us/usc/t42/s16024"
+          ]
+        },
+        {
+          "q": "crop insurance",
+          "ndcg@10": 0.907,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t7/s1508",
+            "/us/usc/t7/ch36",
+            "/us/usc/t7/s2008f"
+          ]
+        },
+        {
+          "q": "\"national wildlife refuge system\"",
+          "ndcg@10": 0.954,
+          "recall@10": 0.8333,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t22/s277d\u201339",
+            "/us/usc/t16/s459h\u20136"
+          ]
+        },
+        {
+          "q": "posse comitatus",
+          "ndcg@10": 0.834,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t6/s466",
+            "/us/usc/t18/s1385",
+            "/us/usc/t25/s219 to 226"
+          ]
+        },
+        {
+          "q": "1331 wild horses",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1331",
+            "/us/usc/t43/s1901",
+            "/us/usc/t16/s460dddd"
+          ]
+        },
+        {
+          "q": "668dd refuge system",
+          "ndcg@10": 0.9577,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t16/s410hhh\u20134",
+            "/us/usc/t16/s3212"
+          ]
+        },
+        {
+          "q": "civil forfeiture",
+          "ndcg@10": 0.7047,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t18/s2254",
+            "/us/usc/t18/s981",
+            "/us/usc/t18/s985"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "phrase",
+      "fields": [
+        "heading^10",
+        "num.text^2",
+        "xml_text"
+      ],
+      "phrase_boost": 4.0,
+      "heading_phrase_boost": 8.0,
+      "scope": "current",
+      "current_boost": 0.0,
+      "mean_ndcg@10": 0.7159,
+      "mean_recall@10": 0.8016,
+      "queries": [
+        {
+          "q": "wild horses and burros",
+          "ndcg@10": 0.9526,
+          "recall@10": 0.9091,
+          "top": [
+            "/us/usc/t16/ch30",
+            "/us/usc/t16/s1333",
+            "/us/usc/t18/s47"
+          ]
+        },
+        {
+          "q": "navigable waters",
+          "ndcg@10": 0.6019,
+          "recall@10": 0.625,
+          "top": [
+            "/us/usc/t33/s494a",
+            "/us/usc/t48/s749",
+            "/us/usc/t33/s407"
+          ]
+        },
+        {
+          "q": "endangered species critical habitat",
+          "ndcg@10": 0.9295,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1533",
+            "/us/usc/t43/s2904",
+            "/us/usc/t16/s1532"
+          ]
+        },
+        {
+          "q": "freedom of information",
+          "ndcg@10": 0.3835,
+          "recall@10": 0.8182,
+          "top": [
+            "/us/usc/t22/s4415",
+            "/us/usc/t25/s3077",
+            "/us/usc/t22/s7814"
+          ]
+        },
+        {
+          "q": "habeas corpus",
+          "ndcg@10": 0.5441,
+          "recall@10": 0.7692,
+          "top": [
+            "/us/usc/t25/s1303",
+            "/us/usc/t8/s1226a",
+            "/us/usc/t28/s2263"
+          ]
+        },
+        {
+          "q": "minimum wage",
+          "ndcg@10": 0.8757,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t29/s206",
+            "/us/usc/t41/s6704",
+            "/us/usc/t29/s254"
+          ]
+        },
+        {
+          "q": "national park service",
+          "ndcg@10": 0.5025,
+          "recall@10": 0.5294,
+          "top": [
+            "/us/usc/t18/s1865",
+            "/us/usc/t54/s102304",
+            "/us/usc/t54/s101919"
+          ]
+        },
+        {
+          "q": "national ambient air quality standards",
+          "ndcg@10": 0.9646,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t42/s7409",
+            "/us/usc/t42/s7410",
+            "/us/usc/t42/s7407"
+          ]
+        },
+        {
+          "q": "whistleblower protection",
+          "ndcg@10": 0.6888,
+          "recall@10": 0.7143,
+          "top": [
+            "/us/usc/t51/s30502",
+            "/us/usc/t15/s2087",
+            "/us/usc/t50/s2702"
+          ]
+        },
+        {
+          "q": "just compensation",
+          "ndcg@10": 0.5899,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t42/s2221",
+            "/us/usc/t40/s3116",
+            "/us/usc/t42/s2075"
+          ]
+        },
+        {
+          "q": "social security disability insurance",
+          "ndcg@10": 0.4544,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s901",
+            "/us/usc/t42/s903",
+            "/us/usc/t42/s1320b\u201313"
+          ]
+        },
+        {
+          "q": "automatic stay",
+          "ndcg@10": 0.9717,
+          "recall@10": 0.875,
+          "top": [
+            "/us/usc/t11/s362",
+            "/us/usc/t48/s2194",
+            "/us/usc/t11/s922"
+          ]
+        },
+        {
+          "q": "fair use",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t17/s107",
+            "/us/usc/t15/s643",
+            "/us/usc/t42/s3616a"
+          ]
+        },
+        {
+          "q": "patent term extension",
+          "ndcg@10": 0.8976,
+          "recall@10": 0.8,
+          "top": [
+            "/us/usc/t35/s156",
+            "/us/usc/t35/s41",
+            "/us/usc/t35/s271"
+          ]
+        },
+        {
+          "q": "asylum",
+          "ndcg@10": 0.8603,
+          "recall@10": 0.9,
+          "top": [
+            "/us/usc/t8/s1158",
+            "/us/usc/t8/s1802",
+            "/us/usc/t8/s1808"
+          ]
+        },
+        {
+          "q": "medicare reimbursement",
+          "ndcg@10": 0.3213,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t42/s1395b\u20136",
+            "/us/usc/t42/s1395w\u201323",
+            "/us/usc/t42/s1395i\u20134"
+          ]
+        },
+        {
+          "q": "money laundering",
+          "ndcg@10": 0.3325,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t12/s5908",
+            "/us/usc/t12/s5907",
+            "/us/usc/t31/s5341"
+          ]
+        },
+        {
+          "q": "insider trading",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t15/s78u\u20131",
+            "/us/usc/t15/s78t\u20131",
+            "/us/usc/t15/s7244"
+          ]
+        },
+        {
+          "q": "controlled substances schedules",
+          "ndcg@10": 0.8404,
+          "recall@10": 0.8571,
+          "top": [
+            "/us/usc/t21/s812",
+            "/us/usc/t21/s826",
+            "/us/usc/t21/s952"
+          ]
+        },
+        {
+          "q": "tribal trust land",
+          "ndcg@10": 0.3633,
+          "recall@10": 0.3077,
+          "top": [
+            "/us/usc/t25/ch51",
+            "/us/usc/t43/s1629h",
+            "/us/usc/t25/s2216"
+          ]
+        },
+        {
+          "q": "veterans disability compensation",
+          "ndcg@10": 0.5457,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t10/s1414",
+            "/us/usc/t38/s546",
+            "/us/usc/t38/s1161"
+          ]
+        },
+        {
+          "q": "wire fraud",
+          "ndcg@10": 0.9333,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t18/s1343",
+            "/us/usc/t18/s2516",
+            "/us/usc/t15/s45e"
+          ]
+        },
+        {
+          "q": "employment discrimination",
+          "ndcg@10": 0.6102,
+          "recall@10": 0.6429,
+          "top": [
+            "/us/usc/t38/s319",
+            "/us/usc/t42/ch21F",
+            "/us/usc/t38/s516"
+          ]
+        },
+        {
+          "q": "environmental impact statement",
+          "ndcg@10": 0.3478,
+          "recall@10": 0.7,
+          "top": [
+            "/us/usc/t54/s306111",
+            "/us/usc/t42/s10247",
+            "/us/usc/t21/s379o"
+          ]
+        },
+        {
+          "q": "grazing permits",
+          "ndcg@10": 0.7441,
+          "recall@10": 0.6154,
+          "top": [
+            "/us/usc/t16/s460uu\u20133",
+            "/us/usc/t43/s1752",
+            "/us/usc/t43/s315b"
+          ]
+        },
+        {
+          "q": "commodity futures",
+          "ndcg@10": 0.6309,
+          "recall@10": 0.5833,
+          "top": [
+            "/us/usc/t7/s2",
+            "/us/usc/t7/s16a",
+            "/us/usc/t26/s1234B"
+          ]
+        },
+        {
+          "q": "coastal zone management",
+          "ndcg@10": 0.493,
+          "recall@10": 0.6364,
+          "top": [
+            "/us/usc/t16/s1456a",
+            "/us/usc/t16/s1462",
+            "/us/usc/t16/s1460"
+          ]
+        },
+        {
+          "q": "hazardous substance liability",
+          "ndcg@10": 0.7564,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t33/s1321",
+            "/us/usc/t26/s9507",
+            "/us/usc/t42/s9656"
+          ]
+        },
+        {
+          "q": "monopolization",
+          "ndcg@10": 0.4467,
+          "recall@10": 0.6,
+          "top": [
+            "/us/usc/t7/s292",
+            "/us/usc/t15/s522",
+            "/us/usc/t15/s1311"
+          ]
+        },
+        {
+          "q": "fishery management council",
+          "ndcg@10": 0.7317,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s460ss\u20132",
+            "/us/usc/t16/s1852",
+            "/us/usc/t16/s3343"
+          ]
+        },
+        {
+          "q": "nuclear reactor license",
+          "ndcg@10": 0.8478,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t42/s2232",
+            "/us/usc/t42/s2242",
+            "/us/usc/t42/s16024"
+          ]
+        },
+        {
+          "q": "crop insurance",
+          "ndcg@10": 0.8459,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t7/s1508",
+            "/us/usc/t7/s2008f",
+            "/us/usc/t7/s1508c"
+          ]
+        },
+        {
+          "q": "\"national wildlife refuge system\"",
+          "ndcg@10": 0.954,
+          "recall@10": 0.8333,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t22/s277d\u201339",
+            "/us/usc/t16/s459h\u20136"
+          ]
+        },
+        {
+          "q": "posse comitatus",
+          "ndcg@10": 0.834,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t6/s466",
+            "/us/usc/t18/s1385",
+            "/us/usc/t25/s219 to 226"
+          ]
+        },
+        {
+          "q": "1331 wild horses",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1331",
+            "/us/usc/t43/s1901",
+            "/us/usc/t16/s460dddd"
+          ]
+        },
+        {
+          "q": "668dd refuge system",
+          "ndcg@10": 0.9577,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t16/s410hhh\u20134",
+            "/us/usc/t16/s3212"
+          ]
+        },
+        {
+          "q": "civil forfeiture",
+          "ndcg@10": 0.7346,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t18/s2254",
+            "/us/usc/t18/s981",
+            "/us/usc/t18/s985"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "all-versions",
+      "fields": [
+        "heading^10",
+        "num.text^2",
+        "xml_text"
+      ],
+      "phrase_boost": 4.0,
+      "heading_phrase_boost": 8.0,
+      "scope": "all",
+      "current_boost": 6.0,
+      "mean_ndcg@10": 0.7192,
+      "mean_recall@10": 0.815,
+      "queries": [
+        {
+          "q": "wild horses and burros",
+          "ndcg@10": 0.9526,
+          "recall@10": 0.9091,
+          "top": [
+            "/us/usc/t16/ch30",
+            "/us/usc/t16/s1333",
+            "/us/usc/t18/s47"
+          ]
+        },
+        {
+          "q": "navigable waters",
+          "ndcg@10": 0.5968,
+          "recall@10": 0.625,
+          "top": [
+            "/us/usc/t33/s494a",
+            "/us/usc/t48/s749",
+            "/us/usc/t33/s407"
+          ]
+        },
+        {
+          "q": "endangered species critical habitat",
+          "ndcg@10": 0.9295,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1533",
+            "/us/usc/t43/s2904",
+            "/us/usc/t16/s1532"
+          ]
+        },
+        {
+          "q": "freedom of information",
+          "ndcg@10": 0.3835,
+          "recall@10": 0.8182,
+          "top": [
+            "/us/usc/t22/s4415",
+            "/us/usc/t25/s3077",
+            "/us/usc/t22/s7814"
+          ]
+        },
+        {
+          "q": "habeas corpus",
+          "ndcg@10": 0.5441,
+          "recall@10": 0.7692,
+          "top": [
+            "/us/usc/t25/s1303",
+            "/us/usc/t8/s1226a",
+            "/us/usc/t28/s2263"
+          ]
+        },
+        {
+          "q": "minimum wage",
+          "ndcg@10": 0.8757,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t29/s206",
+            "/us/usc/t41/s6704",
+            "/us/usc/t29/s254"
+          ]
+        },
+        {
+          "q": "national park service",
+          "ndcg@10": 0.3424,
+          "recall@10": 0.5882,
+          "top": [
+            "/us/usc/t18/s1865",
+            "/us/usc/t16/s470x\u20136",
+            "/us/usc/t54/s102304"
+          ]
+        },
+        {
+          "q": "national ambient air quality standards",
+          "ndcg@10": 0.9646,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t42/s7409",
+            "/us/usc/t42/s7410",
+            "/us/usc/t42/s7407"
+          ]
+        },
+        {
+          "q": "whistleblower protection",
+          "ndcg@10": 0.6888,
+          "recall@10": 0.7143,
+          "top": [
+            "/us/usc/t51/s30502",
+            "/us/usc/t15/s2087",
+            "/us/usc/t50/s2702"
+          ]
+        },
+        {
+          "q": "just compensation",
+          "ndcg@10": 0.613,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s2221",
+            "/us/usc/t40/s3116",
+            "/us/usc/t42/s2075"
+          ]
+        },
+        {
+          "q": "social security disability insurance",
+          "ndcg@10": 0.4544,
+          "recall@10": 0.75,
+          "top": [
+            "/us/usc/t42/s901",
+            "/us/usc/t42/s903",
+            "/us/usc/t42/s1320b\u201313"
+          ]
+        },
+        {
+          "q": "automatic stay",
+          "ndcg@10": 0.9717,
+          "recall@10": 0.875,
+          "top": [
+            "/us/usc/t11/s362",
+            "/us/usc/t48/s2194",
+            "/us/usc/t11/s922"
+          ]
+        },
+        {
+          "q": "fair use",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t17/s107",
+            "/us/usc/t15/s643",
+            "/us/usc/t42/s3616a"
+          ]
+        },
+        {
+          "q": "patent term extension",
+          "ndcg@10": 0.8976,
+          "recall@10": 0.8,
+          "top": [
+            "/us/usc/t35/s156",
+            "/us/usc/t35/s41",
+            "/us/usc/t35/s271"
+          ]
+        },
+        {
+          "q": "asylum",
+          "ndcg@10": 0.8603,
+          "recall@10": 0.9,
+          "top": [
+            "/us/usc/t8/s1158",
+            "/us/usc/t8/s1802",
+            "/us/usc/t8/s1808"
+          ]
+        },
+        {
+          "q": "medicare reimbursement",
+          "ndcg@10": 0.3213,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t42/s1395b\u20136",
+            "/us/usc/t42/s1395w\u201323",
+            "/us/usc/t42/s1395i\u20134"
+          ]
+        },
+        {
+          "q": "money laundering",
+          "ndcg@10": 0.3325,
+          "recall@10": 0.6667,
+          "top": [
+            "/us/usc/t12/s5908",
+            "/us/usc/t12/s5907",
+            "/us/usc/t31/s5341"
+          ]
+        },
+        {
+          "q": "insider trading",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t15/s78u\u20131",
+            "/us/usc/t15/s78t\u20131",
+            "/us/usc/t15/s7244"
+          ]
+        },
+        {
+          "q": "controlled substances schedules",
+          "ndcg@10": 0.8404,
+          "recall@10": 0.8571,
+          "top": [
+            "/us/usc/t21/s812",
+            "/us/usc/t21/s826",
+            "/us/usc/t21/s952"
+          ]
+        },
+        {
+          "q": "tribal trust land",
+          "ndcg@10": 0.3904,
+          "recall@10": 0.4615,
+          "top": [
+            "/us/usc/t25/ch51",
+            "/us/usc/t25/s1041e",
+            "/us/usc/t25/s1779d"
+          ]
+        },
+        {
+          "q": "veterans disability compensation",
+          "ndcg@10": 0.5457,
+          "recall@10": 0.8889,
+          "top": [
+            "/us/usc/t10/s1414",
+            "/us/usc/t38/s546",
+            "/us/usc/t38/s1161"
+          ]
+        },
+        {
+          "q": "wire fraud",
+          "ndcg@10": 0.9333,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t18/s1343",
+            "/us/usc/t18/s2516",
+            "/us/usc/t15/s45e"
+          ]
+        },
+        {
+          "q": "employment discrimination",
+          "ndcg@10": 0.6102,
+          "recall@10": 0.6429,
+          "top": [
+            "/us/usc/t38/s319",
+            "/us/usc/t42/ch21F",
+            "/us/usc/t38/s516"
+          ]
+        },
+        {
+          "q": "environmental impact statement",
+          "ndcg@10": 0.3478,
+          "recall@10": 0.7,
+          "top": [
+            "/us/usc/t54/s306111",
+            "/us/usc/t42/s10247",
+            "/us/usc/t21/s379o"
+          ]
+        },
+        {
+          "q": "grazing permits",
+          "ndcg@10": 0.7441,
+          "recall@10": 0.6154,
+          "top": [
+            "/us/usc/t16/s460uu\u20133",
+            "/us/usc/t43/s1752",
+            "/us/usc/t43/s315b"
+          ]
+        },
+        {
+          "q": "commodity futures",
+          "ndcg@10": 0.6309,
+          "recall@10": 0.5833,
+          "top": [
+            "/us/usc/t7/s2",
+            "/us/usc/t7/s16a",
+            "/us/usc/t26/s1234B"
+          ]
+        },
+        {
+          "q": "coastal zone management",
+          "ndcg@10": 0.493,
+          "recall@10": 0.6364,
+          "top": [
+            "/us/usc/t16/s1456a",
+            "/us/usc/t16/s1462",
+            "/us/usc/t16/s1460"
+          ]
+        },
+        {
+          "q": "hazardous substance liability",
+          "ndcg@10": 0.7564,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t33/s1321",
+            "/us/usc/t26/s9507",
+            "/us/usc/t42/s9656"
+          ]
+        },
+        {
+          "q": "monopolization",
+          "ndcg@10": 0.5215,
+          "recall@10": 0.8,
+          "top": [
+            "/us/usc/t7/s292",
+            "/us/usc/t15/s522",
+            "/us/usc/t15/s1311"
+          ]
+        },
+        {
+          "q": "fishery management council",
+          "ndcg@10": 0.7317,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s460ss\u20132",
+            "/us/usc/t16/s1852",
+            "/us/usc/t16/s3343"
+          ]
+        },
+        {
+          "q": "nuclear reactor license",
+          "ndcg@10": 0.8478,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t42/s2232",
+            "/us/usc/t42/s2242",
+            "/us/usc/t42/s16024"
+          ]
+        },
+        {
+          "q": "crop insurance",
+          "ndcg@10": 0.8433,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t7/s1508",
+            "/us/usc/t7/s2008f",
+            "/us/usc/t7/s1508c"
+          ]
+        },
+        {
+          "q": "\"national wildlife refuge system\"",
+          "ndcg@10": 0.954,
+          "recall@10": 0.8333,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t22/s277d\u201339",
+            "/us/usc/t16/s459h\u20136"
+          ]
+        },
+        {
+          "q": "posse comitatus",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t18/s1385",
+            "/us/usc/t6/s466",
+            "/us/usc/t25/s219 to 226"
+          ]
+        },
+        {
+          "q": "1331 wild horses",
+          "ndcg@10": 1.0,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s1331",
+            "/us/usc/t43/s1901",
+            "/us/usc/t16/s460dddd"
+          ]
+        },
+        {
+          "q": "668dd refuge system",
+          "ndcg@10": 0.9577,
+          "recall@10": 1.0,
+          "top": [
+            "/us/usc/t16/s668dd",
+            "/us/usc/t16/s410hhh\u20134",
+            "/us/usc/t16/s3212"
+          ]
+        },
+        {
+          "q": "civil forfeiture",
+          "ndcg@10": 0.7346,
+          "recall@10": 0.7778,
+          "top": [
+            "/us/usc/t18/s2254",
+            "/us/usc/t18/s981",
+            "/us/usc/t18/s985"
+          ]
+        }
+      ]
+    }
+  ]
+}

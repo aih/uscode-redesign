@@ -1,0 +1,137 @@
+---
+/**
+ * Title and status filters over a result set, each one a link that edits the
+ * query — ADR-0049.
+ *
+ * A facet does not get a query parameter of its own. `?q=water+title:16` is the
+ * whole search, so the URL of a filtered search is the search, and pasting it
+ * into a brief or a ticket carries everything: the words, the filters, the
+ * release point and the order. Two representations of the same filter would
+ * eventually disagree about which one won.
+ *
+ * Counts are over the whole result set rather than the page, which is what
+ * makes them worth reading: "Title 42 — 118" says whether narrowing is worth
+ * doing before the reader spends a click finding out.
+ *
+ * The release point is not here. Filtering by title takes a subset of one
+ * result set; asking for a release point changes which text is searched, so
+ * counts from this search would not describe that one. It stays where the rest
+ * of the site puts it — `?release=`, and the `release:` operator.
+ */
+import type { SearchFacets } from "../lib/types";
+import { hasScope, toggleScope } from "../lib/searchscope";
+import { searchHref } from "../lib/url";
+
+interface Props {
+  facets: SearchFacets;
+  query: string;
+  release?: string | null;
+  date?: string | null;
+  sort?: string;
+  /** Total results, so a facet covering all of them can be left out. */
+  total: number;
+}
+
+const { facets, query, release = null, date = null, sort = "relevance", total } =
+  Astro.props;
+
+/** How many values to offer per group. Past a dozen a facet list is a second
+ *  results page rather than a way of narrowing the first. */
+const SHOWN = 12;
+
+function href(name: string, value: string): string {
+  return searchHref(toggleScope(query, name, value), { release, date, sort });
+}
+
+/** `none` is the bucket for a section the source gives no `@status` — most of
+ *  the Code. It is a filter value, not something the corpus contains. */
+const STATUS_LABELS: Record<string, string> = { none: "No status recorded" };
+
+function statusLabel(value: string): string {
+  return STATUS_LABELS[value] ?? value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** A group with one value covering every result narrows nothing — unless that
+ *  value is the filter already applied, which is why every result carries it.
+ *  Hiding it there would leave the reader filtered to one title with no way
+ *  back but editing the query by hand. */
+function worthShowing(
+  name: string,
+  values: { value: string; count: number }[],
+): boolean {
+  if (values.some((facet) => hasScope(query, name, facet.value))) return true;
+  return values.length > 1 || (values.length === 1 && values[0].count < total);
+}
+
+const titles = facets.titles.slice(0, SHOWN);
+const statuses = facets.statuses.slice(0, SHOWN);
+const show = worthShowing("title", titles) || worthShowing("status", statuses);
+---
+
+{
+  show && (
+    <section class="facets" aria-labelledby="facets-heading">
+      <h2 class="toc-group" id="facets-heading">
+        Narrow these results
+      </h2>
+
+      {worthShowing("title", titles) && (
+        <div class="facets__group">
+          <h3 class="facets__name" id="facet-title">
+            Title
+          </h3>
+          <ul class="facets__list" aria-labelledby="facet-title">
+            {titles.map((facet) => {
+              const on = hasScope(query, "title", facet.value);
+              return (
+                <li>
+                  <a
+                    class:list={[
+                      "facets__value",
+                      "facets__value--title",
+                      on && "facets__value--on",
+                    ]}
+                    href={href("title", facet.value)}
+                    aria-current={on ? "true" : undefined}
+                  >
+                    Title {facet.value}
+                    <span class="facets__count">{facet.count.toLocaleString()}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {worthShowing("status", statuses) && (
+        <div class="facets__group">
+          <h3 class="facets__name" id="facet-status">
+            Status
+          </h3>
+          <ul class="facets__list" aria-labelledby="facet-status">
+            {statuses.map((facet) => {
+              const on = hasScope(query, "status", facet.value);
+              return (
+                <li>
+                  <a
+                    class:list={[
+                      "facets__value",
+                      "facets__value--status",
+                      on && "facets__value--on",
+                    ]}
+                    href={href("status", facet.value)}
+                    aria-current={on ? "true" : undefined}
+                  >
+                    {statusLabel(facet.value)}
+                    <span class="facets__count">{facet.count.toLocaleString()}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  )
+}

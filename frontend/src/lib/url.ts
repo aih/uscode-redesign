@@ -157,12 +157,22 @@ export function gotoHref(query?: string | null): string {
  * the pager rebuilds its own href, and could only rebuild what this accepts. */
 export function searchHref(
   query: string,
-  opts: { cites?: boolean; release?: string | null; date?: string | null } = {},
+  opts: {
+    cites?: boolean;
+    release?: string | null;
+    date?: string | null;
+    sort?: string | null;
+    offset?: number | null;
+  } = {},
 ): string {
   const params = new URLSearchParams({ q: query });
   if (opts.release) params.set("release", opts.release);
   if (opts.date) params.set("date", opts.date);
   if (opts.cites) params.set("cites", "1");
+  // `relevance` is the default, so leaving it out keeps the plain search URL
+  // plain — and keeps two URLs from naming the same search.
+  if (opts.sort && opts.sort !== "relevance") params.set("sort", opts.sort);
+  if (opts.offset) params.set("offset", String(opts.offset));
   return `${APP}/search?${params.toString()}`;
 }
 

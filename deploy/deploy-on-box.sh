@@ -121,6 +121,31 @@ if [ -n "$SITE_ADDRESS" ]; then
     echo "robots.txt served as expected"
 fi
 
+# The search index, when and only when the mapping this image declares differs
+# from the one the live index was built with (ADR-0049).
+#
+# It has to be automatic because the failure is silent. The mapping is not
+# additive — OpenSearch will not add a field type to a live index (ADR-0028) —
+# so a field this release introduces is *absent* on the old index rather than
+# broken: `title:16` returns no results, which is indistinguishable from a title
+# with nothing in it. Nothing 500s, nothing alerts, and the deploy looks clean.
+#
+# `--if-changed` builds each index under a name of its own and moves the alias
+# in a single call at the end, so a search issued while this runs reads the old
+# index throughout and the new one afterwards. Most deploys change no mapping
+# and this is two HEAD requests.
+#
+# Never fatal, and that is safe rather than lax: a failure part-way leaves the
+# alias where it was, so the site keeps the index it already had. Stale search
+# on a deployed site beats a rolled-back deploy of everything else.
+#
+# Current text only (66k documents). `--all-versions` is 490k and has been
+# OOM-killed on this box twice — see docs/deploy-status.md.
+echo "=== rebuilding the search index if this release changed its mapping ==="
+docker compose -f docker-compose.prod.yml run --rm --no-deps api \
+    uv run python -m ingest.reindex_search --if-changed \
+    || echo "(search index rebuild failed; the previous index is still live)"
+
 echo "=== pruning old images ==="
 docker image prune -f
 

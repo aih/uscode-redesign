@@ -17,11 +17,12 @@
  */
 import Base from "../layouts/Base.astro";
 import ErrorPage from "../components/ErrorPage.astro";
+import SearchFacets from "../components/SearchFacets.astro";
 import { ApiError, fetchSearch, releaseParams } from "../lib/api";
 import { CITES_KEYWORD } from "../lib/query";
 import { fuzzify } from "../lib/searchsyntax";
 import type { SearchResponse } from "../lib/types";
-import { appHref, gotoHref, searchHref, syntaxHref } from "../lib/url";
+import { appHref, gotoHref, searchHref, syntaxHref, versionsHref } from "../lib/url";
 import { highlightHtml } from "../lib/uslm";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
@@ -29,6 +30,20 @@ const offset = Math.max(0, Number(Astro.url.searchParams.get("offset") ?? "0") |
 const params = releaseParams(Astro.url);
 /** Set when the query arrived as `cites <citation>`. */
 const asCites = Astro.url.searchParams.get("cites") === "1";
+
+/** relevance, citation or recent. Anything else is treated as the default
+ *  rather than passed on, so a mistyped URL gets a search rather than a 400. */
+const SORTS = ["relevance", "citation", "recent"] as const;
+const requested = Astro.url.searchParams.get("sort");
+const sort = (SORTS as readonly string[]).includes(requested ?? "")
+  ? (requested as string)
+  : "relevance";
+
+const SORT_LABELS: Record<string, string> = {
+  relevance: "Relevance",
+  citation: "Citation order",
+  recent: "Recently amended",
+};
 
 /** One number, not the three hardcoded copies this page used to keep. It has to
  *  match what the API was asked for, since the pager does the arithmetic. */
@@ -39,7 +54,7 @@ let failure: { status: number; detail: string } | null = null;
 
 if (query) {
   try {
-    data = await fetchSearch(query, { offset, limit: PAGE_SIZE, ...params });
+    data = await fetchSearch(query, { offset, limit: PAGE_SIZE, sort, ...params });
   } catch (error) {
     if (error instanceof ApiError) {
       failure = { status: error.status, detail: error.detail };
@@ -62,12 +77,25 @@ if (query) {
  * text underneath. The line below the heading does change, which is the only
  * reason this was a quiet bug rather than a silent one. */
 function pageHref(nextOffset: number): string {
-  const base = searchHref(query, {
+  return searchHref(query, {
     cites: asCites,
     release: params.release,
     date: params.date,
+    sort,
+    offset: nextOffset,
   });
-  return nextOffset ? `${base}&offset=${nextOffset}` : base;
+}
+
+/** The same search under a different order. Everything else about the moment —
+ *  the release, the `cites` framing — is kept; the offset is not, because page
+ *  three of one ordering is not page three of another. */
+function sortHref(next: string): string {
+  return searchHref(query, {
+    cites: asCites,
+    release: params.release,
+    date: params.date,
+    sort: next,
+  });
 }
 
 const total = data?.total ?? 0;
@@ -125,6 +153,40 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
           )}{" "}
           Words match as typed. <a href={syntaxHref()}>Operators</a> loosen that.
         </p>
+
+        {total > 0 && (
+          <nav class="sortbar" aria-label="Sort results">
+            <span class="sortbar__label" id="sortbar-label">
+              Order
+            </span>
+            <ul class="sortbar__list" aria-labelledby="sortbar-label">
+              {SORTS.map((option) => (
+                <li>
+                  {option === sort ? (
+                    <span class="sortbar__option sortbar__option--on" aria-current="true">
+                      {SORT_LABELS[option]}
+                    </span>
+                  ) : (
+                    <a class="sortbar__option" href={sortHref(option)}>
+                      {SORT_LABELS[option]}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+
+        {data && total > 0 && (
+          <SearchFacets
+            facets={data.facets}
+            query={query}
+            release={params.release}
+            date={params.date}
+            sort={sort}
+            total={total}
+          />
+        )}
 
         {data?.note && (
           <div class="usa-alert usa-alert--info usa-alert--slim" role="status">
@@ -194,8 +256,30 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
                 <p class="searchresult__meta">
                   <code>{result.identifier}</code>
                   {result.type === "structure" && result.level && <> · {result.level}</>}
+                  {result.status && <> · {result.status}</>}
                   {result.first_release && <> · unchanged since {result.first_release}</>}
+                  {/* The words are in text this section no longer carries.
+                      Worth saying: the difference between a provision that
+                      does not mention the subject and one that stopped
+                      mentioning it is most of what a version history is for. */}
+                  {result.earlier_matches > 0 && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <a href={versionsHref(result.identifier)}>
+                        also matched in {result.earlier_matches} earlier{" "}
+                        {result.earlier_matches === 1 ? "version" : "versions"}
+                      </a>
+                    </>
+                  )}
                 </p>
+                {result.id_collision && (
+                  <p class="searchresult__caveat">
+                    The source publishes more than one provision under this identifier at
+                    this release point. The index holds one of them; the section page shows
+                    every occurrence.
+                  </p>
+                )}
                 {body.map((snippet) => (
                   <blockquote class="searchresult__snippet" set:html={highlightHtml(snippet.text)} />
                 ))}

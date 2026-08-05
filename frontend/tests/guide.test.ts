@@ -74,6 +74,7 @@ const INFRASTRUCTURE_ADRS = new Set([
   35, // images from ECR, deploys from Actions
   46, // the per-route JavaScript byte budget — a test harness
   47, // declining a shared cache in front of the spine — a deployment decision
+  51, // the search index rebuilds itself on a mapping change — a deploy step
 ]);
 
 const chapters = readChapters();

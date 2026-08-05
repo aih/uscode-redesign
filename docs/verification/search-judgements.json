@@ -1,0 +1,769 @@
+{
+  "about": "Relevance judgements for the keyword search — ADR-0049. Scored by scripts/search_eval.py.",
+  "grading": {
+    "rubric": {
+      "3": "the provision the query is about — a drafter looking for this would stop here",
+      "2": "on the subject, and would be read",
+      "1": "related; worth a look but not what was asked for",
+      "0": "matches the words without being about the subject"
+    },
+    "graded_by": "Claude Opus 5, session 29, from the num, heading and matched snippet of every pooled candidate",
+    "pooled_from": "the union of the top 12 from every profile in storage/searchquery.py CANDIDATES, so no profile is scored against a set gathered only by another",
+    "corpus": "the full local corpus: 58 titles, 65,938 sections, 489,738 section versions",
+    "off_pool": "Some entries were graded without appearing in any profile's pool — the provision a drafter would name for that query, checked to exist in the corpus by identifier. They are what makes recall@10 mean something: 5 U.S.C. 552 is FOIA and its heading is 'Public information; agency rules, opinions, orders, records, and proceedings', so no profile that reads headings will find it from the words 'freedom of information'.",
+    "known_limit": "grades are one person's reading of a heading and a snippet, not a panel's, and not a reading of the whole section. They are recorded so someone else can disagree with a specific line rather than with the idea of a number."
+  },
+  "queries": [
+    {
+      "q": "wild horses and burros",
+      "intent": "the protection statute",
+      "judgements": {
+        "/us/usc/t16/ch30": 3,
+        "/us/usc/t16/s1331": 3,
+        "/us/usc/t16/s1333": 3,
+        "/us/usc/t16/s1332": 2,
+        "/us/usc/t16/s1334": 2,
+        "/us/usc/t16/s1336": 2,
+        "/us/usc/t16/s1337": 2,
+        "/us/usc/t16/s1338a": 2,
+        "/us/usc/t16/s1340": 2,
+        "/us/usc/t18/s47": 2,
+        "/us/usc/t43/s1901": 1,
+        "/us/usc/t43/s1748c": 0,
+        "/us/usc/t16/s6591e": 0
+      }
+    },
+    {
+      "q": "navigable waters",
+      "intent": "the jurisdictional term of art",
+      "judgements": {
+        "/us/usc/t33/s403": 3,
+        "/us/usc/t33/ch1": 3,
+        "/us/usc/t33/s407": 2,
+        "/us/usc/t33/s403a": 2,
+        "/us/usc/t33": 2,
+        "/us/usc/t33/ch11": 1,
+        "/us/usc/t33/ch23": 1,
+        "/us/usc/t33/s494a": 1,
+        "/us/usc/t33/s535g": 1,
+        "/us/usc/t33/s682": 1,
+        "/us/usc/t16/s804": 1,
+        "/us/usc/t48/s749": 1,
+        "/us/usc/t33/s59mm": 1,
+        "/us/usc/t33/s59ee": 1,
+        "/us/usc/t33/ch9/schV": 1,
+        "/us/usc/t33/s603a": 1
+      }
+    },
+    {
+      "q": "endangered species critical habitat",
+      "intent": "designation of critical habitat",
+      "judgements": {
+        "/us/usc/t16/s1533": 3,
+        "/us/usc/t16/s1532": 2,
+        "/us/usc/t16/s1536": 2,
+        "/us/usc/t16/s410aaa–81b": 0,
+        "/us/usc/t16/s6512": 0,
+        "/us/usc/t43/s2904": 0,
+        "/us/usc/t16/s6511": 0,
+        "/us/usc/t43/s2606": 0,
+        "/us/usc/t16/s6701": 0,
+        "/us/usc/t16/s1390": 0,
+        "/us/usc/t16/s3839": 0,
+        "/us/usc/t16/s1433": 0
+      }
+    },
+    {
+      "q": "freedom of information",
+      "intent": "FOIA itself",
+      "judgements": {
+        "/us/usc/t5/s552": 3,
+        "/us/usc/t10/s130e": 1,
+        "/us/usc/t22/s4415": 1,
+        "/us/usc/t25/s3077": 1,
+        "/us/usc/t22/s4355": 1,
+        "/us/usc/t21/s379f": 1,
+        "/us/usc/t10/s3794": 1,
+        "/us/usc/t10/s2254a": 1,
+        "/us/usc/t10/s130d": 1,
+        "/us/usc/t21/ch9/schVII/ptC/spt1": 1,
+        "/us/usc/t10/s2328": 1,
+        "/us/usc/t22/s7814": 0,
+        "/us/usc/t22/s6217": 0,
+        "/us/usc/t20/s1161e": 0,
+        "/us/usc/t22/s8754": 0,
+        "/us/usc/t15/s4606": 0
+      }
+    },
+    {
+      "q": "habeas corpus",
+      "intent": "the writ and its limits",
+      "judgements": {
+        "/us/usc/t28/s2241": 3,
+        "/us/usc/t28/ptVI/ch153": 3,
+        "/us/usc/t28/s2254": 3,
+        "/us/usc/t28/s2244": 2,
+        "/us/usc/t28/s2253": 2,
+        "/us/usc/t28/s2251": 2,
+        "/us/usc/t28/ptVI/ch154": 2,
+        "/us/usc/t28/s2263": 2,
+        "/us/usc/t25/s1303": 2,
+        "/us/usc/t28/s2266": 1,
+        "/us/usc/t8/s1226a": 1,
+        "/us/usc/t48/s872": 1,
+        "/us/usc/t28a/courtRules/App/tVI": 1
+      }
+    },
+    {
+      "q": "minimum wage",
+      "intent": "the FLSA wage requirement",
+      "judgements": {
+        "/us/usc/t29/s206": 3,
+        "/us/usc/t29/s214": 2,
+        "/us/usc/t29/s203": 1,
+        "/us/usc/t29/s218": 1,
+        "/us/usc/t29/s794g": 1,
+        "/us/usc/t29/s254": 1,
+        "/us/usc/t29/s210": 1,
+        "/us/usc/t41/s6704": 1,
+        "/us/usc/t41/s6703": 0,
+        "/us/usc/t5/s5333": 0,
+        "/us/usc/t20/s1095a": 0,
+        "/us/usc/t23/s113": 0,
+        "/us/usc/t42/s7385s–2": 0,
+        "/us/usc/t38/s3485": 0
+      }
+    },
+    {
+      "q": "national park service",
+      "intent": "the organic act and the service's powers",
+      "judgements": {
+        "/us/usc/t54/s100101": 3,
+        "/us/usc/t16/ch1/schI": 3,
+        "/us/usc/t16/ch79": 2,
+        "/us/usc/t54/s102304": 2,
+        "/us/usc/t54/s101919": 1,
+        "/us/usc/t54/s101121": 1,
+        "/us/usc/t16/s445b": 1,
+        "/us/usc/t16/s346a–6": 1,
+        "/us/usc/t18/s1865": 1,
+        "/us/usc/t16/ch79/schIII": 1,
+        "/us/usc/t54/stIII/dB/sd1": 1,
+        "/us/usc/t54/stIII/dB/sd2": 1,
+        "/us/usc/t16/s470x–6": 1,
+        "/us/usc/t16/s17o": 1,
+        "/us/usc/t16/s5912": 1,
+        "/us/usc/t16/s5958": 1,
+        "/us/usc/t16/s17l": 1,
+        "/us/usc/t40/s8123": 0,
+        "/us/usc/t16/s430g": 0,
+        "/us/usc/t16/s410qqq": 0,
+        "/us/usc/t16/s410eee–2": 0,
+        "/us/usc/t16/s429b": 0,
+        "/us/usc/t16/s410dddd": 0,
+        "/us/usc/t16/s430h–14": 0
+      }
+    },
+    {
+      "q": "national ambient air quality standards",
+      "intent": "the Clean Air Act standards",
+      "judgements": {
+        "/us/usc/t42/s7409": 3,
+        "/us/usc/t42/s7410": 3,
+        "/us/usc/t42/s7408": 2,
+        "/us/usc/t42/s7407": 2,
+        "/us/usc/t42/s7619": 1,
+        "/us/usc/t42/s7406": 1,
+        "/us/usc/t42/s7470": 1,
+        "/us/usc/t42/s7514": 1,
+        "/us/usc/t42/s7509a": 1,
+        "/us/usc/t42/s7412": 0,
+        "/us/usc/t42/s7415": 0,
+        "/us/usc/t42/s7627": 0,
+        "/us/usc/t42/s7405": 0,
+        "/us/usc/t10/s2259": 0,
+        "/us/usc/t23/s109": 0,
+        "/us/usc/t42/s6295": 0,
+        "/us/usc/t42/s13369": 0
+      }
+    },
+    {
+      "q": "whistleblower protection",
+      "intent": "protection from reprisal for disclosure",
+      "judgements": {
+        "/us/usc/t5/s2302": 3,
+        "/us/usc/t51/s30502": 2,
+        "/us/usc/t15/s2087": 2,
+        "/us/usc/t50/s2702": 2,
+        "/us/usc/t10/s6242": 2,
+        "/us/usc/t15/s78u–6": 2,
+        "/us/usc/t7/s26": 2,
+        "/us/usc/t6/s625": 2,
+        "/us/usc/t49/stVII/ptA/sptii/ch421/schIII": 2,
+        "/us/usc/t42/ch73/schII": 2,
+        "/us/usc/t38/s323": 1,
+        "/us/usc/t15/s78u–7": 1,
+        "/us/usc/t38/s735": 1,
+        "/us/usc/t38/s733": 1
+      }
+    },
+    {
+      "q": "just compensation",
+      "intent": "compensation for a taking",
+      "judgements": {
+        "/us/usc/t40/s3114": 3,
+        "/us/usc/t40/s3116": 2,
+        "/us/usc/t42/s2221": 2,
+        "/us/usc/t54/s100735": 2,
+        "/us/usc/t42/s2075": 1,
+        "/us/usc/t16/s1910": 1,
+        "/us/usc/t43/s1200a": 1,
+        "/us/usc/t33/s595": 1,
+        "/us/usc/t35/s183": 1,
+        "/us/usc/t46/s56303": 1,
+        "/us/usc/t46/s56304": 1,
+        "/us/usc/t43/s945a": 1,
+        "/us/usc/t42/s2187": 0,
+        "/us/usc/t25/s325": 0,
+        "/us/usc/t7/s7716": 0,
+        "/us/usc/t10/s7676": 0,
+        "/us/usc/t38/s1315": 0
+      }
+    },
+    {
+      "q": "social security disability insurance",
+      "intent": "disability benefits",
+      "judgements": {
+        "/us/usc/t42/s423": 3,
+        "/us/usc/t42/s421": 2,
+        "/us/usc/t42/s424a": 2,
+        "/us/usc/t42/s901": 1,
+        "/us/usc/t42/s1320b–13": 0,
+        "/us/usc/t42/s903": 0,
+        "/us/usc/t42/s907a": 0,
+        "/us/usc/t2/s939": 0,
+        "/us/usc/t42/s1320b–15": 0,
+        "/us/usc/t5/s8349": 0,
+        "/us/usc/t5/s8452": 0,
+        "/us/usc/t42/s910": 0
+      }
+    },
+    {
+      "q": "automatic stay",
+      "intent": "the bankruptcy stay",
+      "judgements": {
+        "/us/usc/t11/s362": 3,
+        "/us/usc/t11/s922": 2,
+        "/us/usc/t11/s1301": 2,
+        "/us/usc/t48/s2194": 2,
+        "/us/usc/t11/s361": 1,
+        "/us/usc/t11/s901": 1,
+        "/us/usc/t11/s742": 1,
+        "/us/usc/t11/s1110": 1,
+        "/us/usc/t11/s108": 0,
+        "/us/usc/t18/s3626": 0,
+        "/us/usc/t12/s4583": 0,
+        "/us/usc/t12/s4634": 0,
+        "/us/usc/t26/s7433": 0
+      }
+    },
+    {
+      "q": "fair use",
+      "intent": "the copyright limitation",
+      "judgements": {
+        "/us/usc/t17/s107": 3,
+        "/us/usc/t15/s643": 0,
+        "/us/usc/t42/s3616a": 0,
+        "/us/usc/t26/s6304": 0,
+        "/us/usc/t15/s7246": 0,
+        "/us/usc/t42/s300gg": 0,
+        "/us/usc/t22/s262p–4p": 0,
+        "/us/usc/t43/s1905": 0,
+        "/us/usc/t16/s251h": 0,
+        "/us/usc/t7/s1339": 0,
+        "/us/usc/t16/s460lll–25": 0,
+        "/us/usc/t16/s1441": 0,
+        "/us/usc/t25/s640d–15": 0
+      }
+    },
+    {
+      "q": "patent term extension",
+      "intent": "extension of a patent's term",
+      "judgements": {
+        "/us/usc/t35/s156": 3,
+        "/us/usc/t35/s155, 155A": 1,
+        "/us/usc/t35/s155 /us/usc/t35/s155A": 1,
+        "/us/usc/t21/s355": 1,
+        "/us/usc/t21/s355a": 1,
+        "/us/usc/t35/s41": 0,
+        "/us/usc/t35/s271": 0,
+        "/us/usc/t35/s282": 0,
+        "/us/usc/t15/s278k": 0,
+        "/us/usc/t15/s1141k": 0,
+        "/us/usc/t15/s1141": 0,
+        "/us/usc/t15/s1051": 0,
+        "/us/usc/t35/s119": 0
+      }
+    },
+    {
+      "q": "asylum",
+      "intent": "eligibility for asylum",
+      "judgements": {
+        "/us/usc/t8/s1158": 3,
+        "/us/usc/t8/s1225": 2,
+        "/us/usc/t22/s7842": 1,
+        "/us/usc/t8/s1377": 1,
+        "/us/usc/t8/s1802": 1,
+        "/us/usc/t8/s1808": 1,
+        "/us/usc/t8/s1810": 1,
+        "/us/usc/t22/s6473": 1,
+        "/us/usc/t22/s6474": 1,
+        "/us/usc/t22/ch73/schIV": 1,
+        "/us/usc/t24/s17": 0,
+        "/us/usc/t22/s7841": 0
+      }
+    },
+    {
+      "q": "medicare reimbursement",
+      "intent": "payment to providers",
+      "judgements": {
+        "/us/usc/t42/s1395l": 3,
+        "/us/usc/t42/s1395ww": 3,
+        "/us/usc/t42/s1395w–23": 2,
+        "/us/usc/t42/s1395b–6": 1,
+        "/us/usc/t42/s1395i–4": 1,
+        "/us/usc/t42/s1315a": 1,
+        "/us/usc/t42/s1395y": 1,
+        "/us/usc/t42/s1395w–114a": 1,
+        "/us/usc/t42/s1395w–131": 1,
+        "/us/usc/t42/s1395ss": 0,
+        "/us/usc/t42/s1395rr–1": 0,
+        "/us/usc/t42/s1395w–141": 0,
+        "/us/usc/t42/s1320a–7m": 0,
+        "/us/usc/t42/s1320b–14": 0,
+        "/us/usc/t10/s1085": 0
+      }
+    },
+    {
+      "q": "money laundering",
+      "intent": "the offence",
+      "judgements": {
+        "/us/usc/t18/s1956": 3,
+        "/us/usc/t18/s1957": 2,
+        "/us/usc/t31/s5318A": 2,
+        "/us/usc/t31/stIV/ch53/schIII": 2,
+        "/us/usc/t31/s5341": 1,
+        "/us/usc/t31/s5342": 1,
+        "/us/usc/t31/s5354": 1,
+        "/us/usc/t31/s5334": 1,
+        "/us/usc/t21/ch28A/schII": 1,
+        "/us/usc/t12/s1772d": 1,
+        "/us/usc/t12/s5908": 1,
+        "/us/usc/t12/s5907": 1,
+        "/us/usc/t21/s2313a": 1,
+        "/us/usc/t22/s9221": 1,
+        "/us/usc/t31/stIV/ch53/schIII/pt1": 1,
+        "/us/usc/t22/s262p–13": 0
+      }
+    },
+    {
+      "q": "insider trading",
+      "intent": "securities fraud on inside information",
+      "judgements": {
+        "/us/usc/t15/s78u–1": 3,
+        "/us/usc/t15/s78t–1": 3,
+        "/us/usc/t15/s78j": 2,
+        "/us/usc/t15/s7244": 2,
+        "/us/usc/t15/s78f": 0,
+        "/us/usc/t15/s78a": 0,
+        "/us/usc/t7/s2": 0,
+        "/us/usc/t15/s77b–1": 0,
+        "/us/usc/t15/s78c–1": 0,
+        "/us/usc/t12/s5908": 0,
+        "/us/usc/t7/s13": 0,
+        "/us/usc/t12/s5904": 0
+      }
+    },
+    {
+      "q": "controlled substances schedules",
+      "intent": "the drug schedules and how they are set",
+      "judgements": {
+        "/us/usc/t21/s812": 3,
+        "/us/usc/t21/s811": 3,
+        "/us/usc/t21/s826": 1,
+        "/us/usc/t21/s952": 1,
+        "/us/usc/t21/s953": 1,
+        "/us/usc/t21/s954": 1,
+        "/us/usc/t21/s823": 1,
+        "/us/usc/t21/s829a": 0,
+        "/us/usc/t21/s828": 0,
+        "/us/usc/t21/s881": 0,
+        "/us/usc/t10/s912a": 0,
+        "/us/usc/t26/s280E": 0,
+        "/us/usc/t18/s1791": 0,
+        "/us/usc/t42/s12111": 0,
+        "/us/usc/t22/s2291j–1": 0,
+        "/us/usc/t22/s2291h": 0
+      }
+    },
+    {
+      "q": "tribal trust land",
+      "intent": "land held in trust for a tribe",
+      "judgements": {
+        "/us/usc/t25/s5108": 3,
+        "/us/usc/t25/s5138": 2,
+        "/us/usc/t25/s5103": 2,
+        "/us/usc/t25/s2216": 2,
+        "/us/usc/t25/ch51": 2,
+        "/us/usc/t25/s5104": 1,
+        "/us/usc/t25/s5614": 1,
+        "/us/usc/t25/s1466": 1,
+        "/us/usc/t25/s1495": 1,
+        "/us/usc/t25/s1778d": 1,
+        "/us/usc/t25/s715c": 1,
+        "/us/usc/t25/s564w–2": 1,
+        "/us/usc/t25/s1041e": 1,
+        "/us/usc/t25/s3115a": 0,
+        "/us/usc/t25/s5322": 0,
+        "/us/usc/t23/s202": 0,
+        "/us/usc/t33/s2269": 0,
+        "/us/usc/t43/s1629h": 0,
+        "/us/usc/t16/s281b": 0,
+        "/us/usc/t42/s15943": 0,
+        "/us/usc/t25/s1779d": 0,
+        "/us/usc/t25/s941i": 0,
+        "/us/usc/t25/s1776d": 0,
+        "/us/usc/t25/s1773a": 0
+      }
+    },
+    {
+      "q": "veterans disability compensation",
+      "intent": "compensation for service-connected disability",
+      "judgements": {
+        "/us/usc/t38/s1110": 3,
+        "/us/usc/t38/s1114": 3,
+        "/us/usc/t38/s1117": 2,
+        "/us/usc/t38/s1156": 2,
+        "/us/usc/t38/s110": 2,
+        "/us/usc/t38/s1161": 2,
+        "/us/usc/t38/s546": 1,
+        "/us/usc/t10/s1414": 1,
+        "/us/usc/t10/s1212": 1,
+        "/us/usc/t38/s1922B": 0,
+        "/us/usc/t38/s5503": 0,
+        "/us/usc/t22/s4048": 0,
+        "/us/usc/t42/s417": 0,
+        "/us/usc/t26/s104": 0,
+        "/us/usc/t31/s3330": 0
+      }
+    },
+    {
+      "q": "wire fraud",
+      "intent": "the offence",
+      "judgements": {
+        "/us/usc/t18/s1343": 3,
+        "/us/usc/t18/s1961": 1,
+        "/us/usc/t18/s981": 1,
+        "/us/usc/t18/s982": 1,
+        "/us/usc/t18/s1029": 0,
+        "/us/usc/t18/s1028A": 0,
+        "/us/usc/t18/s2516": 0,
+        "/us/usc/t18/s2703": 0,
+        "/us/usc/t18/s1956": 0,
+        "/us/usc/t15/s45e": 0,
+        "/us/usc/t12/s4003": 0,
+        "/us/usc/t31/s5311": 0,
+        "/us/usc/t21/s843": 0
+      }
+    },
+    {
+      "q": "employment discrimination",
+      "intent": "the unlawful employment practices",
+      "judgements": {
+        "/us/usc/t42/s2000e–2": 3,
+        "/us/usc/t42/s2000e–3": 3,
+        "/us/usc/t42/s12112": 2,
+        "/us/usc/t29/s623": 2,
+        "/us/usc/t29/ch14": 2,
+        "/us/usc/t42/s1981a": 2,
+        "/us/usc/t42/ch21F": 2,
+        "/us/usc/t42/s2000ff–2": 1,
+        "/us/usc/t42/s2000e–4": 1,
+        "/us/usc/t29/s793": 1,
+        "/us/usc/t5/s7702": 1,
+        "/us/usc/t38/s319": 1,
+        "/us/usc/t2/ch24/schII/ptA": 1,
+        "/us/usc/t3/ch5/schII/ptA": 1,
+        "/us/usc/t38/s516": 0,
+        "/us/usc/t47/s554": 0,
+        "/us/usc/t34/s50104": 0
+      }
+    },
+    {
+      "q": "environmental impact statement",
+      "intent": "the NEPA requirement",
+      "judgements": {
+        "/us/usc/t42/s4332": 3,
+        "/us/usc/t42/s8473": 2,
+        "/us/usc/t54/s306111": 1,
+        "/us/usc/t42/s10247": 1,
+        "/us/usc/t43/s2006": 1,
+        "/us/usc/t42/s7301": 1,
+        "/us/usc/t42/s7274": 1,
+        "/us/usc/t22/s262m–5": 1,
+        "/us/usc/t42/s4336f": 1,
+        "/us/usc/t16/s6514": 1,
+        "/us/usc/t21/s379o": 0,
+        "/us/usc/t15/s720b": 0,
+        "/us/usc/t22/s9611": 0,
+        "/us/usc/t49/s310": 0,
+        "/us/usc/t49/s304a": 0,
+        "/us/usc/t49/s47171": 0
+      }
+    },
+    {
+      "q": "grazing permits",
+      "intent": "permits on the public lands",
+      "judgements": {
+        "/us/usc/t43/s315b": 3,
+        "/us/usc/t43/s1752": 3,
+        "/us/usc/t16/s580l": 2,
+        "/us/usc/t43/s1751": 2,
+        "/us/usc/t16/s460uu–3": 1,
+        "/us/usc/t16/s272b": 1,
+        "/us/usc/t16/s273b": 1,
+        "/us/usc/t43/s315c": 1,
+        "/us/usc/t43/s315o–1": 1,
+        "/us/usc/t43/s315q": 1,
+        "/us/usc/t43/s1781a": 1,
+        "/us/usc/t43/s1908": 1,
+        "/us/usc/t43/s1905": 1,
+        "/us/usc/t16/s406d–2": 0,
+        "/us/usc/t16/s45c": 0,
+        "/us/usc/t16/s410mm–1": 0
+      }
+    },
+    {
+      "q": "commodity futures",
+      "intent": "regulation of futures trading",
+      "judgements": {
+        "/us/usc/t7/s6": 3,
+        "/us/usc/t7/s2": 3,
+        "/us/usc/t7/s6k": 2,
+        "/us/usc/t7/s12a": 2,
+        "/us/usc/t7/s21": 2,
+        "/us/usc/t7/s6n": 1,
+        "/us/usc/t7/s15b": 1,
+        "/us/usc/t7/s16a": 1,
+        "/us/usc/t7/s6m": 1,
+        "/us/usc/t7/s6j": 1,
+        "/us/usc/t7/s13–1": 1,
+        "/us/usc/t7/s24": 1,
+        "/us/usc/t7/s26": 0,
+        "/us/usc/t26/s1234B": 0,
+        "/us/usc/t15/s8306": 0,
+        "/us/usc/t15/s8302": 0,
+        "/us/usc/t7/s27d": 0
+      }
+    },
+    {
+      "q": "coastal zone management",
+      "intent": "the management programme",
+      "judgements": {
+        "/us/usc/t16/ch33": 3,
+        "/us/usc/t16/s1455": 3,
+        "/us/usc/t16/s1456": 3,
+        "/us/usc/t16/s1456a": 2,
+        "/us/usc/t16/s1462": 2,
+        "/us/usc/t16/s1456b": 2,
+        "/us/usc/t16/s1455a": 2,
+        "/us/usc/t16/s1455b": 1,
+        "/us/usc/t16/s1460": 1,
+        "/us/usc/t16/s1456–1": 1,
+        "/us/usc/t16/s1456d": 1,
+        "/us/usc/t16/s3503": 0,
+        "/us/usc/t16/s5103": 0,
+        "/us/usc/t16/s5104": 0,
+        "/us/usc/t42/s9115": 0,
+        "/us/usc/t33/s1508": 0,
+        "/us/usc/t43/s1356a": 0
+      }
+    },
+    {
+      "q": "hazardous substance liability",
+      "intent": "CERCLA liability for cleanup",
+      "judgements": {
+        "/us/usc/t42/s9607": 3,
+        "/us/usc/t33/s1321": 2,
+        "/us/usc/t42/s9656": 2,
+        "/us/usc/t42/s9614": 1,
+        "/us/usc/t26/s9507": 1,
+        "/us/usc/t42/s6924": 0,
+        "/us/usc/t42/s7412": 0,
+        "/us/usc/t26/s4611": 0,
+        "/us/usc/t43/s869–2": 0,
+        "/us/usc/t26/s198": 0,
+        "/us/usc/t14/s335": 0,
+        "/us/usc/t16/s460lll–46": 0
+      }
+    },
+    {
+      "q": "monopolization",
+      "intent": "the antitrust offence",
+      "judgements": {
+        "/us/usc/t15/s2": 3,
+        "/us/usc/t15/s1": 2,
+        "/us/usc/t7/s292": 2,
+        "/us/usc/t15/s522": 2,
+        "/us/usc/t15/s1311": 1,
+        "/us/usc/t15/s57b–1": 0,
+        "/us/usc/t16/s832a": 0,
+        "/us/usc/t16/s833a": 0,
+        "/us/usc/t33/s1503": 0,
+        "/us/usc/t5/s601": 0
+      }
+    },
+    {
+      "q": "fishery management council",
+      "intent": "the regional councils",
+      "judgements": {
+        "/us/usc/t16/s1852": 3,
+        "/us/usc/t16/s1853": 2,
+        "/us/usc/t16/s1851": 2,
+        "/us/usc/t16/s460ss–2": 1,
+        "/us/usc/t16/s5104": 1,
+        "/us/usc/t16/s3343": 0,
+        "/us/usc/t46/s12113": 0,
+        "/us/usc/t16/s1822": 0,
+        "/us/usc/t16/s1823": 0,
+        "/us/usc/t16/s1891b": 0,
+        "/us/usc/t16/s1881": 0,
+        "/us/usc/t16/s3602": 0,
+        "/us/usc/t15/s713c–3": 0,
+        "/us/usc/t16/s7002": 0,
+        "/us/usc/t16/s7702": 0,
+        "/us/usc/t16/s6453": 0
+      }
+    },
+    {
+      "q": "nuclear reactor license",
+      "intent": "licensing a reactor",
+      "judgements": {
+        "/us/usc/t42/s2133": 3,
+        "/us/usc/t42/s2232": 3,
+        "/us/usc/t42/s2242": 2,
+        "/us/usc/t42/s16014": 1,
+        "/us/usc/t42/s2074": 0,
+        "/us/usc/t42/s2215": 0,
+        "/us/usc/t42/s16024": 0,
+        "/us/usc/t42/s10222": 0,
+        "/us/usc/t42/s16281": 0,
+        "/us/usc/t42/s10198": 0,
+        "/us/usc/t22/s3224a": 0,
+        "/us/usc/t42/s2160d": 0
+      }
+    },
+    {
+      "q": "crop insurance",
+      "intent": "the federal programme",
+      "judgements": {
+        "/us/usc/t7/s1508": 3,
+        "/us/usc/t7/ch36": 3,
+        "/us/usc/t7/ch36/schI": 2,
+        "/us/usc/t7/s1503": 2,
+        "/us/usc/t7/s1508c": 2,
+        "/us/usc/t7/s1508a": 2,
+        "/us/usc/t7/s7034": 1,
+        "/us/usc/t7/s2008f": 1,
+        "/us/usc/t7/s7333": 1,
+        "/us/usc/t18/s1903": 0,
+        "/us/usc/t18/s1014": 0,
+        "/us/usc/t16/s590l": 0,
+        "/us/usc/t12/s2218": 0,
+        "/us/usc/t2/s661e": 0
+      }
+    },
+    {
+      "q": "\"national wildlife refuge system\"",
+      "intent": "a phrase search for the system itself",
+      "judgements": {
+        "/us/usc/t16/s668dd": 3,
+        "/us/usc/t16/s459h–6": 1,
+        "/us/usc/t22/s277d–39": 1,
+        "/us/usc/t16/s1a–7b": 1,
+        "/us/usc/t16/s715s": 1,
+        "/us/usc/t16/s742f": 1,
+        "/us/usc/t16/s3212": 0,
+        "/us/usc/t16/s4405": 0,
+        "/us/usc/t43/s1629g–1": 0,
+        "/us/usc/t16/s742f–1": 0,
+        "/us/usc/t42/s15813": 0,
+        "/us/usc/t16/s3149": 0
+      }
+    },
+    {
+      "q": "posse comitatus",
+      "intent": "a two-word term of art with one home",
+      "judgements": {
+        "/us/usc/t18/s1385": 3,
+        "/us/usc/t6/s466": 2,
+        "/us/usc/t25/s219 to 226": 0,
+        "/us/usc/t25/s219...226": 0,
+        "/us/usc/t42/s1989": 0,
+        "/us/usc/t48/s1422": 0,
+        "/us/usc/t48/s1591": 0,
+        "/us/usc/t10/s714": 0,
+        "/us/usc/t21/s801": 0,
+        "/us/usc/t10/s113": 0
+      }
+    },
+    {
+      "q": "1331 wild horses",
+      "intent": "a section number alongside a subject word — what the num field is for",
+      "judgements": {
+        "/us/usc/t16/s1331": 3,
+        "/us/usc/t43/s1901": 0,
+        "/us/usc/t16/s460dddd": 0
+      }
+    },
+    {
+      "q": "668dd refuge system",
+      "intent": "a section number alongside a subject word — what the num field is for",
+      "judgements": {
+        "/us/usc/t16/s668dd": 3,
+        "/us/usc/t16/s1431": 1,
+        "/us/usc/t16/s742f": 1,
+        "/us/usc/t16/s410hhh–4": 0,
+        "/us/usc/t16/s3212": 0,
+        "/us/usc/t16/s742f–1": 0,
+        "/us/usc/t16/s668ff...668jj": 0,
+        "/us/usc/t16/s668ff to 668jj": 0,
+        "/us/usc/t16/s668kk...668ss": 0,
+        "/us/usc/t16/s668kk to 668ss": 0,
+        "/us/usc/t16/s459j–4": 0,
+        "/us/usc/t16/s5207": 0
+      }
+    },
+    {
+      "q": "civil forfeiture",
+      "intent": "forfeiture of property in a civil action",
+      "judgements": {
+        "/us/usc/t18/s981": 3,
+        "/us/usc/t18/s983": 3,
+        "/us/usc/t18/s985": 2,
+        "/us/usc/t18/s984": 2,
+        "/us/usc/t18/s2254": 1,
+        "/us/usc/t28/s1355": 1,
+        "/us/usc/t18/s987": 1,
+        "/us/usc/t28/s1395": 1,
+        "/us/usc/t30/s1466": 1,
+        "/us/usc/t18/s1467": 0,
+        "/us/usc/t18/s2253": 0,
+        "/us/usc/t18/s2323": 0,
+        "/us/usc/t16/s3374": 0,
+        "/us/usc/t16/s470aaa–7": 0,
+        "/us/usc/t16/s773f": 0
+      }
+    }
+  ]
+}
