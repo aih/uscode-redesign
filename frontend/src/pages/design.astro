@@ -43,8 +43,12 @@ import ChapterRail from "../components/ChapterRail.astro";
 import CitationNotFound from "../components/CitationNotFound.astro";
 import CopyColumn from "../components/CopyColumn.astro";
 import NoResults from "../components/NoResults.astro";
+import Neighbors from "../components/Neighbors.astro";
 import ReleaseContext from "../components/ReleaseContext.astro";
+import ReleasePicker from "../components/ReleasePicker.astro";
+import SearchFacets from "../components/SearchFacets.astro";
 import SearchResult from "../components/SearchResult.astro";
+import SectionBar from "../components/SectionBar.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import Timeline from "../components/Timeline.astro";
 import COLOR_PAIRS from "../data/color-pairs.json";
@@ -201,6 +205,26 @@ const VERSIONS: VersionEntry[] = [
   },
 ];
 
+/** The neighbours of § 2, and the subdivision above it — what `SectionBar` and
+ *  `Neighbors` step through. */
+const PREVIOUS: Entry = RAIL_ENTRIES[0];
+const NEXT: Entry = RAIL_ENTRIES[2];
+
+/** Counts over a whole result set, which is what makes a facet worth reading.
+ *  The query carries `title:16`, so that value renders as the applied filter —
+ *  the one pill on the site painted `--danger-ink` on `--link`. */
+const FACETS = {
+  titles: [
+    { value: "16", count: 118 },
+    { value: "42", count: 64 },
+    { value: "7", count: 12 },
+  ],
+  statuses: [
+    { value: "none", count: 180 },
+    { value: "repealed", count: 14 },
+  ],
+};
+
 const RESULTS: SearchResultItem[] = [
   {
     identifier: "/us/usc/t0/s1",
@@ -302,7 +326,9 @@ const TYPE_ROLES = [
   <p class="lede">
     Every part the reader is built from, on one page, rendered by the same components the rest
     of the site renders. The type, the palette with its measured contrast, the focus ring, the
-    status badges, the navigation chrome, and each message the site can put in front of you.
+    status badges, the navigation chrome and the release switcher, the version timeline and the
+    redline, the copy control, a search result row with its facets, and each message the site can
+    put in front of you.
   </p>
 
   <p>
@@ -527,6 +553,69 @@ const TYPE_ROLES = [
     />
   </div>
 
+  <p class="spec__label">Section bar</p>
+
+  <p>
+    The one row that stays put while the text scrolls, and below 40em the only thing that does.
+    Each step names its neighbour from 40em up; below that the arrow stands alone, because this
+    row may not wrap. A section at the edge of its subdivision has nothing to step to and the
+    arrow greys out rather than disappearing, so the row keeps its shape.
+  </p>
+
+  <div class="spec">
+    <SectionBar
+      num="§ 2."
+      heading="Second specimen"
+      status="repealed"
+      previous={PREVIOUS}
+      next={NEXT}
+      up={RAIL_PARENT}
+      release="119-102not101"
+    />
+  </div>
+
+  <div class="spec">
+    <SectionBar
+      num="§ 1."
+      heading="The only section in its subdivision — both steps off"
+      up={RAIL_PARENT}
+      release="119-102not101"
+    />
+  </div>
+
+  <p class="spec__label">Neighbours</p>
+
+  <p>
+    The same two exits at the foot of the page, with their headings and their badges. A repealed
+    or omitted neighbour is shown rather than skipped: it keeps its place in the Code's reading
+    order, and a reader who cannot see the gap cannot tell a repeal from a renumbering. The second
+    specimen is the last section of a subdivision, which has a previous and no next.
+  </p>
+
+  <div class="spec">
+    <Neighbors previous={PREVIOUS} next={NEXT} release="119-102not101" />
+  </div>
+
+  <div class="spec">
+    <Neighbors previous={NEXT} release="119-102not101" />
+  </div>
+
+  <p class="spec__label">Release switcher</p>
+
+  <p>
+    Two GET forms, no scripting: the newest text, a named release point, or a date. Two rather
+    than one because <code>?release=</code> beats <code>?date=</code> when both arrive, so a single
+    form would silently ignore whichever control the reader had just set.
+  </p>
+
+  <div class="spec">
+    <ReleasePicker
+      action={appHref("/us/usc/t0/s1")}
+      options={[RP_NEW, RP_OLD]}
+      selected="119-102not101"
+    />
+  </div>
+
   <p class="spec__label">Release context</p>
 
   <p>
@@ -594,6 +683,19 @@ const TYPE_ROLES = [
   <ul class="toc searchresults spec">
     {RESULTS.map((result) => <SearchResult result={result} />)}
   </ul>
+
+  <p class="spec__label">Facets</p>
+
+  <p>
+    A facet is a link that edits the query rather than a control beside it, so the URL of a
+    filtered search is the whole search. Counts are over the entire result set, not the page. The
+    applied filter is the filled pill — the one place on the site that paints
+    <code>--danger-ink</code> on <code>--link</code>.
+  </p>
+
+  <div class="spec">
+    <SearchFacets facets={FACETS} query="conservation title:16" total={194} />
+  </div>
 
   {/* -------------------------------------------------------------- messages */}
   <h2 class="toc-group" id="messages">Messages</h2>

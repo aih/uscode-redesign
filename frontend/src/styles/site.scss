@@ -3611,6 +3611,28 @@ main[id] {
   margin-left: 0;
 }
 
+/* Two components that pin themselves in place, shown here where they are
+ * written instead.
+ *
+ * Below 40em `.sectionbar` is the one thing on a reader page that sticks, at
+ * `top: 0` with a z-index over everything — so a specimen of it in the page
+ * flow would detach on a phone and follow the reader down the design page,
+ * over whatever it passed. The specimen is a picture of the row, not a second
+ * copy of the chrome. */
+.spec .sectionbar {
+  position: static;
+  z-index: auto;
+}
+
+/* `.neighbors` separates itself from the statutory text above it with 2.5rem
+ * and a rule. Inside a specimen frame there is nothing above it to be separated
+ * from, and the margin is an empty half of the box. */
+.spec .neighbors {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 /* The failure card, shown in the flow rather than in the top layer. The live
  * one is a `popover` and therefore `position: fixed`; a specimen of it has to
  * sit where it is written. */
