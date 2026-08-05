@@ -858,7 +858,16 @@ main[id] {
   justify-content: space-between;
 }
 
-.contextbar .usa-breadcrumb {
+/* The breadcrumb takes the colour of whatever it is placed on.
+ *
+ * USWDS paints it `$theme-breadcrumb-background-color`, which is a compile-time
+ * value assuming a light page while the theme is chosen at runtime (ADR-0027) —
+ * so left alone it is a white slab on a dark page, with `--ink` written on it.
+ * This rule used to be scoped to `.contextbar`, which was every use of the
+ * component until `/app/design` rendered one outside the sticky chrome and the
+ * slab came back. A component whose colours depend on an ancestor class it does
+ * not own is a component that is right in one place. */
+.usa-breadcrumb {
   background: transparent;
   padding: 0;
   margin: 0;
@@ -1595,6 +1604,18 @@ main[id] {
    * icon here would read as "× repealed" to the one group of readers who
    * needed no help distinguishing them. */
   border: 2px solid transparent;
+
+  /* The neutral pill is the *default*, not a case (gotcha 13: the status set is
+   * not closed). A status this file has never heard of used to fall through to
+   * USWDS's own `.usa-tag` — a filled badge in `base-dark`, a colour the
+   * palette does not name and `docs/verification/contrast.json` therefore never
+   * measured, carrying the same visual emphasis as `repealed`. An unknown
+   * status is not an emphatic one; it is a word this site cannot interpret, and
+   * printing the word is the whole of what it can honestly do. Seen on
+   * `/app/design`, which is the only page that renders one (ADR-0053). */
+  background-color: transparent;
+  color: var(--ink);
+  border-color: var(--ink);
 }
 
 .status-tag--repealed,
@@ -1614,17 +1635,9 @@ main[id] {
 }
 
 /* Gotcha 13: the status set is not closed — USLM 2.x adds `renumbered`, and a
- * subchapter can be `reserved`. These three are the ones the source is known to
- * emit; anything else keeps the plain pill, still with its word printed, which
- * is the part that actually carries the meaning. */
-.status-tag--transferred,
-.status-tag--renumbered,
-.status-tag--reserved {
-  background-color: transparent;
-  color: var(--ink);
-  border-color: var(--ink);
-}
-
+ * subchapter can be `reserved`. These are the ones the source is known to emit
+ * and they take the neutral pill set above, each with its own border, so the
+ * distinction survives a monochrome print. */
 .status-tag--reserved {
   border-style: dashed;
 }
