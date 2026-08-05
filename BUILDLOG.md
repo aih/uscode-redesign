@@ -1090,3 +1090,102 @@ Session-by-session record of how this site was built. One entry per working sess
     then 200 on every subsequent request. Worth a look when B3 measures it.
   - `docs/verification/loadtest.json` is now stale for a fourth reason — ADR-0043's extra API call
     per section view — on top of ADR-0029, ADR-0026 and ADR-0037. B3 owns it.
+
+## 046 — 2026-08-04 — Session 28: B3 phase 1, and the wait is not the server's
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Workstream B task B3 — navigation speed. Explicitly the **measure half only**: regenerate
+  `docs/verification/loadtest.json` against the deployed box, add a navigation profile distinct from
+  the load profile, report the numbers and a recommendation, and stop before any fix. Three problems
+  in the task were handed over to be resolved rather than papered over: the rate limiters would shape
+  the results, "the five journeys in the test plan" is a forward reference to a document that does not
+  exist, and per-surface attribution needs something that does not exist either.
+- **Decided:**
+  - **Every load-test row names the limiter that governs it, and whether it was held inside that
+    budget or driven past it.** B3's `-n 500 -c 20` against ADR-0029's budgets does not measure the
+    site, it measures ADR-0029 — and badly, because 429s are produced in microseconds and read as a
+    throughput *improvement* on whichever route shed the most. A limited route now gets two rows:
+    `hey -q` holds a "within" row under the bucket's refill rate so the row describes the route, and
+    an "over" row exceeds it on purpose so the row describes the shedding. Unlimited routes carry a
+    null limiter and are the only ones whose throughput describes a route.
+  - **The five journeys are derived from `docs/ia-map.md`'s "Exits to" column**, and each carries its
+    derivation string into the artifact rather than citing a test plan this repository does not have:
+    spine, citation, search, read-along, compare.
+  - **Per-surface attribution is measured, not inferred.** The box is SSM-only, so `navprofile.py`
+    ships itself there and times the *same path* at four nested vantages — the internet, Caddy over
+    loopback via `--resolve` (same host, same TLS, same virtual host), the Astro container, the
+    FastAPI container. Every subtraction is between two measurements that differ by one layer.
+  - **No SQL is written into the query profile.** `spine_explain.py` attaches a
+    `before_cursor_execute` listener, runs `PostgresRepository`'s own spine calls, and re-runs each
+    captured statement under `EXPLAIN (ANALYZE, BUFFERS)` with the same parameters. What is explained
+    is what was executed, by construction — the property ADR-0040 gives the USLM partition.
+  - **A journey is timed on one connection**, because a browser reuses one; the first step of each
+    journey pays the TLS handshake and `connects` is recorded so a slow first step is not read as a
+    slow page.
+  - **Recommendation carried to the human, not acted on.** The numbers reorder B3's list: fixes 1, 2
+    and 4 all target the API/Postgres side, which is 37 ms of a 78 ms origin inside an 823 ms journey.
+    Proposed doing fix 4 (one index), fix 3 (the byte budget), and the measured half of fix 2 (drop
+    `/api/v1/releases?title=` from the per-view fan-out); proposed **not** building a Caddy cache
+    layer for fix 1, because the headers are already correct for a shared cache and what is missing is
+    a shared cache to read them, which is a deployment decision rather than a code one.
+- **Produced:** `scripts/navprofile.py`, `scripts/spine_explain.py`, `scripts/spine_explain.sh`;
+  `make navprofile` and `make spine-explain`; a rewritten `scripts/loadtest.sh`;
+  `docs/verification/{loadtest,navprofile,spine-explain}.json`. Branch
+  `workstream-b-navigation-ia`, 3 commits on top of session 27's seven.
+- **Verified:**
+  - `make test` — 486 passed. `make test-web` — 227 passed. `make test-e2e` was **not** run: this
+    session changed no application source, only scripts and artifacts. It runs before B3's fix half is
+    called done.
+  - **A reader's four clicks down the spine cost 823 ms, of which 221 ms is the origin and 601 ms
+    (73%) is the network.** Re-check: `jq '.attribution'` over `navprofile.json`.
+  - **Section page, warm p50, by layer:** 117 ms internet and TLS, **41 ms Astro's own render**, 37 ms
+    for the five API calls' critical path, ~3 ms of that in Postgres, and Caddy the remainder.
+    **Caddy's own share is at the resolution limit of this method and cannot be stated more precisely
+    than "small":** across the twelve warm steps it ranges 0.3–11.1 ms, and the section page measured
+    twice — once as the spine's fourth step, once as read-along's first — gives 0.4 ms and 11.1 ms for
+    the same page. It is not the bottleneck; that is all these numbers support.
+  - **ADR-0043's fourth call is free in wall clock.** The parent TOC costs 16 ms and runs in the same
+    `Promise.all` as `/api/v1/releases?title=` at 20 ms, so the page's API cost is unchanged by it. It
+    is also the fastest API row under load: 61.9 rps, 116.9 ms p50, 2,168 wire bytes. The question
+    session 27 left open is answered.
+  - **The transient 502 did not recur** — 813 timed nav-profile requests across four vantages, every
+    one a 200, plus a full load test.
+  - **The reader page is the origin's limit, not the API.** 195 ms for one reader; 702 ms p50 and
+    11.0 rps at 8 concurrent on 2 vCPUs. The TOC page: 526 ms, 14.4 rps. The JSON routes hold up.
+  - **`/api/v1/releases?title=N` is the slowest unlimited API route** — 247 ms p50, 30.6 rps — and it
+    is fetched on every section page *and* every TOC page to fill a picker with 381 options.
+  - **The API diff costs 5.1 s per request** on the box. The limiter sheds correctly (23 × 429 at
+    C=10) but the requests it *admits* still exceed a 20 s client timeout.
+  - **`structure_nodes` has no index on `identifier` alone.** Its unique constraint is
+    `(title_id, identifier)`, which a lookup by identifier cannot use, so it seq-scans 9,916 rows at
+    1.3 ms — 80% of `get_section`'s database time, and it recurs in both `get_toc` paths and
+    `resolve_id`. Everything else is fine: no repository call exceeds 2 ms in Postgres, and the
+    96,204,776-row `guid_map` answers in 0.035 ms through `ix_guid_map_release_id_identifier`.
+  - **Cache headers confirmed live**, by the script rather than by assertion: `immutable` when pinned,
+    `max-age=300` unpinned, `max-age=300` on a TOC even when pinned (ADR-0043). `HEAD` is still 405
+    where `GET` is 200.
+- **Two methodology errors found and paid for, both recorded in the scripts:**
+  - **Neither script asked for compression.** curl sends no `Accept-Encoding` unless told, and Caddy
+    only compresses what asks — so the first pass timed every reader page at 76,021 bytes against the
+    21,246 a browser receives, attributing transfer time to the network that no reader spends. Both
+    runs were discarded and redone with `--compressed`, under which `%{size_download}` reports wire
+    bytes.
+  - **`curl -X HEAD` only changes the method.** curl still waited for a body the 405 never sent, exited
+    18, and `set -e` discarded a completed 35-minute run with every row measured and nothing written.
+    `-I` is curl's own HEAD; every probe in the checks block is now non-fatal for the same reason.
+- **One thing the artifact records as empty on purpose:** `checks.diff_retry_after_header`. The probe
+  asks sequentially, and the diff bucket refills one token every five seconds while the endpoint takes
+  about five seconds to answer — so a caller making one diff at a time is never shed. The 429 and its
+  `Retry-After` are observed in the over-budget row, where concurrency is what exceeds the bucket.
+- **Candidate tasks found, deliberately not done:**
+  - **Astro's own render is the largest single component of the origin cost** — 41 ms against 37 ms
+    for all five API calls' critical path — and the reader page, not the API, is what collapses under
+    concurrency. Profiling inside the Node process is a task of its own, and it is not on B3's list.
+  - **The box's own throughput ceiling is unmeasured.** At C=8 over a ~120 ms round trip the ceiling
+    is 8 ÷ 0.12 ≈ 65 rps as arithmetic, and the fast rows all sit just under it, so they describe the
+    link rather than the box. Measuring the box needs a load generator running on it, which is not
+    something to install on production during a measurement session.
+  - **The load test speaks HTTP/1.1 while the nav profile speaks h2.** `hey` has an `-h2` flag and
+    `scripts/loadtest.sh` does not pass it; curl negotiates h2 by default. So the two artifacts'
+    latencies are not directly comparable, and the load test measures a protocol no browser uses
+    against this host. One flag.

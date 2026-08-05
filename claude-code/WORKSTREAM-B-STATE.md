@@ -4,7 +4,7 @@ Paste `00-CONVENTIONS.md` above any task prompt, then this file, then the task y
 
 **To resume in a new session, one line:**
 
-> Read `CLAUDE.md` and `claude-code/WORKSTREAM-B-STATE.md`, then do task B3.
+> Read `CLAUDE.md` and `claude-code/WORKSTREAM-B-STATE.md`, then do task B3's fix half.
 
 ---
 
@@ -54,21 +54,60 @@ What it found, and what was built from it:
   forms**, because `?release=` beats `?date=` in `resolve_release` and one form would send both.
 - It **left the sticky stack**; the release point stays there as text. See "Standing decisions".
 
-## Remaining: B3, B4, B5, B6
+## Done: B3, measure half (session 28)
 
-**Do B3 next**, and its measure half first — the package's own running order puts B3-measure in
-Phase 1, and both B4 and B5 want numbers that do not exist yet.
+Three artifacts against the deployed box, each regenerable by one command:
+`make loadtest` (with `BASE=`), `make navprofile`, `make spine-explain`. BUILDLOG 046 has the full
+account; the numbers that decide what to fix are below.
 
-- `docs/verification/loadtest.json` is from **2026-07-29** and is stale for four separate reasons now:
-  ADR-0029's limiters, ADR-0026's redline, ADR-0037's `Disallow: /`, and ADR-0043's fourth API call
-  per section view.
-- The deployed box answers: `https://uscode.linkedlegislation.org/app/` returned 200 in ~0.4s during
-  this session (it also returned one transient 502, worth watching). `hey` is installed.
-- ADR-0043 added a per-section-view call whose cost is asserted nowhere. The last measurement of that
-  exact route — `/api/v1/us/usc/t16/ch1/schVI` — was 156 rps, p95 83ms, 9,794 bytes, and it is stale.
+**The wait is not the server's.** A reader's four clicks down the spine cost **823 ms**, of which
+**221 ms is the origin and 601 ms (73%) is the network**. Origin, section page, warm p50: 41 ms
+Astro's own render, 37 ms for the five API calls' critical path, ~3 ms of that in Postgres. Caddy's
+own share is small and cannot be pinned down more precisely than that — the same page measured twice
+gives 0.4 ms and 11.1 ms.
+
+**The two open questions from session 27 are answered.**
+
+- **ADR-0043's fourth call is free in wall clock.** The parent TOC costs 16 ms and runs in the same
+  `Promise.all` as `/api/v1/releases?title=` at 20 ms, so it adds nothing to the page. Under load it
+  is the *fastest* API row: 61.9 rps, 116.9 ms p50, 2,168 wire bytes. The 156 rps / p95 83 ms figure
+  it replaces was a laptop against a partial corpus.
+- **The transient 502 did not recur** in 813 timed requests plus a full load test.
+
+**What is actually slow, in the order the numbers put it:**
+
+1. **The reader page under concurrency** — 195 ms for one reader, **702 ms p50 at 11.0 rps with 8
+   concurrent** on 2 vCPUs. The JSON routes hold up; the SSR page does not.
+2. **`/api/v1/releases?title=N`** — 247 ms p50, 30.6 rps, the slowest unlimited API route, fetched on
+   every section page *and* every TOC page to fill a picker with 381 options. This is the release-menu
+   debt already in "Candidate tasks" below, now with a cost attached.
+3. **The API diff: 5.1 s per request.** The limiter sheds correctly (23 × 429 at C=10) but the
+   requests it *admits* still exceed a 20 s client timeout. B5 owns this.
+4. **`structure_nodes` has no index on `identifier` alone** — the unique constraint is
+   `(title_id, identifier)`, which a lookup by identifier cannot use, so it seq-scans 9,916 rows at
+   1.3 ms, in `get_section`, both `get_toc` paths and `resolve_id`. Everything else in Postgres is
+   fine: no repository call exceeds 2 ms, and the 96,204,776-row `guid_map` answers in 0.035 ms.
+
+## Remaining: B3 fix half, B4, B5, B6
+
+**B3's fix list was written before the numbers and they reorder it.** Fixes 1, 2 and 4 all target the
+API/Postgres side, which is 37 ms of a 78 ms origin inside an 823 ms journey. Proposed to the human
+at the end of session 28, awaiting a decision:
+
+- **Fix 4** — one migration adding the `structure_nodes.identifier` index. Small payoff, real defect.
+- **Fix 3** — the per-route JS byte budget. Know before starting: `dist/client/_astro/` contains
+  **only CSS**; there are zero client JS bundles and every island is `<script is:inline>`, so the
+  budget must count inline `<script>` bytes in the rendered HTML per route.
+- **Fix 2, its measured half** — drop `/api/v1/releases?title=` from the per-view fan-out.
+- **Fix 1 — proposed *not* to build.** The cache headers are already correct for a shared cache
+  (verified live: `immutable` pinned, `max-age=300` unpinned, TOCs revalidating per ADR-0043). What is
+  missing is a shared cache to read them. Caddy has no built-in one and would need a plugin and a
+  custom build, and 73% of the wait is round trips a Caddy-side cache does not remove. An ADR
+  recording that, rather than a cache layer, is the proposal.
 
 Then **B4** (search relevance and operators), **B5** ("Compare with…" on the section header —
-`/app/diff` is still two hops from the text it compares), **B6** (dead ends).
+`/app/diff` is still two hops from the text it compares, and the 5.1 s diff is its cost problem),
+**B6** (dead ends).
 
 ## Standing decisions — do not silently reverse these
 
@@ -89,6 +128,14 @@ Then **B4** (search relevance and operators), **B5** ("Compare with…" on the s
    prev/next affordances, and the two from/to pickers were each checked and are each one path. B1
    asked for deletions; there were none to make. The real defect was the opposite — unreachable and
    thinly-reachable routes.
+
+5. **A measurement of this site asks for compression, or it is not measuring this site.** curl sends no
+   `Accept-Encoding` unless told and `hey` needs `-H`, while Caddy compresses only what asks — so an
+   unadorned run times every reader page at 76,021 bytes against the 21,246 a browser receives. Both
+   scripts now ask, and `%{size_download}` under `--compressed` reports wire bytes.
+6. **The rate-limited routes are measured twice on purpose**, once inside their budget and once past
+   it, and the artifact says which. A single flat run measures ADR-0029 and reads as a throughput
+   *improvement* on whichever route shed the most.
 
 ## Traps already paid for
 
@@ -120,11 +167,25 @@ Then **B4** (search relevance and operators), **B5** ("Compare with…" on the s
   corpus-wide, in the markup of every section page.
 - **`docs/screenshots/demo-video-*.png` churn on every `make shots`** regardless of code changes.
   (Also carried by workstream A.)
+- **Astro's own render is the largest single component of the origin cost** — 41 ms against 37 ms for
+  all five API calls' critical path — and the reader page, not the API, is what collapses under
+  concurrency. Profiling inside the Node process is a task of its own and is on no workstream's list.
+- **The box's own throughput ceiling is unmeasured.** At C=8 over a ~120 ms round trip the ceiling is
+  8 ÷ 0.12 ≈ 65 rps as arithmetic, and every fast row sits just under it — so those rows describe the
+  link, not the box. Measuring the box needs a load generator running on it.
+- **`scripts/loadtest.sh` speaks HTTP/1.1** — `hey` has an `-h2` flag and the script does not pass it,
+  while `navprofile.py` negotiates h2 through curl. The two artifacts' latencies are not directly
+  comparable until it does.
 
 ## Where things live
 
 ```
 docs/ia-map.md                          the map, and the unfindable-route list
+docs/verification/navprofile.json        journeys, four vantages, the layer split
+docs/verification/loadtest.json          throughput, every row naming its limiter
+docs/verification/spine-explain.json     the spine's query plans on the real corpus
+scripts/navprofile.py                    ships itself to the box over SSM
+scripts/spine_explain.py                 explains what the repository sent, never transcribed SQL
 docs/adr/0043                           one navigation chrome
 docs/adr/0044                           release context, and the switcher that keeps your place
 frontend/src/layouts/Base.astro         where the chrome is assembled
