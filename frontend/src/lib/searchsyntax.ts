@@ -17,8 +17,16 @@
 
 export interface SearchOperator {
   /** The `simple_query_string` flag that enables it. Matched against
-   * `api.search.QUERY_SYNTAX_FLAGS`. */
-  flag: string;
+   * `api.search.QUERY_SYNTAX_FLAGS`.
+   *
+   * Absent on an operator this site implements itself rather than passing to
+   * the cluster — the `field:value` scopes, which carry `scope` instead. */
+  flag?: string;
+  /** The name `storage/searchquery.py` parses this prefix under. Matched
+   * against `SCOPE_FIELDS` and `TIME_SCOPES` there, so a scope documented here
+   * and unknown to the parser fails the build the same way a missing flag
+   * does. */
+  scope?: string;
   /** How it is written, for the table's first column. */
   syntax: string;
   /** A short name for what it does. */
@@ -131,5 +139,53 @@ export const SEARCH_OPERATORS: SearchOperator[] = [
     example: "public lands",
     explanation:
       "A space separates terms, and all of them must be present. This is the default, so every word you add narrows the search.",
+  },
+  {
+    scope: "heading",
+    syntax: "heading:",
+    name: "In the heading only",
+    example: "heading:conservation",
+    explanation:
+      "Matches the word in a section's heading rather than anywhere in its text. Use quotes for more than one word: heading:\"wild horses\".",
+  },
+  {
+    scope: "title",
+    syntax: "title:",
+    name: "One title",
+    example: "conservation title:16",
+    explanation:
+      "Restricts the search to that title of the Code. Written either way — title:16 or title:t16. Repeat it for several titles, which matches any of them.",
+  },
+  {
+    scope: "chapter",
+    syntax: "chapter:",
+    name: "One chapter",
+    example: "conservation title:16 chapter:1",
+    explanation:
+      "Restricts the search to that chapter number. Chapter numbers repeat across titles, so pair it with title: unless you mean chapter 1 of every title.",
+  },
+  {
+    scope: "status",
+    syntax: "status:",
+    name: "Repealed, omitted, transferred",
+    example: "conservation status:repealed",
+    explanation:
+      "Restricts the search to provisions carrying that status. status:none is the rest — the sections the source marks with no status at all, which is most of the Code.",
+  },
+  {
+    scope: "release",
+    syntax: "release:",
+    name: "At a release point",
+    example: "conservation release:119-99",
+    explanation:
+      "Searches the text as it stood at that release point instead of the text in force. The same thing ?release= does, written in the box.",
+  },
+  {
+    scope: "date",
+    syntax: "date:",
+    name: "At a date",
+    example: "conservation date:05/08/2026",
+    explanation:
+      "Searches the text in force on that date, resolved to the release point current then. ?release= wins if both are given.",
   },
 ];

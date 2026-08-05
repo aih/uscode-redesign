@@ -492,10 +492,30 @@ main[id] {
     align-items: start;
   }
 
+  /* Pinned, and scrolling on its own — ADR-0050.
+   *
+   * The first attempt at this set `top` and stopped, which is why ADR-0043
+   * recorded a sticky rail as not worth having: `--sticky-h` is 19rem here, so
+   * the rail began 304px down the viewport and then ran to whatever length the
+   * subdivision happened to be, pushing its own tail off the bottom of the
+   * screen with no way to reach it but scrolling the document — which moves the
+   * text the reader is trying to keep still.
+   *
+   * The missing half is the height. Bounding it to what is left of the viewport
+   * under the chrome and letting it scroll inside that gives the rail its own
+   * scrollbar, which is what makes the pin useful rather than merely fixed.
+   *
+   * `overscroll-behavior: contain` keeps a scroll that reaches the end of the
+   * rail from continuing into the document underneath it. */
   .rail {
     order: 0;
     border-top: 0;
     padding-top: 0;
+    position: sticky;
+    top: calc(var(--sticky-h) + 0.5rem);
+    max-height: calc(100vh - var(--sticky-h) - 1.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
 
@@ -2485,11 +2505,125 @@ main[id] {
   box-shadow: inset 0 -0.5em 0 color-mix(in srgb, var(--link) 22%, transparent);
 }
 
+/* The ADR-0021 caveat, on the rows where it can bite. Not an alert: it is a
+ * limit on one result, not a warning about the page. */
+.searchresult__caveat {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-left: 3px solid var(--edge);
+  padding-left: 0.75rem;
+}
+
 .searchpager {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
   margin-top: 2rem;
+}
+
+/* ------------------------------------------- sort control and facets
+ *
+ * Both are lists of links that wrap. At 320 CSS px a row of filters is the
+ * easiest thing on this page to push sideways, and `make shots` fails the
+ * build for it (WCAG 1.4.10), so nothing here is laid out in a track that
+ * cannot wrap. */
+
+.sortbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+}
+
+.sortbar__label {
+  color: var(--muted);
+}
+
+.sortbar__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sortbar__option {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.sortbar__option--on {
+  background: var(--link);
+  /* The badge ink token, for the same reason it exists: text painted on a
+   * filled colour cannot inherit `--ink`, which inverts with the theme while
+   * the fill does not (ADR-0042). */
+  color: var(--danger-ink);
+  border-color: var(--link);
+}
+
+.facets {
+  margin: 1.5rem 0 0;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--panel);
+}
+
+.facets__group {
+  margin-top: 0.75rem;
+}
+
+.facets__name {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.facets__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.facets__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--page);
+  text-decoration: none;
+}
+
+.facets__value--on {
+  background: var(--link);
+  color: var(--danger-ink);
+  border-color: var(--link);
+}
+
+.facets__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* The count sits inside a filled pill when the filter is on, so it cannot keep
+ * the muted grey it has against the page. */
+.facets__value--on .facets__count {
+  color: inherit;
 }
 
 /* ------------------------------------------------- the source XML redline

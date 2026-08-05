@@ -65,10 +65,17 @@ caller — see the module docstring."""
 
 _SCOPE_TOKEN = re.compile(r"^([a-z]+):(.*)$", re.IGNORECASE)
 
-_TOKENS = re.compile(r'"[^"]*"|\S+')
-"""Whitespace-separated tokens, except that a double-quoted run is one token.
-Without the quote arm, `heading:"navigable waters"` would split at the space and
-the second word would be searched as free text — a different query, silently."""
+_TOKENS = re.compile(r'[a-zA-Z]+:"[^"]*"|"[^"]*"|\S+')
+"""Whitespace-separated tokens, except that a double-quoted run is one token —
+including one carrying a scope prefix.
+
+That first alternative is not redundant, and leaving it out is a bug this
+comment exists to prevent. `"[^"]*"|\\S+` only recognises a quoted run when the
+quote opens the token, so `heading:"wild horses"` matched `heading:"wild` and
+then `horses"`: the scope took a value of `"wild` and the second word fell
+through to the free text. The query was still valid and simply meant something
+else, which is the same shape as ADR-0031's `WHITESPACE` flag. Caught by
+`frontend/tests/searchscope.test.ts`, which asserts the round trip."""
 
 
 @dataclass(frozen=True)
@@ -420,6 +427,11 @@ def build_search_body(
         "size": limit,
         "query": query,
         "highlight": highlight,
+        # OpenSearch stops counting at 10,000 by default and reports that as
+        # the total, so a broad search said "10,000 results" whatever the real
+        # number was. On a corpus this size that is most of the interesting
+        # queries, and a count a reader cannot trust is worse than no count.
+        "track_total_hits": True,
     }
 
     if sort != "relevance":
@@ -438,19 +450,36 @@ def build_search_body(
                 "highlight": highlight,
             },
         }
+        # `hits.total` counts documents, and collapsing does not change that —
+        # so a point-in-time search reported the number of matching *versions*
+        # while showing one row per section. At a release point late in the
+        # inventory that is several times the number of rows there are to read.
+        # Counting distinct identifiers is the number the page is showing.
+        body.setdefault("aggs", {})[COLLAPSED_TOTAL] = {
+            "cardinality": {"field": "identifier", "precision_threshold": 40000}
+        }
 
     if facets:
-        body["aggs"] = {
+        body.setdefault("aggs", {}).update({
             "titles": {"terms": {"field": "title_num", "size": 20}},
             # `missing` is what makes the ordinary operative section countable:
             # the source writes no `@status` on one, so a plain terms
             # aggregation would report only the repealed and omitted ones and
             # read as though the corpus were nothing else.
             "statuses": {"terms": {"field": "status", "size": 10, "missing": NO_STATUS}},
-        }
+        })
 
     return body
 
+
+COLLAPSED_TOTAL = "sections"
+"""Aggregation name holding the distinct-section count under a collapse.
+
+Approximate above 40,000 distinct values by construction — `cardinality` is
+HyperLogLog++ — and the threshold is set past the 65,938 sections in the corpus
+only in the sense that no realistic query reaches it. A count that is right to
+within a fraction of a percent on the widest possible search, and exact on every
+ordinary one, beats a count pinned at 10,000."""
 
 NO_STATUS = "none"
 """What `status:` means for a section the source gives no `@status` at all —

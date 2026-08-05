@@ -23,10 +23,16 @@ from pathlib import Path
 import pytest
 
 from api.search import QUERY_SYNTAX_FLAGS
+from storage.searchquery import SCOPE_FIELDS, TIME_SCOPES
 
 GUIDE = Path(__file__).resolve().parent.parent / "frontend/src/lib/searchsyntax.ts"
+SCOPES_TS = Path(__file__).resolve().parent.parent / "frontend/src/lib/searchscope.ts"
 
 FLAG_RE = re.compile(r'^\s*flag:\s*"([A-Z]+)"', re.MULTILINE)
+SCOPE_RE = re.compile(r'^\s*scope:\s*"([a-z]+)"', re.MULTILINE)
+SCOPE_LIST_RE = re.compile(
+    r"export const SEARCH_SCOPES = \[([^\]]*)\]", re.MULTILINE | re.DOTALL
+)
 
 
 def documented_flags() -> set[str]:
@@ -35,6 +41,29 @@ def documented_flags() -> set[str]:
 
 def enabled_flags() -> set[str]:
     return set(QUERY_SYNTAX_FLAGS.split("|"))
+
+
+def documented_scopes() -> set[str]:
+    """The `field:` prefixes the syntax guide tells readers to type."""
+    return set(SCOPE_RE.findall(GUIDE.read_text(encoding="utf-8")))
+
+
+def parsed_scopes() -> set[str]:
+    """The prefixes `storage/searchquery.py` actually lifts out of a query."""
+    return set(SCOPE_FIELDS) | set(TIME_SCOPES)
+
+
+def facet_scopes() -> set[str]:
+    """The prefixes the reader's facet links write, read out of the TypeScript.
+
+    Read as text for the same reason the flag list is: adding a Node build step
+    to the Python suite to check four strings would cost more than it is worth,
+    and a regex that stops matching fails loudly here rather than quietly
+    passing every set comparison below.
+    """
+    match = SCOPE_LIST_RE.search(SCOPES_TS.read_text(encoding="utf-8"))
+    assert match, f"could not find SEARCH_SCOPES in {SCOPES_TS}"
+    return set(re.findall(r'"([a-z]+)"', match.group(1)))
 
 
 def test_guide_file_exists() -> None:
@@ -83,3 +112,41 @@ def test_the_operators_the_guide_is_for_stay_enabled(flag: str) -> None:
     by `_validate/query?explain=true`, because the query is valid either way.
     """
     assert flag in enabled_flags()
+
+
+def test_every_documented_scope_is_parsed() -> None:
+    """A `field:` prefix in the guide that the parser does not know is worse
+    than a missing flag: `title:16` would not merely be ignored, it would be
+    searched for as the literal text `title:16` and return nothing, which reads
+    exactly like a title with nothing in it."""
+    missing = documented_scopes() - parsed_scopes()
+    assert not missing, (
+        f"the syntax guide documents {sorted(missing)}:, which "
+        f"storage/searchquery.py does not parse — the prefix would be matched "
+        f"as literal text"
+    )
+
+
+def test_every_parsed_scope_is_documented() -> None:
+    missing = parsed_scopes() - documented_scopes()
+    assert not missing, (
+        f"{sorted(missing)}: are parsed as scopes but absent from the syntax "
+        f"guide, so readers are not told they exist"
+    )
+
+
+def test_the_facet_links_write_scopes_the_parser_knows() -> None:
+    """The reader's facet links edit the query string rather than adding a
+    parameter (ADR-0049), so the TypeScript that writes `title:16` and the
+    Python that reads it are two halves of one format. A name in one and not
+    the other is a filter that silently searches for its own label."""
+    unknown = facet_scopes() - set(SCOPE_FIELDS)
+    assert not unknown, (
+        f"lib/searchscope.ts writes {sorted(unknown)}: as filters, which "
+        f"SCOPE_FIELDS does not include"
+    )
+    unwritable = set(SCOPE_FIELDS) - facet_scopes()
+    assert not unwritable, (
+        f"{sorted(unwritable)}: is a filter the parser accepts and the reader "
+        f"has no way to toggle"
+    )

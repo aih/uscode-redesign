@@ -220,6 +220,24 @@
       }
     },
     {
+      "usage": "text inside a selected sort or facet pill",
+      "foreground": "--danger-ink",
+      "background": "--link",
+      "requires": 4.5,
+      "light": {
+        "fg": "#ffffff",
+        "bg": "#005ea2",
+        "ratio": 6.72,
+        "passes": true
+      },
+      "dark": {
+        "fg": "#16150f",
+        "bg": "#73b3e7",
+        "ratio": 8.13,
+        "passes": true
+      }
+    },
+    {
       "usage": "the boundary of an input, select or textarea",
       "foreground": "--edge",
       "background": "--field",
@@ -349,8 +367,8 @@
     }
   ],
   "summary": {
-    "pairs": 17,
-    "checks": 34,
+    "pairs": 18,
+    "checks": 36,
     "failures": 0
   }
 }

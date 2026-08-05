@@ -37,6 +37,7 @@ from params import (
 from storage.search import SECTIONS_INDEX, STRUCTURE_INDEX, get_search_client
 from storage.searchquery import (
     CANDIDATES,
+    COLLAPSED_TOTAL,
     QUERY_SYNTAX_FLAGS,
     SORTS,
     build_earlier_versions_body,
@@ -201,6 +202,11 @@ def search(
 
     hits = res["hits"]["hits"]
     total = res["hits"]["total"]["value"] if isinstance(res["hits"]["total"], dict) else res["hits"]["total"]
+    # Under collapse one row is one section and `hits.total` is still counting
+    # versions, so the count and the list would describe different things.
+    collapsed = res.get("aggregations", {}).get(COLLAPSED_TOTAL)
+    if collapsed is not None:
+        total = collapsed["value"]
 
     results = []
     for hit in hits:

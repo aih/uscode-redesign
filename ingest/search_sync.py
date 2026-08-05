@@ -128,8 +128,12 @@ def citation_sort_key(identifier: str | None, seq_in_title: int | None) -> str |
     A title with no suffix pads with `0`, which sorts before `a`, so title 5
     precedes title 5a as the Code prints them.
 
-    Structure nodes have no `seq_in_title` and take position `000000`, so a
-    chapter sorts ahead of the sections inside it.
+    Structure nodes have no `seq_in_title`. They all take position `000000`,
+    which puts every chapter and subchapter heading of a title ahead of every
+    section of it, rather than each one immediately before the sections it
+    contains. Giving them a true position means deriving one from the first
+    section beneath each node, and that is a join this pass does not do. The
+    sort control says so.
     """
     title = title_num_of(identifier)
     if title is None:

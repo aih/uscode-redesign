@@ -44,6 +44,11 @@ PAIRS: list[tuple[str, str, str, float]] = [
     ("--link", "--field", "a link on a form control", 4.5),
     ("--danger", "--page", "error text", 4.5),
     ("--danger-ink", "--danger", "the repealed / omitted badge's own text", 4.5),
+    # The selected sort option and the applied facet are filled pills. Their
+    # text is `--danger-ink` for the reason that token exists — text on a filled
+    # colour cannot inherit `--ink`, which inverts with the theme while the fill
+    # under it does not. Same shape as the badge above, a different fill.
+    ("--danger-ink", "--link", "text inside a selected sort or facet pill", 4.5),
     ("--edge", "--field", "the boundary of an input, select or textarea", 3.0),
     ("--edge", "--page", "a control's boundary against the page", 3.0),
     ("--edge", "--panel", "a control's boundary inside a panel", 3.0),

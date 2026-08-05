@@ -247,6 +247,27 @@ export interface SearchResultItem {
   snippets: SearchSnippet[];
   first_release: string | null;
   is_current: boolean;
+  title_num: string | null;
+  status: string | null;
+  /** Superseded versions of this section that also match (ADR-0049). The
+   * default search reads the text in force, so this is the difference between
+   * a section that does not mention the words and one that stopped. */
+  earlier_matches: number;
+  /** The source published more than one provision under this identifier at this
+   * release point and the index holds one of them (ADR-0021). */
+  id_collision: boolean;
+}
+
+/** One facet value and how many results carry it. */
+export interface FacetValue {
+  value: string;
+  count: number;
+}
+
+/** Mirrors `SearchFacets` — counts over the whole result set, not the page. */
+export interface SearchFacets {
+  titles: FacetValue[];
+  statuses: FacetValue[];
 }
 
 /** Mirrors `SearchResponse`. `release` names the release point actually
@@ -256,6 +277,8 @@ export interface SearchResponse {
   total: number;
   release: string | null;
   note: string | null;
+  sort: string;
+  facets: SearchFacets;
 }
 
 /* --------------------------------------------------------------- OpenAPI
