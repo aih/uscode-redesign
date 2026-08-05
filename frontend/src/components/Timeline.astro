@@ -1,0 +1,50 @@
+---
+/**
+ * The release points at which a section's text changed, oldest first.
+ *
+ * One entry per *distinct text*, not one per release point: the Code
+ * republishes every title at every release point whether or not anything in it
+ * changed (gotcha 10), so a row per release point would be a list of 381
+ * identical texts. `releases` is the run of release points that carried this
+ * one.
+ *
+ * Extracted from `versions/[...identifier].astro` so `/app/design` renders this
+ * component rather than a copy of its markup.
+ */
+import StatusBadge from "./StatusBadge.astro";
+import type { VersionEntry } from "../lib/types";
+import { appHref, diffHref, trimNum } from "../lib/url";
+
+interface Props {
+  /** The section these versions belong to — the target of every link here. */
+  identifier: string;
+  entries: VersionEntry[];
+}
+
+const { identifier, entries } = Astro.props;
+---
+
+<ol class="timeline">
+  {
+    entries.map((entry, index) => {
+      const previous = index > 0 ? entries[index - 1] : null;
+      return (
+        <li>
+          <a class="timeline__release" href={appHref(identifier, entry.first_seen.label)}>
+            {entry.first_seen.label}
+          </a>{" "}
+          — {trimNum(entry.num)} {entry.heading}
+          <StatusBadge status={entry.status} />
+          <p class="timeline__releases">Unchanged through: {entry.releases.join(", ")}</p>
+          {previous && (
+            <p>
+              <a href={diffHref(identifier, previous.first_seen.label, entry.first_seen.label)}>
+                Diff since {previous.first_seen.label}
+              </a>
+            </p>
+          )}
+        </li>
+      );
+    })
+  }
+</ol>

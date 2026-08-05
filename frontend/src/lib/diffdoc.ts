@@ -310,6 +310,19 @@ function plain(text: string): Span[] {
 }
 
 /**
+ * "3 lines changed, 1 added" — the shape of the amendment, before the reader
+ * starts reading it. Empty when nothing changed, which is the caller's cue to
+ * say which of `sourceDelta`'s three cases it found instead.
+ */
+export function diffSummary(diff: DocumentDiff): string {
+  const parts: string[] = [];
+  if (diff.changed) parts.push(`${diff.changed} line${diff.changed === 1 ? "" : "s"} changed`);
+  if (diff.inserted) parts.push(`${diff.inserted} added`);
+  if (diff.deleted) parts.push(`${diff.deleted} removed`);
+  return parts.join(", ");
+}
+
+/**
  * The redline as HTML. Every span is escaped exactly the way a rendered text
  * node is: the input here is statutory text pulled out of XML, and it reaches
  * the page through `set:html`.

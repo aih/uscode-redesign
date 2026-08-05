@@ -1,0 +1,41 @@
+---
+/**
+ * What a search says when nothing matched.
+ *
+ * The search matches the words as typed (ADR-0031), so the useful thing to
+ * offer someone who got nothing back is the loosening they did not ask for:
+ * `~1` on a word, `|` to widen, `-` to narrow. The last line offers the other
+ * reading of what they typed — a citation — because the one box answers both
+ * kinds of question and a query that found no words may still name a provision.
+ *
+ * Extracted from `search.astro` so `/app/design` renders this component rather
+ * than a copy of its markup.
+ */
+import { fuzzify } from "../lib/searchsyntax";
+import { gotoHref, searchHref, syntaxHref } from "../lib/url";
+
+interface Props {
+  query: string;
+}
+
+const { query } = Astro.props;
+---
+
+<div class="usa-alert usa-alert--info">
+  <div class="usa-alert__body">
+    <h3 class="usa-alert__heading">Nothing matched those words</h3>
+    <p class="usa-alert__text">
+      The search covers the text of sections and the headings above them. Every word you
+      type has to appear, so a long query narrows quickly.
+    </p>
+    <p class="usa-alert__text">
+      Unsure of a spelling? Add <code>~1</code> to a word:{" "}
+      <a href={searchHref(fuzzify(query))}><code>{fuzzify(query)}</code></a> also matches
+      words one character away. Widen a query with <code>|</code>, narrow it with{" "}
+      <code>-</code>. See <a href={syntaxHref()}>the full syntax</a>.
+    </p>
+    <p class="usa-alert__text">
+      <a href={gotoHref(query)}>Try “{query}” as a citation</a>
+    </p>
+  </div>
+</div>

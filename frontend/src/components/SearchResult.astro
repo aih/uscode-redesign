@@ -1,0 +1,82 @@
+---
+/**
+ * One row of search results (ADR-0028, ADR-0049).
+ *
+ * The unit indexed is the deduped section *version*, so a row carries facts
+ * about text as well as about a provision: where this exact text first
+ * appeared, how many superseded versions also matched, and whether the source
+ * published more than one element under this identifier at this release point
+ * (ADR-0021, which the index cannot hold both halves of).
+ *
+ * A heading snippet becomes the title rather than a quotation under it. As a
+ * quotation it was the title again, verbatim, on every structural hit; as the
+ * title it shows *which* words matched, in the line the reader is already on.
+ *
+ * Extracted from `search.astro` so `/app/design` renders this component rather
+ * than a copy of its markup.
+ */
+import type { SearchResultItem } from "../lib/types";
+import { appHref, versionsHref } from "../lib/url";
+import { highlightHtml } from "../lib/uslm";
+
+interface Props {
+  result: SearchResultItem;
+  /** The release point searched, carried into the link so the row opens the
+   *  text that matched rather than today's. */
+  release?: string | null;
+}
+
+const { result, release = null } = Astro.props;
+
+const headingHit = result.snippets.find((s) => s.field === "heading");
+const body = result.snippets.filter((s) => s.field !== "heading");
+---
+
+<li class="searchresult">
+  {/* New tab, like a cross reference and for the same reason: a results list is
+      something you work *through*, and following a hit should not throw away
+      the other nineteen. `data-newtab` lets the reader's preference undo it. */}
+  <h3 class="searchresult__title">
+    <a href={appHref(result.identifier, release)} target="_blank" rel="noopener" data-newtab>
+      {result.num ? `${result.num} ` : ""}
+      {
+        headingHit ? (
+          <span set:html={highlightHtml(headingHit.text)} />
+        ) : (
+          result.heading || result.identifier
+        )
+      }
+    </a>
+  </h3>
+  <p class="searchresult__meta">
+    <code>{result.identifier}</code>
+    {result.type === "structure" && result.level && <> · {result.level}</>}
+    {result.status && <> · {result.status}</>}
+    {result.first_release && <> · unchanged since {result.first_release}</>}
+    {/* The words are in text this section no longer carries. Worth saying: the
+        difference between a provision that does not mention the subject and one
+        that stopped mentioning it is most of what a version history is for. */}
+    {
+      result.earlier_matches > 0 && (
+        <>
+          {" "}·{" "}
+          <a href={versionsHref(result.identifier)}>
+            also matched in {result.earlier_matches} earlier{" "}
+            {result.earlier_matches === 1 ? "version" : "versions"}
+          </a>
+        </>
+      )
+    }
+  </p>
+  {
+    result.id_collision && (
+      <p class="searchresult__caveat">
+        The source publishes more than one provision under this identifier at this release
+        point. The index holds one of them; the section page shows every occurrence.
+      </p>
+    )
+  }
+  {body.map((snippet) => (
+    <blockquote class="searchresult__snippet" set:html={highlightHtml(snippet.text)} />
+  ))}
+</li>

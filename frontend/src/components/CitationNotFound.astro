@@ -1,0 +1,52 @@
+---
+/**
+ * A citation that parsed cleanly and names nothing this site holds.
+ *
+ * Distinct from a typo, and the distinction is the whole point of the panel:
+ * the identifier the citation was read as is printed, so the reader can see
+ * that the parse was right and the gap is in the Code or in what has been
+ * loaded. The appendix titles are the standing case — OLRC publishes their
+ * sections under the enacting instrument rather than a flat section number, so
+ * `5 U.S.C. App. 3` reads as `/us/usc/t5a/s3` and finds nothing — and the API
+ * supplies that explanation as `message`.
+ *
+ * Extracted from `goto.astro` so `/app/design` renders this component rather
+ * than a copy of its markup.
+ */
+import type { Citation } from "../lib/types";
+import { appHref, searchHref } from "../lib/url";
+
+interface Props {
+  found: Citation;
+  /** What the reader typed, used for the fall back to a keyword search. */
+  query: string;
+}
+
+const { found, query } = Astro.props;
+---
+
+<div class="usa-alert usa-alert--warning" role="alert">
+  <div class="usa-alert__body">
+    <h2 class="usa-alert__heading">
+      Read as <code>{found.identifier}</code>, but nothing is published there
+    </h2>
+    <p class="usa-alert__text">
+      {
+        found.message ??
+          `Nothing is published at ${found.section_identifier}${
+            found.release ? ` at release point ${found.release.label}` : ""
+          }. The citation parsed correctly, so this is a gap in the Code or in what this site has loaded, not a typo.`
+      }
+    </p>
+    <p class="usa-alert__text">
+      <a href={appHref(`/us/usc/t${found.title_num}`)}>
+        Open Title {found.title_num} and look from there
+      </a>
+    </p>
+    {/* It parsed, so it never reached the search fallback — but a reader whose
+        citation names nothing usually still wants the words. */}
+    <p class="usa-alert__text">
+      <a href={searchHref(query)}>Search the text for “{query}” instead</a>
+    </p>
+  </div>
+</div>

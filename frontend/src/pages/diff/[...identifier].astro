@@ -25,7 +25,7 @@ import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { IMMUTABLE, REVALIDATE } from "../../lib/cache";
-import { documentDiff, diffLinesHtml, sourceDelta } from "../../lib/diffdoc";
+import { documentDiff, diffLinesHtml, diffSummary, sourceDelta } from "../../lib/diffdoc";
 import type { DocumentDiff, SourceDelta } from "../../lib/diffdoc";
 import { apiDiffHref, appHref, diffHref, trimNum, versionsHref } from "../../lib/url";
 import { sourceRedline } from "../../lib/xmlredline";
@@ -144,16 +144,6 @@ function sourceToggleHref(on: boolean): string {
   return `${diffHref(identifier, from ?? "", to ?? "").split("?")[0]}?${params.toString()}`;
 }
 
-/** "3 lines changed, 1 added" — the shape of the amendment, before the reader
- * starts reading it. */
-function summary(d: DocumentDiff): string {
-  const parts: string[] = [];
-  if (d.changed) parts.push(`${d.changed} line${d.changed === 1 ? "" : "s"} changed`);
-  if (d.inserted) parts.push(`${d.inserted} added`);
-  if (d.deleted) parts.push(`${d.deleted} removed`);
-  return parts.join(", ");
-}
-
 const title = after
   ? `Diff ${before?.release.label} → ${after.release.label} · ${trimNum(after.num)} · U.S. Code`
   : "Diff · U.S. Code";
@@ -198,7 +188,7 @@ const currentCrumb: Entry | null = after
           {unchanged && delta
             ? "The text of this section is identical at both release points. " +
               UNCHANGED_NOTE[delta]
-            : summary(diff) + "."}
+            : diffSummary(diff) + "."}
           {unchanged && delta === "beyond-guids" && (
             <>
               {" "}

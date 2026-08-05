@@ -10,10 +10,10 @@
  */
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
-import StatusBadge from "../../components/StatusBadge.astro";
+import Timeline from "../../components/Timeline.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { REVALIDATE } from "../../lib/cache";
-import { appHref, diffHref, trimNum } from "../../lib/url";
+import { appHref, trimNum } from "../../lib/url";
 import type { Entry, Section, Versions } from "../../lib/types";
 import { isToc } from "../../lib/types";
 
@@ -92,34 +92,7 @@ const currentCrumb: Entry | null = section
           release points leave most sections untouched.
         </p>
 
-        <ol class="timeline">
-          {entries.map((entry, index) => {
-            const previous = index > 0 ? entries[index - 1] : null;
-            return (
-              <li>
-                <a class="timeline__release" href={appHref(identifier, entry.first_seen.label)}>
-                  {entry.first_seen.label}
-                </a>{" "}
-                — {trimNum(entry.num)} {entry.heading}
-                <StatusBadge status={entry.status} />
-                <p class="timeline__releases">Unchanged through: {entry.releases.join(", ")}</p>
-                {previous && (
-                  <p>
-                    <a
-                      href={diffHref(
-                        identifier,
-                        previous.first_seen.label,
-                        entry.first_seen.label,
-                      )}
-                    >
-                      Diff since {previous.first_seen.label}
-                    </a>
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+        <Timeline identifier={identifier} entries={entries} />
 
         {
           entries.length > 1 && (
