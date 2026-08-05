@@ -51,14 +51,21 @@ function statusLabel(value: string): string {
   return STATUS_LABELS[value] ?? value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-/** A group with one value covering every result narrows nothing. */
-function worthShowing(values: { value: string; count: number }[]): boolean {
+/** A group with one value covering every result narrows nothing — unless that
+ *  value is the filter already applied, which is why every result carries it.
+ *  Hiding it there would leave the reader filtered to one title with no way
+ *  back but editing the query by hand. */
+function worthShowing(
+  name: string,
+  values: { value: string; count: number }[],
+): boolean {
+  if (values.some((facet) => hasScope(query, name, facet.value))) return true;
   return values.length > 1 || (values.length === 1 && values[0].count < total);
 }
 
 const titles = facets.titles.slice(0, SHOWN);
 const statuses = facets.statuses.slice(0, SHOWN);
-const show = worthShowing(titles) || worthShowing(statuses);
+const show = worthShowing("title", titles) || worthShowing("status", statuses);
 ---
 
 {
@@ -68,7 +75,7 @@ const show = worthShowing(titles) || worthShowing(statuses);
         Narrow these results
       </h2>
 
-      {worthShowing(titles) && (
+      {worthShowing("title", titles) && (
         <div class="facets__group">
           <h3 class="facets__name" id="facet-title">
             Title
@@ -93,7 +100,7 @@ const show = worthShowing(titles) || worthShowing(statuses);
         </div>
       )}
 
-      {worthShowing(statuses) && (
+      {worthShowing("status", statuses) && (
         <div class="facets__group">
           <h3 class="facets__name" id="facet-status">
             Status

@@ -6,11 +6,11 @@
     "wcag21a",
     "wcag21aa"
   ],
-  "scans": 251,
+  "scans": 258,
   "routesWithViolations": 4,
   "totals": {
     "violations": 8,
-    "nodes": 1780,
+    "nodes": 1794,
     "critical": 1,
     "serious": 7,
     "moderate": 0,
@@ -76,7 +76,7 @@
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 448,
+          "nodes": 462,
           "firstTarget": "small:nth-child(1) > pre",
           "help": "Elements must meet minimum color contrast ratio thresholds",
           "seenAt": [

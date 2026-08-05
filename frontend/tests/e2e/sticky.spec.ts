@@ -131,6 +131,11 @@ test.describe("the search box's explainer costs the chrome nothing", () => {
           for (const element of document.querySelectorAll("body *")) {
             const style = getComputedStyle(element);
             if (style.position !== "sticky" && style.position !== "fixed") continue;
+            // The rail pins beside the text (ADR-0050) and runs to the foot of
+            // the viewport. Left in, it is the tallest thing here and both
+            // measurements below become its height — equal, and measuring
+            // nothing.
+            if (element.closest(".rail")) continue;
             const box = element.getBoundingClientRect();
             // `top < 400` keeps this to the chrome at the top of the viewport
             // rather than anything pinned elsewhere on the page.
@@ -219,6 +224,12 @@ test.describe("what moving the switcher out of the sticky stack bought", () => {
         for (const element of document.querySelectorAll("body *")) {
           const style = getComputedStyle(element);
           if (style.position !== "sticky" && style.position !== "fixed") continue;
+          // The rail sticks beside the text rather than above it (ADR-0050), so
+          // it costs an anchor jump nothing and must not be measured as though
+          // it did. It pins at `--sticky-h` and runs to the foot of the
+          // viewport, which without this reads as several hundred pixels of
+          // chrome over budget.
+          if (element.closest(".rail")) continue;
           const box = element.getBoundingClientRect();
           if (box.height > 0 && box.top < 400 && box.bottom > bottom) bottom = box.bottom;
         }
@@ -229,4 +240,62 @@ test.describe("what moving the switcher out of the sticky stack bought", () => {
       expect(spare).toBeGreaterThanOrEqual(size.headroom);
     });
   }
+});
+
+test.describe("the chapter rail stays put while the text scrolls", () => {
+  /**
+   * ADR-0050. `top` alone is what ADR-0043 tried and rejected — it pins the
+   * rail and then lets it run past the bottom of the viewport, so the reader
+   * cannot reach its tail without scrolling the document, which moves the text
+   * they were trying to hold still. The bounded height is what makes the pin
+   * worth having, so it is the thing asserted.
+   */
+  const SECTION = "/app/us/usc/t16/s45f";
+
+  test("at 1280px the rail holds its place through a long scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(SECTION);
+    const rail = page.locator(".rail");
+    await expect(rail).toBeVisible();
+
+    const before = (await rail.boundingBox())!.y;
+    await page.evaluate(() => window.scrollTo(0, 3000));
+    await page.waitForTimeout(300);
+    const after = (await rail.boundingBox())!.y;
+
+    // Unpinned, 3000px of scroll takes the rail 3000px up and off the screen.
+    expect(Math.abs(after - before)).toBeLessThan(40);
+    expect(after).toBeGreaterThan(0);
+  });
+
+  test("the rail is bounded by the viewport and scrolls inside it", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(SECTION);
+
+    const box = await page.evaluate(() => {
+      const rail = document.querySelector(".rail") as HTMLElement;
+      return {
+        height: rail.getBoundingClientRect().height,
+        overflowY: getComputedStyle(rail).overflowY,
+        scrollHeight: rail.scrollHeight,
+        clientHeight: rail.clientHeight,
+      };
+    });
+
+    expect(box.overflowY).toBe("auto");
+    expect(box.height).toBeLessThanOrEqual(900);
+    // Title 16 subchapter I is longer than the space left under the chrome, so
+    // this rail is one that has something to scroll. A rail that fitted would
+    // make the assertion above vacuous.
+    expect(box.scrollHeight).toBeGreaterThan(box.clientHeight);
+  });
+
+  test("below 64em the rail is not pinned", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(SECTION);
+    const position = await page.evaluate(
+      () => getComputedStyle(document.querySelector(".rail") as HTMLElement).position,
+    );
+    expect(position).toBe("static");
+  });
 });

@@ -27,6 +27,7 @@
     { "id": "syntax", "path": "/app/search/syntax", "name": "search operators" },
     { "id": "search-results", "path": "/app/search?q=conservation", "name": "search results" },
     { "id": "search-zero", "path": "/app/search?q=zzzzqqqqxxxx", "name": "search zero results" },
+    { "id": "search-filtered", "path": "/app/search?q=conservation+title%3A16&sort=citation", "name": "search results with a filter and a sort applied — the filled facet and sort pills, which no other route renders" },
     { "id": "guide-index", "path": "/app/guide", "name": "user guide index" },
     { "id": "guide-chapters", "expand": "guide-chapters", "name": "every guide chapter" },
     { "id": "login", "path": "/app/login", "name": "sign in (ACCOUNTS_ENABLED=false)" },

@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43]
+  adrs: [9, 10, 21, 25, 40, 43, 50]
 ---
 
 ## The address of a provision
@@ -76,6 +76,9 @@ steps:
 **The chapter rail** lists the sections around this one, in reading order, from the subdivision that
 contains it. The section you are reading is marked. Beside a wide window it sits to the left of the
 text; on a narrow one it is below the section.
+
+Beside a wide window the rail stays where it is while the text scrolls. A subdivision longer than
+the window scrolls within the rail itself.
 
 The rail is drawn from the newest release point this site holds, and the text beside it is whatever
 release point you asked for. When those differ the rail says so.
