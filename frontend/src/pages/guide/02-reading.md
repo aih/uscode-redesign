@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52]
 ---
 
 ## The address of a provision
@@ -172,3 +172,22 @@ by hand will not resolve on its own.
 they are named for. Note that a citation in the form `5 U.S.C. App. 3` is understood but resolves
 to nothing, because the OLRC publishes no section at that flat address — the site explains this
 rather than showing a bare 404.
+
+## How the text is set
+
+Statutory text is set in Spectral, a serif. Everything about the text — navigation, breadcrumbs,
+badges, the release picker, search — is set in Archivo, a sans serif. Identifiers, guids and API
+examples use whatever fixed-width face your system provides.
+
+Both faces are served from this site. No font is fetched from Google Fonts or any other host, so
+the page renders its type without a request to a third party.
+
+The reading column is 42rem wide, which holds a median of 68 characters per line — 62 to 73 across
+the tenth and ninetieth percentiles, counted from where the browser broke the lines
+(`docs/verification/measure.json`). On a screen narrower than that the column is as wide as the
+screen; at 375 CSS px it holds 38 characters.
+
+Colour carries three meanings and no others. Green marks an insertion and the release currently in
+force. Red marks a deletion, a repeal and an error. Amber marks the provision you asked for. Every
+one of them is also spelled out in text or shape, so none of it depends on being able to tell the
+colours apart.
