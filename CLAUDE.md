@@ -113,8 +113,9 @@ neutrals are `gray-warm` tokens and only the hues are the proposal's; and **`opa
 contrast ratio no token can state** (`.soon__tag` at 0.85 over `--muted` was 4.4:1, invisible to
 `contrast.py` and caught by axe). `--measure` replaces the `46rem` written out in five rules: **42rem,
 a median 68 characters**, measured by `frontend/scripts/measure.mjs` (`make measure`) rather than
-estimated. The face swap alone changed **neither line length nor page height** — the narrower column
-is what costs the scroll, **+3.3% on §45f at 1280px**. The focus ring is still USWDS blue: the brand
+estimated. The face swap alone left line length identical and made pages
+slightly **shorter** (§45f at 1280px: Georgia 8,829px → Spectral 8,798px); the narrower column is
+what costs the scroll, **8,798 → 9,117, +3.6%**. The focus ring is still USWDS blue: the brand
 assigns it the indigo, and `$theme-focus-color` is one compile-time value while the theme is chosen at
 runtime.
 

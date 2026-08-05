@@ -95,12 +95,24 @@ arrive, which is a visible shift on a slow link — the price of not having a bl
 
 **The measure costs scroll length on wide screens.** 16 U.S.C. § 45f at 1280px went 8,829px to
 9,117px, +3.3%; § 1801 went 25,365 to 26,312, +3.7%. At 375px nothing moved, because the viewport
-was always narrower than the measure there.
+is narrower than either measure there.
 
-The cost that was anticipated did not occur. A serif at the reading size was expected to raise the
-line height and lengthen the page; measured before and after the face swap alone, the character
-count per line and the page height were the same in Spectral as in Georgia. It is the narrower
-column, not the face, that adds the scroll.
+The cost that was anticipated did not occur, and the measurement is worth stating in three parts
+because the prediction was that the *face* would lengthen the page. Georgia at 46rem, Spectral at
+46rem and Spectral at 42rem, all at 1280px, same container rebuilt three times:
+
+| | § 45f | § 470a | § 1801 |
+| --- | --- | --- | --- |
+| Georgia, 46rem | 8,829 | 1,448 | 25,365 |
+| Spectral, 46rem | 8,798 | 1,418 | 25,245 |
+| Spectral, 42rem | 9,117 | 1,442 | 26,312 |
+
+The face swap alone made every page slightly *shorter*, and left the line length identical at a
+median 82 characters. All of the added scroll is the narrower column.
+
+Only the last row is in `docs/verification/measure.json`, which records the site as it stands. The
+other two are the same `make measure` run against the parent commit and against an intermediate
+state, and are reproducible by checking those out.
 
 **The neutral ramp is USWDS's `gray-warm`, not the palette's own.** USWDS derives a component's text
 colour from its background (`get-color-token-from-bg`, used by the table, the summary box, the
