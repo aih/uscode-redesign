@@ -1,16 +1,22 @@
-"""Keyword search over the corpus (ADR-0028).
+"""Keyword search over the corpus (ADR-0028, ADR-0031, ADR-0049).
 
 Versioning is the whole difficulty here. The index holds one document per
 deduped section *version*, so a section that has been amended four times has
 four documents whose text all matches "conservation". Returning all of them is
 not a search result list, it is the same section four times. So the default
 filters `is_current` — the text in force now — and `?release=`/`?date=` swap that
-for a point-in-time filter.
+for a point-in-time filter. The earlier versions are still counted and reported
+per result (`earlier_matches`), which is the difference between "this section
+does not mention it" and "this section stopped mentioning it".
 
 Release resolution goes through the Repository like everywhere else (CLAUDE.md
 architecture rule 1): this module turns a label into `release_points.seq` by
 asking the repository, never by querying, so `119-102` resolving to
 `119-102not101` behaves here exactly as it does on a section page.
+
+The query itself is built in `storage/searchquery.py`, not here, so that
+`scripts/search_eval.py` can score the ranking that ships rather than a copy of
+it (ADR-0049).
 """
 
 import logging
@@ -29,6 +35,14 @@ from params import (
     resolve_release_or_404,
 )
 from storage.search import SECTIONS_INDEX, STRUCTURE_INDEX, get_search_client
+from storage.searchquery import (
+    CANDIDATES,
+    QUERY_SYNTAX_FLAGS,
+    SORTS,
+    build_earlier_versions_body,
+    build_search_body,
+    parse_query,
+)
 
 log = logging.getLogger(__name__)
 
@@ -47,29 +61,31 @@ MAX_OFFSET = 1000
 `offset` is therefore both a 500 and heap pressure, from a query string. A
 thousand results deep is far past where a keyword search is useful anyway."""
 
-QUERY_SYNTAX_FLAGS = (
-    "AND|OR|NOT|PHRASE|PRECEDENCE|PREFIX|FUZZY|SLOP|ESCAPE|WHITESPACE"
-)
-"""Which operators `simple_query_string` will honour — ADR-0031.
+RANKING = CANDIDATES["phrase"]
+"""The scoring model in force, chosen by measured nDCG@10 over
+`docs/verification/search-judgements.json` — ADR-0049. Changing this line
+changes the ranking, so re-run `uv run python scripts/search_eval.py` and commit
+what it writes."""
 
-Every flag here is a promise the syntax guide makes, and the two must not
-drift: a flag left out is an operator the guide describes and the cluster
-silently swallows. Naming the set rather than passing `ALL` is what makes that
-checkable — `tests/test_search_syntax.py` asserts the guide and this constant
-agree.
-
-`WHITESPACE` looks like the one flag a search box would never need, and
-leaving it out is the mistake this comment exists to prevent. It does not mean
-"treat tabs as operators": it is what makes the parser *split on spaces at
-all*. Without it `water -pollution` parses to `+water +pollution` — the `-` is
-swallowed and the query returns the opposite of what was asked. Verified
-through `_validate/query?explain=true`, which is the only way to see this: the
-query is valid either way and simply means something else."""
+__all__ = ["router", "QUERY_SYNTAX_FLAGS"]
 
 
 class SearchSnippet(BaseModel):
     field: str
     text: str
+
+
+class FacetValue(BaseModel):
+    value: str
+    count: int
+
+
+class SearchFacets(BaseModel):
+    """Counts over the whole result set, not the page. Each one is a filter the
+    reader can add to the query (`title:16`, `status:repealed`)."""
+
+    titles: List[FacetValue] = []
+    statuses: List[FacetValue] = []
 
 
 class SearchResultItem(BaseModel):
@@ -82,6 +98,15 @@ class SearchResultItem(BaseModel):
     first_release: Optional[str] = None
     """The release point this text first appeared at — "unchanged since"."""
     is_current: bool = True
+    title_num: Optional[str] = None
+    status: Optional[str] = None
+    earlier_matches: int = 0
+    """How many superseded versions of this section also match. Reported rather
+    than returned as rows of their own — see the module docstring."""
+    id_collision: bool = False
+    """The source published more than one provision under this identifier at
+    this release point (ADR-0021), and the index holds one of them. Measured
+    over the loaded corpus: 49 identifiers in 14 titles."""
 
 
 class SearchResponse(BaseModel):
@@ -91,6 +116,8 @@ class SearchResponse(BaseModel):
     """The release point searched, when one was asked for. Absent means the
     default: whatever is in force now."""
     note: Optional[str] = None
+    sort: str = "relevance"
+    facets: SearchFacets = SearchFacets()
 
 
 @router.get(
@@ -103,113 +130,65 @@ def search(
     repository: RepositoryDep,
     q: str = Query(
         ...,
-        description="The keyword or phrase to search for.",
+        description=(
+            "The keyword or phrase to search for. Accepts the operators at "
+            "/app/search/syntax, including the scopes heading:, title:, "
+            "chapter:, status:, release: and date:."
+        ),
         min_length=1,
         max_length=500,
     ),
     release: ReleaseParam = None,
     date: DateParam = None,
+    sort: str = Query(
+        "relevance",
+        description="relevance, citation (the Code's own order) or recent (most recently amended).",
+    ),
     limit: int = Query(20, description="Max number of results to return.", ge=1, le=100),
     offset: int = Query(
         0, description="Pagination offset.", ge=0, le=MAX_OFFSET
     ),
 ):
+    if sort not in SORTS:
+        raise HTTPException(
+            status_code=400, detail=f"sort must be one of: {', '.join(SORTS)}"
+        )
+
+    parsed = parse_query(q)
+    if parsed.is_empty():
+        # Everything the reader typed was a scope with nothing to scope by, so
+        # there is no query left. Answering with the whole corpus would be a
+        # worse answer than saying so.
+        raise HTTPException(status_code=400, detail="that query has nothing to search for")
+
+    # An explicit parameter beats one written into the query. `?release=` is
+    # what the pager and the reader's release context carry, and a query string
+    # the reader typed once should not override the moment the page is pinned to.
+    want_release = release if release is not None else parsed.release
+    want_date = date if date is not None else parsed.date
+
     resolved = None
     note = None
-    if release is not None or date is not None:
+    if want_release is not None or want_date is not None:
         resolved = resolve_release_or_404(
-            repository, release=release, on_date=parse_date_param(date)
+            repository, release=want_release, on_date=parse_date_param(want_date)
         )
         note = resolved.note
 
-    if resolved is None:
-        # The default, and the only one that reads a single document per section.
-        version_filter = {"term": {"is_current": True}}
-    else:
-        # Point-in-time: the text that had appeared by this release and had not
-        # yet been superseded. `first_release_seq <= seq` alone would match every
-        # earlier version too, so the newest match per section is picked by
-        # collapsing on the identifier — the same "newest at or before" rule the
-        # Repository applies to a release point that was never ingested
-        # (gotcha 10).
-        version_filter = {"range": {"first_release_seq": {"lte": resolved.release.seq}}}
+    body = build_search_body(
+        parsed,
+        profile=RANKING,
+        release_seq=resolved.release.seq if resolved else None,
+        sort=sort,
+        limit=limit,
+        offset=offset,
+        facets=True,
+    )
 
-    body = {
-        "from": offset,
-        "size": limit,
-        "query": {
-            "bool": {
-                "must": [
-                    {
-                        # Strict by default, loose only when asked — ADR-0031.
-                        # This used to be a `multi_match` with `fuzziness:
-                        # "AUTO"`, which silently spent two edits on every term:
-                        # a search for `compare` returned `compact` and
-                        # `company`, both of which are exactly two edits away.
-                        # Nobody typing a word into a legal corpus wants a
-                        # different word back. `simple_query_string` matches the
-                        # terms as typed and leaves the edits to the reader, who
-                        # asks for them with `~`.
-                        #
-                        # It is the forgiving parser of the two on purpose:
-                        # `query_string` throws on an unbalanced quote or paren,
-                        # which on a public endpoint turns a typo into a 400.
-                        # `simple_query_string` treats the stray character as
-                        # text and answers.
-                        "simple_query_string": {
-                            "query": q,
-                            "fields": ["heading^2", "xml_text"],
-                            # Every word must appear. The old default was OR,
-                            # so a two-word search ranked by "matched either"
-                            # and buried the documents that matched both.
-                            "default_operator": "and",
-                            "flags": QUERY_SYNTAX_FLAGS,
-                            "analyze_wildcard": True,
-                        }
-                    }
-                ],
-                "filter": [version_filter],
-            }
-        },
-        # Every value here was previously a default nobody chose, and the
-        # defaults are tuned for a log search rather than for reading.
-        #
-        # `number_of_fragments` was 5, per field, over two fields — so a single
-        # result could carry ten disconnected 100-character shards, which is
-        # more text than the provision's own heading and impossible to scan. Two
-        # is enough to show the match in context; the section itself is one
-        # click away and is the thing actually worth reading.
-        #
-        # `fragment_size` was 100, which in statutory prose lands mid-clause
-        # ("…shall include approximately one"). 220 is roughly two lines at the
-        # reading width and usually reaches a sentence boundary.
-        #
-        # `no_match_size: 0` keeps the old behaviour of showing nothing for a
-        # field that did not match, rather than the opening of every section.
-        "highlight": {
-            "fields": {
-                "heading": {"number_of_fragments": 1},
-                "xml_text": {"number_of_fragments": 2, "fragment_size": 220},
-            },
-            "no_match_size": 0,
-        },
-    }
-
-    if resolved is not None:
-        body["collapse"] = {
-            "field": "identifier",
-            "inner_hits": {
-                "name": "at_release",
-                "size": 1,
-                "sort": [{"first_release_seq": "desc"}],
-                "highlight": body["highlight"],
-            },
-        }
-
+    client = get_search_client()
+    index = f"{SECTIONS_INDEX},{STRUCTURE_INDEX}"
     try:
-        res = get_search_client().search(
-            index=f"{SECTIONS_INDEX},{STRUCTURE_INDEX}", body=body
-        )
+        res = client.search(index=index, body=body)
     except Exception:
         # The exception goes to the log, not to the caller. An opensearch-py
         # error stringifies to the cluster's internal hostname, port and index
@@ -249,11 +228,53 @@ def search(
             snippets=snippets,
             first_release=source.get("first_release_label"),
             is_current=bool(source.get("is_current", True)),
+            title_num=source.get("title_num"),
+            status=source.get("status"),
+            id_collision=bool(source.get("id_collision", False)),
         ))
+
+    if resolved is None:
+        _count_earlier_matches(client, parsed, results)
 
     return SearchResponse(
         results=results,
         total=total,
         release=resolved.release.label if resolved else None,
         note=note,
+        sort=sort,
+        facets=_facets(res.get("aggregations", {})),
     )
+
+
+def _count_earlier_matches(client, parsed, results: list[SearchResultItem]) -> None:
+    """Fill in `earlier_matches` for the sections on this page.
+
+    A failure here is not a failed search: the result list is already built and
+    correct, and the count is an extra fact about it. So this logs and leaves the
+    counts at zero rather than turning a good answer into a 503.
+    """
+    identifiers = [r.identifier for r in results if r.type == "section" and r.identifier]
+    if not identifiers:
+        return
+    try:
+        res = client.search(
+            index=SECTIONS_INDEX,
+            body=build_earlier_versions_body(parsed, identifiers, profile=RANKING),
+        )
+    except Exception:
+        log.warning("earlier-version counts unavailable", exc_info=True)
+        return
+    counts = {
+        bucket["key"]: bucket["doc_count"]
+        for bucket in res.get("aggregations", {}).get("by_identifier", {}).get("buckets", [])
+    }
+    for result in results:
+        result.earlier_matches = counts.get(result.identifier, 0)
+
+
+def _facets(aggregations: dict) -> SearchFacets:
+    def values(name: str) -> list[FacetValue]:
+        buckets = aggregations.get(name, {}).get("buckets", [])
+        return [FacetValue(value=str(b["key"]), count=b["doc_count"]) for b in buckets]
+
+    return SearchFacets(titles=values("titles"), statuses=values("statuses"))
