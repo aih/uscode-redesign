@@ -49,6 +49,12 @@ PAIRS: list[tuple[str, str, str, float]] = [
     # colour cannot inherit `--ink`, which inverts with the theme while the fill
     # under it does not. Same shape as the badge above, a different fill.
     ("--danger-ink", "--link", "text inside a selected sort or facet pill", 4.5),
+    # The brand reserves one green for version semantics and puts it nowhere
+    # else (ADR-0052): the insertion side of a redline, the marker on the
+    # release in force. It is read as text and as a 3px rule, so it is held to
+    # the text ratio, which is the stricter of the two.
+    ("--version", "--page", "an insertion in a redline, and the current-release marker", 4.5),
+    ("--version", "--panel", "the same, on a panel", 4.5),
     ("--edge", "--field", "the boundary of an input, select or textarea", 3.0),
     ("--edge", "--page", "a control's boundary against the page", 3.0),
     ("--edge", "--panel", "a control's boundary inside a panel", 3.0),

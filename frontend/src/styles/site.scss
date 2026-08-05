@@ -2,31 +2,151 @@
  * USWDS, themed, plus the reader's own layer.
  *
  * USWDS is the federal government's design system — WCAG 2.1 AA and Section 508
- * are its stated bar, and it is the natural visual language for the United States
- * Code (ADR-0011). Only the packages this reader uses are forwarded, because
- * forwarding all of them costs several hundred kilobytes of CSS for components
- * no page renders.
+ * are its stated bar, and it is the chassis this reader is built on (ADR-0011).
+ * Only the packages this reader uses are forwarded, because forwarding all of
+ * them costs several hundred kilobytes of CSS for components no page renders.
+ *
+ * The brand is a layer of token overrides on that chassis and nothing else
+ * (ADR-0052): two typefaces served from this origin, one palette in two themes,
+ * and a reading measure. No second framework, no utility-class layer.
  *
  * Two theme decisions worth stating:
  *
- *   * **System font stacks.** USWDS ships Public Sans, Merriweather and Roboto
- *     Mono as ~5 MB of files. This site has no CDN by design, so those would be
- *     5 MB in the repository and on the wire; the system stacks are already on
- *     the reader's machine and cost nothing.
  *   * **A serif reading face for statutory text, sans for everything about it.**
  *     Carried over from the Jinja reader (BUILDLOG 007) — it is the distinction
- *     between the law and the apparatus around the law.
+ *     between the law and the apparatus around the law. Since ADR-0052 those are
+ *     Spectral and Archivo rather than Georgia and the system sans.
+ *   * **One monospace, from the system stack.** Identifiers, guids and API
+ *     examples want a fixed pitch and nothing more, and every machine already
+ *     has one.
  */
 
 @use "uswds-core" with (
   $theme-show-notifications: false,
+  /* The colour settings below are hex rather than USWDS palette tokens, which
+   * USWDS warns about on every compile unless told the override is deliberate.
+   * It is: the palette is ADR-0052's, and `scripts/contrast.py` is what holds it
+   * to WCAG rather than USWDS's own grading. */
+  $theme-show-compile-warnings: false,
   $theme-image-path: "/app/uswds/img",
-  $theme-font-path: "/app/uswds/fonts",
-  $theme-font-type-sans: "system",
-  $theme-font-type-serif: "georgia",
+
+  /* ---- type ----------------------------------------------------------------
+   *
+   * Cap heights are measured, not chosen: USWDS normalises its whole type scale
+   * against them (`normalize-type-scale()`), so that changing a face keeps text
+   * the same *apparent* size rather than the same em size. The numbers come out
+   * of the font binaries in `docs/verification/fonts.json` — cap height in px at
+   * a 500px font size, which is the convention USWDS's own Public Sans (362) and
+   * Merriweather (371) values follow.
+   *
+   * These are typeface tokens with no `src`, so USWDS generates no `@font-face`
+   * for them. The reader declares its own further down, because USWDS's
+   * generator emits one rule per static weight — which cannot express a variable
+   * face — and hard-codes `font-display: fallback`.
+   *
+   * `usc-mono` carries `system-font: true` so no display name is emitted and no
+   * `@font-face` is generated: the stack is the whole font. Before this, the
+   * mono role was USWDS's Roboto Mono and every page carried six `@font-face`
+   * rules pointing at `/app/uswds/fonts/roboto-mono/…`, which this site does not
+   * serve and no rule ever asked for. */
+  $theme-typeface-tokens: (
+    "archivo": (
+      display-name: "Archivo",
+      cap-height: 343px,
+      stack: (-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif),
+    ),
+    "spectral": (
+      display-name: "Spectral",
+      cap-height: 330px,
+      stack: (Georgia, "Iowan Old Style", "Times New Roman", Times, serif),
+    ),
+    "usc-mono": (
+      display-name: null,
+      cap-height: 362px,
+      stack: (ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace),
+      system-font: true,
+    ),
+  ),
+  $theme-font-type-sans: "archivo",
+  $theme-font-type-serif: "spectral",
+  $theme-font-type-mono: "usc-mono",
+  /* Body and headings are the interface face. The serif is not the page's
+   * default — it is what statutory text is set in, applied through `--reading`
+   * to the provisions themselves and to the apparatus quoted beside them. */
   $theme-font-role-heading: "sans",
   $theme-font-role-body: "sans",
   $theme-respect-user-font-size: true,
+
+  /* ---- colour ---------------------------------------------------------------
+   *
+   * The same values as the light-theme custom properties below, which is the
+   * point: USWDS's own components (buttons, tags, alerts, the breadcrumb, the
+   * footer) paint from these, and the reader's components paint from those, and
+   * a page renders both. Every ratio either side of that line is in
+   * `docs/verification/contrast.json`.
+   *
+   * Only the light theme can be expressed here. These are compile-time Sass
+   * values and the theme is chosen at runtime (ADR-0027), so the dark palette is
+   * custom properties alone and the USWDS components that need repainting for it
+   * are named in the `[data-theme="dark"]` block. */
+  /* The neutrals are USWDS's own `gray-warm` ramp rather than hexes of our own,
+   * and the light-theme custom properties below take their values from it, so
+   * there is one warm-grey ramp on the page instead of two that nearly agree.
+   *
+   * Not a stylistic preference: USWDS resolves a component's text colour *from*
+   * its background colour (`get-color-token-from-bg`, used by the table, the
+   * summary box and the alert), and that function needs a palette token by name.
+   * Handed a raw hex it returns one, and the `color()` call downstream rejects
+   * it — "Only use quoted color tokens in USWDS functions and mixins" — which is
+   * a compile error, not a warning. The hue tokens further down go through
+   * `set-theme-color` instead, which does take a hex. */
+  $theme-color-base-family: "gray-warm",
+  $theme-color-base-lightest: "gray-warm-3",
+  $theme-color-base-lighter: "gray-warm-5",
+  $theme-color-base-light: "gray-warm-20",
+  $theme-color-base: "gray-warm-40",
+  $theme-color-base-dark: "gray-warm-60",
+  $theme-color-base-darker: "gray-warm-70",
+  $theme-color-base-darkest: "gray-warm-90",
+  $theme-color-base-ink: "gray-warm-90",
+
+  $theme-color-primary-family: "indigo",
+  $theme-color-primary-lighter: #dfe3f2,
+  $theme-color-primary-light: #93a3d6,
+  $theme-color-primary: #31509d,
+  $theme-color-primary-vivid: #31509d,
+  $theme-color-primary-dark: #263e7a,
+  $theme-color-primary-darker: #1b2c58,
+
+  /* Deliberately *not* the brand's green. USWDS's `secondary` is the emphasis
+   * colour its buttons and alerts reach for, and green on this site means one
+   * thing — a version changed (`--version` below). A colour that also means
+   * "press this" means neither. */
+  $theme-color-secondary-family: "red",
+  $theme-color-secondary-lighter: #f7e3e1,
+  $theme-color-secondary-light: #d99b96,
+  $theme-color-secondary: #90302e,
+  $theme-color-secondary-vivid: #90302e,
+  $theme-color-secondary-dark: #74211f,
+  $theme-color-secondary-darker: #571714,
+
+  $theme-color-error: #90302e,
+  $theme-color-error-dark: #74211f,
+  $theme-color-error-darker: #571714,
+  $theme-color-warning: #a16100,
+  $theme-color-warning-dark: #7d4b00,
+  $theme-color-info: #31509d,
+  $theme-color-success: #036639,
+  $theme-color-success-dark: #024f2c,
+
+  $theme-body-background-color: "gray-warm-2",
+  $theme-text-color: "gray-warm-90",
+  /* The link colours are left at their defaults — "primary", "primary-dark",
+   * "primary-darker" — which now resolve to the indigo above. They cannot be
+   * set to a hex directly: `typeset-link()` passes them through `color()`,
+   * which takes a token name and rejects a colour value. Visited links stay
+   * USWDS's violet-70v, the one hue on the page the brand does not name. */
+
   $utilities-use-important: false
 );
 
@@ -54,6 +174,77 @@
 @forward "usa-icon";
 @forward "usa-prose";
 
+/* ----------------------------------------------------------------- webfonts
+ *
+ * Both faces are served from this origin (ADR-0052). Nothing on a reader page
+ * fetches type from another host, so `font-src 'self'` holds in the CSP
+ * (ADR-0030) and the first paint of statutory text costs no round trip to
+ * somebody else's server.
+ *
+ * Written by hand rather than generated by USWDS for two reasons. USWDS emits
+ * one `@font-face` per static weight from a map of filenames, which cannot
+ * express a variable face's weight range; and its generator hard-codes
+ * `font-display: fallback`, whose block period leaves the text of the Code
+ * invisible for up to 100ms on a slow link. `swap` paints the fallback face
+ * immediately and repaints when the webfont arrives.
+ *
+ * Archivo is one variable file per style, `wdth` pinned to 100. Spectral has no
+ * variable version upstream — `ofl/spectral/METADATA.pb` declares fourteen
+ * static instances and no axes — so it is four files. Byte sizes, sha256s,
+ * upstream commits and the command that built them are in
+ * `docs/verification/fonts.json`.
+ */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/app/fonts/archivo-latin-var.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Archivo";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/app/fonts/archivo-latin-var-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/app/fonts/spectral-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/app/fonts/spectral-latin-400-italic.woff2") format("woff2");
+}
+
+/* The source marks emphasis and bold inside provisions — `<i>` and `<b>` are
+ * both in `uslm.ts`'s inline vocabulary — so all four serif faces are reachable
+ * from the text of the Code itself, not just from the chrome around it. */
+@font-face {
+  font-family: "Spectral";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/app/fonts/spectral-latin-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spectral";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/app/fonts/spectral-latin-700-italic.woff2") format("woff2");
+}
+
 /* ------------------------------------------------------------------- tokens */
 
 :root {
@@ -78,19 +269,49 @@
    * Below 40em only `.sectionbar` sticks: one 45px row. */
   --sticky-h: 3.25rem;
 
-  --reading: Georgia, "Iowan Old Style", "Times New Roman", serif;
-  --ink: #1b1b1b;
-  --muted: #565c65;
-  --rule: #dfe1e2;
-  --page: #ffffff;
-  --panel: #f0f0f0;
+  /* The width of the reading column, and of the chrome that spans it. A token
+   * rather than the `46rem` that used to be written out in five rules, because
+   * the measure is a brand decision (ADR-0052) and a measure stated in five
+   * places is five chances to state it differently.
+   *
+   * 42rem is a median 68 characters of Spectral at the reading size, 62 to 73
+   * across the tenth and ninetieth percentiles — counted from where the browser
+   * actually broke the lines, at three viewport widths, by `scripts/measure.mjs`
+   * into `docs/verification/measure.json`. The old 46rem held a median 82, well
+   * outside the 62–70 the brand asks for, and held the same 82 in Georgia: the
+   * measure was already wide, and changing the face neither caused that nor
+   * fixed it. Below 40em the viewport is narrower than any of this and the
+   * column holds 38.
+   *
+   * `--measure-wide` is for the two layouts that put a second column beside the
+   * prose — a section page with its chapter rail, and a guide chapter with its
+   * contents list. Below 64em neither column is beside anything; both stack
+   * under the text, so the wide wrap has nothing to be wide for and the reading
+   * measure applies. Expressed here rather than as a media query on each of the
+   * five consumers, so `<main>` and the sticky chrome above it cannot disagree
+   * about how wide the page is. */
+  --measure: 42rem;
+  --measure-wide: var(--measure);
+
+  /* Statutory text. The interface is set in Archivo; this is the other half of
+   * the distinction — the law, as against the apparatus around the law. */
+  --reading: Spectral, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --ink: #171716;
+  --muted: #5d5d52;
+  --rule: #dcdbd4;
+  --page: #f9f9f7;
+  --panel: #f0f0ec;
   /* Form controls. USWDS already paints these white; the token exists so the
-   * dark theme has one place to move them to. */
+   * dark theme has one place to move them to, and so a control stays paper-white
+   * against a page that is a shade warmer than white. */
   --field: #ffffff;
-  --link: #005ea2;
-  --target: rgba(255, 190, 46, 0.28);
-  --target-edge: #c05600;
-  --danger: #b50909;
+  --link: #31509d;
+  /* The highlighted provision. One amber at two alphas across the themes: it is
+   * neither the insertion green nor the deletion red, which is the point —
+   * "this is the thing you asked for" is not a statement about change. */
+  --target: rgba(254, 179, 84, 0.32);
+  --target-edge: #a16100;
+  --danger: #90302e;
   /* Text painted *on* `--danger` — the repealed/omitted badge. USWDS paints
    * `.usa-tag` white, which is right on the light theme's deep red and 2.25:1
    * on the dark theme's pale one, so it is a token rather than an assumption
@@ -103,7 +324,15 @@
    * edge and exactly not a decorative divider. Holding both to 3:1 would mean
    * every hairline on the site at #949494 or darker, which is a heavy reader
    * for no conformance gain; holding neither means an input you cannot find. */
-  --edge: #565c65;
+  --edge: #76766a;
+
+  /* Version semantics, and nothing else (ADR-0052). This is the colour of an
+   * insertion in a redline, of the marker on the release currently in force,
+   * and of no button, no success message and no decoration. Green and red on
+   * this site mean "the text changed"; a green that also meant "this worked"
+   * would leave both meaning neither. Colour is never the only carrier —
+   * every insertion, deletion and status also has text or shape. */
+  --version: #036639;
 }
 
 @media (min-width: 40em) {
@@ -149,6 +378,8 @@
 @media (min-width: 64em) {
   :root {
     --sticky-h: 19rem;
+    /* 40rem of prose, 16rem of rail, a 2rem gap and 2rem of page padding. */
+    --measure-wide: 60rem;
   }
 }
 
@@ -174,20 +405,21 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --ink: #e8e6e1;
-  --muted: #a9aeb1;
-  --rule: #3d4551;
-  --page: #16150f;
-  --panel: #1c1d1f;
-  --field: #26282b;
-  --link: #73b3e7;
-  --target: rgba(255, 190, 46, 0.22);
-  --target-edge: #ffbe2e;
-  --danger: #f2938c;
+  --ink: #eae8e3;
+  --muted: #b0aea8;
+  --rule: #4a4743;
+  --page: #141310;
+  --panel: #22201d;
+  --field: #2b2a27;
+  --link: #9bb7f2;
+  --target: rgba(254, 179, 84, 0.22);
+  --target-edge: #feb354;
+  --danger: #ec928b;
   /* Dark's `--danger` is a *pale* red, chosen to be readable as text on a dark
    * page. White on it is 2.25:1. Ink on it is what the badge needs. */
-  --danger-ink: #16150f;
-  --edge: #8d9297;
+  --danger-ink: #141310;
+  --edge: #928f88;
+  --version: #81d39f;
 
   body {
     background: var(--page);
@@ -302,13 +534,15 @@
   }
 
   /* A redline is read by colour before it is read by word, so the two marks
-   * have to keep their contrast against the page they are actually on. */
+   * have to keep their contrast against the page they are actually on. The
+   * washes are `--version` and `--danger` at an alpha, written out because a
+   * translucent fill is not a token — the token is the colour it is made of. */
   .diff-view ins {
-    background: rgba(0, 166, 81, 0.3);
+    background: rgba(129, 211, 159, 0.26);
   }
 
   .diff-view del {
-    background: rgba(242, 147, 140, 0.24);
+    background: rgba(236, 146, 139, 0.24);
   }
 }
 
@@ -440,7 +674,7 @@ main[id] {
 }
 
 .reader-wrap {
-  max-width: 46rem;
+  max-width: var(--measure);
   margin: 0 auto;
   padding: 0 1rem 3rem;
 }
@@ -450,7 +684,7 @@ main[id] {
  * both users of this — the guide (ADR-0038) and a section page carrying a
  * `ChapterRail` — are one column anyway. */
 .reader-wrap--wide {
-  max-width: 62rem;
+  max-width: var(--measure-wide);
 }
 
 /* A section page with a rail. The rail is second in the markup and moves to the
@@ -610,11 +844,11 @@ main[id] {
  * offset from the page they belong to. */
 .topbar--wide .contextbar__inner,
 .topbar--wide .sectionbar__inner {
-  max-width: 62rem;
+  max-width: var(--measure-wide);
 }
 
 .contextbar__inner {
-  max-width: 46rem;
+  max-width: var(--measure);
   margin: 0 auto;
   padding: 0.5rem 1rem;
   display: flex;
@@ -1426,7 +1660,7 @@ main[id] {
 }
 
 .sectionbar__inner {
-  max-width: 46rem;
+  max-width: var(--measure);
   margin: 0 auto;
   padding: 0 0.5rem;
   display: flex;
@@ -2075,7 +2309,7 @@ main[id] {
 }
 
 .diff-line--insert {
-  border-left-color: #00a651;
+  border-left-color: var(--version);
 }
 
 .diff-line--delete {
@@ -2096,13 +2330,13 @@ main[id] {
 }
 
 .diff-view ins {
-  background: rgba(0, 166, 81, 0.18);
+  background: rgba(3, 102, 57, 0.16);
   text-decoration: none;
   color: var(--ink);
 }
 
 .diff-view del {
-  background: rgba(181, 9, 9, 0.14);
+  background: rgba(144, 48, 46, 0.14);
   color: var(--muted);
 }
 
@@ -2336,6 +2570,12 @@ main[id] {
 
 /* Small, quiet, and not a colour anyone has to decode: the word does the work.
  * A dot or a lock icon would need a legend. */
+/* No `opacity` on it, though it read better with one. A translucent text colour
+ * is a contrast ratio no token can state: `--muted` at 0.85 over the page was
+ * 4.4:1 against the 4.5 the same colour passes at, and `scripts/contrast.py`
+ * cannot see it because the composite exists only in the browser. The axe scan
+ * caught it the day the palette moved (ADR-0052); the ratio had been thin under
+ * the old one too. */
 .soon__tag {
   font-size: 0.7rem;
   letter-spacing: 0.04em;
@@ -2343,7 +2583,6 @@ main[id] {
   border: 1px solid currentcolor;
   border-radius: 0.75rem;
   padding: 0 0.4rem;
-  opacity: 0.85;
 }
 
 /* In the navbar's link row it has to sit on the links' baseline and carry the

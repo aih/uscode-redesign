@@ -5,36 +5,42 @@
     "light": {
       "--indent-step": "0.75rem",
       "--sticky-h": "3.25rem",
-      "--reading": "Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
-      "--ink": "#1b1b1b",
-      "--muted": "#565c65",
-      "--rule": "#dfe1e2",
-      "--page": "#ffffff",
-      "--panel": "#f0f0f0",
+      "--measure": "42rem",
+      "--measure-wide": "var(--measure)",
+      "--reading": "Spectral, Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
+      "--ink": "#171716",
+      "--muted": "#5d5d52",
+      "--rule": "#dcdbd4",
+      "--page": "#f9f9f7",
+      "--panel": "#f0f0ec",
       "--field": "#ffffff",
-      "--link": "#005ea2",
-      "--target": "rgba(255, 190, 46, 0.28)",
-      "--target-edge": "#c05600",
-      "--danger": "#b50909",
+      "--link": "#31509d",
+      "--target": "rgba(254, 179, 84, 0.32)",
+      "--target-edge": "#a16100",
+      "--danger": "#90302e",
       "--danger-ink": "#ffffff",
-      "--edge": "#565c65"
+      "--edge": "#76766a",
+      "--version": "#036639"
     },
     "dark": {
       "--indent-step": "0.75rem",
       "--sticky-h": "3.25rem",
-      "--reading": "Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
-      "--ink": "#e8e6e1",
-      "--muted": "#a9aeb1",
-      "--rule": "#3d4551",
-      "--page": "#16150f",
-      "--panel": "#1c1d1f",
-      "--field": "#26282b",
-      "--link": "#73b3e7",
-      "--target": "rgba(255, 190, 46, 0.22)",
-      "--target-edge": "#ffbe2e",
-      "--danger": "#f2938c",
-      "--danger-ink": "#16150f",
-      "--edge": "#8d9297",
+      "--measure": "42rem",
+      "--measure-wide": "var(--measure)",
+      "--reading": "Spectral, Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
+      "--ink": "#eae8e3",
+      "--muted": "#b0aea8",
+      "--rule": "#4a4743",
+      "--page": "#141310",
+      "--panel": "#22201d",
+      "--field": "#2b2a27",
+      "--link": "#9bb7f2",
+      "--target": "rgba(254, 179, 84, 0.22)",
+      "--target-edge": "#feb354",
+      "--danger": "#ec928b",
+      "--danger-ink": "#141310",
+      "--edge": "#928f88",
+      "--version": "#81d39f",
       "--outline": "hover {\n    color: var(--ink)"
     }
   },
@@ -45,15 +51,15 @@
       "background": "--page",
       "requires": 4.5,
       "light": {
-        "fg": "#1b1b1b",
-        "bg": "#ffffff",
-        "ratio": 17.22,
+        "fg": "#171716",
+        "bg": "#f9f9f7",
+        "ratio": 17.02,
         "passes": true
       },
       "dark": {
-        "fg": "#e8e6e1",
-        "bg": "#16150f",
-        "ratio": 14.66,
+        "fg": "#eae8e3",
+        "bg": "#141310",
+        "ratio": 15.17,
         "passes": true
       }
     },
@@ -63,15 +69,15 @@
       "background": "--panel",
       "requires": 4.5,
       "light": {
-        "fg": "#1b1b1b",
-        "bg": "#f0f0f0",
-        "ratio": 15.11,
+        "fg": "#171716",
+        "bg": "#f0f0ec",
+        "ratio": 15.7,
         "passes": true
       },
       "dark": {
-        "fg": "#e8e6e1",
-        "bg": "#1c1d1f",
-        "ratio": 13.52,
+        "fg": "#eae8e3",
+        "bg": "#22201d",
+        "ratio": 13.27,
         "passes": true
       }
     },
@@ -81,15 +87,15 @@
       "background": "--field",
       "requires": 4.5,
       "light": {
-        "fg": "#1b1b1b",
+        "fg": "#171716",
         "bg": "#ffffff",
-        "ratio": 17.22,
+        "ratio": 17.94,
         "passes": true
       },
       "dark": {
-        "fg": "#e8e6e1",
-        "bg": "#26282b",
-        "ratio": 11.85,
+        "fg": "#eae8e3",
+        "bg": "#2b2a27",
+        "ratio": 11.72,
         "passes": true
       }
     },
@@ -99,15 +105,15 @@
       "background": "--page",
       "requires": 4.5,
       "light": {
-        "fg": "#565c65",
-        "bg": "#ffffff",
-        "ratio": 6.74,
+        "fg": "#5d5d52",
+        "bg": "#f9f9f7",
+        "ratio": 6.32,
         "passes": true
       },
       "dark": {
-        "fg": "#a9aeb1",
-        "bg": "#16150f",
-        "ratio": 8.17,
+        "fg": "#b0aea8",
+        "bg": "#141310",
+        "ratio": 8.37,
         "passes": true
       }
     },
@@ -117,15 +123,15 @@
       "background": "--panel",
       "requires": 4.5,
       "light": {
-        "fg": "#565c65",
-        "bg": "#f0f0f0",
-        "ratio": 5.92,
+        "fg": "#5d5d52",
+        "bg": "#f0f0ec",
+        "ratio": 5.83,
         "passes": true
       },
       "dark": {
-        "fg": "#a9aeb1",
-        "bg": "#1c1d1f",
-        "ratio": 7.53,
+        "fg": "#b0aea8",
+        "bg": "#22201d",
+        "ratio": 7.32,
         "passes": true
       }
     },
@@ -135,15 +141,15 @@
       "background": "--page",
       "requires": 4.5,
       "light": {
-        "fg": "#005ea2",
-        "bg": "#ffffff",
-        "ratio": 6.72,
+        "fg": "#31509d",
+        "bg": "#f9f9f7",
+        "ratio": 7.21,
         "passes": true
       },
       "dark": {
-        "fg": "#73b3e7",
-        "bg": "#16150f",
-        "ratio": 8.13,
+        "fg": "#9bb7f2",
+        "bg": "#141310",
+        "ratio": 9.24,
         "passes": true
       }
     },
@@ -153,15 +159,15 @@
       "background": "--panel",
       "requires": 4.5,
       "light": {
-        "fg": "#005ea2",
-        "bg": "#f0f0f0",
-        "ratio": 5.9,
+        "fg": "#31509d",
+        "bg": "#f0f0ec",
+        "ratio": 6.65,
         "passes": true
       },
       "dark": {
-        "fg": "#73b3e7",
-        "bg": "#1c1d1f",
-        "ratio": 7.5,
+        "fg": "#9bb7f2",
+        "bg": "#22201d",
+        "ratio": 8.09,
         "passes": true
       }
     },
@@ -171,15 +177,15 @@
       "background": "--field",
       "requires": 4.5,
       "light": {
-        "fg": "#005ea2",
+        "fg": "#31509d",
         "bg": "#ffffff",
-        "ratio": 6.72,
+        "ratio": 7.6,
         "passes": true
       },
       "dark": {
-        "fg": "#73b3e7",
-        "bg": "#26282b",
-        "ratio": 6.57,
+        "fg": "#9bb7f2",
+        "bg": "#2b2a27",
+        "ratio": 7.14,
         "passes": true
       }
     },
@@ -189,15 +195,15 @@
       "background": "--page",
       "requires": 4.5,
       "light": {
-        "fg": "#b50909",
-        "bg": "#ffffff",
-        "ratio": 6.98,
+        "fg": "#90302e",
+        "bg": "#f9f9f7",
+        "ratio": 7.52,
         "passes": true
       },
       "dark": {
-        "fg": "#f2938c",
-        "bg": "#16150f",
-        "ratio": 8.12,
+        "fg": "#ec928b",
+        "bg": "#141310",
+        "ratio": 8.01,
         "passes": true
       }
     },
@@ -208,14 +214,14 @@
       "requires": 4.5,
       "light": {
         "fg": "#ffffff",
-        "bg": "#b50909",
-        "ratio": 6.98,
+        "bg": "#90302e",
+        "ratio": 7.93,
         "passes": true
       },
       "dark": {
-        "fg": "#16150f",
-        "bg": "#f2938c",
-        "ratio": 8.12,
+        "fg": "#141310",
+        "bg": "#ec928b",
+        "ratio": 8.01,
         "passes": true
       }
     },
@@ -226,14 +232,50 @@
       "requires": 4.5,
       "light": {
         "fg": "#ffffff",
-        "bg": "#005ea2",
+        "bg": "#31509d",
+        "ratio": 7.6,
+        "passes": true
+      },
+      "dark": {
+        "fg": "#141310",
+        "bg": "#9bb7f2",
+        "ratio": 9.24,
+        "passes": true
+      }
+    },
+    {
+      "usage": "an insertion in a redline, and the current-release marker",
+      "foreground": "--version",
+      "background": "--page",
+      "requires": 4.5,
+      "light": {
+        "fg": "#036639",
+        "bg": "#f9f9f7",
         "ratio": 6.72,
         "passes": true
       },
       "dark": {
-        "fg": "#16150f",
-        "bg": "#73b3e7",
-        "ratio": 8.13,
+        "fg": "#81d39f",
+        "bg": "#141310",
+        "ratio": 10.4,
+        "passes": true
+      }
+    },
+    {
+      "usage": "the same, on a panel",
+      "foreground": "--version",
+      "background": "--panel",
+      "requires": 4.5,
+      "light": {
+        "fg": "#036639",
+        "bg": "#f0f0ec",
+        "ratio": 6.2,
+        "passes": true
+      },
+      "dark": {
+        "fg": "#81d39f",
+        "bg": "#22201d",
+        "ratio": 9.09,
         "passes": true
       }
     },
@@ -243,15 +285,15 @@
       "background": "--field",
       "requires": 3.0,
       "light": {
-        "fg": "#565c65",
+        "fg": "#76766a",
         "bg": "#ffffff",
-        "ratio": 6.74,
+        "ratio": 4.6,
         "passes": true
       },
       "dark": {
-        "fg": "#8d9297",
-        "bg": "#26282b",
-        "ratio": 4.71,
+        "fg": "#928f88",
+        "bg": "#2b2a27",
+        "ratio": 4.45,
         "passes": true
       }
     },
@@ -261,15 +303,15 @@
       "background": "--page",
       "requires": 3.0,
       "light": {
-        "fg": "#565c65",
-        "bg": "#ffffff",
-        "ratio": 6.74,
+        "fg": "#76766a",
+        "bg": "#f9f9f7",
+        "ratio": 4.36,
         "passes": true
       },
       "dark": {
-        "fg": "#8d9297",
-        "bg": "#16150f",
-        "ratio": 5.83,
+        "fg": "#928f88",
+        "bg": "#141310",
+        "ratio": 5.76,
         "passes": true
       }
     },
@@ -279,15 +321,15 @@
       "background": "--panel",
       "requires": 3.0,
       "light": {
-        "fg": "#565c65",
-        "bg": "#f0f0f0",
-        "ratio": 5.92,
+        "fg": "#76766a",
+        "bg": "#f0f0ec",
+        "ratio": 4.02,
         "passes": true
       },
       "dark": {
-        "fg": "#8d9297",
-        "bg": "#1c1d1f",
-        "ratio": 5.37,
+        "fg": "#928f88",
+        "bg": "#22201d",
+        "ratio": 5.03,
         "passes": true
       }
     },
@@ -297,15 +339,15 @@
       "background": "--page",
       "requires": 3.0,
       "light": {
-        "fg": "#c05600",
-        "bg": "#ffffff",
-        "ratio": 4.59,
+        "fg": "#a16100",
+        "bg": "#f9f9f7",
+        "ratio": 4.71,
         "passes": true
       },
       "dark": {
-        "fg": "#ffbe2e",
-        "bg": "#16150f",
-        "ratio": 11.02,
+        "fg": "#feb354",
+        "bg": "#141310",
+        "ratio": 10.43,
         "passes": true
       }
     },
@@ -315,15 +357,15 @@
       "background": "--panel",
       "requires": 3.0,
       "light": {
-        "fg": "#c05600",
-        "bg": "#f0f0f0",
-        "ratio": 4.03,
+        "fg": "#a16100",
+        "bg": "#f0f0ec",
+        "ratio": 4.35,
         "passes": true
       },
       "dark": {
-        "fg": "#ffbe2e",
-        "bg": "#1c1d1f",
-        "ratio": 10.17,
+        "fg": "#feb354",
+        "bg": "#22201d",
+        "ratio": 9.12,
         "passes": true
       }
     },
@@ -334,15 +376,15 @@
       "requires": null,
       "decorative": true,
       "light": {
-        "fg": "#dfe1e2",
-        "bg": "#ffffff",
-        "ratio": 1.31,
+        "fg": "#dcdbd4",
+        "bg": "#f9f9f7",
+        "ratio": 1.32,
         "passes": null
       },
       "dark": {
-        "fg": "#3d4551",
-        "bg": "#16150f",
-        "ratio": 1.89,
+        "fg": "#4a4743",
+        "bg": "#141310",
+        "ratio": 2.01,
         "passes": null
       }
     },
@@ -353,22 +395,22 @@
       "requires": null,
       "decorative": true,
       "light": {
-        "fg": "#dfe1e2",
-        "bg": "#f0f0f0",
-        "ratio": 1.15,
+        "fg": "#dcdbd4",
+        "bg": "#f0f0ec",
+        "ratio": 1.22,
         "passes": null
       },
       "dark": {
-        "fg": "#3d4551",
-        "bg": "#1c1d1f",
-        "ratio": 1.74,
+        "fg": "#4a4743",
+        "bg": "#22201d",
+        "ratio": 1.76,
         "passes": null
       }
     }
   ],
   "summary": {
-    "pairs": 18,
-    "checks": 36,
+    "pairs": 20,
+    "checks": 40,
     "failures": 0
   }
 }
