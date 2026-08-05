@@ -114,6 +114,13 @@ def load_release(
     guid_rows: list[dict[str, object]] = []
     versions_to_sync: list[dict[str, Any]] = []
     retire_keys: list[tuple[str, int]] = []
+    # Identifiers this release has already created a *new* version for. A second
+    # one means the source published two elements under the one identifier at
+    # this release point (ADR-0021) — and since the index document is keyed on
+    # (identifier, first release), both are the same document. The second write
+    # overwrites the first and flags it, which is why flagging only the later
+    # occurrence is enough.
+    new_version_identifiers: set[str] = set()
 
     # Only text from the newest release this title has reached is "in force", and
     # loads do not have to arrive in order — `load-all` walks the inventory's seq,
@@ -186,11 +193,19 @@ def load_release(
                 "xml": record.xml,
                 "status": record.status,
                 "version_id": version.id,
+                # Where this text sits, for `chapter:` and `?sort=citation`.
+                # The same two values written to `section_release_map` below,
+                # read from the record rather than from that row so the index
+                # write does not wait on the upsert.
+                "parent_identifier": record.ancestors[-1][1] if record.ancestors else None,
+                "seq_in_title": record.seq,
+                "id_collision": record.identifier in new_version_identifiers,
                 "first_release_id": release_id,
                 "first_release_seq": release_seq,
                 "first_release_label": release_label,
                 "is_current": is_newest_for_title,
             })
+            new_version_identifiers.add(record.identifier)
         else:
             # A release republishing this text unchanged needs no index write at
             # all: the document already exists and is already current. This is

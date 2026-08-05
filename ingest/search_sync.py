@@ -21,6 +21,7 @@ import os
 from typing import Any, Iterable
 import re
 from opensearchpy import helpers
+from storage.postgres import title_sort_key
 from storage.search import (
     SECTIONS_INDEX,
     STRUCTURE_INDEX,
@@ -82,15 +83,93 @@ def doc_id(identifier: str, first_release_id: int) -> str:
     return f"{identifier}@{first_release_id}"
 
 
+_TITLE_IN_IDENTIFIER = re.compile(r"^/us/usc/t([0-9]+[a-zA-Z]?)(?:/|$)")
+_CHAPTER_IN_IDENTIFIER = re.compile(r"/ch([^/]+)")
+
+
+def title_num_of(identifier: str | None) -> str | None:
+    """`/us/usc/t16/s45f` → `16`, `/us/usc/t5a/pl/92/463/s1` → `5a`.
+
+    Read off the identifier rather than joined from `titles`, so it is available
+    to every caller — including `retire_versions`, which has only the key.
+    Appendix titles are their own titles (gotcha 7), so `5a` stays `5a`.
+    """
+    if not identifier:
+        return None
+    match = _TITLE_IN_IDENTIFIER.match(identifier)
+    return match.group(1) if match else None
+
+
+def chapter_num_of(parent_identifier: str | None) -> str | None:
+    """`/us/usc/t16/ch1/schVI` → `1`.
+
+    A section's identifier does not carry its chapter, so this reads the parent
+    subdivision recorded on `section_release_map` (ADR-0008 — placement is the
+    release point's, not the deduped text's). A section directly under the title
+    has no chapter and gets None.
+    """
+    if not parent_identifier:
+        return None
+    match = _CHAPTER_IN_IDENTIFIER.search(parent_identifier)
+    return match.group(1) if match else None
+
+
+def citation_sort_key(identifier: str | None, seq_in_title: int | None) -> str | None:
+    """A single sortable string putting the corpus in citation order.
+
+    Two parts. The title comes from `title_sort_key`, the same `'5a'` → `(5, 'a')`
+    split the front page sorts by (gotcha 16), zero-padded to four digits so the
+    comparison stays correct as a string. The position within the title is
+    `section_release_map.seq_in_title` — document order as published, which is
+    what prev/next already walks — rather than the section number, because
+    section numbers are not orderable text: `45a–1` carries an en dash (gotcha
+    17) and `2000e-2` sorts nowhere near `2000`.
+
+    A title with no suffix pads with `0`, which sorts before `a`, so title 5
+    precedes title 5a as the Code prints them.
+
+    Structure nodes have no `seq_in_title` and take position `000000`, so a
+    chapter sorts ahead of the sections inside it.
+    """
+    title = title_num_of(identifier)
+    if title is None:
+        return None
+    number, suffix = title_sort_key(title)
+    return f"{number:04d}{suffix or '0'}|{(seq_in_title or 0):06d}"
+
+
 SECTIONS_MAPPING: dict[str, Any] = {
     "mappings": {
         "properties": {
             "identifier": {"type": "keyword"},
-            "num": {"type": "keyword"},
-            "heading": {"type": "text", "boost": 2.0},
+            # `num` is a keyword so it can be filtered and aggregated, with a
+            # text subfield so `45f` is findable as a word. Without the subfield
+            # a search for a section number matched only where the number also
+            # appeared in prose.
+            "num": {"type": "keyword", "fields": {"text": {"type": "text"}}},
+            # No index-time `boost` here. It was 2.0, and OpenSearch multiplies
+            # it into the query-time weight rather than replacing it, so
+            # `heading^2` in the handler was really weighting headings 4×.
+            # Weighting is the scoring model's business (ADR-0049), stated in
+            # one place, and measured.
+            "heading": {"type": "text"},
             "xml_text": {"type": "text"},
             "status": {"type": "keyword"},
             "version_id": {"type": "integer"},
+            # Title and chapter, so a search can be scoped to one (`title:16`,
+            # `chapter:1`) and faceted by title. `title_num` is read off the
+            # identifier; `chapter` comes from the parent subdivision recorded
+            # on `section_release_map`.
+            "title_num": {"type": "keyword"},
+            "chapter": {"type": "keyword"},
+            # Citation order as one sortable string — `?sort=citation`.
+            "sort_key": {"type": "keyword"},
+            # The source published more than one element under this identifier
+            # at this release point (ADR-0021), so this document is one of two
+            # that share an `_id` and the index kept one. Flagged rather than
+            # smoothed over: it is the one case where a result is knowingly
+            # incomplete.
+            "id_collision": {"type": "boolean"},
             # The release this text first appeared at, as an inventory seq —
             # `release_id` (a row id) was neither ordered nor stable.
             "first_release_id": {"type": "integer"},
@@ -121,7 +200,11 @@ STRUCTURE_MAPPING: dict[str, Any] = {
             "identifier": {"type": "keyword"},
             "level": {"type": "keyword"},
             "num_value": {"type": "keyword"},
-            "heading": {"type": "text", "boost": 2.0},
+            "heading": {"type": "text"},
+            "status": {"type": "keyword"},
+            "title_num": {"type": "keyword"},
+            "chapter": {"type": "keyword"},
+            "sort_key": {"type": "keyword"},
             # structure_nodes is unversioned — one row holding the newest loaded
             # release's view (CLAUDE.md). Carrying the field anyway keeps the
             # default `is_current` filter from silently excluding this index.
@@ -172,7 +255,12 @@ def sync_sections(versions: list[dict[str, Any]]):
 
     Each dict needs `identifier`, `first_release_id`, `first_release_seq` and
     `is_current`; `first_release_label`, `num`, `heading`, `xml`, `status`,
-    `version_id` are optional.
+    `version_id`, `parent_identifier`, `seq_in_title` and `id_collision` are
+    optional.
+
+    `title_num`, `chapter` and `sort_key` are derived here rather than asked of
+    every caller: `load.py` and `reindex_search.py` both index sections, and a
+    field computed twice is a field that eventually disagrees with itself.
     """
     if _disabled():
         return
@@ -183,16 +271,21 @@ def sync_sections(versions: list[dict[str, Any]]):
     actions = []
     for v in versions:
         first_release_id = v["first_release_id"]
+        identifier = v["identifier"]
         actions.append({
             "_index": SECTIONS_INDEX,
-            "_id": doc_id(v["identifier"], first_release_id),
+            "_id": doc_id(identifier, first_release_id),
             "_source": {
-                "identifier": v["identifier"],
+                "identifier": identifier,
                 "num": v.get("num"),
                 "heading": v.get("heading"),
                 "xml_text": strip_xml_tags(v.get("xml")),
                 "status": v.get("status"),
                 "version_id": v.get("version_id"),
+                "title_num": title_num_of(identifier),
+                "chapter": chapter_num_of(v.get("parent_identifier")),
+                "sort_key": citation_sort_key(identifier, v.get("seq_in_title")),
+                "id_collision": bool(v.get("id_collision", False)),
                 "first_release_id": first_release_id,
                 "first_release_seq": v["first_release_seq"],
                 "first_release_label": v.get("first_release_label"),
@@ -248,14 +341,24 @@ def sync_structure_nodes(nodes: list[dict[str, Any]]):
         return
     actions = []
     for n in nodes:
+        identifier = n["identifier"]
         actions.append({
             "_index": STRUCTURE_INDEX,
-            "_id": n["identifier"],
+            "_id": identifier,
             "_source": {
-                "identifier": n["identifier"],
+                "identifier": identifier,
                 "level": n.get("level"),
                 "num_value": n.get("num_value"),
                 "heading": n.get("heading"),
+                "status": n.get("status"),
+                "title_num": title_num_of(identifier),
+                # A chapter's own identifier carries its number, so this reads
+                # the node rather than a parent — `/us/usc/t16/ch1/schVI` is in
+                # chapter 1 as much as its sections are.
+                "chapter": chapter_num_of(identifier),
+                # No `seq_in_title` on a structure node, so it takes position 0
+                # and sorts ahead of the sections beneath it.
+                "sort_key": citation_sort_key(identifier, None),
                 "is_current": True,
                 "first_release_seq": n.get("first_release_seq"),
             }
