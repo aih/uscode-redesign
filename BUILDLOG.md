@@ -1348,7 +1348,7 @@ Session-by-session record of how this site was built. One entry per working sess
     `heading^4` against a boost-free mapping reproduces the old ranking **and its scores exactly**
     on all ten queries tried, where `heading^2` reproduces neither. That is why the baseline
     profile is `heading^4`.
-  - **nDCG@10 over 37 queries and 573 graded documents**, pooled from every candidate profile
+  - **nDCG@10 over 37 queries and 529 graded documents (312 of them graded relevant)**, pooled from every candidate profile
     before grading: deployed **0.6894** → shipping **0.7159**; recall@10 **0.7672** → **0.8016**.
     Thirteen queries improve, nine get worse, fifteen do not move. Re-check:
     `uv run python scripts/search_eval.py score`.
@@ -1374,7 +1374,12 @@ Session-by-session record of how this site was built. One entry per working sess
     `--danger-ink` on `--link` at 6.72:1 light and 8.13:1 dark.
   - **The local index was rebuilt** with `--all-versions`: 489,738 section versions and 9,916
     structure nodes, which is what made the `all-versions` profile measurable rather than
-    hypothetical.
+    hypothetical. The cluster holds **489,578** documents for those 489,738 versions, and the
+    difference is exactly the 160 collisions — an independent confirmation of the ADR-0021 count,
+    arrived at from the other end.
+  - **A number to correct:** commit `c1d4a12`'s message says "573 graded documents". The artifact
+    says **529**, of which 312 are graded relevant. The prose in this entry, `CLAUDE.md` and
+    `WORKSTREAM-B-STATE.md` is right; the commit message is not, and the branch was already past it.
 
 ### Owed before this deploys
 

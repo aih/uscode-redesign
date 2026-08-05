@@ -35,9 +35,9 @@ Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 27 route entries (one expanding to
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 28 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and six
-interactive states, **251 scans in ~1m30s**, against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
+interactive states, **258 scans in ~1m30s**, against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
 `waiveSeverity`. Every entry carries the task that owns the fix; the measured baseline is
@@ -57,7 +57,7 @@ Elements the source uses **both** ways — `note` (30,981 block / 883 inline), `
 
 **Contrast is computed from the tokens, in both themes** (ADR-0042). `uv run python
 scripts/contrast.py` reads the token block out of `site.scss` and writes
-`docs/verification/contrast.json` — 17 pairs, 34 checks — exiting non-zero on a failure. It and the
+`docs/verification/contrast.json` — 18 pairs, 36 checks — exiting non-zero on a failure. It and the
 axe scan miss opposite things: the scan cannot see a pair no scanned route renders (**no route carried
 a status badge**, so none was ever measured, and dark's was 2.25:1), and a token audit cannot see a
 colour that is not a token (**USWDS's `.usa-nav__link` was 2.5:1 on every reader page** below 64em).
@@ -122,7 +122,7 @@ pre-`git checkout` file and exit 0. **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.
 
 **The search ranking is measured rather than asserted** (ADR-0049). `docs/verification/search-judgements.json`
-is 37 drafter queries and 573 graded documents, pooled from every candidate profile before grading;
+is 37 drafter queries and 529 graded documents, pooled from every candidate profile before grading;
 `uv run python scripts/search_eval.py score` writes `docs/verification/search-relevance.json`.
 nDCG@10 went **0.6894 → 0.7159** and recall@10 **0.7672 → 0.8016**. The old heading weight was
 **4, not the 2 its own query said** — a deprecated index-time `boost: 2.0` in the mapping multiplies

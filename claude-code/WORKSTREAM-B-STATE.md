@@ -133,7 +133,7 @@ than the measure half reported.
 ## Done: B4 (session 29)
 
 **Ranking is measured** (ADR-0049). `docs/verification/search-judgements.json` is 37 queries and
-573 graded documents, pooled from every candidate profile before grading; `scripts/search_eval.py`
+529 graded documents (312 of them graded relevant), pooled from every candidate profile before grading; `scripts/search_eval.py`
 scores them. deployed **0.6894** → shipping **0.7159** nDCG@10, recall@10 **0.7672** → **0.8016**.
 Thirteen queries better, nine worse, fifteen unmoved.
 
