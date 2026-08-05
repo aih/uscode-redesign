@@ -155,6 +155,12 @@ counted versions while the page listed sections.
 **The rail is pinned** (ADR-0050) — asked for mid-session, and it reverses standing decision 3
 below.
 
+**The index rebuilds itself on a mapping change** (ADR-0051). The names are aliases now, over a
+physical index named for its mapping's fingerprint; `reindex_search --if-changed` rebuilds only what
+drifted and builds beside the live index, so search stays up. `deploy-on-box.sh` runs it. The
+failure it prevents is silent — a field the new code queries and the old index lacks is *absent, not
+broken*, so `title:16` returns an empty page that looks like a title with nothing in it.
+
 ## Remaining: B5, B6
 
 **B5** ("Compare with…" on the section header — `/app/diff` is still two hops from the text it
@@ -243,8 +249,16 @@ docs/verification/loadtest.json          throughput, every row naming its limite
 docs/verification/spine-explain.json     the spine's query plans on the real corpus
 scripts/navprofile.py                    ships itself to the box over SSM
 scripts/spine_explain.py                 explains what the repository sent, never transcribed SQL
+docs/verification/search-judgements.json 37 queries, 529 graded documents
+docs/verification/search-relevance.json  nDCG@10 per profile, per query
+scripts/search_eval.py                   pool | score — the harness, over the shipping query
+storage/searchquery.py                   the parser, the profiles and the request body
+frontend/src/lib/searchscope.ts          the same scopes, read and written by the facet links
 docs/adr/0043                           one navigation chrome
 docs/adr/0044                           release context, and the switcher that keeps your place
+docs/adr/0049                           the measured ranking, and the scopes
+docs/adr/0050                           the pinned rail
+docs/adr/0051                           the index rebuilds itself (there is no ADR-0048)
 frontend/src/layouts/Base.astro         where the chrome is assembled
 frontend/src/components/ChapterRail.astro
 frontend/src/components/ReleaseContext.astro   replaces the deleted Provenance.astro

@@ -1457,3 +1457,7 @@ Session-by-session record of how this site was built. One entry per working sess
 - **Disk left by a failed rebuild is not collected.** The half-built index keeps its name and the
   next `--if-changed` reuses it, which is correct — documents overwrite by `_id` — but a generation
   abandoned by a mapping that changed twice is only removed by `--recreate`.
+- **There is no ADR-0048**, and never was — checked against the whole history, not just the working
+  tree. The numbering runs 0001–0051 with that one gap, so `docs/adr/` holds 50 files. Noticed while
+  counting them for CLAUDE.md; left alone, because renumbering would break every link that already
+  names an ADR by number.
