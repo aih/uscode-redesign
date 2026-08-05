@@ -27,6 +27,7 @@ from db.models import (
     StructureNode,
 )
 from ingest import search_sync
+from storage.search import get_search_client
 
 FirstRelease = aliased(ReleasePoint)
 MappedRelease = aliased(ReleasePoint)
@@ -117,7 +118,7 @@ def _colliding_doc_ids(session) -> set[tuple[str, int]]:
     return {(identifier, release_id) for identifier, release_id in rows}
 
 
-def _index_structure(session, batch_size: int) -> int:
+def _index_structure(session, batch_size: int, index: str | None = None) -> int:
     print("Indexing StructureNodes...")
     buffer: list[dict] = []
     total = 0
@@ -135,18 +136,19 @@ def _index_structure(session, batch_size: int) -> int:
             "status": node.status,
         })
         if len(buffer) >= batch_size:
-            search_sync.sync_structure_nodes(buffer)
+            search_sync.sync_structure_nodes(buffer, index=index)
             total += len(buffer)
             buffer.clear()
             print(f"  Indexed {total} nodes", flush=True)
     if buffer:
-        search_sync.sync_structure_nodes(buffer)
+        search_sync.sync_structure_nodes(buffer, index=index)
         total += len(buffer)
     print(f"Finished StructureNodes ({total}).")
     return total
 
 
-def _index_sections(session, batch_size: int, limit, all_versions: bool) -> int:
+def _index_sections(session, batch_size: int, limit, all_versions: bool,
+                    index: str | None = None) -> int:
     current_ids: set[int] | None = None
     if all_versions:
         # Which versions are in force, so the superseded ones can be indexed with
@@ -212,12 +214,12 @@ def _index_sections(session, batch_size: int, limit, all_versions: bool) -> int:
             "is_current": True if current_ids is None else version_id in current_ids,
         })
         if len(buffer) >= batch_size:
-            search_sync.sync_sections(buffer)
+            search_sync.sync_sections(buffer, index=index)
             total += len(buffer)
             buffer.clear()
             print(f"  Indexed {total} sections", flush=True)
     if buffer:
-        search_sync.sync_sections(buffer)
+        search_sync.sync_sections(buffer, index=index)
         total += len(buffer)
     print(f"Finished SectionVersions ({total}).")
     return total
@@ -240,9 +242,22 @@ def main():
     parser.add_argument(
         "--recreate",
         action="store_true",
-        help="Drop both indices first. Required after a mapping change.",
+        help="Drop both indices first, in place. Search is down while it runs.",
+    )
+    parser.add_argument(
+        "--if-changed",
+        action="store_true",
+        help=(
+            "Rebuild only when the index was built from a different mapping, "
+            "and build beside the live one rather than over it. What a deploy runs."
+        ),
     )
     args = parser.parse_args()
+
+    if args.if_changed:
+        if args.recreate:
+            parser.error("--if-changed and --recreate mean opposite things")
+        return _rebuild_if_changed(args)
 
     if args.recreate:
         print("Recreating indices...")
@@ -254,6 +269,51 @@ def main():
         _index_structure(session, args.batch_size)
         if not args.skip_sections:
             _index_sections(session, args.batch_size, args.limit, args.all_versions)
+
+    return 0
+
+
+def _rebuild_if_changed(args) -> int:
+    """Rebuild the indices whose mapping has moved, without taking search down.
+
+    The deploy path. A mapping change is not additive (ADR-0028), so the new
+    fields are simply **absent** on an index built from the old one — `title:16`
+    returns nothing, which reads exactly like a title with nothing in it rather
+    than like a broken deployment. That failure is silent, which is why this is
+    automatic rather than a line in a runbook.
+
+    Build, then promote. Each index is filled under a name of its own and the
+    alias is moved in one call at the end, so a search issued while this runs
+    reads the old index throughout and the new one afterwards. A failure
+    part-way leaves the alias where it was: the site keeps the index it had,
+    which is stale rather than empty.
+    """
+    client = get_search_client()
+    stale = search_sync.stale_aliases(client)
+    if not stale:
+        print("Search index mapping is current; nothing to rebuild.")
+        return 0
+
+    print(f"Rebuilding {', '.join(stale)} — the mapping has changed.")
+    built: list[tuple[str, str]] = []
+    with SessionLocal() as session:
+        for alias in stale:
+            physical = search_sync.create_index(client, alias)
+            print(f"  building {physical}")
+            if alias == search_sync.STRUCTURE_INDEX:
+                _index_structure(session, args.batch_size, index=physical)
+            else:
+                _index_sections(
+                    session, args.batch_size, args.limit, args.all_versions, index=physical
+                )
+            built.append((alias, physical))
+
+    # Nothing is promoted until everything is built, so a failure in the second
+    # index does not leave the first one live against a half-migrated pair.
+    for alias, physical in built:
+        client.indices.refresh(index=physical)
+        search_sync.promote(client, alias, physical)
+        print(f"  {alias} now points at {physical}")
 
     return 0
 

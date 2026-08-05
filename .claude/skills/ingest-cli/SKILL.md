@@ -52,14 +52,26 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   pair is redone (load_release is idempotent). Each zip is extracted to a temp dir and
   deleted, so the corpus never doubles on disk. `make load-all`.
 
-## python -m ingest.reindex_search [--recreate] [--all-versions] [--limit N] [--skip-sections]
+## python -m ingest.reindex_search [--if-changed | --recreate] [--all-versions] [--limit N] [--skip-sections]
   Rebuild the search indices from Postgres (ADR-0028). Normal loading keeps them in step
-  incrementally, so this is the "start over" path: after a mapping change (which needs
-  --recreate — OpenSearch will not add a field type to a live index) or over a corpus
-  loaded before search existed. Defaults to the text in force: one document per section,
-  66k of them, which is what the default query reads. --all-versions adds every superseded
-  version (490k) so `?release=` can reach back — much longer, and it buys the default
-  query nothing. Both passes stream; ingest never requires a cluster (DISABLE_SEARCH_SYNC=1).
+  incrementally, so this is the "start over" path: after a mapping change (OpenSearch will
+  not add a field type to a live index) or over a corpus loaded before search existed.
+  Defaults to the text in force: one document per section, 66k of them, which is what the
+  default query reads. --all-versions adds every superseded version (490k) so `?release=`
+  can reach back — much longer, and it buys the default query nothing. Both passes stream;
+  ingest never requires a cluster (DISABLE_SEARCH_SYNC=1).
+
+  --if-changed is the deploy's path (ADR-0051) and the one to reach for by hand. It
+  compares the mapping the code declares against the fingerprint stamped in the live
+  index's _meta and exits doing nothing when they agree. When they differ it builds the new
+  generation under a name of its own (uscode_sections_<fingerprint>) and moves the alias in
+  one call at the end, so search stays up throughout and a failure leaves the old index
+  live. `ingest.search_sync.stale_aliases(client)` answers "does this need rebuilding" on
+  its own.
+
+  --recreate is the destructive one: it deletes every index for both aliases, including any
+  half-built generation a failed --if-changed left behind, and rebuilds in place. Search
+  answers 503 while it runs. Use it to reclaim disk or to start genuinely clean.
 
 ## uv run python scripts/vendor_apidocs.py [--check] [--update]
   Swagger UI and ReDoc, vendored into static/apidocs/ (ADR-0032). The site's CSP names no

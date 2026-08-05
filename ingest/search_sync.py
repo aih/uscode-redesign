@@ -16,6 +16,9 @@ the document, which is what makes incremental sync cheap: a release republishing
 a section unchanged touches nothing at all.
 """
 
+import copy
+import hashlib
+import json
 import logging
 import os
 from typing import Any, Iterable
@@ -219,8 +222,126 @@ STRUCTURE_MAPPING: dict[str, Any] = {
 }
 
 
+INDEX_MAPPINGS: dict[str, dict[str, Any]] = {
+    SECTIONS_INDEX: SECTIONS_MAPPING,
+    STRUCTURE_INDEX: STRUCTURE_MAPPING,
+}
+"""What each index name means. `SECTIONS_INDEX` and `STRUCTURE_INDEX` are
+*aliases* pointing at a physical index named for the mapping it was built from —
+see `mapping_fingerprint`."""
+
+
+def mapping_fingerprint(mapping: dict[str, Any]) -> str:
+    """A short, stable hash of a mapping.
+
+    This is what makes "the deployed index is out of date" a question a script
+    can answer. The mapping is not additive (ADR-0028): OpenSearch will not add
+    a field type to a live index, so a mapping change that nobody rebuilds for
+    leaves the new fields **absent rather than broken** — `title:16` returns no
+    results, which reads exactly like a title with nothing in it.
+
+    Computed over the mapping as declared, before `_meta` is attached, so
+    stamping the fingerprint into the index does not change the fingerprint.
+    """
+    canonical = json.dumps(mapping, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+
+def physical_index(alias: str, fingerprint: str | None = None) -> str:
+    """`uscode_sections` → `uscode_sections_a1b2c3d4e5f6`.
+
+    The name carries the mapping it was built from, so two generations can exist
+    at once — which is what lets a rebuild finish before anything starts reading
+    from it.
+    """
+    if fingerprint is None:
+        fingerprint = mapping_fingerprint(INDEX_MAPPINGS[alias])
+    return f"{alias}_{fingerprint}"
+
+
+def _body_with_meta(alias: str) -> dict[str, Any]:
+    body = copy.deepcopy(INDEX_MAPPINGS[alias])
+    body.setdefault("mappings", {})["_meta"] = {
+        "fingerprint": mapping_fingerprint(INDEX_MAPPINGS[alias]),
+        "alias": alias,
+    }
+    return body
+
+
+def indexed_fingerprint(client, alias: str) -> str | None:
+    """The mapping fingerprint of whatever `alias` currently resolves to.
+
+    None when the alias resolves to nothing, or to an index built before
+    fingerprints existed — both of which mean "rebuild".
+    """
+    try:
+        mappings = client.indices.get_mapping(index=alias)
+    except Exception:
+        return None
+    for body in mappings.values():
+        meta = body.get("mappings", {}).get("_meta") or {}
+        return meta.get("fingerprint")
+    return None
+
+
+def stale_aliases(client) -> list[str]:
+    """Which indices were built from a mapping this code no longer declares."""
+    return [
+        alias
+        for alias in INDEX_MAPPINGS
+        if indexed_fingerprint(client, alias) != mapping_fingerprint(INDEX_MAPPINGS[alias])
+    ]
+
+
+def create_index(client, alias: str) -> str:
+    """Create a fresh physical index for `alias`'s current mapping, and return
+    its name. Does not point the alias at it — see `promote`."""
+    name = physical_index(alias)
+    if not client.indices.exists(index=name):
+        client.indices.create(index=name, body=_body_with_meta(alias))
+    return name
+
+
+def promote(client, alias: str, physical: str) -> None:
+    """Point `alias` at `physical`, and delete whatever it pointed at before.
+
+    The alias move is one `update_aliases` call, so readers never see the name
+    resolve to nothing: a search issued during a rebuild reads the old index
+    until this returns and the new one after, and there is no moment in between.
+
+    The exception is the first run against a box where `uscode_sections` is a
+    *concrete index* rather than an alias, which is every deployment built before
+    this existed. An index and an alias cannot share a name, so the old index has
+    to be deleted before the alias can take it — a gap of one round trip, once,
+    and only on that migration.
+    """
+    old = []
+    if client.indices.exists_alias(name=alias):
+        old = [name for name in client.indices.get_alias(name=alias) if name != physical]
+    elif client.indices.exists(index=alias):
+        logger.info("replacing the concrete index %s with an alias", alias)
+        client.indices.delete(index=alias)
+
+    actions = [{"remove": {"index": name, "alias": alias}} for name in old]
+    actions.append({"add": {"index": physical, "alias": alias}})
+    client.indices.update_aliases(body={"actions": actions})
+
+    for name in old:
+        try:
+            client.indices.delete(index=name)
+        except Exception as exc:
+            # The alias already points at the new index, so the site is correct
+            # either way; this only leaves disk in use.
+            logger.warning("could not delete the superseded index %s: %s", name, exc)
+
+
 def create_indices():
-    """Create OpenSearch indices if they do not exist."""
+    """Create the indices if they are missing. Called on every load.
+
+    Deliberately not a rebuild: a load must not decide to spend twenty minutes
+    reindexing because the mapping moved. `python -m ingest.reindex_search
+    --if-changed` is what does that, and the deploy runs it.
+    """
     if _disabled():
         return
 
@@ -228,34 +349,56 @@ def create_indices():
     if client is None:
         return
     try:
-        if not client.indices.exists(index=SECTIONS_INDEX):
-            client.indices.create(index=SECTIONS_INDEX, body=SECTIONS_MAPPING)
-        if not client.indices.exists(index=STRUCTURE_INDEX):
-            client.indices.create(index=STRUCTURE_INDEX, body=STRUCTURE_MAPPING)
+        for alias in INDEX_MAPPINGS:
+            if client.indices.exists(index=alias) or client.indices.exists_alias(name=alias):
+                continue
+            promote(client, alias, create_index(client, alias))
     except Exception as e:
         logger.warning(f"Could not create OpenSearch indices: {e}")
 
 
 def recreate_indices():
-    """Drop and rebuild both indices. Mapping changes need this — OpenSearch will
-    not add a field type to a live index, and a `create_indices` that only ever
-    creates-if-absent would leave the old mapping in place forever."""
+    """Drop and rebuild both indices, in place. Used by `--recreate`.
+
+    This is the destructive path: the alias resolves to nothing while the
+    rebuild runs, so search answers 503 until it finishes. `--if-changed` builds
+    beside the live index instead and is what a deploy should use.
+    """
     if _disabled():
         return
     client = _client()
     if client is None:
         return
-    for index in (SECTIONS_INDEX, STRUCTURE_INDEX):
-        try:
-            if client.indices.exists(index=index):
-                client.indices.delete(index=index)
-        except Exception as e:
-            logger.warning(f"Could not delete index {index}: {e}")
+    for alias in INDEX_MAPPINGS:
+        for name in _every_index_for(client, alias):
+            try:
+                client.indices.delete(index=name)
+            except Exception as e:
+                logger.warning(f"Could not delete index {name}: {e}")
     create_indices()
 
 
-def sync_sections(versions: list[dict[str, Any]]):
+def _every_index_for(client, alias: str) -> list[str]:
+    """The alias's target, plus any physical index named after it — including
+    one a previous rebuild left behind."""
+    names = set()
+    try:
+        if client.indices.exists_alias(name=alias):
+            names.update(client.indices.get_alias(name=alias))
+        elif client.indices.exists(index=alias):
+            names.add(alias)
+        names.update(client.indices.get(index=f"{alias}_*", ignore_unavailable=True))
+    except Exception as e:
+        logger.warning(f"Could not list indices for {alias}: {e}")
+    return sorted(names)
+
+
+def sync_sections(versions: list[dict[str, Any]], index: str | None = None):
     """Bulk index a list of section versions.
+
+    `index` writes into a named physical index instead of through the alias,
+    which is what a rebuild does: it fills the new generation while every reader
+    is still being served by the old one.
 
     Each dict needs `identifier`, `first_release_id`, `first_release_seq` and
     `is_current`; `first_release_label`, `num`, `heading`, `xml`, `status`,
@@ -277,7 +420,7 @@ def sync_sections(versions: list[dict[str, Any]]):
         first_release_id = v["first_release_id"]
         identifier = v["identifier"]
         actions.append({
-            "_index": SECTIONS_INDEX,
+            "_index": index or SECTIONS_INDEX,
             "_id": doc_id(identifier, first_release_id),
             "_source": {
                 "identifier": identifier,
@@ -335,8 +478,9 @@ def retire_versions(keys: Iterable[tuple[str, int]]):
             logger.warning(f"Failed to retire section versions: {e}")
 
 
-def sync_structure_nodes(nodes: list[dict[str, Any]]):
-    """Bulk index structure nodes."""
+def sync_structure_nodes(nodes: list[dict[str, Any]], index: str | None = None):
+    """Bulk index structure nodes. `index` writes into a named physical index
+    rather than through the alias — see `sync_sections`."""
     if _disabled():
         return
 
@@ -347,7 +491,7 @@ def sync_structure_nodes(nodes: list[dict[str, Any]]):
     for n in nodes:
         identifier = n["identifier"]
         actions.append({
-            "_index": STRUCTURE_INDEX,
+            "_index": index or STRUCTURE_INDEX,
             "_id": identifier,
             "_source": {
                 "identifier": identifier,

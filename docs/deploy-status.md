@@ -231,13 +231,40 @@ gain time on a job already running.
 
 ## Search index
 
-**Owed as of 2026-08-05 (session 29, ADR-0049): the deployed index carries the old mapping.**
-B4 added `title_num`, `chapter`, `sort_key`, `num.text` and `id_collision`, and OpenSearch will
-not add a field type to a live index (ADR-0028). Until `python -m ingest.reindex_search --recreate`
-runs on the box, `title:`, `chapter:`, `status:`, `?sort=citation` and the collision flag return
-nothing rather than failing — the query is valid, the field is simply absent. The deploy does not
-do this on its own. `--recreate` alone (current text, 66k documents) is enough to restore what the
-default search reads; `--all-versions` has the memory problem described below.
+**The deploy rebuilds the index when the mapping changes (ADR-0051).** `deploy-on-box.sh` runs
+`python -m ingest.reindex_search --if-changed` after the stack is up. It compares the mapping this
+image declares against the fingerprint stamped in the live index's `_meta` and does nothing unless
+they differ — two requests on an ordinary deploy.
+
+When they do differ it builds the new generation under a name of its own
+(`uscode_sections_<fingerprint>`) and moves the alias in one call at the end, so **search stays up
+throughout**: a query issued during the rebuild reads the old index, and the next one reads the new.
+A failure leaves the alias where it was, which is why the step is not fatal to the deploy — the site
+keeps the index it had.
+
+The one exception is the **first** run against this box, where `uscode_sections` is still a concrete
+index rather than an alias. The two cannot share a name, so the index is deleted immediately before
+the alias is created: a gap of one round trip, once. Every rebuild after it is gapless.
+
+Verify by hand:
+
+```bash
+# on the box — what the live index was built from, and whether it is current
+docker compose -f docker-compose.prod.yml run --rm --no-deps api \
+    uv run python -c "
+from ingest import search_sync as s
+from storage.search import get_search_client
+c = get_search_client()
+print('stale:', s.stale_aliases(c) or 'nothing — the mapping is current')
+"
+# force it, if you ever need to
+docker compose -f docker-compose.prod.yml run --rm --no-deps api \
+    uv run python -m ingest.reindex_search --if-changed
+```
+
+`--if-changed` indexes current text only (66k documents). `--all-versions` has the memory problem
+described below, so `?release=` search reaches back only as far as whatever `--all-versions` pass
+last succeeded.
 
 **Current text is built and live: 65,938 documents in `uscode_sections`, 9,916 in
 `uscode_structure`.** A query for "conservation" returns 199 hits (`/us/usc/t16/s2903`

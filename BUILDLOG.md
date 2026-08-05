@@ -1410,3 +1410,50 @@ Session-by-session record of how this site was built. One entry per working sess
   Term matching cannot close that; the `embedding` field ADR-0028 declared is where it would go.
 - **The earlier-version count is only as good as what is indexed.** CI builds a current-only index,
   so no scenario can assert "also matched in N earlier versions" without `data: corpus`.
+
+## 050 — 2026-08-05 — Session 29b: the search index rebuilds itself
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Open a PR for B4, and either write instructions for the reindex it needs or — better —
+  trigger it automatically.
+- **Decided:**
+  - **[ADR-0051](docs/adr/0051-the-search-index-rebuilds-itself.md)** — the mapping carries a
+    fingerprint, the index names become aliases over a physical index named for that fingerprint,
+    and `reindex_search --if-changed` rebuilds only what drifted, **beside the live index rather
+    than over it**. `deploy/deploy-on-box.sh` runs it.
+  - **Automatic rather than a runbook line, because the failure is silent.** A field the new code
+    queries and the old index lacks is *absent, not broken*: `title:16` filters on a field that does
+    not exist and matches nothing, which is what a title with nothing in it looks like. Nothing
+    raises, nothing alerts, the deploy is green.
+  - **`--recreate` on every deploy was rejected as worse than the problem** — it deletes the live
+    index and rebuilds 66k documents with the site up, so search answers 503 for the length of every
+    deploy whether or not anything changed.
+  - **A failed rebuild is not a failed deploy.** The step is `|| echo`, which is safe *because*
+    nothing is promoted until everything is built: a failure part-way leaves the alias where it was,
+    so the site keeps the index it had.
+- **Produced:** [PR #25](https://github.com/aih/uscode-redesign/pull/25), and commits on
+  `workstream-b-search-relevance`. New: `tests/test_search_mapping.py`, ADR-0051.
+- **Verified:**
+  - **The migration was run for real against the local cluster**, from exactly the state the box is
+    in: `uscode_sections` a *concrete* index with no fingerprint. `stale_aliases` reported both
+    indices stale, and the rebuild swapped them.
+  - **Search answered normally throughout.** Probed mid-rebuild at 15,000 documents indexed:
+    `q=conservation` returned its usual 2,937 totals and the same first result, because the alias
+    still pointed at the old index. The declared fingerprints are `b8be98476068` (sections) and
+    `68fa86c5cf0b` (structure).
+  - **`--if-changed` is a no-op the second time** — the check is two requests.
+  - **18 tests in `tests/test_search_mapping.py`**, driven against a fake cluster that records the
+    call sequence: a moved field does not change the fingerprint, a changed field *type* does, an
+    index with no fingerprint counts as stale, the alias moves in one call, the old index is deleted
+    *after* the alias moves, and a concrete index of the alias name is deleted *before*.
+  - `_every_index_for` checked against the live cluster: it finds both the old concrete index and
+    the new physical one, and a wildcard matching nothing returns an empty list rather than raising.
+
+### Owed
+
+- **A rebuild concurrent with a corpus load is unguarded.** An incremental load during a rebuild
+  writes through the alias to the outgoing index, and those writes are lost at promotion. The poll
+  is daily and a deploy is minutes. The fix is a lock, and it is not written.
+- **Disk left by a failed rebuild is not collected.** The half-built index keeps its name and the
+  next `--if-changed` reuses it, which is correct — documents overwrite by `_id` — but a generation
+  abandoned by a mapping that changed twice is only removed by `--recreate`.
