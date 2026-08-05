@@ -1189,3 +1189,74 @@ Session-by-session record of how this site was built. One entry per working sess
     `scripts/loadtest.sh` does not pass it; curl negotiates h2 by default. So the two artifacts'
     latencies are not directly comparable, and the load test measures a protocol no browser uses
     against this host. One flag.
+
+## 047 — 2026-08-04 — Session 28b: B3 phase 2, three fixes and one declined
+
+- **Tool/model:** Claude Code, Opus 5. Same session as BUILDLOG 046, after the phase-1 report was
+  approved.
+- **Asked:** Take B3's fix 4 (the `structure_nodes.identifier` index), fix 3 (the byte budget,
+  counting inline `<script>` bytes since there are no client JS bundles) and the measured half of
+  fix 2 (drop `/api/v1/releases` from the per-view fan-out), and write an ADR declining fix 1 rather
+  than building a Caddy cache layer the measurements do not justify.
+- **Decided:**
+  - **ADR-0045 — one release list per title, held five minutes.** Entries hold the *in-flight
+    promise*, not the value, so N concurrent misses make one request; a rejected fetch is evicted
+    rather than cached, guarded on the entry still being current so a slow failure cannot delete its
+    replacement. Five minutes is not a free parameter — it is ADR-0018's own `max-age` for an
+    unpinned answer, so the reader is never staler than what it tells browsers.
+  - **ADR-0046 — the byte budget is counted from source, and validated against a page.** There is no
+    bundle to weigh, so the count walks each page's transitive `.astro` import graph. Counting from
+    source is also what lets it run in Vitest with no server and no build, which is the requirement:
+    a budget needing a running stack is a budget nobody runs, and B3 forbids a fourth runner.
+  - **ADR-0047 — fix 1 declined, with the audit it asked for.** ADR-0018's policy is already correct
+    on the deployed host, re-verified by the load test on every run. What is missing is a shared cache
+    to read those headers; a cache on the box addresses the 27% of a reader's wait that is the origin,
+    not the 73% that is the network. A CDN moves the 73%, and that is ADR-0020's territory.
+  - **The guide states the cost of ADR-0045 rather than hiding it.** Chapter 03 says the release menu
+    is rebuilt at most every five minutes, that `?release=` reaches a new release point immediately,
+    and that the release point a page is *reading* is always read fresh. ADR-0046 and ADR-0047 are
+    infrastructure in the ratchet — a test harness and a deployment decision.
+- **Produced:** migration `d5c81f27a930`; `db/models.py`; `frontend/src/lib/releasecache.ts` +
+  `frontend/tests/releasecache.test.ts`; `frontend/tests/jsbudget.test.ts` + `docs/js-budgets.json` +
+  `docs/verification/js-bytes.json`; `docs/adr/0045`, `0046`, `0047`; guide chapter 03;
+  `docs/verification/b3-fixes.md`. Six commits on `workstream-b-navigation-ia`.
+- **Verified:**
+  - `make test` — 486 passed. `make test-web` — **253** passed, up from 227: 7 for the release cache
+    and 19 for the byte budget. `make test-e2e` — 373 passed, 2 skipped, against a rebuilt frontend
+    container. `docs/verification/a11y.json` unchanged at 8 route/rule pairs over 1,780 nodes.
+  - **The index changes the plan, at production row count.** Local `structure_nodes` holds 9,916
+    rows, the same as the deployed corpus, because the table is the newest loaded release's view
+    rather than something that grows per release point (ADR-0006). Seq Scan 1.497 ms with 9,915 rows
+    removed by filter → Index Scan 0.135 ms on three buffers. Command in
+    `docs/verification/b3-fixes.md`.
+  - **The release call is gone from the fan-out**, counted from the API's own access log rather than
+    from the reader's intentions: eight *concurrent* views on a cold cache produce **one**
+    `/api/v1/releases`, a warm cache produces **none**, and it was eight. That the single-flight
+    promise is what does it is visible in the concurrent case specifically.
+  - **The byte budget bites.** 600 bytes injected into a component on every route's graph failed 16
+    routes, each message naming that route's islands; removing the bytes passes again.
+  - **The static byte count is validated against a live page**, not assumed: source says 32,150 bytes
+    for `/app/us/usc`, the rendered page carries 25,474, and the 6,676-byte difference is exactly
+    `AuthNav` (3,239) plus `WatchButton` (3,437) — both behind `ACCOUNTS_ENABLED` (ADR-0034). The
+    page also carries **zero `<script src>`**, which is the fact the whole approach rests on.
+- **A measurement error in BUILDLOG 046, found while implementing and corrected:** the reader calls
+  `/api/v1/releases?**ingested_title**=16`, and both measurement scripts asked for `?title=16`. Those
+  are different work — `?title=` filters in the repository, `?ingested_title=` fetches all 382 release
+  points and filters in Python — and different costs: **27.0 ms against 20.1 ms** at the API
+  container. So the release list was a *worse* offender than reported, and the section page's API
+  critical path was 42.8 ms rather than the 36.6 ms recorded. Both scripts now ask for what the reader
+  asks for. The committed artifacts still carry the old figure and are superseded on the next run;
+  that is why `b3-fixes.md` says the deployed re-measurement is still owed.
+- **Still owed:** the deployed re-measurement. `make navprofile`, `BASE=… make loadtest` and
+  `make spine-explain` all measure the box, and the fixes are not on the box — the branch is not
+  merged and not deployed. The three artifacts in `docs/verification/` remain the *before* picture.
+- **Candidate tasks found, deliberately not done:**
+  - **`?ingested_title=` should be a repository filter, not a Python one.** `api/routes.py` asks
+    `list_releases(title_num=None)` for all 382 release points and filters the list afterwards, so the
+    work does not shrink when the answer does. ADR-0045 caches around it rather than fixing it.
+  - **`CopyColumn`'s JSON data island is measured nowhere.** 4,278 bytes on `/app/us/usc/t16/s45f`,
+    varying per section, excluded from the byte budget because a static ceiling over it would be a
+    ceiling on the statute. Measuring it needs a running server.
+  - **Inline scripts ship their comments.** 25,474 bytes of inline script on a section page, much of
+    it explanatory prose that only the browser downloads and nobody reads. Minifying inline islands at
+    build time is a real saving and a real loss of the thing that makes them readable in `view-source`.

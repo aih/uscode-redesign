@@ -4,7 +4,7 @@ Paste `00-CONVENTIONS.md` above any task prompt, then this file, then the task y
 
 **To resume in a new session, one line:**
 
-> Read `CLAUDE.md` and `claude-code/WORKSTREAM-B-STATE.md`, then do task B3's fix half.
+> Read `CLAUDE.md` and `claude-code/WORKSTREAM-B-STATE.md`, then do task B4.
 
 ---
 
@@ -18,7 +18,7 @@ All suites green as of the last commit:
 | suite | count |
 |---|---|
 | `make test` | 486 |
-| `make test-web` | 227 |
+| `make test-web` | 253 |
 | `make test-e2e` | 373 (251 of them the a11y scan) |
 | `make shots` | reflow clean at 320 CSS px and 1280@200% |
 
@@ -88,25 +88,37 @@ gives 0.4 ms and 11.1 ms.
    1.3 ms, in `get_section`, both `get_toc` paths and `resolve_id`. Everything else in Postgres is
    fine: no repository call exceeds 2 ms, and the 96,204,776-row `guid_map` answers in 0.035 ms.
 
-## Remaining: B3 fix half, B4, B5, B6
+## Done: B3, fix half (session 28b)
 
-**B3's fix list was written before the numbers and they reorder it.** Fixes 1, 2 and 4 all target the
-API/Postgres side, which is 37 ms of a 78 ms origin inside an 823 ms journey. Proposed to the human
-at the end of session 28, awaiting a decision:
+Three fixes taken, one declined, in the order the numbers put them rather than B3's.
 
-- **Fix 4** — one migration adding the `structure_nodes.identifier` index. Small payoff, real defect.
-- **Fix 3** — the per-route JS byte budget. Know before starting: `dist/client/_astro/` contains
-  **only CSS**; there are zero client JS bundles and every island is `<script is:inline>`, so the
-  budget must count inline `<script>` bytes in the rendered HTML per route.
-- **Fix 2, its measured half** — drop `/api/v1/releases?title=` from the per-view fan-out.
-- **Fix 1 — proposed *not* to build.** The cache headers are already correct for a shared cache
-  (verified live: `immutable` pinned, `max-age=300` unpinned, TOCs revalidating per ADR-0043). What is
-  missing is a shared cache to read them. Caddy has no built-in one and would need a plugin and a
-  custom build, and 73% of the wait is round trips a Caddy-side cache does not remove. An ADR
-  recording that, rather than a cache layer, is the proposal.
+- **The `structure_nodes.identifier` index** (migration `d5c81f27a930`). Seq Scan 1.497 ms with 9,915
+  rows removed by filter → Index Scan 0.135 ms. The local table has the same 9,916 rows as the box,
+  so that comparison is faithful.
+- **ADR-0045 — the release list, once per title per five minutes.** Entries hold the in-flight
+  promise, so eight concurrent cold-cache views make **one** call rather than eight; warm views make
+  none. Counted from the API's access log, not from intentions.
+- **ADR-0046 — a per-route inline-script byte budget** in `make test-web`, counted from source
+  because there is no bundle to weigh, and validated against a live page to within exactly the two
+  accounts-gated components.
+- **ADR-0047 — fix 1 declined.** The audit found ADR-0018's policy already correct on the deployed
+  host. What is missing is a shared cache to read those headers, and a cache on the box addresses the
+  27% of a reader's wait that is the origin rather than the 73% that is the network.
 
-Then **B4** (search relevance and operators), **B5** ("Compare with…" on the section header —
-`/app/diff` is still two hops from the text it compares, and the 5.1 s diff is its cost problem),
+`docs/verification/b3-fixes.md` holds the commands. **The deployed re-measurement is still owed** —
+all three measuring commands measure the box, and the fixes are not on the box until this branch
+deploys, so the artifacts in `docs/verification/` remain the *before* picture.
+
+**A measurement error from the measure half, corrected here:** the reader calls
+`/api/v1/releases?**ingested_title**=`, and both scripts had asked for `?title=`. Different work
+(`?title=` filters in the repository; `?ingested_title=` fetches all 382 release points and filters
+in Python) and different cost — **27.0 ms against 20.1 ms**. The release list was a worse offender
+than the measure half reported.
+
+## Remaining: B4, B5, B6
+
+**B4** (search relevance and operators), **B5** ("Compare with…" on the section header — `/app/diff`
+is still two hops from the text it compares, and the **5.1 s** API diff is its cost problem),
 **B6** (dead ends).
 
 ## Standing decisions — do not silently reverse these
