@@ -4,8 +4,8 @@ title: Checking this site
 order: 9
 summary: How to verify that what you are reading is what the OLRC published, and what this site does not guarantee.
 covers:
-  routes: []
-  adrs: [7, 13, 39, 42]
+  routes: ["/app/design"]
+  adrs: [7, 13, 39, 42, 53]
 ---
 
 This is not an official publication. This chapter explains how to verify the text against official sources.
@@ -78,6 +78,44 @@ scrolling sideways at 320 pixels, and again at 1280 pixels with the page zoomed 
 Automated scanning answers about half of WCAG 2.1 AA. It does not see focus order, reading
 sequence, whether a live region announces, or whether a visible label and its accessible name
 agree.
+
+## The design system page
+
+[/app/design](/app/design) shows every part the reader is built from on one page: the two
+typefaces and the roles they are used in, the reading measure, the colour palette, the focus ring,
+the status badges, the breadcrumb and chapter rail, the version timeline, the redline, the copy
+control, a search result row, and each message the site can show when it cannot answer — no
+results, a rate-limited preview, a citation that parses and names nothing, and a release point that
+answered for another.
+
+Each specimen is the component itself, given specimen data, rather than a picture of it. The page
+reaches no data of its own; the provision it shows is under title 0, which the Office of the Law
+Revision Counsel does not publish, so its citations resolve to nothing and its words are not law.
+
+The colour table on that page computes its ratios in your browser, from the colours the page has
+resolved, so it is correct in whichever theme you are reading. Switching the theme with the control
+in the header recomputes it. The same pairs are computed from the stylesheet by
+`scripts/contrast.py` and committed as a file; the two are compared in the browser test suite.
+
+```scenario
+id: design-system-contrast
+title: The design page reports contrast for the colours it is painted with
+steps:
+  - goto: /app/design
+  - expect:
+      selector: "[data-pairs]"
+      contains: "--ink"
+  - expect:
+      selector: "[data-pairs]"
+      contains: "pass"
+  - expect:
+      selector: ".status-tag--vacated"
+      contains: "vacated"
+```
+
+An unrecognised status is the last of those steps. The set of statuses is not fixed — the source
+may publish one this site has never seen — and a status it does not know keeps the plain badge and
+prints its own word.
 
 ## Limitations
 
