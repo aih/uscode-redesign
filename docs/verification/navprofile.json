@@ -1,0 +1,1937 @@
+{
+  "generated_at": "2026-08-05T01:23:55Z",
+  "host": "uscode.linkedlegislation.org",
+  "instance": "i-06b433caacd78fd96",
+  "command": "uv run python scripts/navprofile.py",
+  "warm_iterations": 12,
+  "cold_variants": 12,
+  "bytes": "wire bytes: every request sends Accept-Encoding and Caddy compresses (`encode gzip zstd`), so these are what crosses the network, not the rendered size",
+  "rate_limits": {
+    "/api/v1/labels": [
+      300,
+      30.0
+    ],
+    "/api/v1/search": [
+      120,
+      10.0
+    ],
+    "/api/v1/citation": [
+      120,
+      10.0
+    ],
+    "/api/v1/sections/*/diff": [
+      5,
+      0.2
+    ],
+    "/app/preview/": [
+      60,
+      5.0
+    ],
+    "/app/diff/": [
+      8,
+      0.5
+    ]
+  },
+  "vantages": {
+    "edge": "from a developer laptop over the internet: TLS, HTTP/2, Caddy, Astro, FastAPI, Postgres",
+    "caddy": "on the box, over loopback to the same virtual host: everything but the internet",
+    "astro": "on the box, to the Astro container's port 4321: no Caddy, no TLS",
+    "api": "on the box, to the FastAPI container's port 8001: no Caddy, no Astro"
+  },
+  "attribution": [
+    {
+      "journey": "spine",
+      "step": "front page",
+      "phase": "warm",
+      "edge_total_p50_ms": 333.1,
+      "caddy_total_p50_ms": 29.2,
+      "astro_total_p50_ms": 21.1,
+      "internet_and_tls_ms": 303.9,
+      "caddy_own_ms": 8.1,
+      "api_calls": 1,
+      "api_cost_ms": 16.3,
+      "astro_own_ms": 4.8,
+      "slowest_parallel_call": null
+    },
+    {
+      "journey": "spine",
+      "step": "title TOC",
+      "phase": "warm",
+      "edge_total_p50_ms": 146.9,
+      "caddy_total_p50_ms": 57.8,
+      "astro_total_p50_ms": 54.2,
+      "internet_and_tls_ms": 89.1,
+      "caddy_own_ms": 3.6,
+      "api_calls": 2,
+      "api_cost_ms": 39.5,
+      "astro_own_ms": 14.7,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "spine",
+      "step": "chapter TOC",
+      "phase": "warm",
+      "edge_total_p50_ms": 147.7,
+      "caddy_total_p50_ms": 56.5,
+      "astro_total_p50_ms": 54.2,
+      "internet_and_tls_ms": 91.2,
+      "caddy_own_ms": 2.3,
+      "api_calls": 2,
+      "api_cost_ms": 36.1,
+      "astro_own_ms": 18.1,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "spine",
+      "step": "section",
+      "phase": "warm",
+      "edge_total_p50_ms": 195.0,
+      "caddy_total_p50_ms": 77.8,
+      "astro_total_p50_ms": 77.4,
+      "internet_and_tls_ms": 117.2,
+      "caddy_own_ms": 0.4,
+      "api_calls": 5,
+      "api_cost_ms": 36.6,
+      "astro_own_ms": 40.8,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "spine",
+      "step": "front page",
+      "phase": "cold",
+      "edge_total_p50_ms": 320.7,
+      "caddy_total_p50_ms": 29.2,
+      "astro_total_p50_ms": 22.0,
+      "internet_and_tls_ms": 291.5,
+      "caddy_own_ms": 7.2,
+      "api_calls": 1,
+      "api_cost_ms": 16.3,
+      "astro_own_ms": 5.7,
+      "slowest_parallel_call": null
+    },
+    {
+      "journey": "spine",
+      "step": "title TOC",
+      "phase": "cold",
+      "edge_total_p50_ms": 144.3,
+      "caddy_total_p50_ms": 49.5,
+      "astro_total_p50_ms": 48.9,
+      "internet_and_tls_ms": 94.8,
+      "caddy_own_ms": 0.6,
+      "api_calls": 2,
+      "api_cost_ms": 39.5,
+      "astro_own_ms": 9.4,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "spine",
+      "step": "chapter TOC",
+      "phase": "cold",
+      "edge_total_p50_ms": 143.4,
+      "caddy_total_p50_ms": 51.1,
+      "astro_total_p50_ms": 51.7,
+      "internet_and_tls_ms": 92.3,
+      "caddy_own_ms": -0.6,
+      "api_calls": 2,
+      "api_cost_ms": 36.1,
+      "astro_own_ms": 15.6,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "spine",
+      "step": "section",
+      "phase": "cold",
+      "edge_total_p50_ms": 171.2,
+      "caddy_total_p50_ms": 79.0,
+      "astro_total_p50_ms": 77.5,
+      "internet_and_tls_ms": 92.2,
+      "caddy_own_ms": 1.5,
+      "api_calls": 5,
+      "api_cost_ms": 36.6,
+      "astro_own_ms": 40.9,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "citation",
+      "step": "goto, redirect followed to the provision",
+      "phase": "warm",
+      "edge_total_p50_ms": 561.2,
+      "caddy_total_p50_ms": 98.3,
+      "astro_total_p50_ms": 92.4,
+      "internet_and_tls_ms": 462.9,
+      "caddy_own_ms": 5.9
+    },
+    {
+      "journey": "citation",
+      "step": "goto, redirect followed to the provision",
+      "phase": "cold",
+      "edge_total_p50_ms": 584.2,
+      "caddy_total_p50_ms": 123.8,
+      "astro_total_p50_ms": 101.1,
+      "internet_and_tls_ms": 460.4,
+      "caddy_own_ms": 22.7
+    },
+    {
+      "journey": "search",
+      "step": "results page",
+      "phase": "warm",
+      "edge_total_p50_ms": 366.7,
+      "caddy_total_p50_ms": 56.1,
+      "astro_total_p50_ms": 48.0,
+      "internet_and_tls_ms": 310.6,
+      "caddy_own_ms": 8.1
+    },
+    {
+      "journey": "search",
+      "step": "first result",
+      "phase": "warm",
+      "edge_total_p50_ms": 273.5,
+      "caddy_total_p50_ms": 91.5,
+      "astro_total_p50_ms": 87.0,
+      "internet_and_tls_ms": 182.0,
+      "caddy_own_ms": 4.5
+    },
+    {
+      "journey": "search",
+      "step": "results page",
+      "phase": "cold",
+      "edge_total_p50_ms": 380.6,
+      "caddy_total_p50_ms": 49.7,
+      "astro_total_p50_ms": 45.2,
+      "internet_and_tls_ms": 330.9,
+      "caddy_own_ms": 4.5
+    },
+    {
+      "journey": "search",
+      "step": "first result",
+      "phase": "cold",
+      "edge_total_p50_ms": 168.0,
+      "caddy_total_p50_ms": 77.3,
+      "astro_total_p50_ms": 74.1,
+      "internet_and_tls_ms": 90.7,
+      "caddy_own_ms": 3.2
+    },
+    {
+      "journey": "read-along",
+      "step": "section",
+      "phase": "warm",
+      "edge_total_p50_ms": 460.3,
+      "caddy_total_p50_ms": 86.0,
+      "astro_total_p50_ms": 74.9,
+      "internet_and_tls_ms": 374.3,
+      "caddy_own_ms": 11.1,
+      "api_calls": 5,
+      "api_cost_ms": 36.6,
+      "astro_own_ms": 38.3,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "read-along",
+      "step": "next section",
+      "phase": "warm",
+      "edge_total_p50_ms": 157.3,
+      "caddy_total_p50_ms": 61.0,
+      "astro_total_p50_ms": 58.3,
+      "internet_and_tls_ms": 96.3,
+      "caddy_own_ms": 2.7
+    },
+    {
+      "journey": "read-along",
+      "step": "the one after",
+      "phase": "warm",
+      "edge_total_p50_ms": 167.7,
+      "caddy_total_p50_ms": 73.8,
+      "astro_total_p50_ms": 73.5,
+      "internet_and_tls_ms": 93.9,
+      "caddy_own_ms": 0.3
+    },
+    {
+      "journey": "read-along",
+      "step": "section",
+      "phase": "cold",
+      "edge_total_p50_ms": 445.0,
+      "caddy_total_p50_ms": 85.0,
+      "astro_total_p50_ms": 79.1,
+      "internet_and_tls_ms": 360.0,
+      "caddy_own_ms": 5.9,
+      "api_calls": 5,
+      "api_cost_ms": 36.6,
+      "astro_own_ms": 42.5,
+      "slowest_parallel_call": "/api/v1/releases?title={t}"
+    },
+    {
+      "journey": "read-along",
+      "step": "next section",
+      "phase": "cold",
+      "edge_total_p50_ms": 165.1,
+      "caddy_total_p50_ms": 67.6,
+      "astro_total_p50_ms": 69.4,
+      "internet_and_tls_ms": 97.5,
+      "caddy_own_ms": -1.8
+    },
+    {
+      "journey": "read-along",
+      "step": "the one after",
+      "phase": "cold",
+      "edge_total_p50_ms": 166.6,
+      "caddy_total_p50_ms": 73.8,
+      "astro_total_p50_ms": 67.9,
+      "internet_and_tls_ms": 92.8,
+      "caddy_own_ms": 5.9
+    },
+    {
+      "journey": "compare",
+      "step": "version history",
+      "phase": "warm",
+      "edge_total_p50_ms": 311.3,
+      "caddy_total_p50_ms": 22.2,
+      "astro_total_p50_ms": 14.3,
+      "internet_and_tls_ms": 289.1,
+      "caddy_own_ms": 7.9
+    },
+    {
+      "journey": "compare",
+      "step": "redline",
+      "phase": "warm",
+      "edge_total_p50_ms": 139.3,
+      "caddy_total_p50_ms": 53.6,
+      "astro_total_p50_ms": 43.2,
+      "internet_and_tls_ms": 85.7,
+      "caddy_own_ms": 10.4
+    },
+    {
+      "journey": "compare",
+      "step": "version history",
+      "phase": "cold",
+      "edge_total_p50_ms": 303.2,
+      "caddy_total_p50_ms": 22.0,
+      "astro_total_p50_ms": 13.5,
+      "internet_and_tls_ms": 281.2,
+      "caddy_own_ms": 8.5
+    },
+    {
+      "journey": "compare",
+      "step": "redline",
+      "phase": "cold",
+      "edge_total_p50_ms": 154.5,
+      "caddy_total_p50_ms": 57.1,
+      "astro_total_p50_ms": 59.7,
+      "internet_and_tls_ms": 97.4,
+      "caddy_own_ms": -2.6
+    }
+  ],
+  "profiles": {
+    "edge": {
+      "vantage": "edge",
+      "journeys": [
+        {
+          "name": "spine",
+          "derivation": "ia-map: `/app/` exits to a title TOC, a TOC to its children, and the leaf is a section",
+          "steps": [
+            {
+              "step": "front page",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 310.7,
+              "ttfb_p95_ms": 324.5,
+              "total_p50_ms": 333.1,
+              "total_p95_ms": 382.3,
+              "bytes": 5800,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "title TOC",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 143.1,
+              "ttfb_p95_ms": 150.4,
+              "total_p50_ms": 146.9,
+              "total_p95_ms": 157.6,
+              "bytes": 9701,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "chapter TOC",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 141.6,
+              "ttfb_p95_ms": 150.0,
+              "total_p50_ms": 147.7,
+              "total_p95_ms": 156.2,
+              "bytes": 7713,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 187.2,
+              "ttfb_p95_ms": 250.6,
+              "total_p50_ms": 195.0,
+              "total_p95_ms": 258.4,
+              "bytes": 21246,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "front page",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 317.5,
+              "ttfb_p95_ms": 412.6,
+              "total_p50_ms": 320.7,
+              "total_p95_ms": 412.9,
+              "bytes": 5795,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "title TOC",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 143.2,
+              "ttfb_p95_ms": 154.8,
+              "total_p50_ms": 144.3,
+              "total_p95_ms": 155.3,
+              "bytes": 6563,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "chapter TOC",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 140.7,
+              "ttfb_p95_ms": 145.7,
+              "total_p50_ms": 143.4,
+              "total_p95_ms": 153.0,
+              "bytes": 5797,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 160.7,
+              "ttfb_p95_ms": 405.0,
+              "total_p50_ms": 171.2,
+              "total_p95_ms": 679.1,
+              "bytes": 17490,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "citation",
+          "derivation": "ia-map: `/app/goto` exits to the provision, or to `/app/search`",
+          "steps": [
+            {
+              "step": "goto, redirect followed to the provision",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 474.2,
+              "ttfb_p95_ms": 547.1,
+              "total_p50_ms": 561.2,
+              "total_p95_ms": 639.0,
+              "bytes": 21246,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "goto, redirect followed to the provision",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 489.5,
+              "ttfb_p95_ms": 709.7,
+              "total_p50_ms": 584.2,
+              "total_p95_ms": 893.7,
+              "bytes": 17490,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "search",
+          "derivation": "ia-map: `/app/search` exits to a section per result",
+          "steps": [
+            {
+              "step": "results page",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 338.3,
+              "ttfb_p95_ms": 353.2,
+              "total_p50_ms": 366.7,
+              "total_p95_ms": 387.8,
+              "bytes": 7766,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "first result",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 188.0,
+              "ttfb_p95_ms": 251.7,
+              "total_p50_ms": 273.5,
+              "total_p95_ms": 337.3,
+              "bytes": 27829,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "results page",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 336.2,
+              "ttfb_p95_ms": 477.0,
+              "total_p50_ms": 380.6,
+              "total_p95_ms": 477.6,
+              "bytes": 7308,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "first result",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 162.1,
+              "ttfb_p95_ms": 248.1,
+              "total_p50_ms": 168.0,
+              "total_p95_ms": 284.2,
+              "bytes": 16538,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "read-along",
+          "derivation": "ia-map: a section exits to prev/next/up \u2014 the SectionBar and ChapterRail path",
+          "steps": [
+            {
+              "step": "section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 366.9,
+              "ttfb_p95_ms": 457.1,
+              "total_p50_ms": 460.3,
+              "total_p95_ms": 548.0,
+              "bytes": 21246,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "next section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 154.4,
+              "ttfb_p95_ms": 236.5,
+              "total_p50_ms": 157.3,
+              "total_p95_ms": 242.8,
+              "bytes": 15171,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "the one after",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 166.1,
+              "ttfb_p95_ms": 172.3,
+              "total_p50_ms": 167.7,
+              "total_p95_ms": 174.1,
+              "bytes": 16455,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 369.9,
+              "ttfb_p95_ms": 565.3,
+              "total_p50_ms": 445.0,
+              "total_p95_ms": 720.6,
+              "bytes": 17490,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "next section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 163.2,
+              "ttfb_p95_ms": 237.7,
+              "total_p50_ms": 165.1,
+              "total_p95_ms": 251.0,
+              "bytes": 15441,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "the one after",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 160.2,
+              "ttfb_p95_ms": 198.8,
+              "total_p50_ms": 166.6,
+              "total_p95_ms": 207.5,
+              "bytes": 15824,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "compare",
+          "derivation": "ia-map thin path: section \u2192 `/app/versions` \u2192 `/app/diff`, two hops",
+          "steps": [
+            {
+              "step": "version history",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 305.7,
+              "ttfb_p95_ms": 332.5,
+              "total_p50_ms": 311.3,
+              "total_p95_ms": 377.4,
+              "bytes": 5255,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "redline",
+              "phase": "warm",
+              "n": 3,
+              "ttfb_p50_ms": 133.5,
+              "ttfb_p95_ms": 142.5,
+              "total_p50_ms": 139.3,
+              "total_p95_ms": 143.5,
+              "bytes": 10795,
+              "connects": 0,
+              "codes": {
+                "200": 3
+              }
+            },
+            {
+              "step": "version history",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 300.6,
+              "ttfb_p95_ms": 330.6,
+              "total_p50_ms": 303.2,
+              "total_p95_ms": 331.6,
+              "bytes": 4954,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "redline",
+              "phase": "cold",
+              "n": 4,
+              "ttfb_p50_ms": 145.3,
+              "ttfb_p95_ms": 469.5,
+              "total_p50_ms": 154.5,
+              "total_p95_ms": 734.4,
+              "bytes": 26645,
+              "connects": 0,
+              "codes": {
+                "200": 4
+              }
+            }
+          ]
+        }
+      ],
+      "fanout": [
+        {
+          "page": "front page",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1/titles",
+              "n": 12,
+              "ttfb_p50_ms": 306.4,
+              "ttfb_p95_ms": 380.5,
+              "total_p50_ms": 309.8,
+              "total_p95_ms": 383.3,
+              "bytes": 6713,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "title TOC",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{t_toc}",
+              "n": 12,
+              "ttfb_p50_ms": 308.1,
+              "ttfb_p95_ms": 358.2,
+              "total_p50_ms": 309.3,
+              "total_p95_ms": 359.5,
+              "bytes": 3879,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 308.5,
+              "ttfb_p95_ms": 396.3,
+              "total_p50_ms": 309.1,
+              "total_p95_ms": 398.6,
+              "bytes": 5315,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "chapter TOC",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{parent}",
+              "n": 12,
+              "ttfb_p50_ms": 308.0,
+              "ttfb_p95_ms": 323.4,
+              "total_p50_ms": 310.6,
+              "total_p95_ms": 327.5,
+              "bytes": 2168,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 312.2,
+              "ttfb_p95_ms": 373.0,
+              "total_p50_ms": 313.7,
+              "total_p95_ms": 375.6,
+              "bytes": 5315,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "section",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{sec}",
+              "n": 12,
+              "ttfb_p50_ms": 305.0,
+              "ttfb_p95_ms": 330.9,
+              "total_p50_ms": 309.3,
+              "total_p95_ms": 333.9,
+              "bytes": 7561,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/labels?identifier={sec}",
+              "n": 12,
+              "ttfb_p50_ms": 295.7,
+              "ttfb_p95_ms": 332.9,
+              "total_p50_ms": 296.3,
+              "total_p95_ms": 333.4,
+              "bytes": 172,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/sections{sec}/neighbors",
+              "n": 12,
+              "ttfb_p50_ms": 300.3,
+              "ttfb_p95_ms": 310.2,
+              "total_p50_ms": 301.7,
+              "total_p95_ms": 313.8,
+              "bytes": 393,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 314.4,
+              "ttfb_p95_ms": 406.2,
+              "total_p50_ms": 314.8,
+              "total_p95_ms": 407.7,
+              "bytes": 5315,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1{parent}",
+              "n": 12,
+              "ttfb_p50_ms": 311.0,
+              "ttfb_p95_ms": 344.4,
+              "total_p50_ms": 311.4,
+              "total_p95_ms": 346.1,
+              "bytes": 2168,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "caddy": {
+      "vantage": "caddy",
+      "journeys": [
+        {
+          "name": "spine",
+          "derivation": "ia-map: `/app/` exits to a title TOC, a TOC to its children, and the leaf is a section",
+          "steps": [
+            {
+              "step": "front page",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 29.0,
+              "ttfb_p95_ms": 31.0,
+              "total_p50_ms": 29.2,
+              "total_p95_ms": 31.6,
+              "bytes": 5795,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "title TOC",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 57.1,
+              "ttfb_p95_ms": 139.8,
+              "total_p50_ms": 57.8,
+              "total_p95_ms": 140.1,
+              "bytes": 9703,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "chapter TOC",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 53.3,
+              "ttfb_p95_ms": 132.1,
+              "total_p50_ms": 56.5,
+              "total_p95_ms": 132.4,
+              "bytes": 7710,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 76.7,
+              "ttfb_p95_ms": 86.0,
+              "total_p50_ms": 77.8,
+              "total_p95_ms": 87.7,
+              "bytes": 21246,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "front page",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 28.4,
+              "ttfb_p95_ms": 109.3,
+              "total_p50_ms": 29.2,
+              "total_p95_ms": 109.5,
+              "bytes": 5795,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "title TOC",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 48.6,
+              "ttfb_p95_ms": 84.9,
+              "total_p50_ms": 49.5,
+              "total_p95_ms": 85.2,
+              "bytes": 6563,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "chapter TOC",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 50.0,
+              "ttfb_p95_ms": 58.2,
+              "total_p50_ms": 51.1,
+              "total_p95_ms": 58.9,
+              "bytes": 5802,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 77.5,
+              "ttfb_p95_ms": 289.2,
+              "total_p50_ms": 79.0,
+              "total_p95_ms": 303.9,
+              "bytes": 17487,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "citation",
+          "derivation": "ia-map: `/app/goto` exits to the provision, or to `/app/search`",
+          "steps": [
+            {
+              "step": "goto, redirect followed to the provision",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 95.3,
+              "ttfb_p95_ms": 176.2,
+              "total_p50_ms": 98.3,
+              "total_p95_ms": 179.4,
+              "bytes": 21243,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "goto, redirect followed to the provision",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 121.0,
+              "ttfb_p95_ms": 242.4,
+              "total_p50_ms": 123.8,
+              "total_p95_ms": 251.1,
+              "bytes": 17487,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "search",
+          "derivation": "ia-map: `/app/search` exits to a section per result",
+          "steps": [
+            {
+              "step": "results page",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 54.7,
+              "ttfb_p95_ms": 60.1,
+              "total_p50_ms": 56.1,
+              "total_p95_ms": 60.3,
+              "bytes": 7766,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "first result",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 90.3,
+              "ttfb_p95_ms": 164.9,
+              "total_p50_ms": 91.5,
+              "total_p95_ms": 170.8,
+              "bytes": 27829,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "results page",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 49.5,
+              "ttfb_p95_ms": 126.7,
+              "total_p50_ms": 49.7,
+              "total_p95_ms": 128.0,
+              "bytes": 7308,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "first result",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 75.8,
+              "ttfb_p95_ms": 112.9,
+              "total_p50_ms": 77.3,
+              "total_p95_ms": 116.1,
+              "bytes": 16535,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "read-along",
+          "derivation": "ia-map: a section exits to prev/next/up \u2014 the SectionBar and ChapterRail path",
+          "steps": [
+            {
+              "step": "section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 84.5,
+              "ttfb_p95_ms": 154.6,
+              "total_p50_ms": 86.0,
+              "total_p95_ms": 158.1,
+              "bytes": 21246,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "next section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 60.3,
+              "ttfb_p95_ms": 82.5,
+              "total_p50_ms": 61.0,
+              "total_p95_ms": 83.9,
+              "bytes": 15173,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "the one after",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 72.0,
+              "ttfb_p95_ms": 83.6,
+              "total_p50_ms": 73.8,
+              "total_p95_ms": 85.8,
+              "bytes": 16455,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 83.2,
+              "ttfb_p95_ms": 256.9,
+              "total_p50_ms": 85.0,
+              "total_p95_ms": 264.6,
+              "bytes": 17487,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "next section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 66.6,
+              "ttfb_p95_ms": 156.3,
+              "total_p50_ms": 67.6,
+              "total_p95_ms": 156.7,
+              "bytes": 15441,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "the one after",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 72.0,
+              "ttfb_p95_ms": 146.2,
+              "total_p50_ms": 73.8,
+              "total_p95_ms": 147.8,
+              "bytes": 15824,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "compare",
+          "derivation": "ia-map thin path: section \u2192 `/app/versions` \u2192 `/app/diff`, two hops",
+          "steps": [
+            {
+              "step": "version history",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 21.8,
+              "ttfb_p95_ms": 24.4,
+              "total_p50_ms": 22.2,
+              "total_p95_ms": 25.0,
+              "bytes": 5255,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "redline",
+              "phase": "warm",
+              "n": 3,
+              "ttfb_p50_ms": 53.3,
+              "ttfb_p95_ms": 56.5,
+              "total_p50_ms": 53.6,
+              "total_p95_ms": 57.5,
+              "bytes": 10800,
+              "connects": 0,
+              "codes": {
+                "200": 3
+              }
+            },
+            {
+              "step": "version history",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 20.9,
+              "ttfb_p95_ms": 55.4,
+              "total_p50_ms": 22.0,
+              "total_p95_ms": 55.6,
+              "bytes": 4956,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "redline",
+              "phase": "cold",
+              "n": 4,
+              "ttfb_p50_ms": 56.1,
+              "ttfb_p95_ms": 405.4,
+              "total_p50_ms": 57.1,
+              "total_p95_ms": 413.0,
+              "bytes": 26645,
+              "connects": 0,
+              "codes": {
+                "200": 4
+              }
+            }
+          ]
+        }
+      ],
+      "fanout": [
+        {
+          "page": "front page",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1/titles",
+              "n": 12,
+              "ttfb_p50_ms": 23.3,
+              "ttfb_p95_ms": 25.4,
+              "total_p50_ms": 24.1,
+              "total_p95_ms": 26.2,
+              "bytes": 6713,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "title TOC",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{t_toc}",
+              "n": 12,
+              "ttfb_p50_ms": 24.9,
+              "ttfb_p95_ms": 27.3,
+              "total_p50_ms": 25.1,
+              "total_p95_ms": 27.6,
+              "bytes": 3879,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 27.4,
+              "ttfb_p95_ms": 49.6,
+              "total_p50_ms": 27.7,
+              "total_p95_ms": 51.1,
+              "bytes": 5315,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "chapter TOC",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{parent}",
+              "n": 12,
+              "ttfb_p50_ms": 22.0,
+              "ttfb_p95_ms": 23.3,
+              "total_p50_ms": 22.2,
+              "total_p95_ms": 23.5,
+              "bytes": 2168,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 26.9,
+              "ttfb_p95_ms": 28.1,
+              "total_p50_ms": 27.4,
+              "total_p95_ms": 29.3,
+              "bytes": 5315,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "section",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{sec}",
+              "n": 12,
+              "ttfb_p50_ms": 22.4,
+              "ttfb_p95_ms": 23.1,
+              "total_p50_ms": 23.0,
+              "total_p95_ms": 23.7,
+              "bytes": 7561,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/labels?identifier={sec}",
+              "n": 12,
+              "ttfb_p50_ms": 15.5,
+              "ttfb_p95_ms": 15.8,
+              "total_p50_ms": 15.8,
+              "total_p95_ms": 16.2,
+              "bytes": 172,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/sections{sec}/neighbors",
+              "n": 12,
+              "ttfb_p50_ms": 19.7,
+              "ttfb_p95_ms": 20.1,
+              "total_p50_ms": 19.9,
+              "total_p95_ms": 20.2,
+              "bytes": 393,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 27.3,
+              "ttfb_p95_ms": 32.4,
+              "total_p50_ms": 27.7,
+              "total_p95_ms": 32.6,
+              "bytes": 5315,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1{parent}",
+              "n": 12,
+              "ttfb_p50_ms": 22.7,
+              "ttfb_p95_ms": 24.7,
+              "total_p50_ms": 22.9,
+              "total_p95_ms": 24.9,
+              "bytes": 2168,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "astro": {
+      "vantage": "astro",
+      "journeys": [
+        {
+          "name": "spine",
+          "derivation": "ia-map: `/app/` exits to a title TOC, a TOC to its children, and the leaf is a section",
+          "steps": [
+            {
+              "step": "front page",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 21.0,
+              "ttfb_p95_ms": 22.5,
+              "total_p50_ms": 21.1,
+              "total_p95_ms": 22.5,
+              "bytes": 23489,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "title TOC",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 54.2,
+              "ttfb_p95_ms": 62.9,
+              "total_p50_ms": 54.2,
+              "total_p95_ms": 63.0,
+              "bytes": 48477,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "chapter TOC",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 54.1,
+              "ttfb_p95_ms": 136.1,
+              "total_p50_ms": 54.2,
+              "total_p95_ms": 136.1,
+              "bytes": 31146,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 77.3,
+              "ttfb_p95_ms": 89.7,
+              "total_p50_ms": 77.4,
+              "total_p95_ms": 89.8,
+              "bytes": 76021,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "front page",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 22.0,
+              "ttfb_p95_ms": 36.1,
+              "total_p50_ms": 22.0,
+              "total_p95_ms": 36.2,
+              "bytes": 23489,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "title TOC",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 48.9,
+              "ttfb_p95_ms": 58.8,
+              "total_p50_ms": 48.9,
+              "total_p95_ms": 58.8,
+              "bytes": 24946,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "chapter TOC",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 51.6,
+              "ttfb_p95_ms": 130.5,
+              "total_p50_ms": 51.7,
+              "total_p95_ms": 130.5,
+              "bytes": 19524,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 77.5,
+              "ttfb_p95_ms": 290.8,
+              "total_p50_ms": 77.5,
+              "total_p95_ms": 291.7,
+              "bytes": 60568,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "citation",
+          "derivation": "ia-map: `/app/goto` exits to the provision, or to `/app/search`",
+          "steps": [
+            {
+              "step": "goto, redirect followed to the provision",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 92.3,
+              "ttfb_p95_ms": 172.0,
+              "total_p50_ms": 92.4,
+              "total_p95_ms": 172.1,
+              "bytes": 76021,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "goto, redirect followed to the provision",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 101.0,
+              "ttfb_p95_ms": 271.1,
+              "total_p50_ms": 101.1,
+              "total_p95_ms": 276.4,
+              "bytes": 60568,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "search",
+          "derivation": "ia-map: `/app/search` exits to a section per result",
+          "steps": [
+            {
+              "step": "results page",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 47.9,
+              "ttfb_p95_ms": 54.6,
+              "total_p50_ms": 48.0,
+              "total_p95_ms": 54.6,
+              "bytes": 29057,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "first result",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 86.9,
+              "ttfb_p95_ms": 98.2,
+              "total_p50_ms": 87.0,
+              "total_p95_ms": 98.4,
+              "bytes": 138760,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "results page",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 45.1,
+              "ttfb_p95_ms": 120.1,
+              "total_p50_ms": 45.2,
+              "total_p95_ms": 120.2,
+              "bytes": 28307,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "first result",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 74.1,
+              "ttfb_p95_ms": 149.9,
+              "total_p50_ms": 74.1,
+              "total_p95_ms": 150.0,
+              "bytes": 55466,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "read-along",
+          "derivation": "ia-map: a section exits to prev/next/up \u2014 the SectionBar and ChapterRail path",
+          "steps": [
+            {
+              "step": "section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 74.9,
+              "ttfb_p95_ms": 151.7,
+              "total_p50_ms": 74.9,
+              "total_p95_ms": 151.8,
+              "bytes": 76021,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "next section",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 58.2,
+              "ttfb_p95_ms": 137.1,
+              "total_p50_ms": 58.3,
+              "total_p95_ms": 137.2,
+              "bytes": 48872,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "the one after",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 73.5,
+              "ttfb_p95_ms": 80.4,
+              "total_p50_ms": 73.5,
+              "total_p95_ms": 80.4,
+              "bytes": 54086,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 79.1,
+              "ttfb_p95_ms": 213.5,
+              "total_p50_ms": 79.1,
+              "total_p95_ms": 213.9,
+              "bytes": 60568,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "next section",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 69.4,
+              "ttfb_p95_ms": 138.0,
+              "total_p50_ms": 69.4,
+              "total_p95_ms": 138.0,
+              "bytes": 48232,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "the one after",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 67.8,
+              "ttfb_p95_ms": 112.8,
+              "total_p50_ms": 67.9,
+              "total_p95_ms": 112.9,
+              "bytes": 50146,
+              "connects": 0,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "compare",
+          "derivation": "ia-map thin path: section \u2192 `/app/versions` \u2192 `/app/diff`, two hops",
+          "steps": [
+            {
+              "step": "version history",
+              "phase": "warm",
+              "n": 12,
+              "ttfb_p50_ms": 14.3,
+              "ttfb_p95_ms": 15.7,
+              "total_p50_ms": 14.3,
+              "total_p95_ms": 15.8,
+              "bytes": 18332,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "redline",
+              "phase": "warm",
+              "n": 3,
+              "ttfb_p50_ms": 43.2,
+              "ttfb_p95_ms": 46.0,
+              "total_p50_ms": 43.2,
+              "total_p95_ms": 46.1,
+              "bytes": 35605,
+              "connects": 0,
+              "codes": {
+                "200": 3
+              }
+            },
+            {
+              "step": "version history",
+              "phase": "cold",
+              "n": 12,
+              "ttfb_p50_ms": 13.5,
+              "ttfb_p95_ms": 44.4,
+              "total_p50_ms": 13.5,
+              "total_p95_ms": 44.4,
+              "bytes": 16511,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "step": "redline",
+              "phase": "cold",
+              "n": 4,
+              "ttfb_p50_ms": 59.7,
+              "ttfb_p95_ms": 415.4,
+              "total_p50_ms": 59.7,
+              "total_p95_ms": 415.7,
+              "bytes": 132318,
+              "connects": 0,
+              "codes": {
+                "200": 4
+              }
+            }
+          ]
+        }
+      ],
+      "fanout": []
+    },
+    "api": {
+      "vantage": "api",
+      "journeys": [
+        {
+          "name": "spine",
+          "derivation": "ia-map: `/app/` exits to a title TOC, a TOC to its children, and the leaf is a section",
+          "steps": []
+        },
+        {
+          "name": "citation",
+          "derivation": "ia-map: `/app/goto` exits to the provision, or to `/app/search`",
+          "steps": []
+        },
+        {
+          "name": "search",
+          "derivation": "ia-map: `/app/search` exits to a section per result",
+          "steps": []
+        },
+        {
+          "name": "read-along",
+          "derivation": "ia-map: a section exits to prev/next/up \u2014 the SectionBar and ChapterRail path",
+          "steps": []
+        },
+        {
+          "name": "compare",
+          "derivation": "ia-map thin path: section \u2192 `/app/versions` \u2192 `/app/diff`, two hops",
+          "steps": []
+        }
+      ],
+      "fanout": [
+        {
+          "page": "front page",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1/titles",
+              "n": 12,
+              "ttfb_p50_ms": 16.2,
+              "ttfb_p95_ms": 17.8,
+              "total_p50_ms": 16.3,
+              "total_p95_ms": 17.9,
+              "bytes": 44047,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "title TOC",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{t_toc}",
+              "n": 12,
+              "ttfb_p50_ms": 18.7,
+              "ttfb_p95_ms": 19.1,
+              "total_p50_ms": 18.7,
+              "total_p95_ms": 19.2,
+              "bytes": 25038,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 20.7,
+              "ttfb_p95_ms": 24.6,
+              "total_p50_ms": 20.8,
+              "total_p95_ms": 24.7,
+              "bytes": 44628,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "chapter TOC",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{parent}",
+              "n": 12,
+              "ttfb_p50_ms": 15.7,
+              "ttfb_p95_ms": 17.1,
+              "total_p50_ms": 15.7,
+              "total_p95_ms": 17.2,
+              "bytes": 9794,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 20.3,
+              "ttfb_p95_ms": 22.3,
+              "total_p50_ms": 20.4,
+              "total_p95_ms": 22.4,
+              "bytes": 44628,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        },
+        {
+          "page": "section",
+          "sequential": 1,
+          "calls": [
+            {
+              "call": "/api/v1{sec}",
+              "n": 12,
+              "ttfb_p50_ms": 16.4,
+              "ttfb_p95_ms": 26.8,
+              "total_p50_ms": 16.5,
+              "total_p95_ms": 26.8,
+              "bytes": 28364,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/labels?identifier={sec}",
+              "n": 12,
+              "ttfb_p50_ms": 10.3,
+              "ttfb_p95_ms": 11.5,
+              "total_p50_ms": 10.4,
+              "total_p95_ms": 11.6,
+              "bytes": 172,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/sections{sec}/neighbors",
+              "n": 12,
+              "ttfb_p50_ms": 12.1,
+              "ttfb_p95_ms": 12.9,
+              "total_p50_ms": 12.2,
+              "total_p95_ms": 12.9,
+              "bytes": 931,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1/releases?title={t}",
+              "n": 12,
+              "ttfb_p50_ms": 20.0,
+              "ttfb_p95_ms": 21.6,
+              "total_p50_ms": 20.1,
+              "total_p95_ms": 21.6,
+              "bytes": 44628,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            },
+            {
+              "call": "/api/v1{parent}",
+              "n": 12,
+              "ttfb_p50_ms": 15.7,
+              "ttfb_p95_ms": 16.4,
+              "total_p50_ms": 15.8,
+              "total_p95_ms": 16.4,
+              "bytes": 9794,
+              "connects": 1,
+              "codes": {
+                "200": 12
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

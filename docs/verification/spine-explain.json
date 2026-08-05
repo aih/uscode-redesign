@@ -1,0 +1,1782 @@
+{
+  "section": "/us/usc/t16/s45f",
+  "release": "119-102not101",
+  "table_rows_estimated": {
+    "guid_map": 96204776,
+    "section_versions": 489148,
+    "section_release_map": 5465420,
+    "structure_nodes": 9916,
+    "sections": 65938
+  },
+  "calls": [
+    {
+      "call": "list_titles (front page)",
+      "queries": 2,
+      "execution_ms_total": 1.518,
+      "plans": [
+        {
+          "sql": "SELECT title_versions.title_id, release_points.seq, release_points.label FROM title_versions JOIN release_points ON release_points.id = title_versions.release_id",
+          "params": {},
+          "execution_ms": 1.498,
+          "planning_ms": 0.142,
+          "shared_hit_blocks": 74,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.35,
+              "rows": 3153,
+              "loops": 1,
+              "shared_hit": 58,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "release_points",
+              "index": null,
+              "actual_ms": 0.085,
+              "rows": 382,
+              "loops": 1,
+              "shared_hit": 16,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT titles.id, titles.num, titles.name, titles.is_positive_law FROM titles",
+          "params": {},
+          "execution_ms": 0.02,
+          "planning_ms": 0.033,
+          "shared_hit_blocks": 1,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "titles",
+              "index": null,
+              "actual_ms": 0.01,
+              "rows": 58,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "resolve_release, newest",
+      "queries": 1,
+      "execution_ms_total": 0.027,
+      "plans": [
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "param_1": "1"
+          },
+          "execution_ms": 0.027,
+          "planning_ms": 0.035,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.007,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "resolve_release, by label",
+      "queries": 1,
+      "execution_ms_total": 0.019,
+      "plans": [
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points WHERE release_points.label = %(label_1)s::VARCHAR",
+          "params": {
+            "label_1": "119-102not101"
+          },
+          "execution_ms": 0.019,
+          "planning_ms": 0.033,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_label_key",
+              "actual_ms": 0.011,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "get_section",
+      "queries": 9,
+      "execution_ms_total": 1.649,
+      "plans": [
+        {
+          "sql": "SELECT sections.id, sections.title_id, sections.identifier FROM sections WHERE sections.identifier IN (%(identifier_1_1)s::VARCHAR)",
+          "params": {
+            "identifier_1_1": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 0.044,
+          "planning_ms": 0.037,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "ix_sections_identifier",
+              "actual_ms": 0.036,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points JOIN title_versions ON title_versions.release_id = release_points.id WHERE title_versions.title_id = %(title_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "seq_1": "381",
+            "param_1": "1"
+          },
+          "execution_ms": 0.04,
+          "planning_ms": 0.152,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.004,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.012,
+              "rows": 4,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT section_versions.id, section_versions.section_id, section_versions.first_release_id, section_versions.content_hash, section_versions.xml, section_versions.html_cache, section_versions.num, section_versions.heading, section_versions.status, section_versions.source_credit, section_release_map.section_version_id, section_release_map.release_id, section_release_map.seq_in_title, section_release_map.parent_identifier FROM section_versions JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE section_versions.section_id = %(section_id_1)s::INTEGER AND section_release_map.release_id = %(release_id_1)s::INTEGER ORDER BY section_release_map.seq_in_title, section_versions.id",
+          "params": {
+            "section_id_1": "156",
+            "release_id_1": "1"
+          },
+          "execution_ms": 0.138,
+          "planning_ms": 0.211,
+          "shared_hit_blocks": 48,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_section_id_content_hash_first_release_id_key",
+              "actual_ms": 0.026,
+              "rows": 11,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "section_release_map_pkey",
+              "actual_ms": 0.008,
+              "rows": 0,
+              "loops": 11,
+              "shared_hit": 34,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT titles.id AS titles_id, titles.num AS titles_num, titles.name AS titles_name, titles.is_positive_law AS titles_is_positive_law FROM titles WHERE titles.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "1"
+          },
+          "execution_ms": 0.017,
+          "planning_ms": 0.035,
+          "shared_hit_blocks": 1,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "titles",
+              "index": null,
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id AS release_points_id, release_points.congress AS release_points_congress, release_points.law_num AS release_points_law_num, release_points.excluded_laws AS release_points_excluded_laws, release_points.update_num AS release_points_update_num, release_points.label AS release_points_label, release_points.currency_date AS release_points_currency_date, release_points.seq AS release_points_seq, release_points.titles_affected AS release_points_titles_affected FROM release_points WHERE release_points.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "380"
+          },
+          "execution_ms": 0.018,
+          "planning_ms": 0.035,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_pkey",
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT guid_map.guid FROM guid_map WHERE guid_map.release_id = %(release_id_1)s::INTEGER AND guid_map.identifier = %(identifier_1)s::VARCHAR LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "release_id_1": "1",
+            "identifier_1": "/us/usc/t16/s45f",
+            "param_1": "1"
+          },
+          "execution_ms": 0.035,
+          "planning_ms": 0.047,
+          "shared_hit_blocks": 5,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "guid_map",
+              "index": "ix_guid_map_release_id_identifier",
+              "actual_ms": 0.026,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 5,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes WHERE structure_nodes.identifier = %(identifier_1)s::VARCHAR",
+          "params": {
+            "identifier_1": "/us/usc/t16/ch1/schVI"
+          },
+          "execution_ms": 1.323,
+          "planning_ms": 0.038,
+          "shared_hit_blocks": 188,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 1.315,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 188,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": [
+            "structure_nodes"
+          ]
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "2"
+          },
+          "execution_ms": 0.018,
+          "planning_ms": 0.079,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "1"
+          },
+          "execution_ms": 0.016,
+          "planning_ms": 0.037,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.008,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "get_section, unpinned",
+      "queries": 9,
+      "execution_ms_total": 1.602,
+      "plans": [
+        {
+          "sql": "SELECT sections.id, sections.title_id, sections.identifier FROM sections WHERE sections.identifier IN (%(identifier_1_1)s::VARCHAR)",
+          "params": {
+            "identifier_1_1": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 0.028,
+          "planning_ms": 0.036,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "ix_sections_identifier",
+              "actual_ms": 0.022,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points JOIN title_versions ON title_versions.release_id = release_points.id WHERE title_versions.title_id = %(title_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "seq_1": "381",
+            "param_1": "1"
+          },
+          "execution_ms": 0.037,
+          "planning_ms": 0.147,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.004,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.011,
+              "rows": 4,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT section_versions.id, section_versions.section_id, section_versions.first_release_id, section_versions.content_hash, section_versions.xml, section_versions.html_cache, section_versions.num, section_versions.heading, section_versions.status, section_versions.source_credit, section_release_map.section_version_id, section_release_map.release_id, section_release_map.seq_in_title, section_release_map.parent_identifier FROM section_versions JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE section_versions.section_id = %(section_id_1)s::INTEGER AND section_release_map.release_id = %(release_id_1)s::INTEGER ORDER BY section_release_map.seq_in_title, section_versions.id",
+          "params": {
+            "section_id_1": "156",
+            "release_id_1": "1"
+          },
+          "execution_ms": 0.109,
+          "planning_ms": 0.205,
+          "shared_hit_blocks": 48,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_section_id_content_hash_first_release_id_key",
+              "actual_ms": 0.025,
+              "rows": 11,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "section_release_map_pkey",
+              "actual_ms": 0.005,
+              "rows": 0,
+              "loops": 11,
+              "shared_hit": 34,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT titles.id AS titles_id, titles.num AS titles_num, titles.name AS titles_name, titles.is_positive_law AS titles_is_positive_law FROM titles WHERE titles.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "1"
+          },
+          "execution_ms": 0.015,
+          "planning_ms": 0.035,
+          "shared_hit_blocks": 1,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "titles",
+              "index": null,
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id AS release_points_id, release_points.congress AS release_points_congress, release_points.law_num AS release_points_law_num, release_points.excluded_laws AS release_points_excluded_laws, release_points.update_num AS release_points_update_num, release_points.label AS release_points_label, release_points.currency_date AS release_points_currency_date, release_points.seq AS release_points_seq, release_points.titles_affected AS release_points_titles_affected FROM release_points WHERE release_points.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "380"
+          },
+          "execution_ms": 0.017,
+          "planning_ms": 0.036,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_pkey",
+              "actual_ms": 0.009,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT guid_map.guid FROM guid_map WHERE guid_map.release_id = %(release_id_1)s::INTEGER AND guid_map.identifier = %(identifier_1)s::VARCHAR LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "release_id_1": "1",
+            "identifier_1": "/us/usc/t16/s45f",
+            "param_1": "1"
+          },
+          "execution_ms": 0.034,
+          "planning_ms": 0.045,
+          "shared_hit_blocks": 5,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "guid_map",
+              "index": "ix_guid_map_release_id_identifier",
+              "actual_ms": 0.025,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 5,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes WHERE structure_nodes.identifier = %(identifier_1)s::VARCHAR",
+          "params": {
+            "identifier_1": "/us/usc/t16/ch1/schVI"
+          },
+          "execution_ms": 1.332,
+          "planning_ms": 0.038,
+          "shared_hit_blocks": 188,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 1.325,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 188,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": [
+            "structure_nodes"
+          ]
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "2"
+          },
+          "execution_ms": 0.017,
+          "planning_ms": 0.037,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "1"
+          },
+          "execution_ms": 0.013,
+          "planning_ms": 0.033,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.006,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "get_section, provision",
+      "queries": 9,
+      "execution_ms_total": 1.662,
+      "plans": [
+        {
+          "sql": "SELECT sections.id, sections.title_id, sections.identifier FROM sections WHERE sections.identifier IN (%(identifier_1_1)s::VARCHAR, %(identifier_1_2)s::VARCHAR, %(identifier_1_3)s::VARCHAR)",
+          "params": {
+            "identifier_1_1": "/us/usc/t16/s45f/c/5",
+            "identifier_1_2": "/us/usc/t16/s45f/c",
+            "identifier_1_3": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 0.046,
+          "planning_ms": 0.046,
+          "shared_hit_blocks": 10,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "ix_sections_identifier",
+              "actual_ms": 0.039,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 10,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points JOIN title_versions ON title_versions.release_id = release_points.id WHERE title_versions.title_id = %(title_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "seq_1": "381",
+            "param_1": "1"
+          },
+          "execution_ms": 0.037,
+          "planning_ms": 0.149,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.004,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.011,
+              "rows": 4,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT section_versions.id, section_versions.section_id, section_versions.first_release_id, section_versions.content_hash, section_versions.xml, section_versions.html_cache, section_versions.num, section_versions.heading, section_versions.status, section_versions.source_credit, section_release_map.section_version_id, section_release_map.release_id, section_release_map.seq_in_title, section_release_map.parent_identifier FROM section_versions JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE section_versions.section_id = %(section_id_1)s::INTEGER AND section_release_map.release_id = %(release_id_1)s::INTEGER ORDER BY section_release_map.seq_in_title, section_versions.id",
+          "params": {
+            "section_id_1": "156",
+            "release_id_1": "1"
+          },
+          "execution_ms": 0.137,
+          "planning_ms": 0.208,
+          "shared_hit_blocks": 48,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_section_id_content_hash_first_release_id_key",
+              "actual_ms": 0.026,
+              "rows": 11,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "section_release_map_pkey",
+              "actual_ms": 0.007,
+              "rows": 0,
+              "loops": 11,
+              "shared_hit": 34,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT titles.id AS titles_id, titles.num AS titles_num, titles.name AS titles_name, titles.is_positive_law AS titles_is_positive_law FROM titles WHERE titles.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "1"
+          },
+          "execution_ms": 0.015,
+          "planning_ms": 0.035,
+          "shared_hit_blocks": 1,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "titles",
+              "index": null,
+              "actual_ms": 0.009,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id AS release_points_id, release_points.congress AS release_points_congress, release_points.law_num AS release_points_law_num, release_points.excluded_laws AS release_points_excluded_laws, release_points.update_num AS release_points_update_num, release_points.label AS release_points_label, release_points.currency_date AS release_points_currency_date, release_points.seq AS release_points_seq, release_points.titles_affected AS release_points_titles_affected FROM release_points WHERE release_points.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "380"
+          },
+          "execution_ms": 0.018,
+          "planning_ms": 0.035,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_pkey",
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT guid_map.guid FROM guid_map WHERE guid_map.release_id = %(release_id_1)s::INTEGER AND guid_map.identifier = %(identifier_1)s::VARCHAR LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "release_id_1": "1",
+            "identifier_1": "/us/usc/t16/s45f",
+            "param_1": "1"
+          },
+          "execution_ms": 0.036,
+          "planning_ms": 0.053,
+          "shared_hit_blocks": 5,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "guid_map",
+              "index": "ix_guid_map_release_id_identifier",
+              "actual_ms": 0.026,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 5,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes WHERE structure_nodes.identifier = %(identifier_1)s::VARCHAR",
+          "params": {
+            "identifier_1": "/us/usc/t16/ch1/schVI"
+          },
+          "execution_ms": 1.335,
+          "planning_ms": 0.04,
+          "shared_hit_blocks": 188,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 1.327,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 188,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": [
+            "structure_nodes"
+          ]
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "2"
+          },
+          "execution_ms": 0.02,
+          "planning_ms": 0.05,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.011,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "1"
+          },
+          "execution_ms": 0.018,
+          "planning_ms": 0.047,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "get_toc, chapter rail",
+      "queries": 6,
+      "execution_ms_total": 1.769,
+      "plans": [
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes WHERE structure_nodes.identifier = %(identifier_1)s::VARCHAR",
+          "params": {
+            "identifier_1": "/us/usc/t16/ch1/schVI"
+          },
+          "execution_ms": 1.353,
+          "planning_ms": 0.036,
+          "shared_hit_blocks": 188,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 1.344,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 188,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": [
+            "structure_nodes"
+          ]
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points JOIN title_versions ON title_versions.release_id = release_points.id WHERE title_versions.title_id = %(title_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "seq_1": "381",
+            "param_1": "1"
+          },
+          "execution_ms": 0.039,
+          "planning_ms": 0.163,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.005,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.011,
+              "rows": 4,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes JOIN release_points ON release_points.id = structure_nodes.first_release_id WHERE structure_nodes.parent_id = %(parent_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY structure_nodes.seq",
+          "params": {
+            "parent_id_1": "10",
+            "seq_1": "381"
+          },
+          "execution_ms": 0.046,
+          "planning_ms": 0.163,
+          "shared_hit_blocks": 5,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "release_points",
+              "index": null,
+              "actual_ms": 0.006,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Bitmap Heap Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 0.008,
+              "rows": 0,
+              "loops": 1,
+              "shared_hit": 2,
+              "shared_read": 0
+            },
+            {
+              "node": "Bitmap Index Scan",
+              "relation": null,
+              "index": "ix_structure_nodes_parent_id_seq",
+              "actual_ms": 0.007,
+              "rows": 0,
+              "loops": 1,
+              "shared_hit": 2,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT sections.identifier, section_versions.num, section_versions.heading, section_versions.status FROM sections JOIN section_versions ON section_versions.section_id = sections.id JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE section_release_map.release_id = %(release_id_1)s::INTEGER AND section_release_map.parent_identifier = %(parent_identifier_1)s::VARCHAR ORDER BY section_release_map.seq_in_title",
+          "params": {
+            "release_id_1": "1",
+            "parent_identifier_1": "/us/usc/t16/ch1/schVI"
+          },
+          "execution_ms": 0.298,
+          "planning_ms": 0.351,
+          "shared_hit_blocks": 357,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "ix_section_release_map_parent",
+              "actual_ms": 0.04,
+              "rows": 50,
+              "loops": 1,
+              "shared_hit": 7,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_pkey",
+              "actual_ms": 0.002,
+              "rows": 1,
+              "loops": 50,
+              "shared_hit": 200,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "sections_pkey",
+              "actual_ms": 0.002,
+              "rows": 1,
+              "loops": 50,
+              "shared_hit": 150,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "2"
+          },
+          "execution_ms": 0.019,
+          "planning_ms": 0.047,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.011,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id AS structure_nodes_id, structure_nodes.title_id AS structure_nodes_title_id, structure_nodes.identifier AS structure_nodes_identifier, structure_nodes.level AS structure_nodes_level, structure_nodes.num AS structure_nodes_num, structure_nodes.num_value AS structure_nodes_num_value, structure_nodes.heading AS structure_nodes_heading, structure_nodes.status AS structure_nodes_status, structure_nodes.parent_id AS structure_nodes_parent_id, structure_nodes.seq AS structure_nodes_seq, structure_nodes.depth AS structure_nodes_depth, structure_nodes.first_release_id AS structure_nodes_first_release_id, structure_nodes.last_release_id AS structure_nodes_last_release_id FROM structure_nodes WHERE structure_nodes.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "1"
+          },
+          "execution_ms": 0.014,
+          "planning_ms": 0.035,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "structure_nodes",
+              "index": "structure_nodes_pkey",
+              "actual_ms": 0.007,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "get_toc, title",
+      "queries": 4,
+      "execution_ms_total": 1.76,
+      "plans": [
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes WHERE structure_nodes.identifier = %(identifier_1)s::VARCHAR",
+          "params": {
+            "identifier_1": "/us/usc/t16"
+          },
+          "execution_ms": 1.293,
+          "planning_ms": 0.042,
+          "shared_hit_blocks": 188,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 1.284,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 188,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": [
+            "structure_nodes"
+          ]
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points JOIN title_versions ON title_versions.release_id = release_points.id WHERE title_versions.title_id = %(title_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "seq_1": "381",
+            "param_1": "1"
+          },
+          "execution_ms": 0.038,
+          "planning_ms": 0.156,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.004,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.011,
+              "rows": 4,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes JOIN release_points ON release_points.id = structure_nodes.first_release_id WHERE structure_nodes.parent_id = %(parent_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY structure_nodes.seq",
+          "params": {
+            "parent_id_1": "1",
+            "seq_1": "381"
+          },
+          "execution_ms": 0.392,
+          "planning_ms": 0.141,
+          "shared_hit_blocks": 30,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Bitmap Heap Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 0.058,
+              "rows": 153,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Bitmap Index Scan",
+              "relation": null,
+              "index": "ix_structure_nodes_parent_id_seq",
+              "actual_ms": 0.015,
+              "rows": 153,
+              "loops": 1,
+              "shared_hit": 2,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "release_points",
+              "index": null,
+              "actual_ms": 0.09,
+              "rows": 382,
+              "loops": 1,
+              "shared_hit": 16,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT sections.identifier, section_versions.num, section_versions.heading, section_versions.status FROM sections JOIN section_versions ON section_versions.section_id = sections.id JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE section_release_map.release_id = %(release_id_1)s::INTEGER AND section_release_map.parent_identifier = %(parent_identifier_1)s::VARCHAR ORDER BY section_release_map.seq_in_title",
+          "params": {
+            "release_id_1": "1",
+            "parent_identifier_1": "/us/usc/t16"
+          },
+          "execution_ms": 0.037,
+          "planning_ms": 0.321,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "ix_section_release_map_parent",
+              "actual_ms": 0.017,
+              "rows": 0,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_pkey",
+              "actual_ms": 0.0,
+              "rows": 0,
+              "loops": 0,
+              "shared_hit": 0,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "sections_pkey",
+              "actual_ms": 0.0,
+              "rows": 0,
+              "loops": 0,
+              "shared_hit": 0,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "neighbors",
+      "queries": 5,
+      "execution_ms_total": 0.291,
+      "plans": [
+        {
+          "sql": "SELECT sections.id, sections.title_id, sections.identifier FROM sections WHERE sections.identifier IN (%(identifier_1_1)s::VARCHAR)",
+          "params": {
+            "identifier_1_1": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 0.03,
+          "planning_ms": 0.038,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "ix_sections_identifier",
+              "actual_ms": 0.022,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points JOIN title_versions ON title_versions.release_id = release_points.id WHERE title_versions.title_id = %(title_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "seq_1": "381",
+            "param_1": "1"
+          },
+          "execution_ms": 0.037,
+          "planning_ms": 0.139,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.004,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.01,
+              "rows": 4,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT section_release_map.seq_in_title FROM section_release_map JOIN section_versions ON section_versions.id = section_release_map.section_version_id WHERE section_versions.section_id = %(section_id_1)s::INTEGER AND section_release_map.release_id = %(release_id_1)s::INTEGER",
+          "params": {
+            "section_id_1": "156",
+            "release_id_1": "1"
+          },
+          "execution_ms": 0.096,
+          "planning_ms": 0.168,
+          "shared_hit_blocks": 48,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_section_id_content_hash_first_release_id_key",
+              "actual_ms": 0.024,
+              "rows": 11,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "section_release_map_pkey",
+              "actual_ms": 0.005,
+              "rows": 0,
+              "loops": 11,
+              "shared_hit": 34,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT sections.identifier, section_versions.num, section_versions.heading, section_versions.status FROM sections JOIN section_versions ON section_versions.section_id = sections.id JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE sections.title_id = %(title_id_1)s::INTEGER AND section_release_map.release_id = %(release_id_1)s::INTEGER AND section_release_map.seq_in_title < %(seq_in_title_1)s::INTEGER ORDER BY section_release_map.seq_in_title DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "release_id_1": "1",
+            "seq_in_title_1": "155",
+            "param_1": "1"
+          },
+          "execution_ms": 0.077,
+          "planning_ms": 0.37,
+          "shared_hit_blocks": 11,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "ix_section_release_map_release_id_seq",
+              "actual_ms": 0.016,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_pkey",
+              "actual_ms": 0.019,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "sections_pkey",
+              "actual_ms": 0.016,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT sections.identifier, section_versions.num, section_versions.heading, section_versions.status FROM sections JOIN section_versions ON section_versions.section_id = sections.id JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE sections.title_id = %(title_id_1)s::INTEGER AND section_release_map.release_id = %(release_id_1)s::INTEGER AND section_release_map.seq_in_title > %(seq_in_title_1)s::INTEGER ORDER BY section_release_map.seq_in_title ASC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "release_id_1": "1",
+            "seq_in_title_1": "155",
+            "param_1": "1"
+          },
+          "execution_ms": 0.051,
+          "planning_ms": 0.324,
+          "shared_hit_blocks": 11,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_release_map",
+              "index": "ix_section_release_map_release_id_seq",
+              "actual_ms": 0.01,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_pkey",
+              "actual_ms": 0.013,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "sections_pkey",
+              "actual_ms": 0.006,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "versions",
+      "queries": 3,
+      "execution_ms_total": 0.876,
+      "plans": [
+        {
+          "sql": "SELECT sections.id, sections.title_id, sections.identifier FROM sections WHERE sections.identifier IN (%(identifier_1_1)s::VARCHAR)",
+          "params": {
+            "identifier_1_1": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 0.03,
+          "planning_ms": 0.043,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "ix_sections_identifier",
+              "actual_ms": 0.022,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT section_release_map.section_version_id, release_points.seq, release_points.label FROM section_release_map JOIN release_points ON release_points.id = section_release_map.release_id JOIN section_versions ON section_versions.id = section_release_map.section_version_id WHERE section_versions.section_id = %(section_id_1)s::INTEGER",
+          "params": {
+            "section_id_1": "156"
+          },
+          "execution_ms": 0.56,
+          "planning_ms": 0.308,
+          "shared_hit_blocks": 180,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_section_id_content_hash_first_release_id_key",
+              "actual_ms": 0.022,
+              "rows": 11,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Only Scan",
+              "relation": "section_release_map",
+              "index": "section_release_map_pkey",
+              "actual_ms": 0.023,
+              "rows": 10,
+              "loops": 11,
+              "shared_hit": 150,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "release_points",
+              "index": null,
+              "actual_ms": 0.082,
+              "rows": 382,
+              "loops": 1,
+              "shared_hit": 16,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT section_versions.id, section_versions.section_id, section_versions.first_release_id, section_versions.content_hash, section_versions.xml, section_versions.html_cache, section_versions.num, section_versions.heading, section_versions.status, section_versions.source_credit, release_points.id AS id_1, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM section_versions JOIN release_points ON release_points.id = section_versions.first_release_id WHERE section_versions.section_id = %(section_id_1)s::INTEGER ORDER BY release_points.seq",
+          "params": {
+            "section_id_1": "156"
+          },
+          "execution_ms": 0.286,
+          "planning_ms": 0.145,
+          "shared_hit_blocks": 30,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "ix_section_versions_section_id_first_release_id",
+              "actual_ms": 0.029,
+              "rows": 11,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "release_points",
+              "index": null,
+              "actual_ms": 0.08,
+              "rows": 382,
+              "loops": 1,
+              "shared_hit": 16,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "list_releases, one title",
+      "queries": 2,
+      "execution_ms_total": 1.604,
+      "plans": [
+        {
+          "sql": "SELECT title_versions.release_id, titles.num FROM title_versions JOIN titles ON titles.id = title_versions.title_id",
+          "params": {},
+          "execution_ms": 1.353,
+          "planning_ms": 0.122,
+          "shared_hit_blocks": 59,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.382,
+              "rows": 3153,
+              "loops": 1,
+              "shared_hit": 58,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "titles",
+              "index": null,
+              "actual_ms": 0.009,
+              "rows": 58,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points WHERE %(titles_affected_1)s::VARCHAR = ANY (release_points.titles_affected) ORDER BY release_points.seq DESC",
+          "params": {
+            "titles_affected_1": "16"
+          },
+          "execution_ms": 0.251,
+          "planning_ms": 0.061,
+          "shared_hit_blocks": 16,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "release_points",
+              "index": null,
+              "actual_ms": 0.174,
+              "rows": 115,
+              "loops": 1,
+              "shared_hit": 16,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "labels, batch of 1",
+      "queries": 3,
+      "execution_ms_total": 0.179,
+      "plans": [
+        {
+          "sql": "SELECT titles.id, titles.num, titles.name, titles.is_positive_law FROM titles WHERE titles.num = %(num_1)s::VARCHAR",
+          "params": {
+            "num_1": "16"
+          },
+          "execution_ms": 0.02,
+          "planning_ms": 0.04,
+          "shared_hit_blocks": 1,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "titles",
+              "index": null,
+              "actual_ms": 0.013,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id, release_points.congress, release_points.law_num, release_points.excluded_laws, release_points.update_num, release_points.label, release_points.currency_date, release_points.seq, release_points.titles_affected FROM release_points JOIN title_versions ON title_versions.release_id = release_points.id WHERE title_versions.title_id = %(title_id_1)s::INTEGER AND release_points.seq <= %(seq_1)s::INTEGER ORDER BY release_points.seq DESC LIMIT %(param_1)s::INTEGER",
+          "params": {
+            "title_id_1": "1",
+            "seq_1": "381",
+            "param_1": "1"
+          },
+          "execution_ms": 0.038,
+          "planning_ms": 0.148,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_seq_key",
+              "actual_ms": 0.004,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            },
+            {
+              "node": "Seq Scan",
+              "relation": "title_versions",
+              "index": null,
+              "actual_ms": 0.011,
+              "rows": 4,
+              "loops": 1,
+              "shared_hit": 1,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT sections.identifier, section_versions.num, section_versions.heading, section_versions.status FROM sections JOIN section_versions ON section_versions.section_id = sections.id JOIN section_release_map ON section_release_map.section_version_id = section_versions.id WHERE sections.title_id = %(title_id_1)s::INTEGER AND section_release_map.release_id = %(release_id_1)s::INTEGER AND sections.identifier IN (%(identifier_1_1)s::VARCHAR)",
+          "params": {
+            "title_id_1": "1",
+            "release_id_1": "1",
+            "identifier_1_1": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 0.121,
+          "planning_ms": 0.327,
+          "shared_hit_blocks": 53,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "sections_title_id_identifier_key",
+              "actual_ms": 0.018,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Scan",
+              "relation": "section_versions",
+              "index": "section_versions_section_id_content_hash_first_release_id_key",
+              "actual_ms": 0.02,
+              "rows": 11,
+              "loops": 1,
+              "shared_hit": 14,
+              "shared_read": 0
+            },
+            {
+              "node": "Index Only Scan",
+              "relation": "section_release_map",
+              "index": "section_release_map_pkey",
+              "actual_ms": 0.005,
+              "rows": 0,
+              "loops": 11,
+              "shared_hit": 35,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    },
+    {
+      "call": "resolve_id, guid_map",
+      "queries": 4,
+      "execution_ms_total": 1.388,
+      "plans": [
+        {
+          "sql": "SELECT guid_map.guid AS guid_map_guid, guid_map.release_id AS guid_map_release_id, guid_map.identifier AS guid_map_identifier FROM guid_map WHERE guid_map.guid = %(pk_1)s::VARCHAR",
+          "params": {
+            "pk_1": "id3438fb73-050d-11e3-a300-9bed43da2d8e"
+          },
+          "execution_ms": 0.03,
+          "planning_ms": 0.032,
+          "shared_hit_blocks": 5,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "guid_map",
+              "index": "guid_map_pkey",
+              "actual_ms": 0.023,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 5,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT release_points.id AS release_points_id, release_points.congress AS release_points_congress, release_points.law_num AS release_points_law_num, release_points.excluded_laws AS release_points_excluded_laws, release_points.update_num AS release_points_update_num, release_points.label AS release_points_label, release_points.currency_date AS release_points_currency_date, release_points.seq AS release_points_seq, release_points.titles_affected AS release_points_titles_affected FROM release_points WHERE release_points.id = %(pk_1)s::INTEGER",
+          "params": {
+            "pk_1": "3"
+          },
+          "execution_ms": 0.02,
+          "planning_ms": 0.039,
+          "shared_hit_blocks": 3,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "release_points",
+              "index": "release_points_pkey",
+              "actual_ms": 0.011,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 3,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        },
+        {
+          "sql": "SELECT structure_nodes.id, structure_nodes.title_id, structure_nodes.identifier, structure_nodes.level, structure_nodes.num, structure_nodes.num_value, structure_nodes.heading, structure_nodes.status, structure_nodes.parent_id, structure_nodes.seq, structure_nodes.depth, structure_nodes.first_release_id, structure_nodes.last_release_id FROM structure_nodes WHERE structure_nodes.identifier = %(identifier_1)s::VARCHAR",
+          "params": {
+            "identifier_1": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 1.308,
+          "planning_ms": 0.04,
+          "shared_hit_blocks": 188,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Seq Scan",
+              "relation": "structure_nodes",
+              "index": null,
+              "actual_ms": 1.3,
+              "rows": 0,
+              "loops": 1,
+              "shared_hit": 188,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": [
+            "structure_nodes"
+          ]
+        },
+        {
+          "sql": "SELECT sections.id, sections.title_id, sections.identifier FROM sections WHERE sections.identifier IN (%(identifier_1_1)s::VARCHAR)",
+          "params": {
+            "identifier_1_1": "/us/usc/t16/s45f"
+          },
+          "execution_ms": 0.03,
+          "planning_ms": 0.041,
+          "shared_hit_blocks": 4,
+          "shared_read_blocks": 0,
+          "scans": [
+            {
+              "node": "Index Scan",
+              "relation": "sections",
+              "index": "ix_sections_identifier",
+              "actual_ms": 0.022,
+              "rows": 1,
+              "loops": 1,
+              "shared_hit": 4,
+              "shared_read": 0
+            }
+          ],
+          "seq_scans_on_large_tables": []
+        }
+      ]
+    }
+  ]
+}
