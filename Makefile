@@ -1,5 +1,6 @@
 .PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
-        verify verify-deep load-all shots loadtest test-e2e test-a11y demo-video
+        verify verify-deep load-all shots loadtest navprofile spine-explain \
+        test-e2e test-a11y demo-video
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -119,7 +120,24 @@ verify-deep:
 load-all:
 	uv run python -m ingest load-all
 
-# Load test of the top routes against a running `make dev-all` (PLAN Day 6c).
-# Needs `brew install hey`. Writes docs/verification/loadtest.json.
+# Load test of the top routes: how many requests per second each holds. Every
+# row names the ADR-0029 limiter that governs it and whether it was held inside
+# that budget or driven past it on purpose. Needs `brew install hey` and a
+# running stack — `make dev-all`, or BASE= the deployed host.
+# Writes docs/verification/loadtest.json.
 loadtest:
 	scripts/loadtest.sh
+
+# The other half of the same question: how long *one* reader waits, per journey,
+# and which surface spent it. Times the same paths from the internet, from the
+# box's loopback through Caddy, and against the Astro and FastAPI containers
+# directly, so the layer split is measured rather than inferred. Needs AWS
+# credentials for the box (SSM). Writes docs/verification/navprofile.json.
+navprofile:
+	uv run python scripts/navprofile.py
+
+# EXPLAIN (ANALYZE, BUFFERS) for every query the spine actually runs, against
+# the deployed corpus — the only place the 96 M-row guid_map exists. Needs the
+# same SSM access. Writes docs/verification/spine-explain.json.
+spine-explain:
+	scripts/spine_explain.sh

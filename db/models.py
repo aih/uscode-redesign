@@ -153,6 +153,12 @@ class StructureNode(Base):
     __table_args__ = (
         UniqueConstraint("title_id", "identifier"),
         Index("ix_structure_nodes_parent_id_seq", "parent_id", "seq"),
+        # Lookup by identifier alone — what `get_section`, both `get_toc` paths
+        # and `resolve_id` do. The unique constraint above leads with `title_id`,
+        # and a composite index cannot serve a predicate on its second column, so
+        # without this each of those sequentially scanned the table (measured:
+        # 9,916 rows, 1.3 ms, migration d5c81f27a930).
+        Index("ix_structure_nodes_identifier", "identifier"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

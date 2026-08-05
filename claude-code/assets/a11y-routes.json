@@ -1,0 +1,119 @@
+{
+  "_comment": "Seed matrix for the axe scan (task A1). Reconcile against the guide ratchet's covers.routes — that is the authoritative route inventory. Fixture corpus is Title 16 at 119-99 and 119-102not101.",
+  "viewports": [
+    {
+      "width": 320,
+      "height": 768
+    },
+    {
+      "width": 375,
+      "height": 812
+    },
+    {
+      "width": 1280,
+      "height": 900
+    }
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "extraModes": [
+    "forced-colors"
+  ],
+  "routes": [
+    {
+      "path": "/app",
+      "name": "home / title list"
+    },
+    {
+      "path": "/app/us/usc/t16",
+      "name": "title"
+    },
+    {
+      "path": "/app/us/usc/t16/ch1",
+      "name": "chapter TOC"
+    },
+    {
+      "path": "/app/us/usc/t16/s45f",
+      "name": "section"
+    },
+    {
+      "path": "/app/us/usc/t16/s45f/c/5",
+      "name": "provision anchored in section"
+    },
+    {
+      "path": "/app/us/usc/t16/s45f?release=119-99",
+      "name": "section at an older release point"
+    },
+    {
+      "path": "/app/us/usc/t16/s45f?date=07/12/2026",
+      "name": "section by date (not-law exception visible)"
+    },
+    {
+      "path": "/app/diff?identifier=/us/usc/t16/s45f&from=119-99&to=119-102not101",
+      "name": "redline",
+      "states": [
+        "summary announced",
+        "expanded"
+      ]
+    },
+    {
+      "path": "/app/search?q=national+park",
+      "name": "search results",
+      "states": [
+        "results",
+        "filtered by title"
+      ]
+    },
+    {
+      "path": "/app/search?q=zzzznotaword",
+      "name": "search zero results"
+    },
+    {
+      "path": "/app/search/syntax",
+      "name": "search operators"
+    },
+    {
+      "path": "/app/releases",
+      "name": "release points / currency"
+    },
+    {
+      "path": "/app/guide",
+      "name": "user guide index"
+    },
+    {
+      "path": "/app/guide/*",
+      "name": "every guide chapter",
+      "expand": "from covers.routes"
+    },
+    {
+      "path": "/app/design",
+      "name": "living style guide (task C2)"
+    },
+    {
+      "path": "/app/accessibility",
+      "name": "conformance statement (task A10)"
+    },
+    {
+      "path": "/app/404",
+      "name": "not found"
+    },
+    {
+      "path": "/app/us/usc/t5a/s3",
+      "name": "appendix citation explanation"
+    },
+    {
+      "path": "/static/apidocs/",
+      "name": "vendored API docs"
+    }
+  ],
+  "interactiveStates": [
+    "preview open via focus",
+    "preview dismissed via Escape",
+    "timeline expanded",
+    "copy control active",
+    "theme just toggled",
+    "429 rate-limited response"
+  ]
+}

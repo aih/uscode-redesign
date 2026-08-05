@@ -1,5 +1,8 @@
 /**
- * Rate limits for the reader's two expensive server-rendered routes (ADR-0029).
+ * Two things every reader request passes through: a canonical redirect that
+ * drops empty `?release=`/`?date=`, and the rate limits below.
+ *
+ * ## Rate limits for the reader's two expensive server-rendered routes (ADR-0029)
  *
  * `params.py` limits `/api/v1`. This file exists because the reader cannot be
  * covered by that limit at all, for two independent reasons:
@@ -64,7 +67,42 @@ const LIMITED: ReadonlyArray<readonly [string, RateLimiter]> = [
   ["/app/diff/", diff],
 ];
 
+/**
+ * The two parameters that mean "a moment in time", and are meaningless empty.
+ *
+ * The release switcher is a plain GET form with no JavaScript (ADR-0044), and a
+ * GET form submits every named control it has. Its "Newest — follows new
+ * releases" option carries an empty value, because an absent `?release=` is
+ * already how the whole site spells "newest" — so choosing it produces
+ * `/app/us/usc/t16/s45f?release=`. That answers correctly, and it is also the
+ * URL the reader is invited to copy and cite. Redirecting to the clean form
+ * once, here, is cheaper than teaching every page to strip it.
+ */
+const EMPTY_PARAMS = ["release", "date"] as const;
+
+/** Strip `?release=` / `?date=` with no value, or null if there are none. */
+function canonicalUrl(url: URL): URL | null {
+  const empties = EMPTY_PARAMS.filter((name) => url.searchParams.getAll(name).some((v) => v === ""));
+  if (empties.length === 0) return null;
+
+  const clean = new URL(url);
+  for (const name of empties) {
+    const kept = clean.searchParams.getAll(name).filter((value) => value !== "");
+    clean.searchParams.delete(name);
+    for (const value of kept) clean.searchParams.append(name, value);
+  }
+  return clean;
+}
+
 export const onRequest = defineMiddleware((context, next) => {
+  if (context.request.method === "GET") {
+    const clean = canonicalUrl(context.url);
+    // `pathname + search` rather than the absolute URL: the reader sits behind
+    // Caddy (ADR-0015), so `context.url`'s origin is this container's, not the
+    // one the browser asked for.
+    if (clean) return context.redirect(`${clean.pathname}${clean.search}`, 307);
+  }
+
   const match = LIMITED.find(([prefix]) => context.url.pathname.startsWith(prefix));
   if (!match) return next();
 

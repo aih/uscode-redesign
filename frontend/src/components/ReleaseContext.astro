@@ -1,0 +1,68 @@
+---
+/**
+ * Which text this is, as a fact rather than an inference — the first thing under
+ * the chrome on every page that shows a provision.
+ *
+ * Replaces `Provenance`, which carried three of these four and put them in the
+ * reading column as grey meta text below the section heading:
+ *
+ *   * the release point and its currency date — what you are looking at;
+ *   * **whether it is the newest**, which `Provenance` never said. A reader who
+ *     has not compared the label against `/app/releases` cannot tell a pinned
+ *     older release from the law in force, and both render identically;
+ *   * the **caveat** on a `not` release point — at `119-102not101` the text is
+ *     current through 07/12/2026 *except* for Public Law 119-101 (gotcha 5);
+ *   * the **served-from note** when the requested release point was never
+ *     ingested — the answer is right, but it came from another release point
+ *     and the page has to say so (gotcha 10).
+ *
+ * Not in the sticky stack, and that is measured rather than assumed: at 700px
+ * the chrome has 19px of headroom under `--sticky-h`, and `--sticky-h` is what
+ * `scroll-margin-top` spends (`tests/e2e/sticky.spec.ts`). A line here would
+ * either overflow the token or force it up, and the 40em–64em band is already
+ * carrying 19rem of chrome. So this sits at the top of the content, directly
+ * under the bar, spanning the page — and the sticky picker's own label names the
+ * release point, so the answer is on screen at every scroll position too.
+ */
+import type { Release } from "../lib/types";
+
+interface Props {
+  /** The release point the answer actually came from. */
+  served: Release;
+  /** False when a newer release point exists for this title. */
+  isNewest?: boolean;
+  /** Where "read the newest instead" goes. Omitted when this is the newest. */
+  newestHref?: string | null;
+  /** The API's own sentence when it answered from a different release point. */
+  note?: string | null;
+}
+
+const { served, isNewest = true, newestHref = null, note = null } = Astro.props;
+const [year, month, day] = served.currency_date.split("-");
+---
+
+<div class="releasebar">
+  <p class="releasebar__line">
+    <span class="releasebar__what">Release point</span>
+    <span class="releasebar__rp">{served.label}</span>
+    <span class="releasebar__date">current through {month}/{day}/{year}</span>
+    {
+      isNewest ? (
+        <span class="releasebar__newest">newest</span>
+      ) : (
+        <span class="releasebar__older">
+          not the newest
+          {newestHref && (
+            <>
+              {" — "}
+              <a href={newestHref}>read the current text</a>
+            </>
+          )}
+        </span>
+      )
+    }
+  </p>
+
+  {served.caveat && <p class="releasebar__caveat">{served.caveat}</p>}
+  {note && <p class="releasebar__note">{note}</p>}
+</div>

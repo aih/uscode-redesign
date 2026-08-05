@@ -1,12 +1,29 @@
 ---
 /**
- * "As of when" — the question a versioned reader has to keep answering.
+ * "As of when" — the question a versioned reader has to keep answering, and the
+ * three ways to answer it: the newest text, a date, or a named release point.
  *
- * A plain GET form, submitted by a button, with no JavaScript at all: it works
- * with scripting off, and what it produces is a URL you can paste. That was true
- * of the Jinja reader (BUILDLOG 007) and it stays true here — the release picker
- * is exactly the kind of thing a framework tempts you to make interactive and
- * thereby fragile.
+ * Plain GET forms, submitted by a button, with no JavaScript at all: they work
+ * with scripting off, and what they produce is a URL you can paste. That was
+ * true of the Jinja reader (BUILDLOG 007) and it stays true here — the release
+ * picker is exactly the kind of thing a framework tempts you to make interactive
+ * and thereby fragile.
+ *
+ * **Two forms rather than one.** `?release=` beats `?date=` in the repository
+ * (`storage/postgres.py:resolve_release`), so a single form carrying both
+ * controls would send both and silently ignore whichever the reader had just
+ * set. Separate forms send one parameter each and there is nothing to resolve.
+ *
+ * **`action` is the requested identifier, not the section's.** Built from
+ * `section.identifier`, switching release on `/us/usc/t16/s45f/c/5` dropped the
+ * provision and landed on the whole section — the reader asked to keep their
+ * place in time and lost their place in the text.
+ *
+ * This is no longer in the sticky chrome. At 700px that stack has 19px of
+ * headroom under `--sticky-h` (measured; `tests/e2e/sticky.spec.ts` holds the
+ * token honest), and the date field costs about eighty. Rather than raise a
+ * token that `scroll-margin-top` spends, in a band already carrying 19rem of
+ * chrome, the whole switcher moved down beside the release facts it changes.
  */
 import type { Release } from "../lib/types";
 
@@ -26,22 +43,65 @@ function label(release: Release): string {
 
 {
   options.length > 0 && (
-    <form class="picker" method="get" action={action}>
-      <div>
-        <label class="usa-label picker__label" for="release">
-          Release point
-        </label>
-        <select class="usa-select picker__select" id="release" name="release">
-          {options.map((option) => (
-            <option value={option.label} selected={option.label === selected}>
-              {label(option)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <button class="usa-button picker__go" type="submit">
-        Go
-      </button>
-    </form>
+    <div class="picker">
+      <form class="picker__form" method="get" action={action}>
+        <div>
+          <label class="usa-label picker__label" for="release">
+            Release point
+          </label>
+          {/* An empty value means "whatever is newest", which is what an absent
+              `?release=` already means everywhere else — `lib/api.ts`'s `qs()`
+              drops empty parameters, so submitting this produces a bare
+              identifier URL that follows new releases rather than pinning one.
+              A reader who instead picks the newest release *by name* gets the
+              pinned, immutable form (ADR-0018). Both are useful, they are
+              different URLs, so both are offered. */}
+          <select class="usa-select picker__select" id="release" name="release">
+            <option value="">Newest — follows new releases</option>
+            {options.map((option) => (
+              <option value={option.label} selected={option.label === selected}>
+                {label(option)}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* Two submit buttons on one page both reading "Go" have the same
+            accessible name and nothing but position to tell them apart. The
+            label starts with the visible text, so the two agree (WCAG 2.5.3). */}
+        <button class="usa-button picker__go" type="submit" aria-label="Go to this release point">
+          Go
+        </button>
+      </form>
+
+      <form class="picker__form picker__form--date" method="get" action={action}>
+        <div>
+          <label class="usa-label picker__label" for="asof">
+            As of date
+          </label>
+          {/* Text rather than `type="date"`: that control imposes the browser's
+              locale format on a field this site documents as MM/DD/YYYY — the
+              form uscode.house.gov prints and the one `parse_date_param` names
+              first. */}
+          <input
+            class="usa-input picker__date"
+            id="asof"
+            name="date"
+            type="text"
+            inputmode="numeric"
+            placeholder="MM/DD/YYYY"
+            aria-describedby="asof-hint"
+          />
+        </div>
+        <button class="usa-button picker__go" type="submit" aria-label="Go to this date">
+          Go
+        </button>
+        {/* After the button, not inside the field: sitting under the input it
+            made the flex row as tall as itself and dropped the button below the
+            control it submits. It wraps to its own line instead. */}
+        <span class="picker__hint" id="asof-hint">
+          The newest release point on or before that date.
+        </span>
+      </form>
+    </div>
   )
 }

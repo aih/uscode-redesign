@@ -13,6 +13,7 @@
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
+import ReleaseContext from "../components/ReleaseContext.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
 import SectionBar from "../components/SectionBar.astro";
 import type { Entry, Release } from "../lib/types";
@@ -33,7 +34,17 @@ export interface Bar {
 interface Props {
   title: string;
   crumbs?: Entry[];
+  /** The node being read, rendered as the trail's last, unlinked item. */
+  current?: Entry | null;
   release?: string | null;
+  /** The four facts about the text on screen, stated once for every page that
+   *  shows a provision rather than assembled per page (ADR-0044). */
+  releaseContext?: {
+    served: Release;
+    isNewest?: boolean;
+    newestHref?: string | null;
+    note?: string | null;
+  } | null;
   picker?: { action: string; options: Release[]; selected: string } | null;
   bar?: Bar | null;
   /** What the header's search box should already contain.
@@ -46,6 +57,8 @@ interface Props {
    * first was the wrong one. Prefilling the single box the site already has is
    * the same affordance without the double. */
   searchValue?: string | null;
+  /** Set by a page that fills the `rail` slot. See `hasRail` below. */
+  rail?: boolean;
   /** Widens the page beyond the 46rem reading measure.
    *
    * The measure is set for statutory text and is right for it. The user guide
@@ -59,13 +72,29 @@ interface Props {
 const {
   title,
   crumbs = [],
+  current = null,
   release = null,
+  releaseContext = null,
   picker = null,
   bar = null,
   searchValue = null,
+  rail = false,
   wide = false,
 } = Astro.props;
-const hasContext = crumbs.length > 0 || picker !== null;
+const hasContext = crumbs.length > 0 || current !== null;
+/** The release band and the switcher under it: one block, at the top of the
+ *  content, on every page that knows which release point it is showing. */
+const hasReleaseBlock = releaseContext !== null || picker !== null;
+/** Whether this page is supplying the `rail` slot, and so wants the two-column
+ *  reading layout. The guide asks for `wide` directly; a rail implies it.
+ *
+ *  A prop rather than `Astro.slots.has("rail")`, which does not answer this
+ *  question: a page whose slot content is behind a condition
+ *  (`{rail && <ChapterRail slot="rail" …/>}`) reports `true` from `has()` even
+ *  when the condition is false, so every table-of-contents page took the
+ *  two-column layout and the wide measure with nothing in the first column. */
+const hasRail = rail;
+const mainClass = wide || hasRail ? "reader-wrap reader-wrap--wide" : "reader-wrap";
 ---
 
 <html lang="en">
@@ -161,15 +190,25 @@ const hasContext = crumbs.length > 0 || picker !== null;
         (`site.scss`). Anything that sticks has to be paid for in
         `--sticky-h`, which drives `scroll-margin-top` — otherwise a deep link
         to a provision lands *behind* this. */}
-    <div class="topbar">
+    <div class={hasRail ? "topbar topbar--wide" : "topbar"}>
       <SiteHeader searchValue={searchValue} />
 
       {
         hasContext && (
           <div class="contextbar">
             <div class="contextbar__inner">
-              <Breadcrumbs crumbs={crumbs} release={release} />
-              {picker && <ReleasePicker {...picker} />}
+              <Breadcrumbs crumbs={crumbs} current={current} release={release} />
+              {/* The release point as text, not as a control. The switcher used
+                  to live here; the date field it grew would not fit — at 700px
+                  the sticky stack has 19px of headroom under `--sticky-h`, and
+                  that token is what `scroll-margin-top` spends. So the answer
+                  to "as of when" stays pinned and the means of changing it sits
+                  with the rest of the release facts, below. */}
+              {release && (
+                <p class="contextbar__rp">
+                  <span class="contextbar__rplabel">Release point</span> {release}
+                </p>
+              )}
             </div>
           </div>
         )
@@ -178,8 +217,25 @@ const hasContext = crumbs.length > 0 || picker !== null;
       {bar && <SectionBar {...bar} release={release} />}
     </div>
 
-    <main id="main" class={wide ? "reader-wrap reader-wrap--wide" : "reader-wrap"}>
-      <slot />
+    {/* A page supplying the `rail` slot gets two columns from 64em and the wider
+        measure to hold them, the same arrangement `.guide__nav` uses. Without
+        the slot the markup is unchanged — one column, one `<slot />` — so no
+        page that does not ask for a rail pays for one. */}
+    <main id="main" class={mainClass}>
+      <div class={hasRail ? "reader-layout" : "reader-layout reader-layout--single"}>
+        {hasRail && <slot name="rail" />}
+        <div class="reader-col">
+          {
+            hasReleaseBlock && (
+              <div class="releaseblock">
+                {releaseContext && <ReleaseContext {...releaseContext} />}
+                {picker && <ReleasePicker {...picker} />}
+              </div>
+            )
+          }
+          <slot />
+        </div>
+      </div>
     </main>
 
     <SiteFooter />

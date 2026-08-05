@@ -1017,3 +1017,246 @@ Session-by-session record of how this site was built. One entry per working sess
 - **Named costs, in the ADR.** The pair list is hand-declared: a changed hex is caught because the values are read from the stylesheet, but **a new token painted on a new surface is a pair nobody added**, and the script does not know to look — the axe scan is the backstop, and only on routes the matrix covers. Four badge colours are now **hard-coded** rather than tokenised, deliberately (they must not move with the theme) and therefore outside `contrast.py`'s reach. `--rule` failing 1.4.11 on paper is a judgement a reviewer can argue with, and the numbers to argue with are in the artifact. **`forced-color-adjust: none` is used twice**, on the badge and the highlighted provision — both override a reader's chosen palette, which is what the property is for and is still an override.
 - **Candidate task found, not fixed (scope discipline).** The scan matrix had no route carrying a status badge for the whole of A1 and A6. Adding `/app/us/usc/t16/s688` fixed that one case, but nothing systematically checks that the matrix *exercises every component the reader can render* — a component-level inventory against the matrix would be the real fix, and would have caught this without a token audit.
 - **Left owed:** A3, A4, A5, A8, A9, A10. Five entries in `docs/a11y/known-violations.json`, all vendored bundles or A4's two.
+
+## 045 — 2026-08-04 — Session 27: the chrome was on one page out of seven
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Workstream B (`claude-code/prompts/B-navigation-ia.md`) — navigation, information
+  architecture, retrieval. Scope agreed at the start of the session: **B1 and B2 together**, because
+  B1's breadcrumb bullet is literally "with the release context pinned to its right", which is B2's
+  requirement, and splitting them means editing the same components twice. TOC rail agreed as a left
+  rail from 64em with a disclosure below. B3–B6 deferred.
+- **Decided:**
+  - **ADR-0043 — one navigation chrome.** `docs/ia-map.md` first, derived from the guide ratchet's
+    own `readerRoutes()` rather than from memory, with every inbound link recorded as file:line.
+    From it: the breadcrumb ends at the provision on screen (`usa-current`, `aria-current="page"`);
+    `SectionBar`'s steps name their neighbour from 40em up; a new `ChapterRail` shows the parent
+    subdivision's sections in reading order with status badges in place; `/app/versions` and
+    `/app/diff` get the trail they never had.
+  - **ADR-0044 — release context in the chrome.** `ReleaseContext` replaces `Provenance` and adds the
+    fact it never stated: whether the release point being read is the newest. `ReleasePicker` becomes
+    two GET forms offering all three ways to ask — newest, a date, a named release point — and posts
+    to the *requested* identifier, so the provision survives the switch.
+  - **The switcher left the sticky stack, and that is measured, not assumed.** Before: 19px of
+    headroom under `--sticky-h` at 700px, 55px at 1280px; the date field costs about eighty.
+    `--sticky-h` is what `scroll-margin-top` spends and `docs/backlog.md` already flags that band for
+    carrying 19rem of chrome, so the control moved down to the facts it changes and the release point
+    stayed pinned as text. After: 89px and 85px, asserted in `sticky.spec.ts`.
+  - **`/app/versions` and `/app/diff` get no release band** — the first spans every release point, the
+    second is about two. A narrower reading of B2's "every reader page" than asked for, taken
+    deliberately and recorded in ADR-0044.
+  - **B1 asked for deletions and there were none to make.** `/app/goto` vs `/app/search`, the three
+    prev/next affordances and the two from/to pickers were each checked and are each one path;
+    recorded in the map so the question is not re-opened. The real defect was the opposite —
+    `/app/settings` reachable from no rendered page, `/app/diff` two hops from the text it compares.
+  - **The guide's scenario DSL gained a `select` verb.** `fill` cannot drive a `<select>`, and
+    "switching release keeps the provision you were reading" is the claim that most needed executing.
+- **Produced:** `docs/ia-map.md`; `docs/adr/0043`, `docs/adr/0044`;
+  `frontend/src/components/{ChapterRail,ReleaseContext}.astro`; `Provenance.astro` deleted;
+  `Breadcrumbs`, `SectionBar`, `ReleasePicker`, `Base.astro`, `middleware.ts`, `site.scss`, the
+  section/versions/diff pages; guide chapters 02 and 03; `scripts/scenarios.mjs` +
+  `tests/e2e/guide.spec.ts` (`select`); `tests/e2e/sticky.spec.ts`;
+  `claude-code/WORKSTREAM-B-STATE.md`. Branch `workstream-b-navigation-ia`, 6 commits from `387ff3a`.
+- **Verified:**
+  - `make test` — 486 passed. `make test-web` — 227 passed, including the ADR-0038 ratchet, which is
+    what forced chapters 02 and 03 to claim ADR-0043 and ADR-0044.
+  - `make test-e2e` — 373 passed, 251 of them the a11y scan. `docs/verification/a11y.json` is **8
+    route/rule pairs over 1,780 nodes**, the same as the ADR-0039 baseline, and everything in it is
+    still `docs/a11y/known-violations.json`'s.
+  - `make shots` — no horizontal overflow at 320 CSS px or 1280 at 200% zoom, apart from the known
+    3px on `/app/docs` that A4 owns.
+  - The switcher, end to end against `make dev-all`, from `/app/us/usc/t16/s45f/c/5?release=119-99`:
+    picking a release gives `/app/us/usc/t16/s45f/c/5?release=119-102not101`; picking a date gives
+    `…/c/5?date=06/12/2026`; picking Newest gives `…/c/5` with no parameter. The
+    `switch-keeps-provision` scenario in guide chapter 03 is the standing version of that check.
+  - **One real bug the scan caught, not me:** the unlinked breadcrumb item was the first non-link
+    text ever put in that bar, so it inherited USWDS's own breadcrumb ink — derived from
+    `$theme-breadcrumb-background-color`, which assumes a light page — and failed `color-contrast`
+    in dark theme on **every reader page**. Same shape as ADR-0042's `.usa-nav__link`. Fixed to
+    `--ink` on `--panel`, a pair `scripts/contrast.py` already measures.
+- **Candidate tasks found, deliberately not done:**
+  - **`/app/settings` has no inbound link from any rendered page.** `AuthNav:49` is its only linker
+    and `SiteHeader` does not render `AuthNav` while `ACCOUNTS_ENABLED` is false (ADR-0034). Guide
+    chapter 06 links it in prose; that is the only way in.
+  - **`previewHref` in `lib/url.ts` has no caller.** `CitePreview.astro:176` builds
+    `` `/app/preview${identifier}` `` inline in browser JavaScript — a reader href built outside
+    `url.ts`, against architecture rule 5, and the exact inlining `previewHref`'s docstring says it
+    exists to replace.
+  - **`us/usc/index.astro:22` calls `fetch` with its own `process.env.API_BASE_URL`** instead of
+    going through `lib/api`.
+  - **The release menu carries every release point for the title** — 115 options against the local
+    corpus, 381 corpus-wide, in the markup of every section page.
+  - **The deployed box returned one transient 502** on `/app/` while checking B3's prerequisites,
+    then 200 on every subsequent request. Worth a look when B3 measures it.
+  - `docs/verification/loadtest.json` is now stale for a fourth reason — ADR-0043's extra API call
+    per section view — on top of ADR-0029, ADR-0026 and ADR-0037. B3 owns it.
+
+## 046 — 2026-08-04 — Session 28: B3 phase 1, and the wait is not the server's
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Workstream B task B3 — navigation speed. Explicitly the **measure half only**: regenerate
+  `docs/verification/loadtest.json` against the deployed box, add a navigation profile distinct from
+  the load profile, report the numbers and a recommendation, and stop before any fix. Three problems
+  in the task were handed over to be resolved rather than papered over: the rate limiters would shape
+  the results, "the five journeys in the test plan" is a forward reference to a document that does not
+  exist, and per-surface attribution needs something that does not exist either.
+- **Decided:**
+  - **Every load-test row names the limiter that governs it, and whether it was held inside that
+    budget or driven past it.** B3's `-n 500 -c 20` against ADR-0029's budgets does not measure the
+    site, it measures ADR-0029 — and badly, because 429s are produced in microseconds and read as a
+    throughput *improvement* on whichever route shed the most. A limited route now gets two rows:
+    `hey -q` holds a "within" row under the bucket's refill rate so the row describes the route, and
+    an "over" row exceeds it on purpose so the row describes the shedding. Unlimited routes carry a
+    null limiter and are the only ones whose throughput describes a route.
+  - **The five journeys are derived from `docs/ia-map.md`'s "Exits to" column**, and each carries its
+    derivation string into the artifact rather than citing a test plan this repository does not have:
+    spine, citation, search, read-along, compare.
+  - **Per-surface attribution is measured, not inferred.** The box is SSM-only, so `navprofile.py`
+    ships itself there and times the *same path* at four nested vantages — the internet, Caddy over
+    loopback via `--resolve` (same host, same TLS, same virtual host), the Astro container, the
+    FastAPI container. Every subtraction is between two measurements that differ by one layer.
+  - **No SQL is written into the query profile.** `spine_explain.py` attaches a
+    `before_cursor_execute` listener, runs `PostgresRepository`'s own spine calls, and re-runs each
+    captured statement under `EXPLAIN (ANALYZE, BUFFERS)` with the same parameters. What is explained
+    is what was executed, by construction — the property ADR-0040 gives the USLM partition.
+  - **A journey is timed on one connection**, because a browser reuses one; the first step of each
+    journey pays the TLS handshake and `connects` is recorded so a slow first step is not read as a
+    slow page.
+  - **Recommendation carried to the human, not acted on.** The numbers reorder B3's list: fixes 1, 2
+    and 4 all target the API/Postgres side, which is 37 ms of a 78 ms origin inside an 823 ms journey.
+    Proposed doing fix 4 (one index), fix 3 (the byte budget), and the measured half of fix 2 (drop
+    `/api/v1/releases?title=` from the per-view fan-out); proposed **not** building a Caddy cache
+    layer for fix 1, because the headers are already correct for a shared cache and what is missing is
+    a shared cache to read them, which is a deployment decision rather than a code one.
+- **Produced:** `scripts/navprofile.py`, `scripts/spine_explain.py`, `scripts/spine_explain.sh`;
+  `make navprofile` and `make spine-explain`; a rewritten `scripts/loadtest.sh`;
+  `docs/verification/{loadtest,navprofile,spine-explain}.json`. Branch
+  `workstream-b-navigation-ia`, 3 commits on top of session 27's seven.
+- **Verified:**
+  - `make test` — 486 passed. `make test-web` — 227 passed. `make test-e2e` was **not** run: this
+    session changed no application source, only scripts and artifacts. It runs before B3's fix half is
+    called done.
+  - **A reader's four clicks down the spine cost 823 ms, of which 221 ms is the origin and 601 ms
+    (73%) is the network.** Re-check: `jq '.attribution'` over `navprofile.json`.
+  - **Section page, warm p50, by layer:** 117 ms internet and TLS, **41 ms Astro's own render**, 37 ms
+    for the five API calls' critical path, ~3 ms of that in Postgres, and Caddy the remainder.
+    **Caddy's own share is at the resolution limit of this method and cannot be stated more precisely
+    than "small":** across the twelve warm steps it ranges 0.3–11.1 ms, and the section page measured
+    twice — once as the spine's fourth step, once as read-along's first — gives 0.4 ms and 11.1 ms for
+    the same page. It is not the bottleneck; that is all these numbers support.
+  - **ADR-0043's fourth call is free in wall clock.** The parent TOC costs 16 ms and runs in the same
+    `Promise.all` as `/api/v1/releases?title=` at 20 ms, so the page's API cost is unchanged by it. It
+    is also the fastest API row under load: 61.9 rps, 116.9 ms p50, 2,168 wire bytes. The question
+    session 27 left open is answered.
+  - **The transient 502 did not recur** — 813 timed nav-profile requests across four vantages, every
+    one a 200, plus a full load test.
+  - **The reader page is the origin's limit, not the API.** 195 ms for one reader; 702 ms p50 and
+    11.0 rps at 8 concurrent on 2 vCPUs. The TOC page: 526 ms, 14.4 rps. The JSON routes hold up.
+  - **`/api/v1/releases?title=N` is the slowest unlimited API route** — 247 ms p50, 30.6 rps — and it
+    is fetched on every section page *and* every TOC page to fill a picker with 381 options.
+  - **The API diff costs 5.1 s per request** on the box. The limiter sheds correctly (23 × 429 at
+    C=10) but the requests it *admits* still exceed a 20 s client timeout.
+  - **`structure_nodes` has no index on `identifier` alone.** Its unique constraint is
+    `(title_id, identifier)`, which a lookup by identifier cannot use, so it seq-scans 9,916 rows at
+    1.3 ms — 80% of `get_section`'s database time, and it recurs in both `get_toc` paths and
+    `resolve_id`. Everything else is fine: no repository call exceeds 2 ms in Postgres, and the
+    96,204,776-row `guid_map` answers in 0.035 ms through `ix_guid_map_release_id_identifier`.
+  - **Cache headers confirmed live**, by the script rather than by assertion: `immutable` when pinned,
+    `max-age=300` unpinned, `max-age=300` on a TOC even when pinned (ADR-0043). `HEAD` is still 405
+    where `GET` is 200.
+- **Two methodology errors found and paid for, both recorded in the scripts:**
+  - **Neither script asked for compression.** curl sends no `Accept-Encoding` unless told, and Caddy
+    only compresses what asks — so the first pass timed every reader page at 76,021 bytes against the
+    21,246 a browser receives, attributing transfer time to the network that no reader spends. Both
+    runs were discarded and redone with `--compressed`, under which `%{size_download}` reports wire
+    bytes.
+  - **`curl -X HEAD` only changes the method.** curl still waited for a body the 405 never sent, exited
+    18, and `set -e` discarded a completed 35-minute run with every row measured and nothing written.
+    `-I` is curl's own HEAD; every probe in the checks block is now non-fatal for the same reason.
+- **One thing the artifact records as empty on purpose:** `checks.diff_retry_after_header`. The probe
+  asks sequentially, and the diff bucket refills one token every five seconds while the endpoint takes
+  about five seconds to answer — so a caller making one diff at a time is never shed. The 429 and its
+  `Retry-After` are observed in the over-budget row, where concurrency is what exceeds the bucket.
+- **Candidate tasks found, deliberately not done:**
+  - **Astro's own render is the largest single component of the origin cost** — 41 ms against 37 ms
+    for all five API calls' critical path — and the reader page, not the API, is what collapses under
+    concurrency. Profiling inside the Node process is a task of its own, and it is not on B3's list.
+  - **The box's own throughput ceiling is unmeasured.** At C=8 over a ~120 ms round trip the ceiling
+    is 8 ÷ 0.12 ≈ 65 rps as arithmetic, and the fast rows all sit just under it, so they describe the
+    link rather than the box. Measuring the box needs a load generator running on it, which is not
+    something to install on production during a measurement session.
+  - **The load test speaks HTTP/1.1 while the nav profile speaks h2.** `hey` has an `-h2` flag and
+    `scripts/loadtest.sh` does not pass it; curl negotiates h2 by default. So the two artifacts'
+    latencies are not directly comparable, and the load test measures a protocol no browser uses
+    against this host. One flag.
+
+## 047 — 2026-08-04 — Session 28b: B3 phase 2, three fixes and one declined
+
+- **Tool/model:** Claude Code, Opus 5. Same session as BUILDLOG 046, after the phase-1 report was
+  approved.
+- **Asked:** Take B3's fix 4 (the `structure_nodes.identifier` index), fix 3 (the byte budget,
+  counting inline `<script>` bytes since there are no client JS bundles) and the measured half of
+  fix 2 (drop `/api/v1/releases` from the per-view fan-out), and write an ADR declining fix 1 rather
+  than building a Caddy cache layer the measurements do not justify.
+- **Decided:**
+  - **ADR-0045 — one release list per title, held five minutes.** Entries hold the *in-flight
+    promise*, not the value, so N concurrent misses make one request; a rejected fetch is evicted
+    rather than cached, guarded on the entry still being current so a slow failure cannot delete its
+    replacement. Five minutes is not a free parameter — it is ADR-0018's own `max-age` for an
+    unpinned answer, so the reader is never staler than what it tells browsers.
+  - **ADR-0046 — the byte budget is counted from source, and validated against a page.** There is no
+    bundle to weigh, so the count walks each page's transitive `.astro` import graph. Counting from
+    source is also what lets it run in Vitest with no server and no build, which is the requirement:
+    a budget needing a running stack is a budget nobody runs, and B3 forbids a fourth runner.
+  - **ADR-0047 — fix 1 declined, with the audit it asked for.** ADR-0018's policy is already correct
+    on the deployed host, re-verified by the load test on every run. What is missing is a shared cache
+    to read those headers; a cache on the box addresses the 27% of a reader's wait that is the origin,
+    not the 73% that is the network. A CDN moves the 73%, and that is ADR-0020's territory.
+  - **The guide states the cost of ADR-0045 rather than hiding it.** Chapter 03 says the release menu
+    is rebuilt at most every five minutes, that `?release=` reaches a new release point immediately,
+    and that the release point a page is *reading* is always read fresh. ADR-0046 and ADR-0047 are
+    infrastructure in the ratchet — a test harness and a deployment decision.
+- **Produced:** migration `d5c81f27a930`; `db/models.py`; `frontend/src/lib/releasecache.ts` +
+  `frontend/tests/releasecache.test.ts`; `frontend/tests/jsbudget.test.ts` + `docs/js-budgets.json` +
+  `docs/verification/js-bytes.json`; `docs/adr/0045`, `0046`, `0047`; guide chapter 03;
+  `docs/verification/b3-fixes.md`. Six commits on `workstream-b-navigation-ia`.
+- **Verified:**
+  - `make test` — 486 passed. `make test-web` — **253** passed, up from 227: 7 for the release cache
+    and 19 for the byte budget. `make test-e2e` — 373 passed, 2 skipped, against a rebuilt frontend
+    container. `docs/verification/a11y.json` unchanged at 8 route/rule pairs over 1,780 nodes.
+  - **The index changes the plan, at production row count.** Local `structure_nodes` holds 9,916
+    rows, the same as the deployed corpus, because the table is the newest loaded release's view
+    rather than something that grows per release point (ADR-0006). Seq Scan 1.497 ms with 9,915 rows
+    removed by filter → Index Scan 0.135 ms on three buffers. Command in
+    `docs/verification/b3-fixes.md`.
+  - **The release call is gone from the fan-out**, counted from the API's own access log rather than
+    from the reader's intentions: eight *concurrent* views on a cold cache produce **one**
+    `/api/v1/releases`, a warm cache produces **none**, and it was eight. That the single-flight
+    promise is what does it is visible in the concurrent case specifically.
+  - **The byte budget bites.** 600 bytes injected into a component on every route's graph failed 16
+    routes, each message naming that route's islands; removing the bytes passes again.
+  - **The static byte count is validated against a live page**, not assumed: source says 32,150 bytes
+    for `/app/us/usc`, the rendered page carries 25,474, and the 6,676-byte difference is exactly
+    `AuthNav` (3,239) plus `WatchButton` (3,437) — both behind `ACCOUNTS_ENABLED` (ADR-0034). The
+    page also carries **zero `<script src>`**, which is the fact the whole approach rests on.
+- **A measurement error in BUILDLOG 046, found while implementing and corrected:** the reader calls
+  `/api/v1/releases?**ingested_title**=16`, and both measurement scripts asked for `?title=16`. Those
+  are different work — `?title=` filters in the repository, `?ingested_title=` fetches all 382 release
+  points and filters in Python — and different costs: **27.0 ms against 20.1 ms** at the API
+  container. So the release list was a *worse* offender than reported, and the section page's API
+  critical path was 42.8 ms rather than the 36.6 ms recorded. Both scripts now ask for what the reader
+  asks for. The committed artifacts still carry the old figure and are superseded on the next run;
+  that is why `b3-fixes.md` says the deployed re-measurement is still owed.
+- **Still owed:** the deployed re-measurement. `make navprofile`, `BASE=… make loadtest` and
+  `make spine-explain` all measure the box, and the fixes are not on the box — the branch is not
+  merged and not deployed. The three artifacts in `docs/verification/` remain the *before* picture.
+- **Candidate tasks found, deliberately not done:**
+  - **`?ingested_title=` should be a repository filter, not a Python one.** `api/routes.py` asks
+    `list_releases(title_num=None)` for all 382 release points and filters the list afterwards, so the
+    work does not shrink when the answer does. ADR-0045 caches around it rather than fixing it.
+  - **`CopyColumn`'s JSON data island is measured nowhere.** 4,278 bytes on `/app/us/usc/t16/s45f`,
+    varying per section, excluded from the byte budget because a static ceiling over it would be a
+    ceiling on the statute. Measuring it needs a running server.
+  - **Inline scripts ship their comments.** 25,474 bytes of inline script on a section page, much of
+    it explanatory prose that only the browser downloads and nobody reads. Minifying inline islands at
+    build time is a real saving and a real loss of the thing that makes them readable in `view-source`.

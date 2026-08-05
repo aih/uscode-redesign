@@ -11,10 +11,11 @@
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import StatusBadge from "../../components/StatusBadge.astro";
-import { ApiError, fetchVersions } from "../../lib/api";
+import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { REVALIDATE } from "../../lib/cache";
 import { appHref, diffHref, trimNum } from "../../lib/url";
-import type { Versions } from "../../lib/types";
+import type { Entry, Section, Versions } from "../../lib/types";
+import { isToc } from "../../lib/types";
 
 // The route's own static prefix is "versions", not "us/usc" (unlike the
 // identifier catch-all page) — the captured param already carries "us/usc/…".
@@ -42,9 +43,29 @@ const current = entries.length > 0 ? entries[entries.length - 1] : null;
 const title = current
   ? `Versions of ${trimNum(current.num)} · U.S. Code`
   : "Versions · U.S. Code";
+
+// The breadcrumb, at the cost of a second call. `/sections/…/versions` answers
+// `{identifier, versions}` and nothing else — it has no ancestors to give — so
+// the trail comes from the section itself. Allowed to fail: this page's subject
+// is the timeline, and a reader who loses the trail still has it.
+const section: Section | null = await fetchIdentifier(identifier)
+  .then((body) => (isToc(body) ? null : body))
+  .catch(() => null);
+
+const crumbs: Entry[] = section?.ancestors ?? [];
+const currentCrumb: Entry | null = section
+  ? {
+      identifier: section.identifier,
+      level: "section",
+      num: section.num,
+      heading: section.heading,
+      status: section.status,
+      is_section: true,
+    }
+  : null;
 ---
 
-<Base title={title}>
+<Base title={title} crumbs={crumbs} current={currentCrumb}>
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
   {

@@ -12,11 +12,11 @@
  */
 import Base from "../../../layouts/Base.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
+import ChapterRail from "../../../components/ChapterRail.astro";
 import CitePreview from "../../../components/CitePreview.astro";
 import CopyColumn from "../../../components/CopyColumn.astro";
 import KeyboardNav from "../../../components/KeyboardNav.astro";
 import Neighbors from "../../../components/Neighbors.astro";
-import Provenance from "../../../components/Provenance.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import WatchButton from "../../../components/WatchButton.astro";
 import {
@@ -24,11 +24,12 @@ import {
   fetchIdentifier,
   fetchLabels,
   fetchNeighbors,
-  fetchReleases,
+  fetchToc,
   releaseParams,
 } from "../../../lib/api";
 import { REVALIDATE, setPublicCache } from "../../../lib/cache";
 import { ACCOUNTS_ENABLED } from "../../../lib/features";
+import { cachedReleases } from "../../../lib/releasecache";
 import { citedIdentifiers } from "../../../lib/refs";
 import type {
   Entry,
@@ -81,6 +82,9 @@ let crumbs: Entry[] = [];
 let releases: Release[] = [];
 let selected = "";
 let neighbors: NeighborsBody | null = null;
+/** The parent subdivision's table of contents, which feeds the `ChapterRail`.
+ *  Null when the section has no parent, or when the call failed. */
+let parentToc: Toc | null = null;
 let labels: Labels = {};
 let sectionHtml = "";
 /** One rendered body per further occurrence the source published under this same
@@ -102,7 +106,7 @@ if (body && isToc(body)) {
   // node rather than one per release point (ADR-0006), so it revalidates rather
   // than being pinned even when the URL named a release point.
   Astro.response.headers.set("Cache-Control", REVALIDATE);
-  releases = await fetchReleases(titleNum);
+  releases = await cachedReleases(titleNum);
   title = `${trimNum(toc.node.num)} ${toc.node.heading ?? ""} · ${selected} · U.S. Code`;
 } else if (body) {
   section = body;
@@ -119,20 +123,31 @@ if (body && isToc(body)) {
   // page, not one per occurrence.
   const dupFragments = (section.duplicates ?? []).map((d) => parseFragment(d.xml));
 
-  // Three calls, all server-side and all on localhost: the labels this page's
-  // citations need (batched, `fetchLabels`), the neighbours, and the release
-  // points a picker can offer. There used to be a fourth — the parent node's
-  // whole table of contents, fetched to keep two fields of it — which is the
-  // Day-6 debt carried over from the Jinja reader. The breadcrumb now rides on
-  // the section itself (PLAN Day 6b).
+  // Four calls, all server-side and all on localhost: the labels this page's
+  // citations need (batched, `fetchLabels`), the neighbours, the release points
+  // a picker can offer, and the parent's table of contents.
   //
-  // The labels are the one call allowed to fail. They are hover text over
+  // Three of them reach the API every time. The release points usually do not:
+  // `cachedReleases` holds one answer per title for five minutes, because the
+  // list is the same for every section of a title and changes only when the
+  // ingest chain loads something (ADR-0045). It was the slowest of these four
+  // at 27.0 ms, so it set the whole group's cost; it is now a hit.
+  //
+  // The parent TOC is the call this page dropped in Day 6b, when the breadcrumb
+  // moved onto the section itself and only two fields of a whole TOC were still
+  // wanted. ADR-0043 puts it back and spends the whole of it: it is the
+  // `ChapterRail`, which is a use for the sections list rather than for two
+  // fields of the node.
+  //
+  // The labels are one of two calls allowed to fail. They are hover text over
   // citations that are already links, and the section's own words are in hand
   // before this runs — so losing them costs a tooltip, while `Promise.all`
   // rejecting costs the reader the statute. 3 U.S.C. § 301 is where that bill
   // came due: 242 cross references, one over-long request, 422, and a page
-  // that 500ed with its text sitting in memory.
-  [labels, neighbors, releases] = await Promise.all([
+  // that 500ed with its text sitting in memory. The parent TOC is the other,
+  // for the same reason: without it the reader loses the rail and still has the
+  // section, the sticky bar and the neighbours.
+  [labels, neighbors, releases, parentToc] = await Promise.all([
     fetchLabels(
       citedIdentifiers([fragment, ...dupFragments].flatMap((f) => hrefs(f))),
       selected,
@@ -141,7 +156,13 @@ if (body && isToc(body)) {
       return {};
     }),
     fetchNeighbors(section.identifier, selected),
-    fetchReleases(titleNum),
+    cachedReleases(titleNum),
+    section.parent_identifier
+      ? fetchToc(section.parent_identifier, selected).catch((error) => {
+          console.error(`rail for ${section.identifier} at ${selected}:`, error);
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
 
   crumbs = section.ancestors ?? [];
@@ -161,11 +182,28 @@ if (body && isToc(body)) {
 }
 
 const remainder = section ? identifier.slice(section.identifier.length) : "";
+/** The form posts back to the identifier that was *asked for*, not to the
+ *  section that answered. Built from `section.identifier`, switching release on
+ *  `/us/usc/t16/s45f/c/5` dropped the `/c/5` and landed on the whole section. */
 const picker =
   releases.length > 0 && body
-    ? { action: appHref(section ? section.identifier : toc!.node.identifier), options: releases, selected }
+    ? { action: appHref(identifier), options: releases, selected }
     : null;
 const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
+/** The last crumb: the thing on screen, unlinked. `ancestors` stops at the
+ *  parent, so without this the trail names everything except the section. */
+const currentCrumb: Entry | null = section
+  ? {
+      identifier: section.identifier,
+      level: "section",
+      num: section.num,
+      heading: section.heading,
+      status: section.status,
+      is_section: true,
+    }
+  : toc
+    ? toc.node
+    : null;
 /** The sticky row's contents (Day 7). Only a section gets one: a table of
  * contents has no reading order to step through, and its own breadcrumbs
  * already say where it is. */
@@ -179,9 +217,55 @@ const bar = section
       up: upNode,
     }
   : null;
+
+/** `fetchReleases` answers newest first, so the head of the list is the newest
+ *  release point this title has. Used to decide whether the rail has to warn
+ *  that its structure and the text on screen may be from different releases. */
+const isNewest = releases.length === 0 || releases[0].label === selected;
+/** The rail's own data. Only a section gets one: a table of contents already
+ *  *is* the list a rail would show. */
+const rail =
+  section && parentToc && parentToc.sections.length > 0
+    ? { parent: parentToc.node, entries: parentToc.sections }
+    : null;
+
+/** The four facts about the text on screen (ADR-0044). `served_from` is the
+ *  release point that actually answered, which is not always the one asked for
+ *  (gotcha 10); `note` is the API's own sentence saying so. */
+const served = section?.served_from ?? toc?.served_from ?? null;
+const releaseContext = served
+  ? {
+      served,
+      isNewest,
+      newestHref: isNewest ? null : appHref(identifier),
+      note: section?.note ?? toc?.note ?? null,
+    }
+  : null;
 ---
 
-<Base title={title} crumbs={crumbs} release={selected} picker={picker} bar={bar}>
+<Base
+  title={title}
+  crumbs={crumbs}
+  current={currentCrumb}
+  release={selected}
+  releaseContext={releaseContext}
+  picker={picker}
+  bar={bar}
+  rail={rail !== null}
+>
+  {
+    rail && (
+      <ChapterRail
+        slot="rail"
+        parent={rail.parent}
+        entries={rail.entries}
+        current={section!.identifier}
+        release={selected}
+        isNewest={isNewest}
+      />
+    )
+  }
+
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
   {
@@ -198,8 +282,6 @@ const bar = section
             Version history — every release point where this text changed
           </a>
         </p>
-
-        <Provenance served={section.served_from} note={section.note} />
 
         {/* Same reasoning as the navbar's account control: an island that can
             only ever be told 401 is a request per page view for nothing. */}
@@ -317,8 +399,6 @@ const bar = section
           {toc.node.heading}
           <StatusBadge status={toc.node.status} />
         </h1>
-
-        <Provenance served={toc.served_from} note={toc.note} />
 
         {toc.children.length === 0 && toc.sections.length === 0 && (
           <p class="lede">Nothing is listed under this node at {selected}.</p>

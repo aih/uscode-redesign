@@ -67,6 +67,26 @@ reported without a requirement. Two traps, both hit here: **`.usa-alert`'s backg
 for** — `.endpoint__method` took its *text* colour from `--panel`, which inverts, over a fixed
 background.
 
+**One navigation chrome, and the release point is a fact rather than an inference** (ADR-0043,
+ADR-0044). `docs/ia-map.md` is the map — every reader route, derived from the guide ratchet's own
+`readerRoutes()`, with each inbound link recorded as file:line — and it found that **only
+`us/usc/[...identifier].astro` passed `crumbs`/`release`/`bar` to `Base`**, so `/app/versions` and
+`/app/diff` carried no trail at all. Now: the breadcrumb ends at the provision on screen
+(`aria-current="page"`), `SectionBar`'s steps name the neighbour from 40em up, and `ChapterRail`
+lists the parent subdivision's sections in reading order with status badges **in place**, so a
+repealed neighbour is visible before it is clicked (gotcha 9) — at the cost of the fourth API call
+Day 6b dropped, and of showing `structure_nodes`' unversioned view, which the rail says out loud.
+`ReleaseContext` replaces `Provenance` and adds what it never stated — **whether this is the newest
+release point**; `ReleasePicker` is two GET forms (newest / a date / a named release point, two
+because `?release=` beats `?date=` in `resolve_release`) posting to the **requested** identifier,
+since building the action from `section.identifier` **dropped the provision anchor** on every switch.
+The switcher **left the sticky stack** on a measurement: 19px of headroom under `--sticky-h` at
+700px against a date field costing ~80, in the band `docs/backlog.md` already flags for 19rem of
+chrome — 89px after the move, asserted in `sticky.spec.ts`. Two traps: **`Astro.slots.has(name)` is
+true for a slot whose content sits behind a false condition**, and **the first non-link text in the
+breadcrumb bar inherits USWDS's own ink** (`$theme-breadcrumb-background-color`, light-page
+assumption) and failed contrast in dark on every reader page — ADR-0042's `.usa-nav__link` again.
+
 **The hover preview is keyboard-reachable and fails out loud** (ADR-0041, amending ADR-0024's
 decision 4). The card no longer carries `aria-hidden="true"` next to `tabindex="0"` — focusable and
 hidden from assistive technology at once, which is what ADR-0039's open-state scan found. It is a
@@ -76,15 +96,15 @@ focus restore fires `focusin` on the trigger and the card the reader just closed
 A fetch failure renders "Preview unavailable" plus the citation instead of nothing, and a 429 says so
 by name; an `AbortError` stays silent, because that is the island superseding its own request.
 
-`make test` = **486** Python tests; `make test-web` = **227** frontend tests; `make test-e2e` = **369**
-Playwright tests, 252 of which are the accessibility scan (**all three are required** — reader
+`make test` = **486** Python tests; `make test-web` = **227** frontend tests; `make test-e2e` = **373**
+Playwright tests, 251 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(42 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(44 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -101,9 +121,19 @@ the file is a single-file bind mount, which binds an inode, so `caddy reload` wo
 pre-`git checkout` file and exit 0. **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.
 
-**Next: (1) finish the deployment's open items (`docs/deploy-status.md`); (2) Day 7 hardening.**
+**Next: (1) workstream B task B3 — measure before changing anything else; `docs/verification/loadtest.json`
+is from 2026-07-29 and is now stale for four reasons (ADR-0029's limiters, ADR-0026's redline,
+ADR-0037's `Disallow: /`, and ADR-0043's fourth call per section view). State and standing decisions
+are in `claude-code/WORKSTREAM-B-STATE.md`; (2) finish the deployment's open items
+(`docs/deploy-status.md`); (3) Day 7 hardening.**
 
-Open debts: **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
+Open debts: **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
+`SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
+link is the only way in (`docs/ia-map.md`); **`/app/diff` is two hops from the text it compares**
+(section → version history → pick two → diff), which task B5 owns; **`previewHref` in `lib/url.ts`
+has no caller** — `CitePreview.astro:176` builds `` `/app/preview${identifier}` `` inline in browser
+JavaScript, a reader href built outside `url.ts` against architecture rule 5, and the exact inlining
+that function's docstring says it replaced; **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
 `docs/verification/a11y.json` is **8 route/rule pairs over 1,780 nodes**, down from 41 over 2,251, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and

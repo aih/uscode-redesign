@@ -1,0 +1,25 @@
+{
+  "note": "Per-route ceilings on inline <script is:inline> bytes, enforced by frontend/tests/jsbudget.test.ts in `make test-web` (ADR-0046). Raising a ceiling is a decision: do it in the same commit as the growth and say why in BUILDLOG.md.",
+  "counted": "Bytes inside <script is:inline> across each route's transitive .astro import graph. Where two page files serve one route, the ceiling is the heavier of the two, since a request reaches one and never both. Comments inside those scripts are counted, because Astro ships inline scripts verbatim and a reader downloads them.",
+  "headroom": "Each ceiling is the measured size plus 200 bytes, rounded up to the next 500, so an ordinary comment edit does not fail the build but real growth does.",
+  "budgets": {
+    "/app/": 7500,
+    "/app/404": 7500,
+    "/app/about": 7500,
+    "/app/demo": 7500,
+    "/app/diff": 9000,
+    "/app/docs": 7500,
+    "/app/goto": 7500,
+    "/app/guide": 7500,
+    "/app/login": 9000,
+    "/app/provisions": 8000,
+    "/app/releases": 7500,
+    "/app/search": 7500,
+    "/app/search/syntax": 7500,
+    "/app/settings": 12000,
+    "/app/signup": 8500,
+    "/app/us/usc": 32500,
+    "/app/versions": 7500
+  },
+  "not_counted": "CopyColumn's <script type=\"application/json\" data-copy-targets>: its size is the section's provision list rather than code, so it varies per URL. Measured once at 4,278 bytes on /app/us/usc/t16/s45f and measured nowhere continuously."
+}

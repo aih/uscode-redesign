@@ -30,7 +30,7 @@ import type { DocumentDiff, SourceDelta } from "../../lib/diffdoc";
 import { apiDiffHref, appHref, diffHref, trimNum, versionsHref } from "../../lib/url";
 import { sourceRedline } from "../../lib/xmlredline";
 import { parseFragment, readingBlocks } from "../../lib/uslm";
-import type { Section } from "../../lib/types";
+import type { Entry, Section } from "../../lib/types";
 import { isToc } from "../../lib/types";
 
 // The route's own static prefix is "diff", not "us/usc" (unlike the
@@ -157,9 +157,25 @@ function summary(d: DocumentDiff): string {
 const title = after
   ? `Diff ${before?.release.label} → ${after.release.label} · ${trimNum(after.num)} · U.S. Code`
   : "Diff · U.S. Code";
+
+// The trail comes from the newer of the two texts, which is the one this page is
+// framed around. No release band and no switcher here: this page is *about* two
+// release points, so a bar naming one of them would be answering a question the
+// page does not ask. The two labels are in the lede, and in the from/to picker.
+const crumbs: Entry[] = after?.ancestors ?? [];
+const currentCrumb: Entry | null = after
+  ? {
+      identifier: after.identifier,
+      level: "section",
+      num: after.num,
+      heading: after.heading,
+      status: after.status,
+      is_section: true,
+    }
+  : null;
 ---
 
-<Base title={title}>
+<Base title={title} crumbs={crumbs} current={currentCrumb}>
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
   {
