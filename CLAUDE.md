@@ -295,7 +295,7 @@ link is the only way in (`docs/ia-map.md`); **`/app/diff` is two hops from the t
 has no caller** — `CitePreview.astro:199` builds `` `/app/preview${identifier}` `` inline in browser
 JavaScript, a reader href built outside `url.ts` against architecture rule 5, and the exact inlining
 that function's docstring says it replaced; **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 1,794 nodes**, down from 41 over 2,251, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 1,955 nodes**, down from 41 over 2,251, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by

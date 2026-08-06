@@ -13,7 +13,7 @@
       "id": "front-page-titles",
       "title": "Open a title from the front page",
       "startMs": 3500,
-      "durationMs": 11433,
+      "durationMs": 10933,
       "captions": [
         "Every provision of the US Code has an address — at every point in time it has existed.",
         "The front page lists the titles that are loaded."
@@ -22,8 +22,8 @@
     {
       "id": "section-by-address",
       "title": "Open a section by its citation",
-      "startMs": 14933,
-      "durationMs": 9867,
+      "startMs": 14433,
+      "durationMs": 9633,
       "captions": [
         "The citation is the URL. This is 16 U.S.C. § 45f.",
         "The section, with its number and heading as the Code prints them."
@@ -32,18 +32,18 @@
     {
       "id": "provision-in-context",
       "title": "A subsection is shown inside its whole section",
-      "startMs": 24800,
-      "durationMs": 9800,
+      "startMs": 24067,
+      "durationMs": 8367,
       "captions": [
         "Ask for subsection (c)(5) —",
-        "— and it is highlighted inside the whole section, never stranded out of context."
+        "— and it is highlighted in place, inside the whole section."
       ]
     },
     {
       "id": "chapter-rail",
       "title": "The sections around this one, with their status",
-      "startMs": 34600,
-      "durationMs": 15267,
+      "startMs": 32433,
+      "durationMs": 15367,
       "captions": [
         "Beside the section, the rest of the subchapter in reading order.",
         "The section you are reading is marked in the list.",
@@ -53,10 +53,10 @@
     {
       "id": "neighbors-next",
       "title": "Move to the next section from the sticky bar",
-      "startMs": 49867,
-      "durationMs": 15400,
+      "startMs": 47800,
+      "durationMs": 14867,
       "captions": [
-        "Reading order is preserved, so you can move through a chapter section by section.",
+        "Reading order is preserved, and a chapter can be read section by section.",
         "The sticky bar carries previous, next and up-one-level.",
         "§ 45g — the next section, whatever you were reading before."
       ]
@@ -64,19 +64,19 @@
     {
       "id": "section-contents",
       "title": "Jump to the notes from the top of a section",
-      "startMs": 65267,
-      "durationMs": 20367,
+      "startMs": 62667,
+      "durationMs": 15667,
       "captions": [
         "Above the text, a section's own contents — its subsections, its source credit, its notes.",
         "Every top-level provision, with its heading.",
-        "One click to the notes, past however many subsections are in between.",
-        "The notes, without scrolling the length of the section to find them."
+        "One click to the notes.",
+        "The notes, at the foot of the section."
       ]
     },
     {
       "id": "keyboard-help",
       "title": "Open the shortcut list from the keyboard",
-      "startMs": 85633,
+      "startMs": 78333,
       "durationMs": 20933,
       "captions": [
         "Press ? anywhere on the site.",
@@ -89,18 +89,18 @@
     {
       "id": "release-pin",
       "title": "Read a section as it stood at a named release point",
-      "startMs": 106567,
-      "durationMs": 12767,
+      "startMs": 99267,
+      "durationMs": 10633,
       "captions": [
         "Add ?release= to any address to read it as it stood at that release point.",
-        "The page names the release point it answered from — every page does."
+        "The page names the release point it answered from."
       ]
     },
     {
       "id": "date-resolves",
       "title": "A date resolves to the release point in force then",
-      "startMs": 119333,
-      "durationMs": 10433,
+      "startMs": 109900,
+      "durationMs": 10600,
       "captions": [
         "Or ask by date, and the site finds the release point in force then.",
         "12 July 2026 resolves to release point 119-102not101."
@@ -109,52 +109,53 @@
     {
       "id": "switch-keeps-provision",
       "title": "Switching release point keeps the provision you were reading",
-      "startMs": 129767,
-      "durationMs": 16733,
+      "startMs": 120500,
+      "durationMs": 18400,
       "captions": [
         "Reading subsection (c)(5) of § 45f, pinned to release point 119-99.",
+        "The bar names the release point you are reading, and opens the ways to change it.",
         "Choose a different release point.",
-        "The address keeps the provision — you move in time, not in the text.",
+        "The address keeps the provision, and changes the release point.",
         "Still (c)(5), now at release point 119-102not101."
       ]
     },
     {
       "id": "versions-timeline",
       "title": "See every release point at which a section's text changed",
-      "startMs": 146500,
-      "durationMs": 14000,
+      "startMs": 138900,
+      "durationMs": 10833,
       "captions": [
-        "The version history: one entry per distinct text, not one per release point.",
+        "The version history: one entry per distinct text.",
         "Each entry says when that text first appeared, and what it stood unchanged through."
       ]
     },
     {
       "id": "diff-real-change",
       "title": "Compare two release points and see what the words did",
-      "startMs": 160500,
-      "durationMs": 12433,
+      "startMs": 149733,
+      "durationMs": 10267,
       "captions": [
         "A redline between any two release points, in the reading text.",
-        "Removed words struck through, added words underlined — the amendment, not the markup."
+        "Removed words struck through, added words underlined."
       ]
     },
     {
       "id": "citation-box",
       "title": "Type a citation and land on the provision",
-      "startMs": 172933,
-      "durationMs": 16200,
+      "startMs": 160000,
+      "durationMs": 13833,
       "captions": [
-        "One box takes a citation or a phrase — you do not have to say which.",
+        "One box takes a citation or a phrase.",
         "Type a citation in more or less any written form.",
         "And it goes straight to the provision.",
-        "16 U.S.C. § 45f — no need to know the URL scheme at all."
+        "16 U.S.C. § 45f."
       ]
     },
     {
       "id": "keyword-search",
       "title": "Search the text of the Code",
-      "startMs": 189133,
-      "durationMs": 12033,
+      "startMs": 173833,
+      "durationMs": 11800,
       "captions": [
         "Anything that is not a citation searches the text of the Code.",
         "Matches are highlighted, and each result says where it sits in the Code."
@@ -163,8 +164,8 @@
     {
       "id": "search-scope-title",
       "title": "Restrict a search to one title",
-      "startMs": 201167,
-      "durationMs": 7933,
+      "startMs": 185633,
+      "durationMs": 7967,
       "captions": [
         "title:16 searches Title 16 and nothing else.",
         "Every result is in the title you asked for."
@@ -173,19 +174,19 @@
     {
       "id": "search-facet-goes-in-the-url",
       "title": "A filter you click is part of the search's address",
-      "startMs": 209100,
-      "durationMs": 13233,
+      "startMs": 193600,
+      "durationMs": 11367,
       "captions": [
         "The counts say which titles and statuses the matches fall into.",
         "Selecting one narrows the search.",
-        "The filter is written into the query, so the URL is the whole search."
+        "The filter is written into the query, and the URL is the whole search."
       ]
     },
     {
       "id": "copy-whole-section",
       "title": "Copy a whole section",
-      "startMs": 222333,
-      "durationMs": 14233,
+      "startMs": 204967,
+      "durationMs": 14267,
       "captions": [
         "Every provision has a copy control, and the whole section has its own button.",
         "Choose what copying means — text, citation, both, or a link.",
@@ -195,19 +196,19 @@
     {
       "id": "hover-preview",
       "title": "Read a cross reference without losing your place",
-      "startMs": 236567,
-      "durationMs": 13133,
+      "startMs": 219233,
+      "durationMs": 11767,
       "captions": [
         "Statutory text is full of references to other statutory text.",
         "Hover one and the cited provision comes to you —",
-        "— heading, status and opening words, without losing your place."
+        "— heading, status and opening words."
       ]
     },
     {
       "id": "theme-toggle",
       "title": "Switch the site to dark",
-      "startMs": 249700,
-      "durationMs": 11200,
+      "startMs": 231000,
+      "durationMs": 11267,
       "captions": [
         "Light is the default setting.",
         "One control in the header switches it.",
@@ -217,14 +218,14 @@
     {
       "id": "density-toggle",
       "title": "Switch the reading density to compact",
-      "startMs": 260900,
-      "durationMs": 12067,
+      "startMs": 242267,
+      "durationMs": 11933,
       "captions": [
         "Comfortable is the default setting.",
         "The control beside the theme toggle switches it.",
-        "Compact is in force, and the control now offers the way back."
+        "The control now reads Comfortable, which is the way back."
       ]
     }
   ],
-  "totalMs": 272967
+  "totalMs": 254200
 }
