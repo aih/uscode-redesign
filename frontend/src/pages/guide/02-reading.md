@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56]
 ---
 
 ## The address of a provision
@@ -193,6 +193,7 @@ Press <kbd>?</kbd> on any page for this list, or use the **Keyboard shortcuts** 
 | Key | |
 |---|---|
 | <kbd>t</kbd> | Top of the page |
+| <kbd>b</kbd> | Bottom of the page |
 | <kbd>/</kbd> | Search or go to a citation |
 | <kbd>?</kbd> | The shortcut list |
 | <kbd>Esc</kbd> | Close the shortcut list, or a citation preview |
@@ -203,6 +204,18 @@ where you landed.
 
 <kbd>[</kbd> and <kbd>]</kbd> step through the rows of the contents list, so a section with no
 subsections has nothing to step through.
+
+<kbd>t</kbd> goes to the top of the page's content, past the navigation. <kbd>b</kbd> goes to the
+foot of the page, where the site's own links are.
+
+```scenario
+id: keyboard-bottom
+title: Jump to the foot of the page from the keyboard
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - press: b
+  - expect: { selector: "footer", inViewport: true }
+```
 
 ```scenario
 id: keyboard-help

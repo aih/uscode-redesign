@@ -108,6 +108,16 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         what: "Top of the page",
       },
       {
+        action: "bottom",
+        keys: ["b"],
+        codes: ["b"],
+        // The footer, which is the last thing on every page. `t` reaches
+        // `#main` rather than the window's top, and this is its counterpart at
+        // the other end: the end of the content, with the site's own links
+        // under the keyboard when it lands.
+        what: "Bottom of the page",
+      },
+      {
         action: "search",
         keys: ["/"],
         codes: ["/"],
