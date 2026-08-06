@@ -50,6 +50,8 @@ import ReleasePicker from "../components/ReleasePicker.astro";
 import SearchFacets from "../components/SearchFacets.astro";
 import SearchResult from "../components/SearchResult.astro";
 import SectionBar from "../components/SectionBar.astro";
+import SectionContents from "../components/SectionContents.astro";
+import ShortcutsDialog from "../components/ShortcutsDialog.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import Timeline from "../components/Timeline.astro";
 import COLOR_PAIRS from "../data/color-pairs.json";
@@ -58,7 +60,7 @@ import { documentDiff, diffLinesHtml, diffSummary } from "../lib/diffdoc";
 import { previewFailureHtml } from "../lib/preview";
 import type { Citation, Entry, Release, SearchResultItem, VersionEntry } from "../lib/types";
 import { appHref } from "../lib/url";
-import { copyableIdentifiers, parseFragment, readingBlocks, render } from "../lib/uslm";
+import { copyableIdentifiers, outline, parseFragment, readingBlocks, render } from "../lib/uslm";
 
 /** Fixed markup with no per-reader content and no release point to pin it to. */
 setPublicCache(Astro.response.headers, null, false);
@@ -169,8 +171,20 @@ const SPECIMEN_AFTER = SPECIMEN_BEFORE.replace(
 );
 
 const specimen = parseFragment(SPECIMEN_AFTER);
-const specimenHtml = render(specimen, { target: "/us/usc/t0/s1/b/1", release: null, labels: {} });
+const specimenHtml = render(specimen, {
+  target: "/us/usc/t0/s1/b/1",
+  release: null,
+  labels: {},
+  // The page renders one section and no hover card, so the two apparatus
+  // fragment names are free here and the specimen contents list below leads
+  // somewhere. A specimen whose links do nothing is a picture of a component.
+  anchors: true,
+});
 const copyTargets = copyableIdentifiers(specimen);
+/** The contents rows, from the same `outline()` the section page calls, over
+ *  the same fragment the text below is rendered from — so the four subsections,
+ *  the source credit and the notes in the list are the ones on the page. */
+const CONTENTS = outline(specimen);
 
 const redline = documentDiff(
   readingBlocks(parseFragment(SPECIMEN_BEFORE)),
@@ -403,6 +417,7 @@ const TYPE_ROLES = [
     <p class="apidocs__contents-item"><a href="#focus">Focus</a></p>
     <p class="apidocs__contents-item"><a href="#status">Status badges</a></p>
     <p class="apidocs__contents-item"><a href="#chrome">Navigation chrome</a></p>
+    <p class="apidocs__contents-item"><a href="#keyboard">Keyboard navigation</a></p>
     <p class="apidocs__contents-item"><a href="#versions">Versions and redlines</a></p>
     <p class="apidocs__contents-item"><a href="#text">Statutory text and the copy control</a></p>
     <p class="apidocs__contents-item"><a href="#density">Reading density</a></p>
@@ -689,6 +704,38 @@ const TYPE_ROLES = [
 
   <div class="spec">
     <ReleaseContext served={RP_OLD} isNewest={false} newestHref={appHref("/us/usc/t0/s1")} />
+  </div>
+
+  {/* -------------------------------------------------------------- keyboard */}
+  <h2 class="toc-group" id="keyboard">Keyboard navigation</h2>
+
+  <p>
+    A section's own contents: its top-level provisions, then the source credit and the notes
+    underneath them. The rows are <code>outline()</code>'s answer for the same specimen the
+    statutory text further down is rendered from, so the six links below reach that section's six
+    blocks. The provisions link to their <code>@identifier</code>, which is already the
+    <code>id</code> every provision renders with; the two apparatus rows are the only fragment
+    names the reader invents. Rows past about nine scroll inside the panel rather than pushing the
+    section's first sentence off the screen.
+  </p>
+
+  <div class="spec">
+    <SectionContents entries={CONTENTS} />
+  </div>
+
+  <p class="spec__label">The shortcut list</p>
+
+  <p>
+    Every binding on the site, rendered from the same list <code>KeyboardNav</code> binds — a key
+    that is printed here is a key that fires. On a real page this is a modal <code>&lt;dialog&gt;</code>
+    opened with <kbd>?</kbd> or from the footer; here it is the same component rendered as a block,
+    because a second <code>&lt;dialog id="shortcuts"&gt;</code> would duplicate the one this page
+    already carries from <code>Base</code>, and a modal held open would make the rest of the page
+    inert.
+  </p>
+
+  <div class="spec">
+    <ShortcutsDialog panel={true} idPrefix="shortcuts-specimen" />
   </div>
 
   {/* -------------------------------------------------------------- versions */}

@@ -17,6 +17,8 @@ import ReleaseContext from "../components/ReleaseContext.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
 import SectionBar from "../components/SectionBar.astro";
 import PrintHeader from "../components/PrintHeader.astro";
+import ShortcutsDialog from "../components/ShortcutsDialog.astro";
+import KeyboardNav from "../components/KeyboardNav.astro";
 import type { Entry, Release } from "../lib/types";
 import "../styles/site.scss";
 
@@ -292,5 +294,24 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
     </main>
 
     <SiteFooter />
+
+    {/* The shortcut list and the keys that reach it, on every page.
+
+        Here rather than on the section page, which is where three of these
+        keys started. `/` and `?` belong to the site: a search box reachable
+        only by tabbing past the navbar is a search box for the pointer, and a
+        list of shortcuts you can only summon from the page whose shortcuts you
+        already know is not a list anybody finds. The section keys go quiet on a
+        page with no section — `KeyboardNav` is handed no destinations and the
+        in-page targets are not in the document.
+
+        The dialog first, because the island looks it up by id on the way in. */}
+    <ShortcutsDialog />
+    <KeyboardNav
+      previous={bar?.previous}
+      next={bar?.next}
+      up={bar?.up}
+      release={release}
+    />
   </body>
 </html>

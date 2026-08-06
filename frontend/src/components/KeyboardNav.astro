@@ -1,15 +1,77 @@
 ---
 /**
- * The reader's one island (Day 4): ←/→ or j/k for the previous/next section,
- * `u` up a level. Everything else in this app ships zero client JavaScript
- * (`Base.astro`'s docstring) — this is the one thing that is genuinely
- * interactive rather than a GET form standing in for one.
+ * Every keyboard shortcut the reader has, bound.
  *
- * `is:inline` keeps it a plain, unbundled script (the same choice the one
- * existing inline script on the identifier catch-all page already made) —
- * Astro would otherwise turn it into an ES module, where
- * `document.currentScript` is always `null`.
+ * This started as three keys on the section page — ←/→ or j/k for the
+ * neighbours, `u` up a level — and moved into `Base.astro`, so it is now on
+ * every page. Two things made that worth doing. `/` and `?` are site-wide by
+ * nature: a search box the keyboard cannot reach without tabbing past the whole
+ * navbar is a search box for the pointer, and a shortcut list you can only find
+ * on the page whose shortcuts you already know is not a list anybody finds. And
+ * the section keys are now eight rather than three, which is more than a
+ * paragraph at the foot of one page can usefully document.
+ *
+ * ## Where the bindings come from
+ *
+ * `lib/shortcuts.ts`, handed to the script below as JSON. An `is:inline` script
+ * can import nothing, and this component renders the list nowhere — the dialog
+ * next door does — so a binding written here would be a second copy of it, and
+ * the two would diverge the first time either changed. The script switches on
+ * an action name; the module owns which key produces it.
+ *
+ * ## What it will not do
+ *
+ * No combination holding Ctrl, Alt or ⌘ is touched: those are the browser's and
+ * the operating system's. Shift is allowed through for `?` alone, which needs
+ * it on most layouts, so a blanket refusal would make the help key unreachable
+ * on the keyboards most readers have. Nothing fires while focus is in a text
+ * field, a `<select>` or anything `contenteditable`, and nothing fires while
+ * the help dialog is open — otherwise `]` behind a modal scrolls a document the
+ * reader cannot see. `Escape` is in the printed list and is bound to nothing
+ * here: the dialog and the hover card each already handle their own.
+ *
+ * ## In-page jumps move focus as well as the scroll position
+ *
+ * Scrolling alone would leave a keyboard reader's next Tab back at the top of
+ * the document, which is the trap that makes most skip links useless. `goTo`
+ * gives its target `tabindex="-1"` at the moment it is jumped to and focuses it
+ * with `preventScroll`, so the focus call does not fight the smooth scroll that
+ * just started. The attribute is negative, so nothing enters the tab order that
+ * was not already in it.
+ *
+ * `scroll-margin-top` does the rest: `site.scss` sets it on `main` and on every
+ * identified element in the statutory text, and it applies to `scrollIntoView`
+ * as well as to a fragment jump, so nothing here has to know how tall the
+ * sticky stack is at this viewport.
+ *
+ * ## Stepping through provisions
+ *
+ * `[` and `]` read their targets off the rendered contents list rather than
+ * querying the statutory text, because that list is already the server's answer
+ * to "what are this section's top-level provisions" (`uslm.outline`) and the
+ * text is a tree seven levels deep with no CSS selector for "first rung only".
+ * The list's last two rows are the source credit and the notes, whose fragment
+ * names are not identifiers; they are excluded, because a key documented as
+ * "next subsection" that lands on an editorial note is documented wrongly, and
+ * `s` and `n` go there directly.
+ *
+ * Which provision is "current" is decided against the reading line and not
+ * against the top of the viewport. The sticky stack covers the first few rem,
+ * so a provision that has just been jumped to sits *under* the chrome rather
+ * than at zero — and comparing against zero is what made `]` land on the
+ * provision it started from, 60px down the viewport being greater than 0. The
+ * offset comes from the target's own computed `scroll-margin-top`, which is the
+ * same number the jump itself lands on, at every width and with no second copy
+ * of `--sticky-h` in this file.
+ *
+ * `is:inline` keeps this a plain, unbundled script — Astro would otherwise turn
+ * it into an ES module, where `document.currentScript` is always `null`. It is
+ * on every route, so its bytes are on every route's budget (ADR-0046): the
+ * prose that would ordinarily sit beside the code below is up here instead,
+ * because an inline script ships verbatim and a comment in one is a comment the
+ * reader downloads.
  */
+import { keyMap } from "../lib/shortcuts";
 import type { Entry } from "../lib/types";
 import { appHref } from "../lib/url";
 
@@ -22,36 +84,105 @@ interface Props {
 
 const { previous = null, next = null, up = null, release = null } = Astro.props;
 
-const prevHref = previous ? appHref(previous.identifier, release) : "";
-const nextHref = next ? appHref(next.identifier, release) : "";
-const upHref = up ? appHref(up.identifier, release) : "";
+/** The three destinations the server knows and the browser does not. Empty
+ *  string for a neighbour that does not exist — the last section of a title has
+ *  no next, and the key does nothing rather than navigating to `/app`. */
+const targets = {
+  "previous-section": previous ? appHref(previous.identifier, release) : "",
+  "next-section": next ? appHref(next.identifier, release) : "",
+  "up-level": up ? appHref(up.identifier, release) : "",
+};
 ---
 
-{
-  (previous || next || up) && (
-    <p class="kbd-hint">
-      Keyboard: <kbd>←</kbd>/<kbd>j</kbd> previous · <kbd>→</kbd>/<kbd>k</kbd> next ·{" "}
-      <kbd>u</kbd> up a level
-    </p>
-  )
-}
+{/* `type="application/json"` so the browser does not execute it and the CSP has
+    no opinion about it — the arrangement `CopyColumn` and `CitePreview` both
+    use to hand an inline island server-computed data. */}
+<script type="application/json" data-shortcut-keys set:html={JSON.stringify(keyMap())} />
+<script type="application/json" data-shortcut-targets set:html={JSON.stringify(targets)} />
 
-<script is:inline data-prev={prevHref} data-next={nextHref} data-up={upHref}>
+<script is:inline>
   {
-    const script = document.currentScript;
-    const targets = {
-      ArrowLeft: script.dataset.prev,
-      j: script.dataset.prev,
-      ArrowRight: script.dataset.next,
-      k: script.dataset.next,
-      u: script.dataset.up,
-    };
+    const read = (selector) =>
+      JSON.parse(document.querySelector(selector)?.textContent || "{}");
+    const keys = read("[data-shortcut-keys]");
+    const targets = read("[data-shortcut-targets]");
+    const dialog = document.getElementById("shortcuts");
+
+    function goTo(el) {
+      if (!el) return false;
+      el.scrollIntoView({ block: "start", behavior: "smooth" });
+      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+      el.focus({ preventScroll: true });
+      return true;
+    }
+
+    /** Top-level provisions, in document order. See the docstring above. */
+    function provisions() {
+      const found = [];
+      for (const link of document.querySelectorAll('.contents__link[href^="#/"]')) {
+        const el = document.getElementById(link.getAttribute("href").slice(1));
+        if (el) found.push(el);
+      }
+      return found;
+    }
+
+    function step(direction) {
+      const list = provisions();
+      if (list.length === 0) return false;
+      let current = -1;
+      list.forEach((el, index) => {
+        const line = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+        if (el.getBoundingClientRect().top <= line + 2) current = index;
+      });
+      // -1 when the reader is above the first provision, which is where `]`
+      // should reach it: `list[-1 + 1]`.
+      return goTo(list[current + direction]);
+    }
+
+    function openHelp() {
+      if (!dialog || dialog.open) return;
+      dialog.showModal();
+    }
+
+    function run(action) {
+      const href = targets[action];
+      if (href) {
+        window.location.assign(href);
+        return true;
+      }
+      switch (action) {
+        case "top":
+          return goTo(document.getElementById("main"));
+        case "contents":
+          return goTo(document.querySelector(".contents__link"));
+        case "source":
+          return goTo(document.getElementById("section-source"));
+        case "notes":
+          return goTo(document.getElementById("section-notes"));
+        case "previous-provision":
+          return step(-1);
+        case "next-provision":
+          return step(1);
+        case "search": {
+          const input = document.getElementById("site-q");
+          if (!input) return false;
+          input.focus();
+          input.select?.();
+          return true;
+        }
+        case "help":
+          openHelp();
+          return true;
+        default:
+          // A neighbour this page does not have, or `Escape`, which the dialog
+          // and the hover card handle themselves.
+          return false;
+      }
+    }
 
     document.addEventListener("keydown", (event) => {
-      // No modifier traps: leave Cmd/Ctrl/Alt/Shift combinations alone
-      // (browser back-forward, tab switching, text selection) and never
-      // hijack a key typed into a form control.
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.shiftKey && event.key !== "?") return;
       const el = event.target;
       if (
         el &&
@@ -59,9 +190,39 @@ const upHref = up ? appHref(up.identifier, release) : "";
       ) {
         return;
       }
+      if (dialog?.open) return;
 
-      const href = targets[event.key];
-      if (href) window.location.assign(href);
+      const action = keys[event.key];
+      // Only once something actually happened: a key that found nothing to do
+      // should still do whatever the browser was going to do with it.
+      if (action && run(action)) event.preventDefault();
+    });
+
+    // The footer's link goes to the guide chapter without this and opens the
+    // dialog with it — the `data-newtab` shape from `Base.astro`.
+    for (const opener of document.querySelectorAll("[data-shortcuts-open]")) {
+      opener.addEventListener("click", (event) => {
+        if (!dialog) return;
+        event.preventDefault();
+        openHelp();
+      });
+    }
+
+    dialog
+      ?.querySelector("[data-shortcuts-close]")
+      ?.addEventListener("click", () => dialog.close());
+
+    // A modal dialog's backdrop fills the viewport, so a click on it is
+    // reported against the dialog with coordinates outside its box.
+    dialog?.addEventListener("click", (event) => {
+      if (event.target !== dialog) return;
+      const box = dialog.getBoundingClientRect();
+      const inside =
+        event.clientX >= box.left &&
+        event.clientX <= box.right &&
+        event.clientY >= box.top &&
+        event.clientY <= box.bottom;
+      if (!inside) dialog.close();
     });
   }
 </script>

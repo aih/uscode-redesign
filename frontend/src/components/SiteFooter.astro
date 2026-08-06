@@ -30,6 +30,21 @@ import { APP, syntaxHref } from "../lib/url";
           <li><a class="usa-footer__primary-link" href={`${APP}/releases`}>Release points</a></li>
           <li><a class="usa-footer__primary-link" href={`${APP}/guide`}>User guide</a></li>
           <li><a class="usa-footer__primary-link" href={syntaxHref()}>Search guide</a></li>
+          {/* An `<a>` and not a `<button>`, deliberately. Without the island it
+              goes to the chapter that lists the same shortcuts in prose; with
+              it, `KeyboardNav` intercepts the click and opens the dialog. A
+              button would be a control that does nothing when the script has
+              not run, and the destination behind it is a real page. The same
+              progressive-enhancement shape `data-newtab` uses in `Base`. */}
+          <li>
+            <a
+              class="usa-footer__primary-link"
+              href={`${APP}/guide/02-reading#keyboard-shortcuts`}
+              data-shortcuts-open
+            >
+              Keyboard shortcuts
+            </a>
+          </li>
           <li><a class="usa-footer__primary-link" href={`${APP}/docs`}>API documentation</a></li>
           <li><a class="usa-footer__primary-link" href={`${APP}/design`}>Design system</a></li>
           <li><a class="usa-footer__primary-link" href={`${APP}/about`}>About</a></li>

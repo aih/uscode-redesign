@@ -209,6 +209,10 @@
       "name": "compact reading density in force (ADR-0054)"
     },
     {
+      "id": "shortcuts-open",
+      "name": "the keyboard shortcut list open as a modal dialog (ADR-0055)"
+    },
+    {
       "id": "diff-source-expanded",
       "name": "redline with the source-XML details open (ADR-0026)"
     },

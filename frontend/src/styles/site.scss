@@ -2565,22 +2565,127 @@ main[id] {
   }
 }
 
-/* --------------------------------------------------------------- keyboard nav */
+/* --------------------------------------------------------------- keyboard nav
+ *
+ * `ShortcutsDialog.astro`. A modal `<dialog>`, so the top layer, the backdrop,
+ * the focus trap and `Escape` are the element's rather than this stylesheet's.
+ *
+ * The `<dialog>` selector carries the box because a closed dialog is
+ * `display: none` by the UA stylesheet and nothing here should undo that; the
+ * `.shortcuts` class carries everything a panel and a dialog share, so the
+ * specimen on `/app/design` looks like the thing it is a specimen of. */
 
-/* The one island in the reader (Day 4): a footer hint plus a keydown listener,
- * both driven by the same three hrefs the nav strip already rendered. */
-.kbd-hint {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-top: 0.5rem;
+.shortcuts {
+  max-width: 34rem;
+  width: calc(100vw - 2rem);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.9rem;
 }
 
-.kbd-hint kbd {
+dialog.shortcuts {
+  /* Centred by the UA's own `inset: 0; margin: auto` for a modal dialog; only
+   * the shadow is worth adding, and it is the hover card's. */
+  box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 18%);
+}
+
+.shortcuts::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.shortcuts--panel {
+  width: auto;
+  max-height: none;
+}
+
+.shortcuts__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.shortcuts__heading {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.shortcuts__close {
+  flex: none;
+}
+
+.shortcuts__group {
+  margin-top: 1rem;
+}
+
+.shortcuts__groupname {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Which page a group applies to, said on the group rather than in a sentence
+ * under the list — a reader scanning for a key reads the rows, not the prose. */
+.shortcuts__scope {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.shortcuts__list {
+  margin: 0;
+}
+
+/* A `<dl>` of key-to-meaning, laid out as rows. The `<div>` between the list
+ * and its `<dt>`/`<dd>` pairs is the one wrapper HTML allows there, and is what
+ * lets a row stay a row at every width. */
+.shortcuts__row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+  padding: 0.15rem 0;
+}
+
+.shortcuts__keys {
+  margin: 0;
+}
+
+.shortcuts__what {
+  margin: 0;
+}
+
+.shortcuts__or {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+.shortcuts kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
   border: 1px solid var(--rule);
   border-radius: 0.2rem;
   padding: 0.05rem 0.35rem;
   background: var(--panel);
+}
+
+.shortcuts__note {
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 /* ------------------------------------------------------- the citation preview */
@@ -4468,7 +4573,8 @@ main[id] {
   .rail,
   .copycol,
   .copybtn,
-  .kbd-hint,
+  .contents,
+  .shortcuts,
   .picker,
   .neighbors,
   .theme-toggle,
