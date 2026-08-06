@@ -49,6 +49,19 @@ steps:
 
 ## Searching the text
 
+Each result is headed by its citation — `16 U.S.C. § 3831`, not `§ 3831` — followed by the heading,
+with the words that matched marked. A chapter or subchapter heading is headed `Title 16, CHAPTER 1`
+instead. Under it are the identifier, the status if the provision has one, the release point this
+exact text first appeared at, and a link to any earlier versions that also matched.
+
+```scenario
+id: search-result-citation
+title: A result names the title it is in
+steps:
+  - goto: /app/search?q=conservation
+  - expect: { selector: ".searchresult__cite", contains: "U.S.C." }
+```
+
 The search **matches the words you typed** without applying fuzzy matching or stemming by default.
 
 If you want more flexibility, use search operators: `conservtion~1` allows one character change. The other operators — `"exact phrase"`,

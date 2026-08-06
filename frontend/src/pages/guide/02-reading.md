@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58]
 ---
 
 ## The address of a provision
@@ -59,6 +59,28 @@ From a script, the same address answers with JSON — `curl -L` follows the redi
 [The API](/app/guide/08-api).
 
 ## Site navigation
+
+**The site menus.** The links to the rest of the site — Titles, Release points, the user guide, the
+API reference — are a row at the top of every page and a row at the foot of it. On a window narrower
+than 1024 pixels both rows collapse: the top one behind a **Menu** button beside the search box, the
+bottom one behind **Site links**. The disclaimer under the footer menu stays on screen either way.
+
+The header menu opens over the page rather than pushing it down, so the text stays where it was.
+Press the button again to close it.
+
+```scenario
+id: site-menu-mobile
+title: Reach the site menu on a narrow screen
+needs:
+  viewport: mobile
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: On a phone the site links are behind one button, not three rows of them.
+  - click: .navmenu__summary
+    caption: Menu opens them over the page.
+  - expect: { selector: '.usa-nav__primary a[href="/app/releases"]', visible: true }
+    caption: The same destinations the top of a wide window shows in a row.
+```
 
 **The breadcrumb** at the top of every page runs from the title down to the provision on screen:
 `Title 16 › CHAPTER 1 › SUBCHAPTER VI › § 45f`. Every level above the current one is a link, and the

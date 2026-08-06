@@ -52,13 +52,19 @@ steps:
 
 ### Summary of changes
 
-The textual changes are shown on the diff page. If there are non-textual metadata changes (e.g. a change in @id or @temporalId, or a change in whitespace), the page says what has been changed.
+The line under the two release points is the result: `No text changes`, or a count —
+`2 lines added`, `3 lines changed, 1 line removed`.
+
+When nothing in the words changed, the paragraph under that line says what the source did to the
+markup while saying the same thing: served the same stored text, changed only the `@id` guids, or
+changed something else that carries no words — whitespace, `@temporalId`, another attribute.
 
 ```scenario
 id: diff-nothing-changed
 title: An unchanged section says which kind of unchanged it is
 steps:
   - goto: /app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101
+  - expect: { selector: ".lede", contains: "No text changes" }
   - expect: { selector: "main", contains: "same stored text" }
 ```
 
