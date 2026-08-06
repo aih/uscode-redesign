@@ -33,6 +33,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
+from api.schemas import ErrorOut
 from params import cookies_are_secure, no_store, rate_limit
 from storage import DuplicateEmailError, SessionRef, UserRef, get_accounts
 from storage.accounts import AccountsRepository
@@ -242,11 +243,25 @@ RequireCsrfDep = Annotated[None, Depends(require_csrf)]
     "/signup",
     response_model=UserOut,
     status_code=201,
+    responses={409: {"model": ErrorOut}, 429: {"model": ErrorOut}},
+    summary="Create an account",
     dependencies=[Depends(_limit_signup)],
 )
 def signup(
     body: SignupIn, request: Request, response: Response, accounts: AccountsDep
 ) -> UserOut:
+    """Register an email address and password, and start a session.
+
+    Sets the session cookie and the CSRF cookie, so a caller is logged in on
+    return. A duplicate email is 409. Rate-limited: ten in a burst, then thirty
+    an hour, because each call costs 64 MiB of argon2 and writes a durable row
+    (ADR-0029).
+
+    There is no email verification and no password reset — accounts are
+    throwaway until email exists (ADR-0019). Accounts are also switched off in
+    the reader (ADR-0034); this route is unaffected by that, being a UI
+    decision.
+    """
     password_hash = _hasher.hash(body.password)
     try:
         user = accounts.create_user(email=body.email, password_hash=password_hash)
@@ -258,10 +273,22 @@ def signup(
     return UserOut.of(user)
 
 
-@auth.post("/login", response_model=UserOut)
+@auth.post(
+    "/login",
+    response_model=UserOut,
+    responses={401: {"model": ErrorOut}, 429: {"model": ErrorOut}},
+    summary="Start a session",
+)
 def login(
     body: LoginIn, request: Request, response: Response, accounts: AccountsDep
 ) -> UserOut:
+    """Exchange an email and password for a session cookie and a CSRF cookie.
+
+    Wrong credentials are 401 and are recorded. Throttled by failure count
+    rather than by request rate: five failures for one email address, or fifty
+    from one client address, answer 429 with `Retry-After` before the password
+    is looked at (ADR-0019).
+    """
     email = body.email.strip().lower()
     ip = _client_ip(request)
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -303,19 +330,36 @@ def login(
     return UserOut.of(user)
 
 
-@auth.post("/logout", status_code=204)
+@auth.post(
+    "/logout",
+    status_code=204,
+    responses={403: {"model": ErrorOut}},
+    summary="End the current session",
+)
 def logout(
     response: Response,
     accounts: AccountsDep,
     session: CurrentSessionDep,
     _csrf: RequireCsrfDep,
 ) -> Response:
+    """Delete the session server-side and clear both cookies.
+
+    Requires the CSRF header to match the CSRF cookie (ADR-0017). Answers 204
+    whether or not a session was in force, so a caller cannot probe for one.
+    """
     if session is not None:
         accounts.delete_session(session.token_hash)
     _clear_session_cookies(response)
     return Response(status_code=204)
 
 
-@auth.get("/me", response_model=UserOut)
+@auth.get(
+    "/me",
+    response_model=UserOut,
+    responses={401: {"model": ErrorOut}},
+    summary="The account this session belongs to",
+)
 def me(user: RequireUserDep) -> UserOut:
+    """The signed-in user. 401 with no session, which is how the reader tells
+    signed-in from signed-out."""
     return UserOut.of(user)

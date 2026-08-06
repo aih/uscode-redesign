@@ -25,6 +25,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional
 
+from api.schemas import ErrorOut
+
 from params import (
     DateParam,
     ReleaseParam,
@@ -124,6 +126,11 @@ class SearchResponse(BaseModel):
 @router.get(
     "/search",
     response_model=SearchResponse,
+    responses={
+        400: {"model": ErrorOut},
+        429: {"model": ErrorOut},
+        503: {"model": ErrorOut},
+    },
     summary="Search US Code sections and structure",
     dependencies=[Depends(_limit_search)],
 )

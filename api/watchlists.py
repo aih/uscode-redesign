@@ -129,36 +129,64 @@ def _translate_item_error(exc: UnknownTitleError | UnknownReleaseError) -> HTTPE
 # ------------------------------------------------------------ generic CRUD
 
 
-@watchlists.get("", response_model=list[WatchlistSummaryOut])
+@watchlists.get(
+    "",
+    response_model=list[WatchlistSummaryOut],
+    summary="Every watchlist this account owns",
+)
 def list_watchlists(user: RequireUserDep, accounts: AccountsDep) -> list[WatchlistSummaryOut]:
+    """Name and item count per list, newest first. 401 with no session."""
     return [WatchlistSummaryOut.of(w) for w in accounts.list_watchlists(user.id)]
 
 
-@watchlists.post("", response_model=WatchlistSummaryOut, status_code=201)
+@watchlists.post(
+    "",
+    response_model=WatchlistSummaryOut,
+    status_code=201,
+    summary="Create a watchlist",
+)
 def create_watchlist(
     body: WatchlistCreateIn, user: RequireUserDep, accounts: AccountsDep, _csrf: RequireCsrfDep
 ) -> WatchlistSummaryOut:
+    """A named, empty list. Requires the CSRF header (ADR-0017)."""
     return WatchlistSummaryOut.of(accounts.create_watchlist(user_id=user.id, name=body.name))
 
 
-@watchlists.delete("/{watchlist_id}", status_code=204)
+@watchlists.delete(
+    "/{watchlist_id}",
+    status_code=204,
+    summary="Delete a watchlist and everything in it",
+)
 def delete_watchlist(
     watchlist_id: int, user: RequireUserDep, accounts: AccountsDep, _csrf: RequireCsrfDep
 ) -> None:
+    """A list belonging to another account is 404, not 403 — ownership is
+    checked before existence is admitted."""
     _owned_watchlist(watchlist_id, user.id, accounts)
     accounts.delete_watchlist(watchlist_id)
 
 
-@watchlists.get("/{watchlist_id}/items", response_model=WatchlistOut)
+@watchlists.get(
+    "/{watchlist_id}/items",
+    response_model=WatchlistOut,
+    summary="What is on one watchlist",
+)
 def list_items(
     watchlist_id: int, user: RequireUserDep, accounts: AccountsDep, repository: RepositoryDep
 ) -> WatchlistOut:
+    """Each item carries what its provision currently says — num, heading and
+    status — so a section that went repealed since it was added shows it."""
     watchlist = _owned_watchlist(watchlist_id, user.id, accounts)
     items = accounts.list_items(watchlist_id)
     return WatchlistOut.of(watchlist, _enrich(items, repository))
 
 
-@watchlists.post("/{watchlist_id}/items", response_model=WatchlistItemOut, status_code=201)
+@watchlists.post(
+    "/{watchlist_id}/items",
+    response_model=WatchlistItemOut,
+    status_code=201,
+    summary="Watch a provision",
+)
 def add_item(
     watchlist_id: int,
     body: WatchlistItemCreateIn,
@@ -166,10 +194,16 @@ def add_item(
     accounts: AccountsDep,
     _csrf: RequireCsrfDep,
 ) -> WatchlistItemOut:
+    """An identifier, an optional note, and an optional pinned release point.
+    Watching the same identifier twice is 409."""
     return _add_item(watchlist_id, body, user, accounts)
 
 
-@watchlists.patch("/{watchlist_id}/items/{item_id}", response_model=WatchlistItemOut)
+@watchlists.patch(
+    "/{watchlist_id}/items/{item_id}",
+    response_model=WatchlistItemOut,
+    summary="Change an item's note or pinned release point",
+)
 def update_item(
     watchlist_id: int,
     item_id: int,
@@ -189,7 +223,11 @@ def update_item(
     return WatchlistItemOut.of(item)
 
 
-@watchlists.delete("/{watchlist_id}/items/{item_id}", status_code=204)
+@watchlists.delete(
+    "/{watchlist_id}/items/{item_id}",
+    status_code=204,
+    summary="Stop watching a provision",
+)
 def delete_item(
     watchlist_id: int,
     item_id: int,
@@ -229,7 +267,11 @@ def _add_item(
 # --------------------------------------------------- the reader's default list
 
 
-@default_watchlist.get("", response_model=WatchlistOut)
+@default_watchlist.get(
+    "",
+    response_model=WatchlistOut,
+    summary="The default watchlist, created on first use",
+)
 def get_default_watchlist(
     user: RequireUserDep, accounts: AccountsDep, repository: RepositoryDep
 ) -> WatchlistOut:
@@ -239,7 +281,12 @@ def get_default_watchlist(
     return WatchlistOut.of(watchlist, _enrich(items, repository))
 
 
-@default_watchlist.post("/items", response_model=WatchlistItemOut, status_code=201)
+@default_watchlist.post(
+    "/items",
+    response_model=WatchlistItemOut,
+    status_code=201,
+    summary="Watch a provision on the default watchlist",
+)
 def add_to_default_watchlist(
     body: WatchlistItemCreateIn,
     user: RequireUserDep,
@@ -250,7 +297,11 @@ def add_to_default_watchlist(
     return _add_item(watchlist.id, body, user, accounts)
 
 
-@default_watchlist.delete("/items/{item_id}", status_code=204)
+@default_watchlist.delete(
+    "/items/{item_id}",
+    status_code=204,
+    summary="Stop watching a provision on the default watchlist",
+)
 def remove_from_default_watchlist(
     item_id: int, user: RequireUserDep, accounts: AccountsDep, _csrf: RequireCsrfDep
 ) -> None:

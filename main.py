@@ -59,6 +59,25 @@ Release points are named for the last public law they incorporate, and `not` in 
 label means a law that was *skipped*: at `119-102not101` the text is current
 through 07/12/2026 **except** for Public Law 119-101. Responses carry that caveat
 rather than only a date.
+
+**Rate limits.** Five routes are throttled per client (ADR-0029). Each is a token
+bucket: a burst up to the capacity, refilled at the sustained rate. Over budget,
+the response is **429** with a `Retry-After` header in seconds.
+
+* `GET /api/v1/search` — burst 120, then 10 a second.
+* `GET /api/v1/citation` — burst 120, then 10 a second.
+* `GET /api/v1/labels` — burst 300, then 30 a second.
+* `GET /api/v1/sections/{identifier}/diff` — burst 5, then 1 every 5 seconds.
+* `POST /api/v1/auth/signup` — burst 10, then 30 an hour.
+
+`POST /api/v1/auth/login` is throttled by failure count rather than by request
+rate: 5 failures for one email address, or 50 from one client address, and further
+attempts answer 429 (ADR-0019).
+
+**`HEAD` is not routed.** Every route here is registered for its own method alone,
+so a `HEAD` request answers **405**.
+
+**`/api/v1` is the only version.** A breaking change would land at `/api/v2`.
 """
 
 
@@ -92,8 +111,11 @@ from api.search import router as search_router
 app.include_router(search_router)
 
 
-@app.get("/health", tags=["ops"])
+@app.get("/health", tags=["ops"], summary="Liveness check")
 def health() -> dict[str, str]:
+    """`{"status": "ok"}` if the process is up. It touches no database and no
+    search cluster, so it says nothing about whether either is reachable — for
+    that, ask `/api/v1/status`."""
     return {"status": "ok"}
 
 

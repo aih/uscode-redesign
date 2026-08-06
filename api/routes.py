@@ -329,8 +329,9 @@ def labels(
     identifier: Annotated[
         list[str],
         Query(
-            description="Repeat once per identifier. Unknown ones are absent from "
-            "the answer rather than an error.",
+            description="Repeat once per identifier, up to 100 per request; more "
+            "than that is a 422. Unknown identifiers are absent from the answer "
+            "rather than an error.",
             examples=[["/us/usc/t16/s45f", "/us/usc/t16/s1"]],
             # The list fans into one `IN (...)`, so an unbounded one is an
             # unbounded query (ADR-0029).
@@ -354,7 +355,8 @@ def labels(
 
     A section's text can carry forty cross references, and a reader that labels
     them — hover text, so a citation is legible without following it — has to ask
-    once, not forty times.
+    once, not forty times. **At most 100 identifiers per request**; a caller with
+    more asks more than once.
     """
     paths = [normalize_identifier(one) for one in identifier]
     resolved = resolve_release_or_404(
