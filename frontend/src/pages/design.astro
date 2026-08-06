@@ -458,9 +458,12 @@ const TYPE_ROLES = [
 
   <p>
     One token, <code>--measure</code>, sets the width of the reading column and of the chrome
-    that spans it. The block below is that width. Characters per rendered line are counted by
+    that spans it. It is a multiple of <code>--reading-size</code> rather than a fixed width, so
+    the column narrows with the text and the line holds the same number of characters at either
+    reading density. The block below is the reading column, bounded. Characters per rendered line are counted by
     <code>make measure</code> into <code>docs/verification/measure.json</code> rather than
-    estimated from a glyph width.
+    estimated from a glyph width: a median of 67, and 62 to 71 across the tenth and ninetieth
+    percentiles, in both densities.
   </p>
 
   <div class="spec">
@@ -728,9 +731,10 @@ const TYPE_ROLES = [
     The <strong>subsection ladder</strong> — (a), (1), (A), (i), (I) — is one step of
     <code>--indent-step</code> per level, cumulative through the nesting, with the number
     hanging into the step so that the numbers at one depth line up with the text at the depth
-    above. The step is <code>3ch</code> of the reading face, <code>2ch</code> below 40em; a
+    above. The step is <code>1.5em</code> of the reading text, <code>1em</code> below 40em; a
     designator wider than the step pushes the words beside it along that line rather than
-    wrapping them under itself. The ladder goes seven deep in the corpus and 91.8% of sections
+    wrapping them under itself. The source writes its own indentation on the same elements and
+    it is overridden here, so that one scale answers the question. The ladder goes seven deep in the corpus and 91.8% of sections
     stop at three (<code>docs/verification/ladder.json</code>, from
     <code>scripts/ladder.py</code>).
   </p>

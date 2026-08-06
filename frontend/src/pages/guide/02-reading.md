@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54]
 ---
 
 ## The address of a provision
@@ -175,17 +175,71 @@ rather than showing a bare 404.
 
 ## How the text is set
 
-Statutory text is set in Spectral, a serif. Everything about the text — navigation, breadcrumbs,
-badges, the release picker, search — is set in Archivo, a sans serif. Identifiers, guids and API
-examples use whatever fixed-width face your system provides.
+Statutory text is set in Spectral, a serif. Everything written *about* the text — navigation,
+breadcrumbs, badges, the release picker, search, and the editorial notes and source credit under a
+section — is set in Archivo, a sans serif. Identifiers, guids and API examples use whatever
+fixed-width face your system provides.
 
 Both faces are served from this site. No font is fetched from Google Fonts or any other host, so
 the page renders its type without a request to a third party.
 
-The reading column is 42rem wide, which holds a median of 68 characters per line — 62 to 73 across
-the tenth and ninetieth percentiles, counted from where the browser broke the lines
-(`docs/verification/measure.json`). On a screen narrower than that the column is as wide as the
-screen; at 375 CSS px it holds 38 characters.
+The reading column holds a median of 67 characters per line — 62 to 71 across the tenth and
+ninetieth percentiles, counted from where the browser broke the lines
+(`docs/verification/measure.json`). On a screen narrower than the column, the column is as wide as
+the screen; at 375 CSS px it holds 38 characters. The text is never justified and is never
+hyphenated automatically.
+
+### The subsection ladder
+
+Each level of a provision — (a), then (1), then (A), then (i), then (I) — is indented one step
+further than the level containing it, and its number hangs out to the left of the text, so the
+numbers at one depth line up with the text at the depth above. The step is about three characters
+wide, and two below 40em, where the screen has less to spend. A long number such as `(xxviii)`
+pushes the words beside it along that line rather than wrapping them underneath itself.
+
+A level with no heading runs in behind its number — "(1) There is authorized to be
+appropriated…" — the way the printed Code sets it. A level with a heading keeps the heading beside
+the number and starts its text on the next line.
+
+The deepest provision in the Code is seven levels down. 91.8% of sections stop at three
+(`docs/verification/ladder.json`).
+
+### Five kinds of text in one column
+
+| | How it is set |
+|---|---|
+| Operative text | Spectral, the reading face |
+| Quoted amending text | Spectral, on a tinted panel labelled **Quoted** |
+| Editorial notes | Archivo, behind a pale left rule |
+| Source credit | Archivo, under a rule at the foot of the section |
+| Tables | Archivo, with figures aligned in columns |
+
+Quoted amending text is words an act is moving around rather than words in force. Most of it sits
+inside an editorial note describing the amendment that made it. It keeps the reading face, because
+it is statutory text, and takes the panel and the label so that it is not read as the note's own
+prose.
+
+A table wider than the column scrolls inside its own box rather than pushing the page sideways.
+The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll it.
+
+## Printing
+
+Printing a section gives you the document. The navigation, the search box, the copy column, the
+chapter rail, the release picker and the footer are all left off the page. The notes and the source
+credit are printed open whatever state they were in on screen. The page is black on white whether
+or not you were reading in night mode.
+
+Every printed sheet carries a running header with the citation, the release point, and the address
+the page was printed from — so a page that has left your printer still says which provision it is
+and as of when.
+
+Every cross reference prints its URL after the words it sits on, in angle brackets. The printed URL
+is the citation URL, carrying the release point, so following it later lands on the same text you
+printed.
+
+**Limitations.** Notes print open only in browsers that support the `::details-content` selector;
+in others they print in whatever state you left them, which is closed unless you opened them. A
+provision longer than a page is broken across pages wherever it falls.
 
 Colour carries three meanings and no others. Green marks an insertion and the release currently in
 force. Red marks a deletion, a repeal and an error. Amber marks the provision you asked for. Every

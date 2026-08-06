@@ -13,6 +13,12 @@
  * Counts where the browser broke the lines rather than dividing the column
  * width by an average glyph, so the number is the text the reader is looking at.
  * Writes docs/verification/measure.json.
+ *
+ * Both reading densities, since ADR-0054 (`--measure` is a multiple of
+ * `--reading-size`, so the *claim* is that the character count does not move
+ * when the density does — and a claim measured in one setting only is not
+ * measured). Exits non-zero if a median falls outside 62-70 at a width where
+ * the column is at its maximum, so this is a check as well as a generator.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
@@ -22,6 +28,31 @@ const OUT = new URL("../../docs/verification/", import.meta.url);
 
 /** Widths that put the reading column at, below and well above its maximum. */
 const WIDTHS = [375, 768, 1280];
+
+/** The two settings of the reading-density control (ADR-0054). `null` is the
+ * default — no attribute on `<html>` at all, which is what a reader who has
+ * never touched the control gets. */
+const DENSITIES = [null, "compact"];
+
+/** The band ADR-0052 holds the median in. Only checked where the column is at
+ * its maximum: below that the viewport is the measure and 38 characters is the
+ * screen's fault, not the token's. */
+const BAND = { low: 62, high: 70 };
+const FULL_WIDTH = 768;
+
+/** Stamp the density on `<html>` before the page's own scripts run, the way the
+ * pre-paint bootstrap in `Base.astro` does — so the page is laid out at this
+ * density from the first paint and nothing here is measuring a reflow. */
+async function withDensity(context, density) {
+  await context.addInitScript((value) => {
+    try {
+      if (value) localStorage.setItem("usc-density", value);
+      else localStorage.removeItem("usc-density");
+    } catch {
+      // No storage in this context; the default stands and the run says so.
+    }
+  }, density);
+}
 
 /** A long, ordinary provision — prose rather than a list of short paragraphs. */
 const PAGE = "/app/us/usc/t16/s45f";
@@ -101,49 +132,55 @@ const browser = await chromium.launch();
 const results = [];
 const heights = [];
 
-for (const path of HEIGHTS) {
-  for (const width of [375, 1280]) {
+for (const density of DENSITIES) {
+  for (const path of HEIGHTS) {
+    for (const width of [375, 1280]) {
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      await withDensity(context, density);
+      const page = await context.newPage();
+      await page.goto(`${SITE}${path}`, { waitUntil: "networkidle" });
+      await page.evaluate(() => document.fonts.ready);
+      heights.push({
+        page: path,
+        density: density ?? "comfortable",
+        viewport: width,
+        scrollHeightPx: await page.evaluate(() => document.documentElement.scrollHeight),
+      });
+      await context.close();
+    }
+  }
+
+  for (const width of WIDTHS) {
     const context = await browser.newContext({ viewport: { width, height: 900 } });
+    await withDensity(context, density);
     const page = await context.newPage();
-    await page.goto(`${SITE}${path}`, { waitUntil: "networkidle" });
+    await page.goto(`${SITE}${PAGE}`, { waitUntil: "networkidle" });
     await page.evaluate(() => document.fonts.ready);
-    heights.push({
-      page: path,
+
+    const column = await page.evaluate(() => {
+      const body = document.querySelector(".section-body");
+      if (!body) return null;
+      const style = getComputedStyle(body);
+      return {
+        widthPx: Math.round(body.getBoundingClientRect().width),
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        lineHeight: style.lineHeight,
+      };
+    });
+
+    results.push({
       viewport: width,
-      scrollHeightPx: await page.evaluate(() => document.documentElement.scrollHeight),
+      density: density ?? "comfortable",
+      page: PAGE,
+      columnWidthPx: column?.widthPx ?? null,
+      fontFamily: column?.fontFamily ?? null,
+      fontSize: column?.fontSize ?? null,
+      lineHeight: column?.lineHeight ?? null,
+      characters: summarise(await lineLengths(page)),
     });
     await context.close();
   }
-}
-
-for (const width of WIDTHS) {
-  const context = await browser.newContext({ viewport: { width, height: 900 } });
-  const page = await context.newPage();
-  await page.goto(`${SITE}${PAGE}`, { waitUntil: "networkidle" });
-  await page.evaluate(() => document.fonts.ready);
-
-  const columnWidth = await page.evaluate(() => {
-    const body = document.querySelector(".section-body");
-    return body ? Math.round(body.getBoundingClientRect().width) : null;
-  });
-  const family = await page.evaluate(() => {
-    const el = document.querySelector(".section-body");
-    return el ? getComputedStyle(el).fontFamily : null;
-  });
-  const size = await page.evaluate(() => {
-    const el = document.querySelector(".section-body");
-    return el ? getComputedStyle(el).fontSize : null;
-  });
-
-  results.push({
-    viewport: width,
-    page: PAGE,
-    columnWidthPx: columnWidth,
-    fontFamily: family,
-    fontSize: size,
-    characters: summarise(await lineLengths(page)),
-  });
-  await context.close();
 }
 
 await browser.close();
@@ -158,8 +195,11 @@ await writeFile(
         "Range.getClientRects() rather than estimated from a glyph width. Final lines of a " +
         "paragraph are excluded: they end where the sentence ends, not where the column does. " +
         "ADR-0052 holds the median between 62 and 70 at the widths where the column is at its " +
-        "maximum. documentHeights is the scroll length of three sections at two widths, which " +
-        "is what a narrower measure costs.",
+        "maximum, and this script exits non-zero when one falls outside it. Both reading " +
+        "densities are measured (ADR-0054): --measure is a multiple of --reading-size, so the " +
+        "character count is supposed to be the same in either, and that is the claim these two " +
+        "sets of rows check. documentHeights is the scroll length of three sections at two " +
+        "widths, which is what a narrower measure and a tighter leading cost.",
       site: SITE,
       results,
       documentHeights: heights,
@@ -169,10 +209,21 @@ await writeFile(
   )}\n`,
 );
 
+let failed = 0;
 for (const result of results) {
   const c = result.characters;
+  const checked = result.viewport >= FULL_WIDTH;
+  const inBand = c.median >= BAND.low && c.median <= BAND.high;
+  if (checked && !inBand) failed += 1;
   console.log(
-    `${String(result.viewport).padStart(4)}px  column ${String(result.columnWidthPx).padStart(4)}px  ` +
-      `${c.lines} lines  median ${c.median}  p10-p90 ${c.p10}-${c.p90}`,
+    `${result.density.padEnd(11)} ${String(result.viewport).padStart(4)}px  ` +
+      `column ${String(result.columnWidthPx).padStart(4)}px  ${c.lines} lines  ` +
+      `median ${c.median}  p10-p90 ${c.p10}-${c.p90}` +
+      (checked ? (inBand ? "  ok" : `  OUTSIDE ${BAND.low}-${BAND.high}`) : "  (viewport-bound)"),
   );
+}
+
+if (failed) {
+  console.error(`\n${failed} measurement(s) outside ${BAND.low}-${BAND.high} characters.`);
+  process.exit(1);
 }

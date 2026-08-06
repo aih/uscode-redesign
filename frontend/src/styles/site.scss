@@ -269,25 +269,30 @@
   /* One step of the (a)/(1)/(A)/(i) ladder. Every level of a provision is one
    * of these deeper than its parent, and the number hangs into it.
    *
-   * In `ch` rather than `rem`, and the unit is the point: `ch` is the width of
-   * a `0` in the font of the element using it, which here is Spectral at
-   * `--reading-size`. So the step is stated in the same currency as the numbers
-   * it has to hold, and it tracks the density control for free.
+   * In `em` rather than `rem`, so it is a multiple of the text it indents and
+   * tracks the density control without being restated.
+   *
+   * `em` rather than `ch`, and the difference is not cosmetic: `ch` is the
+   * width of a `0` in the font *of the element using it*, and `.uslm-num` is
+   * bold. The step was 3ch, and 3ch of Spectral Bold is 3px wider than 3ch of
+   * Spectral — so the number's negative margin overshot its parent's padding
+   * and every designator on the page hung 3px into the column above it. `em`
+   * is font-*size* relative, and weight does not change font size.
    *
    * Measured against Spectral at 16.8px (`scripts/ladder.py` for the
-   * designators, the browser for the widths): `(a)` is 1.98ch, `(1)` 2.00ch,
-   * `(A)` 2.42ch, `(i)` 1.60ch, `(viii)` 3.79ch, `(xxviii)` 5.77ch. Three
+   * designators, the browser for their widths): `(a)` is 0.99em, `(1)` 1.00em,
+   * `(A)` 1.21em, `(i)` 0.80em, `(viii)` 1.90em, `(xxviii)` 2.89em. Three
    * characters is the median designator at every depth and eight is the widest
-   * in the samples. 3ch clears every single-character designator with a gap;
+   * in the samples. 1.5em clears every single-character designator with a gap;
    * the romans overhang, which pushes the text beside them and never wraps it
    * underneath.
    *
-   * 2ch below 40em is the degradation the small screen asks for. The ladder
+   * 1em below 40em is the degradation the small screen asks for. The ladder
    * goes seven deep — `/us/usc/t16/s1391`, and 11 of 11,512 sections reach it
    * (`docs/verification/ladder.json`) — so at 320 CSS px the deepest clause
    * spends 118px of a 288px column and keeps about 20 characters a line.
    * 91.8% of sections stop at depth 3, which costs 50px and keeps 28. */
-  --indent-step: 2ch;
+  --indent-step: 1em;
 
   /* How much of the viewport the sticky stack occupies. Not decoration: this
    * feeds `scroll-margin-top`, so every value here is a promise that an anchor
@@ -324,14 +329,21 @@
    * five consumers, so `<main>` and the sticky chrome above it cannot disagree
    * about how wide the page is.
    *
-   * Written as a multiple of the reading size rather than as `42rem`, because
-   * the thing being held constant is the character count and not the width.
-   * 40 × 1.05rem is 42rem to the pixel — the same column as before — and it
-   * stays the same *measure* when the density control changes the size under
-   * it, which a fixed 42rem would not: a smaller face in an unchanged column is
-   * more characters a line, straight out of the 62–70 the brand asks for.
-   * `make measure` counts both densities and holds the median in that band. */
-  --measure: calc(40 * var(--reading-size));
+   * Written as a multiple of the reading size rather than as a fixed `rem`,
+   * because the thing being held constant is the character count and not the
+   * width. It stays the same *measure* when the density control changes the
+   * size under it, which a fixed width would not: a smaller face in an
+   * unchanged column is more characters a line, straight out of the 62–70 the
+   * brand asks for. `make measure` counts both densities, holds the median in
+   * that band, and exits non-zero when it is not.
+   *
+   * 38, where ADR-0052's 42rem would be 40. The multiplier came down because
+   * the ladder moved the column it applies to: subsections used to inherit the
+   * source's own `indent2` — two steps of a 1.6rem token, 50px — and every
+   * paragraph under one another 25 on top, so the text was being measured
+   * inside a column much narrower than `--measure`. One scale is a tighter
+   * ladder, and at 40 the median went to 72. Measured, not adjusted by eye. */
+  --measure: calc(38 * var(--reading-size));
   --measure-wide: var(--measure);
 
   /* Statutory text. The interface is set in Archivo; this is the other half of
@@ -387,7 +399,7 @@
 
 @media (min-width: 40em) {
   :root {
-    --indent-step: 3ch;
+    --indent-step: 1.5em;
     /* Navbar + search box + contextual bar + section bar, all sticky from here
      * up. The nav is still the forced-open wrapping row until 64em (see below)
      * and the search box sits under it, so this band is the tallest the stack
@@ -428,8 +440,17 @@
 @media (min-width: 64em) {
   :root {
     --sticky-h: 19rem;
-    /* 40rem of prose, 16rem of rail, a 2rem gap and 2rem of page padding. */
-    --measure-wide: 60rem;
+    /* The reading measure, plus what a second column costs: 16rem of rail and
+     * a 2rem gap. The page padding is inside `--measure` already, so the prose
+     * track here comes out at exactly the width it has on a page with no rail.
+     *
+     * `calc(var(--measure) + 18rem)` rather than the `60rem` this used to be,
+     * and the difference only shows under the density control (ADR-0054): a
+     * fixed 60rem holds the prose track at 640px while compact narrows the
+     * text inside it, which is more characters a line — the one thing
+     * `--measure` exists to hold. At the default size the two are the same
+     * 960px. */
+    --measure-wide: calc(var(--measure) + 18rem);
   }
 }
 
@@ -2223,6 +2244,25 @@ main[id] {
  */
 .section-body .prov {
   padding-left: var(--indent-step);
+
+  /* The source's own indent classes answer the same question, and on a level
+   * element the ladder has already answered it. `<subsection class="indent2
+   * firstIndent-2">` is OLRC's rendering of the printed edition's leading; the
+   * nesting is the structure. Left to compose, the two stack: § 45f's
+   * subsections started 78px in rather than 0, its paragraphs 129px, and two
+   * sibling paragraphs at the same depth sat 25px apart because the source
+   * happened to write `indent1` on one and `indent0` on the other.
+   *
+   * So one scale means one of them, and the structural one is the one that is
+   * always right. `firstIndent-N` goes with it: that is the source describing
+   * a hanging first line, which is what the `<num>` below already is, and
+   * keeping both hangs the number twice.
+   *
+   * `.section-body .prov` outranks the single-class `.indentN` rules further
+   * down, which still apply everywhere a level does not reach — inside notes
+   * and tables, where the source's scale is the only one there is. */
+  margin-left: 0;
+  text-indent: 0;
 }
 
 /* The hanging number. Pulled back by exactly the step its parent added, so it
@@ -2570,8 +2610,11 @@ main[id] {
 
 .diff-view {
   font-family: var(--reading);
-  font-size: 1.02rem;
-  line-height: 1.7;
+  /* Statutory text, so it takes the reading tokens and follows the density
+   * control with everything else set in the law's own face (ADR-0054). It was
+   * 1.02rem/1.7, a third pair of numbers for the same job. */
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
   white-space: pre-wrap;
   margin-top: 1.5rem;
 }
@@ -3945,24 +3988,28 @@ main[id] {
 }
 
 /* The two faces, named rather than shown in a role — this is the only place on
- * the site where the typeface is the subject rather than the vehicle. */
+ * the site where the typeface is the subject rather than the vehicle.
+ *
+ * The reading tokens rather than the numbers they hold: a specimen that states
+ * its own size is a specimen of nothing, and it would go on showing 1.05rem
+ * after the density control moved the text it is a specimen of (ADR-0054). */
 .spec__spectral {
   font-family: var(--reading);
-  font-size: 1.05rem;
-  line-height: 1.6;
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
 }
 
 .spec__archivo {
-  font-size: 1.05rem;
-  line-height: 1.6;
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
 }
 
 /* The measure, made visible: the column the reading text is set in, with its
  * edge drawn so the width is a thing on screen rather than a number. */
 .spec__measure {
   font-family: var(--reading);
-  font-size: 1.05rem;
-  line-height: 1.6;
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
   max-width: var(--measure);
   border-left: 2px solid var(--edge);
   border-right: 2px solid var(--edge);
