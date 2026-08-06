@@ -34,13 +34,13 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 | `/app/releases` | `releases.astro` | Every release point, its currency date, and when the source was last checked (ADR-0036) | `SiteHeader:46`, `SiteFooter:30`, `about.astro:70`, `search/syntax.astro:219`, `AccountsOff:37` | a title at a chosen release point | header, footer |
 | `/app/goto` | `goto.astro` | The one search box's target: routes a citation to its provision, anything else to `/app/search` | `SiteSearch:57` (form action), `search.astro:102,158`, `search/syntax.astro:91,288`, its own examples | the provision, or `/app/search` | header, footer, prefilled box |
 | `/app/search` | `search.astro` | Keyword results (ADR-0028), strict by default (ADR-0031) | `goto.astro:45,58,123`, `search/syntax.astro` examples, its own pager | a section per result, `/app/search/syntax`, `/app/goto` | header, footer, prefilled box |
-| `/app/search/syntax` | `search/syntax.astro` | The operators the search box accepts, each with a live example | `SiteFooter:32`, `SiteSearch:98`, `about.astro:84`, `search.astro:126,155`, `AccountsOff:42` | a worked search for every operator, `/app/goto`, `/app/releases` | header, footer |
+| `/app/search/syntax` | `search/syntax.astro` | The operators the search box accepts, each with a live example | `SiteFooter:47`, `SiteSearch:98`, `about.astro:84`, `search.astro:126,155`, `AccountsOff:42` | a worked search for every operator, `/app/goto`, `/app/releases` | header, footer |
 | `/app/guide` | `guide/index.astro` | Contents of the user guide (ADR-0038) | `SiteHeader:55`, `SiteFooter:31`, `index.astro:38`, `demo.astro:50,56`, `GuideLayout:45,77` | any chapter | header, footer |
-| `/app/guide/<chapter>` | `guide/*.md` | One chapter, nine of them | `guide/index.astro`, the pager in `GuideLayout` | the next and previous chapter, the routes it documents | header, footer, wide |
+| `/app/guide/<chapter>` | `guide/*.md` | One chapter, nine of them | `guide/index.astro`, the pager in `GuideLayout`, `SiteFooter:42` (Keyboard shortcuts, to chapter 02 — intercepted by `KeyboardNav` into the dialog when the island has run) | the next and previous chapter, the routes it documents | header, footer, wide |
 | `/app/demo` | `demo.astro` | The captioned demo video, recorded from the guide's scenarios | `index.astro:37` | `/app/guide` | header, footer |
-| `/app/design` | `design.astro` | The design system: every component the reader is built from, with specimen data, and the contrast of every declared colour pair computed in the browser (ADR-0053) | `SiteFooter:34` | nothing — every link on it is a specimen under title 0, which OLRC does not publish | header, footer |
-| `/app/about` | `about.astro` | What this site is, and what it is not | `SiteHeader:70`, `SiteFooter:35,52` | `/app/releases`, `/app/docs`, `/app/search/syntax`, OLRC, the repository | header, footer |
-| `/app/docs` | `docs.astro` | The OpenAPI schema in this site's chrome, rather than the bare Swagger page | `SiteHeader:62`, `SiteFooter:33`, `about.astro:77`, `AccountsOff:47` | `/docs`, `/redoc`, `/openapi.json` | header, footer |
+| `/app/design` | `design.astro` | The design system: every component the reader is built from, with specimen data, and the contrast of every declared colour pair computed in the browser (ADR-0053) | `SiteFooter:49` | nothing — every link on it is a specimen under title 0, which OLRC does not publish | header, footer |
+| `/app/about` | `about.astro` | What this site is, and what it is not | `SiteHeader:70`, `SiteFooter:50,67` | `/app/releases`, `/app/docs`, `/app/search/syntax`, OLRC, the repository | header, footer |
+| `/app/docs` | `docs.astro` | The OpenAPI schema in this site's chrome, rather than the bare Swagger page | `SiteHeader:62`, `SiteFooter:48`, `about.astro:77`, `AccountsOff:47` | `/docs`, `/redoc`, `/openapi.json` | header, footer |
 | `/app/provisions` | `provisions.astro` | The watchlist. Switched off in the UI (ADR-0034) | `SiteHeader:49`, `AuthNav:48` | a watched provision, `/app/login` | header, footer |
 | `/app/settings` | `settings.astro` | How links open, and the theme. Switched off in the UI | `AuthNav:49` only — **see Unreachable routes** | `/app/login` | header, footer |
 | `/app/login` | `login.astro` | Sign in. Switched off in the UI | `provisions.astro:46`, `settings.astro:52`, `signup.astro:53`, `AuthNav:35` | `/app/signup`, the `?next=` destination | header, footer |
@@ -81,6 +81,12 @@ re-opened.
   citation to its provision and everything else to `search`. `SiteSearch` posts to `goto` alone.
 - **`SectionBar`, `Neighbors` and `KeyboardNav`** are three prev/next affordances on a section page:
   the top of the text, the bottom of the text, and the keyboard. That is what B1 asks for.
+- **Navigation *inside* a section is a fourth set** (ADR-0055), and none of it is a route:
+  `SectionContents` above the text links to each top-level provision and to `#section-source` and
+  `#section-notes`; the section bar's own number links to `#main`; and `KeyboardNav`, now in `Base`
+  rather than on the section page, binds `c`, `[`, `]`, `s`, `n` and `t` to the same places. The
+  shortcut list itself is `ShortcutsDialog`, a modal `<dialog>` on every page rather than a page of
+  its own — `?` opens it, and the footer's link is the no-script fallback to guide chapter 02.
 - **The from/to picker on `/app/versions` and on `/app/diff`** is the same form on two pages. The
   first chooses a comparison; the second changes one already on screen.
 

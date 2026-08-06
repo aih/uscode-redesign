@@ -271,6 +271,17 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
     },
   },
+  "shortcuts-open": {
+    routeId: "section",
+    setup: async (page) => {
+      // A modal `<dialog>` (ADR-0055). The page behind it is inert, so this
+      // scan is of the dialog and its backdrop — the one state where axe sees
+      // markup the closed page does not render at all.
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.keyboard.press("Shift+Slash");
+      await expect(page.locator("#shortcuts")).toBeVisible({ timeout: 5000 });
+    },
+  },
   "diff-source-expanded": {
     routeId: "diff",
     setup: async (page) => {

@@ -1,0 +1,88 @@
+---
+/**
+ * The keyboard shortcut list, as a modal dialog on every page.
+ *
+ * A `<dialog>` opened with `showModal()`, which is the one element that gives a
+ * focus trap, `Escape`, an inert background and the top layer without any of
+ * them being written here. The hover card next door is a `popover` for the
+ * opposite reason: it appears beside the thing it describes and the reader goes
+ * on reading past it, where this is a thing to read and then dismiss.
+ *
+ * The rows come from `lib/shortcuts.ts`, which is also where `KeyboardNav`'s
+ * island gets its bindings, so a key that is listed is a key that fires.
+ *
+ * `panel` renders the identical contents in a `<div>` instead. `/app/design`
+ * uses it (ADR-0053): the design page has to show this component, and a second
+ * `<dialog id="shortcuts">` on a page that already carries the real one would
+ * duplicate the id, while a modal held open would make the rest of the page
+ * inert. The tag is a variable rather than the markup being written twice.
+ */
+import { SHORTCUT_GROUPS } from "../lib/shortcuts";
+
+interface Props {
+  /** Render as a block rather than a modal dialog. */
+  panel?: boolean;
+  /** Distinguishes the specimen's ids from the live one's. */
+  idPrefix?: string;
+}
+
+const { panel = false, idPrefix = "shortcuts" } = Astro.props;
+const Wrapper = panel ? "div" : "dialog";
+const headingId = `${idPrefix}-heading`;
+---
+
+<Wrapper
+  class:list={["shortcuts", panel && "shortcuts--panel"]}
+  id={panel ? undefined : idPrefix}
+  aria-labelledby={panel ? undefined : headingId}
+>
+  <div class="shortcuts__head">
+    <h2 class="shortcuts__heading" id={headingId}>Keyboard shortcuts</h2>
+    {/* A reader who opened this with a pointer looks for something to click.
+        Escape is there too and the dialog gives it for free. */}
+    {
+      !panel && (
+        <button
+          class="usa-button usa-button--unstyled shortcuts__close"
+          type="button"
+          data-shortcuts-close
+        >
+          Close
+        </button>
+      )
+    }
+  </div>
+
+  {
+    SHORTCUT_GROUPS.map((group) => (
+      <section class="shortcuts__group">
+        <h3 class="shortcuts__groupname">
+          {group.name}
+          {group.sectionOnly && (
+            <span class="shortcuts__scope">on a section page</span>
+          )}
+        </h3>
+        <dl class="shortcuts__list">
+          {group.items.map((item) => (
+            <div class="shortcuts__row">
+              <dt class="shortcuts__keys">
+                {item.keys.map((key, index) => (
+                  <>
+                    {index > 0 && <span class="shortcuts__or"> or </span>}
+                    <kbd>{key}</kbd>
+                  </>
+                ))}
+              </dt>
+              <dd class="shortcuts__what">{item.what}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    ))
+  }
+
+  <p class="shortcuts__note">
+    A key typed into a search box or a date field is left alone, and so is any combination held with
+    Ctrl, Alt or ⌘.
+  </p>
+</Wrapper>

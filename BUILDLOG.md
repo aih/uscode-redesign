@@ -1717,3 +1717,71 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     Mostly inside `<toc>`, which is skipped, but `Uslm2Parser`'s table work will meet them.
   - **The running header depends on `@page { margin-top: 22mm }` staying larger than it is**, and
     nothing asserts the relationship.
+
+## 054 — 2026-08-06 — Session 32: a card that cut text off, a section with no way into it, and one keyboard map
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Three things, in the user's words: the popup preview of linked sections now cuts off
+  the beginning of the text on the left; within a large section there is no easy way to scroll to
+  the top or to the Notes or Sources; review the keyboard navigation overall, provide it
+  throughout, and provide a guide to it reachable by keyboard shortcut on each page and as a popup.
+- **Decided:** [ADR-0055](docs/adr/0055-navigation-inside-a-section-and-a-keyboard-map.md).
+  - **The ladder is shared with the hover card; the scale is not.** `.section-body .prov` becomes
+    `.section-body .prov, .cite-preview__body .prov`, and the card sets `--indent-step: 1em` on its
+    own body. The card's old `[class*="indent"]` half-step override is deleted — it matched
+    `indent0`, `indentUp2` and `indentTo54pts` alike, the same defect ADR-0054 removed from the
+    page, and being a `margin-left` rule it could not reach `firstIndent-N`'s `text-indent` at all.
+  - **A section has its own contents**, from a new `uslm.outline()`: top-level provisions with
+    their headings, then the source credit and the notes. Top level only — the ladder goes seven
+    deep and a recursive list would be longer than the section it indexes.
+  - **`RenderOptions.anchors` names the apparatus, opt-in and once per document.** Provisions need
+    no new anchor (`@identifier` is already their `id`); a `<notes>` container carries nothing to
+    address it by, so `#section-source` and `#section-notes` are invented. Three things render this
+    markup into one page — the section, a further occurrence under one identifier (ADR-0021), and
+    the hover card — and only the first may name them.
+  - **The section bar's number links to `#main`.** Nothing new may be pinned: `--sticky-h` is what
+    `scroll-margin-top` spends (ADR-0044), so a second sticky row would move every anchor jump on
+    the page.
+  - **One keyboard map, in `Base`, from one list.** `KeyboardNav` moves into the layout and gains
+    `t`, `c`, `[`, `]`, `s`, `n`, `/` and `?`. `lib/shortcuts.ts` is the single source: the dialog
+    renders it, `/app/design` renders the same component as a panel, and the island receives
+    `keyMap()` as JSON, because an `is:inline` script can import nothing.
+  - The help is a modal `<dialog>` — focus trap, `Escape`, inert background and top layer, none of
+    them written here. The footer's control is an `<a>` to guide chapter 02 that the island
+    upgrades into a dialog opener, so it does something with the script off.
+- **Produced:** `frontend/src/components/{SectionContents,ShortcutsDialog}.astro`,
+  `frontend/src/lib/shortcuts.ts`, `frontend/tests/{shortcuts.test.ts,e2e/keyboard.spec.ts}`,
+  `docs/adr/0055-…`; changes to `KeyboardNav.astro`, `SectionBar.astro`, `SiteFooter.astro`,
+  `Base.astro`, `uslm.ts`, `site.scss`, `design.astro`, `us/usc/[...identifier].astro`, guide
+  chapter 02, `uslm.test.ts`, `a11y.spec.ts`, `docs/a11y/routes.json`, `docs/js-budgets.json`,
+  `docs/ia-map.md`, `docs/demo/scenes.json` and 20 screenshots.
+- **Verified:**
+  - The regression, reproduced before it was fixed and re-measured after: at
+    `/app/preview/us/usc/t16/s1391` in a 1280px card, `(a)`, `(b)` and `(c)` rendered 21–31px
+    outside the card's padding box, where `overflow-y: auto` clipped them — invisible, and every
+    line under them missing its first character. Five preview targets now report zero elements
+    left of the content edge.
+  - `make test` **545**, `make test-web` **299** (up from 286: 13 for `outline()`, the apparatus
+    anchors and the shortcut list), `make test-e2e` **441** (up from 421: 14 in
+    `keyboard.spec.ts`, 5 guide scenarios, 1 axe state). The axe scan is **267 scans** and still
+    **8 violation/route pairs over 1,794 nodes** — the modal dialog and the contents panel add
+    none.
+  - `make shots` clean but for the known `/app/docs` 3px reflow. `make measure` unchanged: median
+    **67**, p10–p90 **62–71**, both densities.
+  - Every route pays **3,678 bytes** more inline script, `KeyboardNav` now being in `Base`.
+    `docs/js-budgets.json` moves `/app/` 9,000 → 13,000 and `/app/us/usc` 34,500 → 37,500. Written
+    the ordinary way — rationale in comments beside the code — it was 6,500 a route; the prose is
+    in the component's frontmatter docstring instead, which Astro does not ship.
+- **Candidate tasks found and not done here:**
+  - **`j` is previous and `k` is next**, the reverse of the convention every reader who knows those
+    keys has. It is what ADR-0038's guide already documents and `guide.spec.ts` already asserts, so
+    reversing it was not done unasked — but the pair is now printed in a dialog on every page
+    rather than in one sentence at the foot of one, so the inconsistency is more visible than it
+    was. Owed as a decision, not a bug fix.
+  - **`[` and `]` are silent on a section with no contents list** — a one-paragraph repeal has no
+    top-level provisions, so the keys do nothing and nothing says why.
+  - **A jump to the apparatus below 40em lands on a closed `<details>`.** Above 40em `site.scss`
+    forces the panel visible without opening the element, which is the same mismatch ADR-0043
+    recorded against `ChapterRail`. Inherited here rather than fixed.
+  - **The dialog has no "don't show me the keys" affordance and no first-visit hint**, so a reader
+    who never presses `?` and never looks at the footer never learns any of this exists.

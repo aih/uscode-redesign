@@ -1890,6 +1890,25 @@ main[id] {
   flex: none;
 }
 
+/* The number is the link back to the top of the section. Undecorated and in the
+ * row's own ink at rest: it is the section's identity first and a control
+ * second, and in the link colour it would read as a fourth destination beside
+ * the three either side of it.
+ *
+ * Three classes, for the reason counted out under `.contents__link` below:
+ * `:root[data-theme="dark"] a` is 0-2-1, so anything less than this painted the
+ * number ink on a light page and link-blue on a dark one — the exact
+ * inconsistency the rule exists to prevent. */
+.sectionbar .sectionbar__id .sectionbar__top {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sectionbar__top:hover,
+.sectionbar__top:focus-visible {
+  text-decoration: underline;
+}
+
 /* The heading gives up its tail first; `§ 523` never does. */
 .sectionbar__heading {
   color: var(--muted);
@@ -1962,6 +1981,110 @@ main[id] {
 .watch-remove {
   display: inline;
 }
+
+/* ------------------------------------------------------- the section contents
+ *
+ * `SectionContents.astro` — the top-level provisions of the section on screen,
+ * then its source credit and its notes.
+ *
+ * A panel rather than a bare list, so that a reader scrolling back up can tell
+ * where the apparatus around the section ends and the statute begins. Set in
+ * the interface face for the same reason everything else about the law is
+ * (ADR-0054): this is a list of places, not text of the Code.
+ *
+ * Bounded and scrolling inside itself, because the number of rows is the
+ * section's business and not the design's — 16 U.S.C. § 1801 has twelve
+ * top-level provisions and the deepest titles have far more. 14rem is about
+ * nine rows, past which this would be pushing the section's first sentence off
+ * a phone screen to describe it. It needs no `tabindex` of its own to satisfy
+ * axe's `scrollable-region-focusable`: every row in it is a link. */
+
+.contents {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--panel);
+  font-family: var(--ui);
+  font-size: 0.9rem;
+}
+
+.contents__label {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.contents__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Two columns once there is width for them: these rows are a designator and a
+ * short heading, and one per line down a 42rem column is a lot of vertical
+ * space spent on very little ink. `break-inside` keeps a row whole. */
+@media (min-width: 40em) {
+  .contents__list {
+    columns: 2;
+    column-gap: 1.5rem;
+  }
+
+  .contents__item {
+    break-inside: avoid;
+  }
+}
+
+/* The designator carries the link colour and the heading beside it does not —
+ * the arrangement `.rail__link` already uses, so the two lists of places on a
+ * section page are read the same way.
+ *
+ * Three classes on the colour rule, and the count is the point.
+ * `:root[data-theme="dark"] a` is **0-2-1** — `:root` is a pseudo-class,
+ * `[data-theme]` an attribute, and both count as classes — so it outranks a
+ * one-class rule *and* a two-class one, and any colour stated at either
+ * specificity applies in light and is silently replaced in dark. That is the
+ * trap ADR-0042 recorded against `.usa-nav__link`, and it is the reason this
+ * row's designator came out ink on a light page and blue on a dark one before
+ * the selector was counted rather than guessed at. */
+.contents__link {
+  display: block;
+  padding: 0.2rem 0;
+  text-decoration: none;
+  /* One row, one line. A subsection heading can run to a sentence and this is
+   * an index, not the text. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contents .contents__item .contents__link {
+  color: var(--link);
+}
+
+.contents__link:hover,
+.contents__link:focus-visible {
+  text-decoration: underline;
+}
+
+.contents__num {
+  font-weight: 700;
+  margin-right: 0.4em;
+}
+
+.contents__heading {
+  color: var(--muted);
+}
+
+/* On paper the whole section is already there to be read and a list of links to
+ * parts of it is not, so `.contents` is in the print block's chrome list at the
+ * bottom of this file rather than carrying a rule of its own here. */
 
 /* ------------------------------------------------------------ the copy column
  *
@@ -2241,8 +2364,20 @@ main[id] {
  * Before this, nothing indented a level at all: `--indent-step` reached only
  * the source's own `indentN` classes further down, and `(a)`, `(1)` and `(A)`
  * all sat flush at the same left edge on every section page.
+ *
+ * The hover card gets the same ladder. That is a comma-joined selector of the
+ * kind the card's own block below refuses for *sizes*, and it is right here for
+ * the reason that one is wrong there: the two surfaces render the same markup
+ * and need the same structure, and the only thing that differs — how wide a
+ * rung is — is already a variable the card sets for itself. Sharing the rule
+ * shares the structure; the scale stays local. Left unshared, the card had the
+ * ladder's costs and none of it: `.firstIndent-2` still pulled a first line two
+ * steps to the left, nothing put a step of padding there to spend, and the
+ * card's scroll box clipped it — `(a)`, `(b)` and `(c)` were not visible at all
+ * on `/us/usc/t16/s1391`, and every line under them lost its first character.
  */
-.section-body .prov {
+.section-body .prov,
+.cite-preview__body .prov {
   padding-left: var(--indent-step);
 
   /* The source's own indent classes answer the same question, and on a level
@@ -2273,7 +2408,8 @@ main[id] {
  *
  * `vertical-align: top` keeps an inline-block from sitting on the text
  * baseline's descender line and adding a pixel of leading to every rung. */
-.section-body .prov > .uslm-num {
+.section-body .prov > .uslm-num,
+.cite-preview__body .prov > .uslm-num {
   display: inline-block;
   min-width: var(--indent-step);
   margin-left: calc(-1 * var(--indent-step));
@@ -2299,7 +2435,9 @@ main[id] {
  * writes none, and inventing an em dash the source does not have would be this
  * page adding punctuation to a statute. */
 .section-body .prov > .uslm-num + .uslm-content,
-.section-body .prov > .uslm-num + .uslm-chapeau {
+.section-body .prov > .uslm-num + .uslm-chapeau,
+.cite-preview__body .prov > .uslm-num + .uslm-content,
+.cite-preview__body .prov > .uslm-num + .uslm-chapeau {
   display: inline;
 }
 
@@ -2427,22 +2565,127 @@ main[id] {
   }
 }
 
-/* --------------------------------------------------------------- keyboard nav */
+/* --------------------------------------------------------------- keyboard nav
+ *
+ * `ShortcutsDialog.astro`. A modal `<dialog>`, so the top layer, the backdrop,
+ * the focus trap and `Escape` are the element's rather than this stylesheet's.
+ *
+ * The `<dialog>` selector carries the box because a closed dialog is
+ * `display: none` by the UA stylesheet and nothing here should undo that; the
+ * `.shortcuts` class carries everything a panel and a dialog share, so the
+ * specimen on `/app/design` looks like the thing it is a specimen of. */
 
-/* The one island in the reader (Day 4): a footer hint plus a keydown listener,
- * both driven by the same three hrefs the nav strip already rendered. */
-.kbd-hint {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-top: 0.5rem;
+.shortcuts {
+  max-width: 34rem;
+  width: calc(100vw - 2rem);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.9rem;
 }
 
-.kbd-hint kbd {
+dialog.shortcuts {
+  /* Centred by the UA's own `inset: 0; margin: auto` for a modal dialog; only
+   * the shadow is worth adding, and it is the hover card's. */
+  box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 18%);
+}
+
+.shortcuts::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.shortcuts--panel {
+  width: auto;
+  max-height: none;
+}
+
+.shortcuts__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.shortcuts__heading {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.shortcuts__close {
+  flex: none;
+}
+
+.shortcuts__group {
+  margin-top: 1rem;
+}
+
+.shortcuts__groupname {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Which page a group applies to, said on the group rather than in a sentence
+ * under the list — a reader scanning for a key reads the rows, not the prose. */
+.shortcuts__scope {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.shortcuts__list {
+  margin: 0;
+}
+
+/* A `<dl>` of key-to-meaning, laid out as rows. The `<div>` between the list
+ * and its `<dt>`/`<dd>` pairs is the one wrapper HTML allows there, and is what
+ * lets a row stay a row at every width. */
+.shortcuts__row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+  padding: 0.15rem 0;
+}
+
+.shortcuts__keys {
+  margin: 0;
+}
+
+.shortcuts__what {
+  margin: 0;
+}
+
+.shortcuts__or {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+.shortcuts kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
   border: 1px solid var(--rule);
   border-radius: 0.2rem;
   padding: 0.05rem 0.35rem;
   background: var(--panel);
+}
+
+.shortcuts__note {
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 /* ------------------------------------------------------- the citation preview */
@@ -2520,6 +2763,22 @@ main[id] {
 .cite-preview__body {
   font-family: var(--reading);
   line-height: 1.5;
+
+  /* The card's own rung, narrower than the page's 1.5em because the card is
+   * 28rem wide and a preview is a glance. 1em is the step the page itself
+   * spends below 40em, so this is a width the ladder is already known to hold
+   * rather than a third number: the median designator is three characters
+   * (`docs/verification/ladder.json`), which overhangs 1em and pushes the words
+   * beside it along one line instead of wrapping them underneath.
+   *
+   * Declared here rather than as a `[class*="indent"]` override, which is what
+   * used to halve the source's scale. That selector matched `indent0`,
+   * `indentUp2` and `indentTo54pts` alike — the same defect ADR-0054 removed
+   * from the page — and, being a `margin-left` rule only, it could not reach
+   * `firstIndent-N`'s negative `text-indent` at all. Halving the variable
+   * halves every rule that reads it, in one place, and keeps the card's ladder
+   * and the source's scale in the same currency. */
+  --indent-step: 1em;
 }
 
 .cite-preview__body p {
@@ -2548,12 +2807,6 @@ main[id] {
 .cite-preview__body > .uslm-section > .uslm-num,
 .cite-preview__body > .uslm-section > .uslm-heading {
   display: none;
-}
-
-/* Provision depth still reads inside a card, at half the page's step: the
- * structure matters, and 1.6rem of indent inside a 28rem box does not. */
-.cite-preview__body [class*="indent"] {
-  margin-left: calc(var(--indent-step) / 2);
 }
 
 .cite-preview__foot {
@@ -4320,7 +4573,8 @@ main[id] {
   .rail,
   .copycol,
   .copybtn,
-  .kbd-hint,
+  .contents,
+  .shortcuts,
   .picker,
   .neighbors,
   .theme-toggle,
