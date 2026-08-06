@@ -89,11 +89,31 @@ const upLabel = shortNum(up);
       )
     }
 
-    {/* The identity. `§ 523` never truncates; the heading gives up its tail
-        first, because a reader who has scrolled this far already knows what
-        they are reading and needs the number to stay legible. */}
+    {/* The identity, and the way back to the top of the section.
+
+        `§ 523` never truncates; the heading gives up its tail first, because a
+        reader who has scrolled this far already knows what they are reading and
+        needs the number to stay legible.
+
+        The number is a link to `#main`. This row is the only chrome that stays
+        put at every width, so it is the only place a "back to the top" can live
+        without being another sticky box counted in `--sticky-h` — and the
+        token is what `scroll-margin-top` spends, so a second row would move
+        every anchor jump on the page. Clicking the thing you are reading to
+        return to its start is the behaviour of a document title bar, and the
+        accessible name says so rather than leaving it to be guessed at. The
+        heading beside it stays plain text: one target, not two adjacent ones
+        that do the same thing. */}
     <p class="sectionbar__id">
-      {label && <span class="sectionbar__num">{label}</span>}
+      {label && (
+        <a
+          class="sectionbar__num sectionbar__top"
+          href="#main"
+          aria-label={`Back to the top of ${label}`}
+        >
+          {label}
+        </a>
+      )}
       {heading && <span class="sectionbar__heading">{heading}</span>}
       {status && <StatusBadge status={status} />}
     </p>

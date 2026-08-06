@@ -1890,6 +1890,25 @@ main[id] {
   flex: none;
 }
 
+/* The number is the link back to the top of the section. Undecorated and in the
+ * row's own ink at rest: it is the section's identity first and a control
+ * second, and in the link colour it would read as a fourth destination beside
+ * the three either side of it.
+ *
+ * Three classes, for the reason counted out under `.contents__link` below:
+ * `:root[data-theme="dark"] a` is 0-2-1, so anything less than this painted the
+ * number ink on a light page and link-blue on a dark one — the exact
+ * inconsistency the rule exists to prevent. */
+.sectionbar .sectionbar__id .sectionbar__top {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sectionbar__top:hover,
+.sectionbar__top:focus-visible {
+  text-decoration: underline;
+}
+
 /* The heading gives up its tail first; `§ 523` never does. */
 .sectionbar__heading {
   color: var(--muted);
@@ -1962,6 +1981,110 @@ main[id] {
 .watch-remove {
   display: inline;
 }
+
+/* ------------------------------------------------------- the section contents
+ *
+ * `SectionContents.astro` — the top-level provisions of the section on screen,
+ * then its source credit and its notes.
+ *
+ * A panel rather than a bare list, so that a reader scrolling back up can tell
+ * where the apparatus around the section ends and the statute begins. Set in
+ * the interface face for the same reason everything else about the law is
+ * (ADR-0054): this is a list of places, not text of the Code.
+ *
+ * Bounded and scrolling inside itself, because the number of rows is the
+ * section's business and not the design's — 16 U.S.C. § 1801 has twelve
+ * top-level provisions and the deepest titles have far more. 14rem is about
+ * nine rows, past which this would be pushing the section's first sentence off
+ * a phone screen to describe it. It needs no `tabindex` of its own to satisfy
+ * axe's `scrollable-region-focusable`: every row in it is a link. */
+
+.contents {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--panel);
+  font-family: var(--ui);
+  font-size: 0.9rem;
+}
+
+.contents__label {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.contents__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Two columns once there is width for them: these rows are a designator and a
+ * short heading, and one per line down a 42rem column is a lot of vertical
+ * space spent on very little ink. `break-inside` keeps a row whole. */
+@media (min-width: 40em) {
+  .contents__list {
+    columns: 2;
+    column-gap: 1.5rem;
+  }
+
+  .contents__item {
+    break-inside: avoid;
+  }
+}
+
+/* The designator carries the link colour and the heading beside it does not —
+ * the arrangement `.rail__link` already uses, so the two lists of places on a
+ * section page are read the same way.
+ *
+ * Three classes on the colour rule, and the count is the point.
+ * `:root[data-theme="dark"] a` is **0-2-1** — `:root` is a pseudo-class,
+ * `[data-theme]` an attribute, and both count as classes — so it outranks a
+ * one-class rule *and* a two-class one, and any colour stated at either
+ * specificity applies in light and is silently replaced in dark. That is the
+ * trap ADR-0042 recorded against `.usa-nav__link`, and it is the reason this
+ * row's designator came out ink on a light page and blue on a dark one before
+ * the selector was counted rather than guessed at. */
+.contents__link {
+  display: block;
+  padding: 0.2rem 0;
+  text-decoration: none;
+  /* One row, one line. A subsection heading can run to a sentence and this is
+   * an index, not the text. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contents .contents__item .contents__link {
+  color: var(--link);
+}
+
+.contents__link:hover,
+.contents__link:focus-visible {
+  text-decoration: underline;
+}
+
+.contents__num {
+  font-weight: 700;
+  margin-right: 0.4em;
+}
+
+.contents__heading {
+  color: var(--muted);
+}
+
+/* On paper the whole section is already there to be read and a list of links to
+ * parts of it is not, so `.contents` is in the print block's chrome list at the
+ * bottom of this file rather than carrying a rule of its own here. */
 
 /* ------------------------------------------------------------ the copy column
  *

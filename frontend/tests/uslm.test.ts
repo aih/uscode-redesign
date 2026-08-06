@@ -6,6 +6,7 @@ import {
   copyableIdentifiers,
   highlightHtml,
   hrefs,
+  outline,
   parseFragment,
   render,
 } from "../src/lib/uslm";
@@ -54,6 +55,92 @@ describe("notes and sourceCredit render as no-JS collapsibles", () => {
 
     expect(html).toContain('<details class="uslm-details uslm-notes">');
     expect(html).toContain("<summary>Notes</summary>");
+  });
+});
+
+/**
+ * The two fragment names the in-section navigation needs, and the rule that
+ * keeps them unique.
+ *
+ * Three things render this markup into one document — the section, any further
+ * occurrence the source publishes under the same identifier (ADR-0021), and the
+ * hover card, which inserts a *different* section's body into the page the
+ * reader is on. Only one of them may name its apparatus.
+ */
+describe("apparatus anchors (RenderOptions.anchors)", () => {
+  const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><subsection identifier="/us/usc/t16/s45f/a"><num>(a)</num><notes><note>a note on (a)</note></notes></subsection><sourceCredit>(Pub. L. 100–1)</sourceCredit><notes><note>See also Tables.</note></notes></section>`;
+
+  it("names the section's own source credit and notes when asked", () => {
+    const html = render(parseFragment(xml), {
+      target: null,
+      release: null,
+      labels: {},
+      anchors: true,
+    });
+
+    expect(html).toContain('uslm-sourceCredit" id="section-source"');
+    expect(html).toContain('uslm-notes" id="section-notes"');
+  });
+
+  it("names nothing by default, so a preview card cannot collide with the page", () => {
+    const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
+
+    expect(html).not.toContain("section-source");
+    expect(html).not.toContain("section-notes");
+  });
+
+  it("names only the section's own notes, never a subsection's", () => {
+    const html = render(parseFragment(xml), {
+      target: null,
+      release: null,
+      labels: {},
+      anchors: true,
+    });
+
+    // Two <notes> in this fragment, one of them nested inside (a).
+    expect(html.match(/uslm-notes/gu)).toHaveLength(2);
+    expect(html.match(/id="section-notes"/gu)).toHaveLength(1);
+  });
+});
+
+describe("outline — a section's own contents", () => {
+  it("lists top-level provisions in order, then the source credit and the notes", () => {
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><num>§ 45f.</num><heading>Top</heading><subsection identifier="/us/usc/t16/s45f/a"><num>(a)</num><heading>Statement of purpose</heading><content>one</content></subsection><subsection identifier="/us/usc/t16/s45f/b"><num>(b)</num><content>two</content></subsection><sourceCredit>(Pub. L. 100–1)</sourceCredit><notes><note>See also Tables.</note></notes></section>`;
+
+    expect(outline(parseFragment(xml))).toEqual([
+      { anchor: "/us/usc/t16/s45f/a", num: "(a)", heading: "Statement of purpose" },
+      { anchor: "/us/usc/t16/s45f/b", num: "(b)", heading: null },
+      { anchor: "section-source", num: "Source credit", heading: null },
+      { anchor: "section-notes", num: "Notes", heading: null },
+    ]);
+  });
+
+  it("stops at the first rung — a paragraph inside a subsection is not a row", () => {
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><subsection identifier="/us/usc/t16/s45f/a"><num>(a)</num><paragraph identifier="/us/usc/t16/s45f/a/1"><num>(1)</num><content>one</content></paragraph></subsection></section>`;
+
+    expect(outline(parseFragment(xml)).map((entry) => entry.anchor)).toEqual([
+      "/us/usc/t16/s45f/a",
+    ]);
+  });
+
+  it("drops a provision with no number, which would render as an empty link", () => {
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><subsection identifier="/us/usc/t16/s45f/a"><content>numberless</content></subsection><subsection identifier="/us/usc/t16/s45f/b"><num>(b)</num><content>two</content></subsection></section>`;
+
+    expect(outline(parseFragment(xml)).map((entry) => entry.num)).toEqual(["(b)"]);
+  });
+
+  it("lists one row when the source repeats an identifier (ADR-0021)", () => {
+    // Same reasoning as `copyableIdentifiers`: a fragment name addresses the
+    // first element carrying it, so a second row would link to the first's text.
+    const xml = `<section ${NS} identifier="/us/usc/t16/s45f"><subsection identifier="/us/usc/t16/s45f/a"><num>(a)</num><content>one</content></subsection><subsection identifier="/us/usc/t16/s45f/a"><num>(a)</num><content>again</content></subsection></section>`;
+
+    expect(outline(parseFragment(xml))).toHaveLength(1);
+  });
+
+  it("is empty for a section that is one block of text with no apparatus", () => {
+    const xml = `<section ${NS} identifier="/us/usc/t16/s688"><num>§ 688.</num><content>Repealed.</content></section>`;
+
+    expect(outline(parseFragment(xml))).toEqual([]);
   });
 });
 

@@ -1,0 +1,52 @@
+---
+/**
+ * A section's own contents: its top-level provisions, its source credit and its
+ * notes, each a link to where it sits in the text.
+ *
+ * The site had one-click routes to every *other* section and none into the one
+ * on screen. § 45f is short; 16 U.S.C. § 1801 is not, and the source credit and
+ * the notes — the two blocks a drafter reaches for most — are at the bottom of
+ * whatever length the section happens to be, past every subsection of it.
+ *
+ * The rows come from `uslm.outline()`, which reads the parsed fragment the page
+ * already has, so this makes no request and knows no USLM element names of its
+ * own (architecture rule 5). Provisions link to their `@identifier`, which is
+ * already the `id` every provision renders with; the apparatus links to the two
+ * names `uslm.ts` gives it under `RenderOptions.anchors`.
+ *
+ * Not sticky, and not for want of trying: anything pinned has to be counted in
+ * `--sticky-h`, because that token is what `scroll-margin-top` spends, and a
+ * block of this height in the stack would push every anchor jump a contents
+ * list further down the page than the provision it was aiming at (ADR-0044's
+ * measurement). Reaching the apparatus from the middle of a long section is the
+ * keyboard shortcuts' job instead — <kbd>s</kbd> and <kbd>n</kbd> — and getting
+ * back up here is the section bar's, whose number links to the top.
+ *
+ * Nothing here is client-side.
+ */
+import type { OutlineEntry } from "../lib/uslm";
+
+interface Props {
+  entries: OutlineEntry[];
+}
+
+const { entries } = Astro.props;
+---
+
+{
+  entries.length > 0 && (
+    <nav class="contents" aria-label="In this section">
+      <p class="contents__label">In this section</p>
+      <ul class="contents__list">
+        {entries.map((entry) => (
+          <li class="contents__item">
+            <a class="contents__link" href={`#${entry.anchor}`}>
+              <span class="contents__num">{entry.num}</span>
+              {entry.heading && <span class="contents__heading">{entry.heading}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}

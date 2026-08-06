@@ -102,6 +102,102 @@ export function copyableIdentifiers(fragment: UslmElement): string[] {
   return found;
 }
 
+/** The `id` the section's own source credit and notes are rendered with when
+ * `RenderOptions.anchors` is set, and the only fragment names the reader's
+ * in-section navigation targets that USLM does not already supply.
+ *
+ * Every provision has an `@identifier` and is rendered with it as its `id`, so
+ * `(a)` is reachable as `#/us/usc/t16/s45f/a` with nothing invented. The
+ * apparatus has no identifier of its own — a `<notes>` container carries no
+ * attribute distinguishing it from any other — so these two are named here. */
+export const SOURCE_ANCHOR = "section-source";
+export const NOTES_ANCHOR = "section-notes";
+
+/** One row of a section's own contents: a top-level provision, or the source
+ * credit or notes block underneath them. */
+export interface OutlineEntry {
+  /** The fragment name to link to, without the `#`. */
+  anchor: string;
+  /** `(a)`, or the apparatus block's name. */
+  num: string;
+  /** The provision's heading where the source writes one. */
+  heading: string | null;
+}
+
+/**
+ * A section's own table of contents: its top-level provisions, then its source
+ * credit and notes.
+ *
+ * Top level only, and deliberately. The ladder goes seven deep
+ * (`docs/verification/ladder.json`), and a contents list that recursed would be
+ * longer than the section it indexes for anything below `(a)(1)`. What a reader
+ * wants from it is the shape of the section and a way into the apparatus, both
+ * of which the first rung answers.
+ *
+ * Here rather than in the component that renders it, for the same reason
+ * `copyableIdentifiers` is: `LEVEL_TAGS` is the list of what counts as a
+ * provision, and architecture rule 5 keeps USLM element names in this module.
+ */
+export function outline(fragment: UslmElement): OutlineEntry[] {
+  const entries: OutlineEntry[] = [];
+  const seen = new Set<string>();
+  let source = false;
+  let notes = false;
+
+  for (let i = 0; i < fragment.childNodes.length; i++) {
+    const node = fragment.childNodes[i];
+    if (node.nodeType !== ELEMENT_NODE) continue;
+    const child = node as UslmElement;
+    const tag = tagOf(child);
+
+    if (tag === "sourceCredit") {
+      source = true;
+      continue;
+    }
+    if (tag === "notes") {
+      notes = true;
+      continue;
+    }
+    if (!LEVEL_TAGS.has(tag)) continue;
+
+    const identifier = child.getAttribute("identifier");
+    // Same rule as `copyableIdentifiers`: the source repeats the odd identifier
+    // at one release point (ADR-0021) and a fragment name addresses the first
+    // element carrying it, so a second row would link to the first one's text.
+    if (!identifier || seen.has(identifier)) continue;
+    seen.add(identifier);
+
+    const num = normalizeSpace(childText(child, "num"));
+    // A provision with no `<num>` has nothing to label a contents row with —
+    // "" would render as an empty link, which is a WCAG 2.4.4 failure and no
+    // use to anyone. There is no fallback worth inventing: the row is dropped
+    // and the provision is still reachable by scrolling.
+    if (!num) continue;
+    entries.push({
+      anchor: identifier,
+      num,
+      heading: normalizeSpace(childText(child, "heading")) || null,
+    });
+  }
+
+  if (source) entries.push({ anchor: SOURCE_ANCHOR, num: "Source credit", heading: null });
+  if (notes) entries.push({ anchor: NOTES_ANCHOR, num: "Notes", heading: null });
+  return entries;
+}
+
+/** The text of the first direct child with this tag — `<num>` or `<heading>`,
+ * which is all `outline` asks for. Direct children only: a nested provision's
+ * number is not this one's. */
+function childText(el: UslmElement, tag: string): string {
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const node = el.childNodes[i];
+    if (node.nodeType !== ELEMENT_NODE) continue;
+    const child = node as UslmElement;
+    if (tagOf(child) === tag) return inlineText(child);
+  }
+  return "";
+}
+
 function tagOf(el: UslmElement): string {
   return el.localName ?? el.tagName;
 }
@@ -234,6 +330,19 @@ export interface RenderOptions {
   target: string | null;
   release: string | null;
   labels: Labels;
+  /**
+   * Name the section's own source credit and notes blocks, so the in-section
+   * navigation has somewhere to point.
+   *
+   * Off by default, and a caller opts in exactly once per document. A fragment
+   * name has to be unique in the page it lands in, and three things render this
+   * markup into one page: the section, any further occurrence the source
+   * publishes under the same identifier (ADR-0021), and the hover card, which
+   * inserts a *different* section's body into the document the reader is on. If
+   * this were unconditional, all three would carry `id="section-notes"` and the
+   * link would go to whichever the browser met first.
+   */
+  anchors?: boolean;
 }
 
 /** Renders the section root itself (not just its children): CSS depends on it
@@ -264,8 +373,17 @@ function renderElement(el: UslmElement, opts: RenderOptions, depth: number): str
   // not a section (ADR-0005) — it renders here, with its own number and
   // heading, inside the quotation that owns it.
   if (QUOTE_TAGS.has(tag)) return wrapTag("blockquote", el, opts, elDepth, [`uslm-${tag}`]);
-  if (tag === "sourceCredit") return wrapDetails(el, opts, elDepth, "uslm-sourceCredit", "Source");
-  if (tag === "notes") return wrapDetails(el, opts, elDepth, "uslm-notes", "Notes");
+  // `depth === 1` is a direct child of the section root — the section's own
+  // apparatus, as against a note hanging off a subsection deeper down. Only
+  // that one is named, and only when the caller asked (`RenderOptions.anchors`).
+  if (tag === "sourceCredit") {
+    const id = opts.anchors && depth === 1 ? SOURCE_ANCHOR : null;
+    return wrapDetails(el, opts, elDepth, "uslm-sourceCredit", "Source", id);
+  }
+  if (tag === "notes") {
+    const id = opts.anchors && depth === 1 ? NOTES_ANCHOR : null;
+    return wrapDetails(el, opts, elDepth, "uslm-notes", "Notes", id);
+  }
   if (tag === "br") return "<br/>";
   if (tag === "table") return renderTable(el, opts, elDepth);
   if (tag in TABLE_TAGS) return wrapTag(TABLE_TAGS[tag], el, opts, elDepth, [`uslm-${tag}`]);
@@ -362,6 +480,7 @@ function wrapDetails(
   depth: number,
   className: string,
   summary: string,
+  id: string | null = null,
 ): string {
   // No JS (Day 4): `<details>` toggles natively. Rendered without the `open`
   // attribute — closed is the honest default everywhere — and `site.scss`
@@ -370,8 +489,9 @@ function wrapDetails(
   const sourceClass = el.getAttribute("class");
   const classes = ["uslm-details", className, ...(sourceClass ? [sourceClass] : [])];
   const inner = renderChildren(el, opts, depth);
+  const idAttr = id ? ` id="${escapeAttr(id)}"` : "";
   return (
-    `<details class="${escapeAttr(classes.join(" "))}">` +
+    `<details class="${escapeAttr(classes.join(" "))}"${idAttr}>` +
     `<summary>${escapeText(summary)}</summary>${inner}</details>`
   );
 }

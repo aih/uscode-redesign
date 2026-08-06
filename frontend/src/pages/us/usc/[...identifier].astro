@@ -15,8 +15,8 @@ import ErrorPage from "../../../components/ErrorPage.astro";
 import ChapterRail from "../../../components/ChapterRail.astro";
 import CitePreview from "../../../components/CitePreview.astro";
 import CopyColumn from "../../../components/CopyColumn.astro";
-import KeyboardNav from "../../../components/KeyboardNav.astro";
 import Neighbors from "../../../components/Neighbors.astro";
+import SectionContents from "../../../components/SectionContents.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import WatchButton from "../../../components/WatchButton.astro";
 import {
@@ -48,7 +48,8 @@ import {
   trimNum,
   versionsHref,
 } from "../../../lib/url";
-import { copyableIdentifiers, hrefs, parseFragment, render } from "../../../lib/uslm";
+import type { OutlineEntry } from "../../../lib/uslm";
+import { copyableIdentifiers, hrefs, outline, parseFragment, render } from "../../../lib/uslm";
 
 /** Name the subdivisions after what they actually are: a title lists chapters, a
  * chapter lists subchapters, and USLM 2.x titles have subtitles. */
@@ -96,6 +97,9 @@ let titleNum: string | null = null;
 /** Every provision the copy column offers a control for — computed from the
  *  same parsed fragment the page renders, never from the emitted HTML. */
 let copyTargets: string[] = [];
+/** The section's own contents — its top-level provisions, then its source
+ *  credit and notes. Same fragment, a third pass over it. */
+let contents: OutlineEntry[] = [];
 
 if (body && isToc(body)) {
   toc = body;
@@ -175,9 +179,14 @@ if (body && isToc(body)) {
     release: selected,
     labels,
   };
-  sectionHtml = render(fragment, renderOptions);
+  // `anchors` names the source credit and the notes so `SectionContents` has
+  // somewhere to link to, and is passed for the first occurrence only: a
+  // fragment name has to be unique in the page, and a further occurrence
+  // (ADR-0021) is a second full section body in the same document.
+  sectionHtml = render(fragment, { ...renderOptions, anchors: true });
   duplicateHtml = dupFragments.map((f) => render(f, renderOptions));
   copyTargets = copyableIdentifiers(fragment);
+  contents = outline(fragment);
   title = `${trimNum(section.num)} ${section.heading ?? ""} · ${selected} · U.S. Code`;
 }
 
@@ -331,6 +340,13 @@ const releaseContext = served
           <p class="doc-occurrence">Occurrence 1 of {duplicateHtml.length + 1}</p>
         )}
 
+        {/* The section's own contents, above the text it indexes. A reader who
+            has just arrived is at the top; what they cannot otherwise see from
+            here is how long the section is, what its subsections are called,
+            and that there is a source credit and a notes block at the end of
+            it. */}
+        <SectionContents entries={contents} />
+
         {/* Before the text, so the mode toggle is the first thing a reader
             meets rather than something found after scrolling past the controls
             it governs. The widget itself injects the per-provision buttons into
@@ -354,12 +370,9 @@ const releaseContext = served
 
         <Neighbors previous={neighbors?.previous} next={neighbors?.next} release={selected} />
 
-        <KeyboardNav
-          previous={neighbors?.previous}
-          next={neighbors?.next}
-          up={upNode}
-          release={selected}
-        />
+        {/* `KeyboardNav` used to sit here, bound to these same three
+            neighbours. It is in `Base.astro` now and takes them from the `bar`
+            prop, which is built from the same `neighbors` a few lines up. */}
 
         {/* One card for every citation in the text above (ADR-0024). Mounted
             only on a section page, because that is the only page that renders
