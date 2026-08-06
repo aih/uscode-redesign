@@ -15,6 +15,7 @@ import { DOMParser } from "@xmldom/xmldom";
 
 import type { Labels } from "./types";
 import { resolveRef } from "./refs";
+import { citationHref } from "./url";
 
 /** The handful of members this module actually calls on an xmldom node —
  * narrower than xmldom's own types, so a real `Element`/`Text` satisfies it
@@ -181,6 +182,12 @@ const INLINE_TAGS: Record<string, string> = {
  */
 const CONTEXTUAL_TAGS = new Set(["note", "quotedContent"]);
 
+/** Statutory text quoted by an amending act, rendered as a block quotation.
+ * `quotedContent` reaches this only when `inRunningProse` says it is not part
+ * of a sentence; `quotedText` occurs in neither schema's samples and is here
+ * because the schema defines it and the two mean the same thing to a reader. */
+const QUOTE_TAGS = new Set(["quotedContent", "quotedText"]);
+
 /** A non-whitespace text node immediately before or after — the same test
  * `scripts/inline_elements.py` counts with. */
 function inRunningProse(el: UslmElement): boolean {
@@ -189,9 +196,18 @@ function inRunningProse(el: UslmElement): boolean {
   return filled(el.previousSibling) || filled(el.nextSibling);
 }
 
-/** Real HTML table semantics, not `<div class="uslm-table">` soup. */
+/** Real HTML table semantics, not `<div class="uslm-table">` soup.
+ *
+ * USLM 2.x writes these in the XHTML namespace — `xhtml:table`, `xhtml:td`,
+ * 781 tables in `usc49.xml` alone — which arrive here as their local names and
+ * so need no separate vocabulary. `caption` is one of them (766 occurrences)
+ * and used to fall through to the `<div>` at the bottom of `renderElement`: a
+ * `<div>` is not valid inside a `<table>`, so the browser hoisted it out and
+ * the table lost its own title. It is also the only accessible name a table
+ * carries, which is what `renderTable` labels the scroll region with. */
 const TABLE_TAGS: Record<string, string> = {
   table: "table",
+  caption: "caption",
   thead: "thead",
   tbody: "tbody",
   tr: "tr",
@@ -241,16 +257,65 @@ function renderElement(el: UslmElement, opts: RenderOptions, depth: number): str
   if (CONTEXTUAL_TAGS.has(tag) && inRunningProse(el)) {
     return wrapTag("span", el, opts, elDepth, [`uslm-${tag}`, "uslm-inlined"]);
   }
+  // Statutory text quoted by an amending act, as its own block. `<blockquote>`
+  // rather than a `<div>`, so that the boundary between the law in force and
+  // the words an amendment is moving around is carried by the markup and not
+  // only by the rule down its left edge (ADR-0054). A `<section>` inside one is
+  // not a section (ADR-0005) — it renders here, with its own number and
+  // heading, inside the quotation that owns it.
+  if (QUOTE_TAGS.has(tag)) return wrapTag("blockquote", el, opts, elDepth, [`uslm-${tag}`]);
   if (tag === "sourceCredit") return wrapDetails(el, opts, elDepth, "uslm-sourceCredit", "Source");
   if (tag === "notes") return wrapDetails(el, opts, elDepth, "uslm-notes", "Notes");
   if (tag === "br") return "<br/>";
+  if (tag === "table") return renderTable(el, opts, elDepth);
   if (tag in TABLE_TAGS) return wrapTag(TABLE_TAGS[tag], el, opts, elDepth, [`uslm-${tag}`]);
   if (tag in INLINE_TAGS) return wrapTag(INLINE_TAGS[tag], el, opts, elDepth, [`uslm-${tag}`]);
   if (tag === "num") return wrapTag("span", el, opts, elDepth, ["uslm-num"]);
   if (PARAGRAPH_TAGS.has(tag)) return wrapTag("p", el, opts, elDepth, [`uslm-${tag}`]);
 
   // ADR-0015: a `<div>` fallback for every element this table does not name.
-  return wrapTag("div", el, opts, elDepth, [`uslm-${tag}`]);
+  // A level below the section root also carries `prov`, which is the whole of
+  // what the stylesheet needs to know to build the (a)/(1)/(A)/(i) ladder: one
+  // step of indent per nesting, numbers hanging into it. The class is emitted
+  // here rather than the stylesheet enumerating `uslm-subsection`,
+  // `uslm-paragraph` and the rest, because `LEVEL_TAGS` is already that list
+  // and architecture rule 5 keeps USLM element names in this module.
+  //
+  // `depth > 0` excludes the fragment's own root: the section is the column,
+  // not a rung in it.
+  const ladder = LEVEL_TAGS.has(tag) && depth > 0 ? ["prov"] : [];
+  return wrapTag("div", el, opts, elDepth, [`uslm-${tag}`, ...ladder]);
+}
+
+/**
+ * A table, inside a region a keyboard can reach.
+ *
+ * Wide tables scroll sideways inside themselves rather than pushing the page
+ * sideways (`site.scss`). A scrollable box that nothing can focus is
+ * unreachable without a pointer — axe's `scrollable-region-focusable`, and one
+ * of the two instances already on `docs/a11y/known-violations.json`. The
+ * wrapper is the fix and it ships with the table rather than after it.
+ *
+ * The region is named from the table's own `<caption>` where there is one; the
+ * bare "Table" is the fallback for USLM 1.x, which writes none.
+ */
+function renderTable(el: UslmElement, opts: RenderOptions, depth: number): string {
+  const table = wrapTag("table", el, opts, depth, ["uslm-table"]);
+  const label = captionText(el) || "Table";
+  return (
+    `<div class="uslm-tablewrap" role="region" tabindex="0" ` +
+    `aria-label="${escapeAttr(label)}">${table}</div>`
+  );
+}
+
+function captionText(table: UslmElement): string {
+  for (let i = 0; i < table.childNodes.length; i++) {
+    const node = table.childNodes[i];
+    if (node.nodeType !== ELEMENT_NODE) continue;
+    const child = node as UslmElement;
+    if (tagOf(child) === "caption") return normalizeSpace(inlineText(child));
+  }
+  return "";
 }
 
 function renderChildren(el: UslmElement, opts: RenderOptions, depth: number): string {
@@ -357,7 +422,20 @@ function renderRef(el: UslmElement, opts: RenderOptions): string {
     ? ` data-cite="${escapeAttr(resolved.identifier)}"` +
       (opts.release ? ` data-cite-release="${escapeAttr(opts.release)}"` : "")
     : "";
-  return `<a href="${escapeAttr(resolved.href)}"${title}${rel}${cite}>${text}</a>`;
+  // What the print stylesheet prints after the link text (ADR-0054). A
+  // reference is the one thing on a printed page that stops working, and
+  // `attr(href)` would print `/app/us/usc/…` — the reader's own prefix, which
+  // is not the form worth writing down. `citationHref` is (`url.ts`): the bare
+  // citation URL, carrying the release point so the printed reference resolves
+  // to the same vintage as the page it was printed from. An external reference
+  // already has a whole URL in its href and keeps it.
+  const printUrl = resolved.identifier
+    ? citationHref(resolved.identifier, opts.release)
+    : resolved.href;
+  return (
+    `<a href="${escapeAttr(resolved.href)}"${title}${rel}${cite}` +
+    ` data-print-url="${escapeAttr(printUrl)}">${text}</a>`
+  );
 }
 
 /* ----------------------------------------------------------- reading text

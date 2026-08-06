@@ -251,10 +251,43 @@
   /* Light, always, until the reader says otherwise — see the dark block below. */
   color-scheme: light;
 
-  /* The one lever the BUILDLOG 008 review asked for by name: provision depth is
-   * a variable, small enough on a phone that a four-deep paragraph still has a
-   * column to be read in, and wide enough on a desktop to show structure. */
-  --indent-step: 0.75rem;
+  /* ------------------------------------------------- reading density
+   *
+   * How much law fits on a screen, chosen by the reader (ADR-0054). Comfortable
+   * is the default and is what every measurement in
+   * `docs/verification/measure.json` was taken at; `[data-density="compact"]`
+   * further down is the other setting, stamped on `<html>` before first paint
+   * by the bootstrap in `Base.astro`, exactly as the theme is.
+   *
+   * These four are the whole of it. Nothing else in the stylesheet may state a
+   * reading size, a reading leading or a paragraph gap of its own — a rule that
+   * writes `1.05rem` is a rule that ignores the control. */
+  --reading-size: 1.05rem;
+  --reading-leading: 1.6;
+  --reading-gap: 0.75rem;
+
+  /* One step of the (a)/(1)/(A)/(i) ladder. Every level of a provision is one
+   * of these deeper than its parent, and the number hangs into it.
+   *
+   * In `ch` rather than `rem`, and the unit is the point: `ch` is the width of
+   * a `0` in the font of the element using it, which here is Spectral at
+   * `--reading-size`. So the step is stated in the same currency as the numbers
+   * it has to hold, and it tracks the density control for free.
+   *
+   * Measured against Spectral at 16.8px (`scripts/ladder.py` for the
+   * designators, the browser for the widths): `(a)` is 1.98ch, `(1)` 2.00ch,
+   * `(A)` 2.42ch, `(i)` 1.60ch, `(viii)` 3.79ch, `(xxviii)` 5.77ch. Three
+   * characters is the median designator at every depth and eight is the widest
+   * in the samples. 3ch clears every single-character designator with a gap;
+   * the romans overhang, which pushes the text beside them and never wraps it
+   * underneath.
+   *
+   * 2ch below 40em is the degradation the small screen asks for. The ladder
+   * goes seven deep — `/us/usc/t16/s1391`, and 11 of 11,512 sections reach it
+   * (`docs/verification/ladder.json`) — so at 320 CSS px the deepest clause
+   * spends 118px of a 288px column and keeps about 20 characters a line.
+   * 91.8% of sections stop at depth 3, which costs 50px and keeps 28. */
+  --indent-step: 2ch;
 
   /* How much of the viewport the sticky stack occupies. Not decoration: this
    * feeds `scroll-margin-top`, so every value here is a promise that an anchor
@@ -289,13 +322,30 @@
    * under the text, so the wide wrap has nothing to be wide for and the reading
    * measure applies. Expressed here rather than as a media query on each of the
    * five consumers, so `<main>` and the sticky chrome above it cannot disagree
-   * about how wide the page is. */
-  --measure: 42rem;
+   * about how wide the page is.
+   *
+   * Written as a multiple of the reading size rather than as `42rem`, because
+   * the thing being held constant is the character count and not the width.
+   * 40 × 1.05rem is 42rem to the pixel — the same column as before — and it
+   * stays the same *measure* when the density control changes the size under
+   * it, which a fixed 42rem would not: a smaller face in an unchanged column is
+   * more characters a line, straight out of the 62–70 the brand asks for.
+   * `make measure` counts both densities and holds the median in that band. */
+  --measure: calc(40 * var(--reading-size));
   --measure-wide: var(--measure);
 
   /* Statutory text. The interface is set in Archivo; this is the other half of
    * the distinction — the law, as against the apparatus around the law. */
   --reading: Spectral, Georgia, "Iowan Old Style", "Times New Roman", serif;
+
+  /* The interface face, as a token. USWDS already applies Archivo to `<body>`
+   * through `$theme-font-role-body`, so nothing needs this to *get* the face —
+   * it exists because the apparatus inside the reading column has to get back
+   * to it (ADR-0054): a note or a source credit sits inside `.section-body`,
+   * which is Spectral, and "set in the interface face" has to be sayable there.
+   * Same stack USWDS's `archivo` typeface token carries, above. */
+  --ui: Archivo, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
   --ink: #171716;
   --muted: #5d5d52;
   --rule: #dcdbd4;
@@ -337,7 +387,7 @@
 
 @media (min-width: 40em) {
   :root {
-    --indent-step: 1.6rem;
+    --indent-step: 3ch;
     /* Navbar + search box + contextual bar + section bar, all sticky from here
      * up. The nav is still the forced-open wrapping row until 64em (see below)
      * and the search box sits under it, so this band is the tallest the stack
@@ -381,6 +431,36 @@
     /* 40rem of prose, 16rem of rail, a 2rem gap and 2rem of page padding. */
     --measure-wide: 60rem;
   }
+}
+
+/* ---------------------------------------------------------- compact density
+ *
+ * The second of the two settings the reading-density control offers
+ * (ADR-0054). It moves three numbers and nothing else: the size, the leading,
+ * and the space between paragraphs. `--indent-step` is in `ch` and `--measure`
+ * is a multiple of `--reading-size`, so the ladder and the column follow
+ * without being restated here — which is what keeps the measure at the same
+ * character count in both settings rather than only in the default one.
+ *
+ * Deliberately not a smaller *face*. Compact is for a reader comparing two
+ * versions of a long section on one screen, and the way to give them that is
+ * to spend less on the space between lines, not on the letters. 1rem is the
+ * ordinary body size; 1.4 is close-set for a serif and still above the 1.5
+ * that WCAG 1.4.12 asks a *user* be able to reach, which they can: the setting
+ * is theirs, and text-spacing overrides apply on top of it either way.
+ *
+ * No media query on this block. The compact setting is the reader saying they
+ * want more on the screen, and that is as true on a phone as on a desktop.
+ *
+ * The selector is `:root[data-density="compact"]`, which outranks the plain
+ * `:root` blocks above at every viewport — including the two inside media
+ * queries, since a media query adds no specificity. Anything this block
+ * declares therefore wins everywhere, so it declares only what is genuinely
+ * viewport-independent. */
+:root[data-density="compact"] {
+  --reading-size: 1rem;
+  --reading-leading: 1.4;
+  --reading-gap: 0.4rem;
 }
 
 /* --------------------------------------------------------------- dark mode
@@ -655,7 +735,8 @@ body {
 }
 
 /* Paper has no viewport to pin things to, and a bar reprinted on page one of a
- * forty-page section is just noise. */
+ * forty-page section is just noise. The whole print treatment is further down,
+ * under "printing"; this is only the sticky stack giving up its pin. */
 @media print {
   .topbar,
   .sectionbar {
@@ -1447,6 +1528,45 @@ main[id] {
   line-height: 1;
 }
 
+/* The reading-density control, next to the theme toggle and built the same way
+ * (ADR-0054). Both are about reading comfort rather than navigation, which is
+ * why they share the end of the tools row. */
+.density-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  width: auto;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.density-toggle:hover,
+.density-toggle:focus {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.density-toggle__icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* The label alternates between "Compact" and "Comfortable" — it names where the
+ * click goes, not where the reader is. Those are different widths, and in a
+ * flex row a width change moves everything after it: without this the theme
+ * toggle jumps left on every density change. Wide enough for the longer of the
+ * two, measured in the interface face at this size. */
+.density-toggle__label {
+  display: inline-block;
+  min-width: 6.6em;
+  text-align: left;
+}
+
 .sitesearch__hint {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
@@ -1993,13 +2113,56 @@ main[id] {
   }
 }
 
-/* --------------------------------------------------------- statutory text */
+/* --------------------------------------------------------- statutory text
+ *
+ * ADR-0054. Five things share this column and a reader has to be able to tell
+ * them apart at a glance, because mistaking one for another is a professional
+ * error rather than an aesthetic one:
+ *
+ *   1. **Operative text** — the law in force. Spectral, `--ink`, full measure.
+ *   2. **Quoted amending text** — words an act is moving around, not words in
+ *      force. A `<blockquote>` (`uslm.ts`), inset, still Spectral because it is
+ *      still statutory text, with a solid rule and a label down its edge.
+ *   3. **Editorial notes** — the OLRC's apparatus. Archivo, `--muted`.
+ *   4. **Source credit** — the citation trail. Archivo, `--muted`, above a rule.
+ *   5. **Tables** — the source's own columns, in a region a keyboard can reach.
+ *
+ * The face carries the largest part of the distinction: **the law is set in
+ * Spectral and everything written about the law is set in Archivo**, which is
+ * the same division ADR-0052 drew between the text and the interface. Colour
+ * and rules are the second signal, so the partition survives a forced-colors
+ * mode that discards both.
+ */
 
 .section-body {
   font-family: var(--reading);
-  font-size: 1.05rem;
-  line-height: 1.6;
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
   margin-top: 1.5rem;
+
+  /* Never justified. Justified text sets uneven word spacing, and in a column
+   * of 62–70 characters carrying `notwithstanding` and `§ 1531(a)(2)(A)` the
+   * rivers get wide. `start` rather than `left` so the rule survives a
+   * right-to-left context.
+   *
+   * The source does write `text-align:justify` inline — 1,948 times in
+   * `usc16.xml`, every one of them on a `<td>` or on the `<p>` inside it, none
+   * on statutory prose, and none at all in the USLM 2.x samples. Those are the
+   * source's own column alignment in a leader table and they keep winning,
+   * because an inline style outranks this and because a table is the one place
+   * justification is doing a job. */
+  text-align: start;
+
+  /* Last-line orphans. `pretty` costs a little layout time and buys back the
+   * one-word last line that a hanging-indent ladder makes conspicuous — the
+   * word sits alone in a column that already has a number pointing at it.
+   * Unsupported browsers get `wrap`, which is what they do now. */
+  text-wrap: pretty;
+
+  /* No automatic hyphenation, ever. A break inserted inside `subparagraph` or
+   * inside a section number is a word this page invented. `manual` still
+   * honours a soft hyphen the source actually wrote. */
+  hyphens: manual;
 }
 
 /* USLM writes a subsection as `<num>(a)</num><heading>Purpose</heading>` — two
@@ -2020,14 +2183,109 @@ main[id] {
   margin-right: 0.4em;
 }
 
-.section-body p {
-  max-width: none;
-  margin: 0.75rem 0;
+/* The source parks editorial footnote bodies *inside* the number they annotate
+ * — `<num>(d) <ref class="footnoteRef">1</ref><footnote>So in original. Two
+ * subsecs. (d) have been enacted.</footnote></num>`, 39 of them across the
+ * committed samples (`docs/verification/ladder.json`). Bolded with the rest of
+ * the `<num>`, a 55-character editorial aside reads as part of the designator.
+ * The marker stays bold; the body is a note and is set like one. */
+.section-body .uslm-num .uslm-note,
+.section-body .uslm-num .uslm-footnote {
+  font-weight: 400;
+  font-family: var(--ui);
+  font-size: 0.85em;
+  color: var(--muted);
 }
 
-/* Every indent level is one step of a variable, so depth stays legible at 360px
- * instead of eating 40% of the screen (BUILDLOG 008, item 1). */
-[class*="indent"] {
+.section-body p {
+  max-width: none;
+  margin: var(--reading-gap) 0;
+}
+
+/* ------------------------------------------------------------- the ladder
+ *
+ * `(a)` `(1)` `(A)` `(i)` — one step of `--indent-step` per level, cumulative
+ * through the nesting rather than counted, and the number hangs into the step
+ * so the left edge of the numbers at one depth is the left edge of the text at
+ * the depth above.
+ *
+ * `.prov` is on every level below the section root, put there by `uslm.ts` from
+ * its own `LEVEL_TAGS` — the stylesheet never names a USLM element, and there
+ * is no second list to fall out of step (architecture rule 5).
+ *
+ * `padding-left` and not `margin-left`, so the target highlight (ADR-0001) and
+ * the copy control's hover box enclose the number instead of starting to the
+ * right of it.
+ *
+ * Before this, nothing indented a level at all: `--indent-step` reached only
+ * the source's own `indentN` classes further down, and `(a)`, `(1)` and `(A)`
+ * all sat flush at the same left edge on every section page.
+ */
+.section-body .prov {
+  padding-left: var(--indent-step);
+}
+
+/* The hanging number. Pulled back by exactly the step its parent added, so it
+ * starts where the parent's text starts; `min-width` and not `width`, so a
+ * designator too wide for the step — `(xxviii)` is 5.77ch against a 3ch step —
+ * pushes the words beside it along that one line rather than wrapping them
+ * underneath itself, which is the failure this shape exists to prevent.
+ *
+ * `vertical-align: top` keeps an inline-block from sitting on the text
+ * baseline's descender line and adding a pixel of leading to every rung. */
+.section-body .prov > .uslm-num {
+  display: inline-block;
+  min-width: var(--indent-step);
+  margin-left: calc(-1 * var(--indent-step));
+  margin-right: 0;
+  /* Inside the min-width under `border-box`, so a designator narrower than the
+   * step still lands the text at the step and a wider one keeps a gap. */
+  padding-right: 0.4em;
+  vertical-align: top;
+}
+
+/* The body of an unheaded level runs in behind its number — "(1) There is
+ * authorized to be appropriated…", one flow, the way the printed Code sets it.
+ * `<content>` renders as a `<p>` (block) so that a level with several of them
+ * gets paragraph spacing; the first one, when the number is all that precedes
+ * it, is the same sentence as the number and is set as one. Without this every
+ * rung spends a line on a number by itself, and at the seven-deep clause in
+ * `/us/usc/t16/s1391` that is seven lines of nothing.
+ *
+ * The adjacent-sibling combinator is doing the work: a level with a `<heading>`
+ * does not match, so `(a) In general` keeps its heading on the number's line
+ * and the text below. That case is left alone deliberately — running it in
+ * would need a separator between the heading and the first word, USLM 1.x
+ * writes none, and inventing an em dash the source does not have would be this
+ * page adding punctuation to a statute. */
+.section-body .prov > .uslm-num + .uslm-content,
+.section-body .prov > .uslm-num + .uslm-chapeau {
+  display: inline;
+}
+
+/* --------------------------------------------- the source's own indent scale
+ *
+ * Alongside the structural ladder the source writes `class="indent0"` …
+ * `indent7` on elements inside notes and tables — its own rendering of the
+ * printed edition's leading, 28,142 `indent0` and 16,117 `indent1` across the
+ * committed samples (`docs/verification/ladder.json`). One scale, so these
+ * spend the same step the ladder does.
+ *
+ * They were `[class*="indent"] { margin-left: var(--indent-step) }`, which gave
+ * exactly one step to everything whose class contained the word — including all
+ * 28,142 `indent0`, which means *no indent*, and including `indentUp0`,
+ * `indentDown2` and `indentTo54pts`, which mean three other things. Naming the
+ * levels is duller and correct. `indent6` and `indent7` exist (70 and 10) and
+ * had one step each.
+ *
+ * `firstIndent-N` is the printed Code's hanging paragraph, 13,976 of them, and
+ * is what the negative `text-indent` is: first line out to the left, the rest
+ * at the indent. It is a first-line rule, so it composes with the `indentN` on
+ * the same element rather than replacing it. */
+.indent0 {
+  margin-left: 0;
+}
+.indent1 {
   margin-left: var(--indent-step);
 }
 .indent2 {
@@ -2042,20 +2300,58 @@ main[id] {
 .indent5 {
   margin-left: calc(5 * var(--indent-step));
 }
+.indent6 {
+  margin-left: calc(6 * var(--indent-step));
+}
+.indent7 {
+  margin-left: calc(7 * var(--indent-step));
+}
 
+.firstIndent-1 {
+  text-indent: calc(-1 * var(--indent-step));
+}
+.firstIndent-2 {
+  text-indent: calc(-2 * var(--indent-step));
+}
+.firstIndent-4 {
+  text-indent: calc(-4 * var(--indent-step));
+}
+
+/* ------------------------------------------------------------- the apparatus
+ *
+ * Set in the interface face. A note about the law is not the law, and the
+ * cheapest way to say so on a page a drafter is scanning is to stop using the
+ * face the law is set in. */
 .uslm-sourceCredit {
+  font-family: var(--ui);
   font-size: 0.9rem;
+  line-height: 1.45;
   color: var(--muted);
   margin-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 0.5rem;
 }
 
 .uslm-note,
 .uslm-notes {
+  font-family: var(--ui);
   font-size: 0.92rem;
+  line-height: 1.5;
   border-left: 4px solid var(--rule);
   padding-left: 0.75rem;
   margin: 1rem 0;
   color: var(--muted);
+}
+
+/* A note's own heading — "Amendments", "References in Text", "Effective Date"
+ * — is part of the apparatus and takes the apparatus face. Without this it
+ * loses to `.section-body .uslm-heading`, which is a longer selector and sets
+ * the reading face, so every note in the corpus announced itself in Spectral
+ * inside a block set in Archivo. */
+.section-body .uslm-note .uslm-heading,
+.section-body .uslm-notes .uslm-heading,
+.section-body .uslm-sourceCredit .uslm-heading {
+  font-family: var(--ui);
 }
 
 
@@ -2375,11 +2671,63 @@ main[id] {
   color: var(--muted);
 }
 
+/* Quoted amending text (ADR-0054, kind 2).
+ *
+ * Words an amending act is moving around. They are statutory text, so they keep
+ * the reading face and the reading size — a drafter reads them as closely as
+ * the operative text — and everything else about the block says they are not in
+ * force here: a solid `--edge` rule rather than the notes' pale one, a tinted
+ * panel, and the word "Quoted" set down the edge.
+ *
+ * The distinction is worth the paint. Before this a block quotation and an
+ * editorial note were the same 4px `--rule` and nothing else, so the words an
+ * act *inserts* and the OLRC's prose *about* the insertion were told apart only
+ * by reading them.
+ *
+ * A `<section>` inside one of these is not a section (ADR-0005): it carries no
+ * `@identifier`, it is never stored or counted, and it renders here with its
+ * own number and heading because that is what the quotation says. */
 .uslm-quotedContent,
 .uslm-quotedText {
-  border-left: 4px solid var(--rule);
-  margin: 0.8rem 0 0.8rem 1rem;
-  padding-left: 0.8rem;
+  border-left: 3px solid var(--edge);
+  background: var(--panel);
+  margin: 1rem 0 1rem var(--indent-step);
+  padding: 0.6rem 0.8rem 0.6rem 0.9rem;
+  /* Back to the reading face and the reading size, wherever the quotation
+   * happens to sit. Most of them are inside an editorial note explaining the
+   * amendment that made them, and a note is set in the interface face — which
+   * the words of the amendment would otherwise inherit, setting the statutory
+   * text the act inserts in the face reserved for writing *about* the law. */
+  font-family: var(--reading);
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
+  color: var(--ink);
+}
+
+/* Named, not merely inset. The label is generated content, so it is decoration
+ * a screen reader never announces — the `<blockquote>` `uslm.ts` emits is what
+ * carries the fact to assistive technology, and this is the same fact for
+ * someone reading with their eyes. */
+.uslm-quotedContent::before,
+.uslm-quotedText::before {
+  content: "Quoted";
+  display: block;
+  font-family: var(--ui);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+
+/* An inline quotation is a phrase in a sentence and gets none of that — no
+ * panel, no rule, and above all no label, which would land in the middle of
+ * the sentence. `uslm.ts` decides inline or block per occurrence (ADR-0040);
+ * this is `.uslm-inlined` further down doing the cancelling, plus the one
+ * thing it cannot cancel because it is not a property of the element. */
+.uslm-inlined::before {
+  content: none;
 }
 
 /* `<note>` and `<quotedContent>` are block apparatus most of the time and part
@@ -2392,18 +2740,64 @@ main[id] {
 .uslm-inlined {
   display: inline;
   border: 0;
+  background: none;
   margin: 0;
   padding: 0;
+  /* Everything about the sentence it is in, not about the block it would have
+   * been. The face matters as much as the box: a quoted phrase inside an
+   * editorial note is part of that note's sentence, and switching to the
+   * reading face for three words in the middle of it is worse than the
+   * distinction is worth. */
   font-size: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
 }
 
-/* Wide tables scroll inside themselves rather than making the page scroll. */
-.section-body .uslm-table {
-  display: block;
+/* ------------------------------------------------------------------ tables
+ *
+ * The source's own columns (ADR-0054, kind 5). USLM 2.x carries 781 of them in
+ * `usc49.xml` alone, in the XHTML namespace, with a `<caption>` on 766;
+ * `Uslm2Parser` does not read them yet, and the treatment is here so that they
+ * arrive into a design rather than into a gap.
+ *
+ * Set in the interface face at the interface size: a table of fees or distances
+ * is data the statute carries, not a sentence of it, and Archivo's figures are
+ * tabular where Spectral's are not — a column of numbers that does not line up
+ * is a column that has to be read twice.
+ *
+ * The wrapper is the scrollable box and it is focusable (`uslm.ts`). A table
+ * wider than the column scrolls inside the wrapper rather than pushing the page
+ * sideways — WCAG 1.4.10, which `make shots` asserts at 320 CSS px — and
+ * because the wrapper takes `tabindex="0"` and a region role, a keyboard can
+ * reach the scroll. Two of those boxes without a keyboard route are already on
+ * `docs/a11y/known-violations.json`; this one is not going to be a third. */
+.uslm-tablewrap {
   overflow-x: auto;
-  border-collapse: collapse;
-  font-size: 0.9rem;
   max-width: 100%;
+  margin: 1rem 0;
+}
+
+.section-body .uslm-table {
+  border-collapse: collapse;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The table's own title, from `<caption>` — 766 of them in `usc49.xml`, and
+ * before ADR-0054 they were `<div>`s, which is not valid inside a `<table>`:
+ * the browser hoisted each one out above its table, unstyled, and the region
+ * had no accessible name to take. */
+.section-body .uslm-caption {
+  caption-side: top;
+  text-align: start;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding-bottom: 0.35rem;
 }
 
 .uslm-td,
@@ -2421,6 +2815,11 @@ main[id] {
 .target {
   background: var(--target);
   outline: 2px solid var(--target-edge);
+  /* Outside the box rather than on its edge. The hanging number of a `.prov`
+   * sits exactly at the padding edge (ADR-0054), which is where an unoffset
+   * outline is drawn — it struck through the opening parenthesis of every
+   * highlighted paragraph, and the rounded corner clipped the rest of it. */
+  outline-offset: 2px;
   border-radius: 0.15rem;
   scroll-margin-top: 4rem;
 }
@@ -3805,5 +4204,225 @@ main[id] {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ printing
+ *
+ * ADR-0054. Drafters print. What comes out of the printer has to be the
+ * document, with enough on it to say which document it is and as of when — a
+ * printed section that does not name its release point is a page of statutory
+ * text of unknown vintage, which is the one thing this project exists to
+ * prevent.
+ *
+ * Four decisions:
+ *
+ *   * **A running header on every page** — the citation, the release point and
+ *     the URL the page was printed from (`PrintHeader.astro`).
+ *   * **Notes and the source credit stay.** They collapse behind `<details>` on
+ *     a small screen; on paper there is no screen to save and a source credit
+ *     is what makes the print citable.
+ *   * **The chrome goes.** Navigation, search, the rail, the copy column, the
+ *     release picker, the footer: controls do nothing on paper. The release
+ *     *facts* stay — `ReleaseContext` is a statement, not a control.
+ *   * **References print their URLs.** A cross reference is the one thing on a
+ *     printed page that stops working, and `data-print-url` (`uslm.ts`) carries
+ *     the citation URL rather than the reader's own `/app` path.
+ */
+
+@page {
+  /* The top margin is deep enough to hold the running header, which sits in it
+   * at a negative offset. Everything else is an ordinary document margin. */
+  margin: 22mm 16mm 16mm;
+}
+
+@media print {
+  :root {
+    /* Nothing is sticky on paper, and `--sticky-h` is spent as
+     * `scroll-margin-top` — 25rem of it above the first provision would be a
+     * blank first page. */
+    --sticky-h: 0rem;
+
+    /* Ink on white, whatever the reader was looking at. A dark theme sent to a
+     * printer is a black page, and most printers drop the background and print
+     * the pale text on white, which is worse: it is the statute in 2:1
+     * contrast. Forcing the light values here means the printed page does not
+     * depend on which theme the screen was in. */
+    --page: #ffffff;
+    --panel: #ffffff;
+    --field: #ffffff;
+    --ink: #000000;
+    --muted: #333333;
+    --rule: #999999;
+    --edge: #555555;
+    --link: #000000;
+    --target: transparent;
+  }
+
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  /* The chrome. `!important` throughout: several of these are USWDS components
+   * whose own rules set `display` at a higher specificity than a class here. */
+  .usa-skipnav,
+  .topbar,
+  .usa-header,
+  .usa-footer,
+  .rail,
+  .copycol,
+  .copybtn,
+  .kbd-hint,
+  .picker,
+  .neighbors,
+  .theme-toggle,
+  .density-toggle,
+  .cite-preview {
+    display: none !important;
+  }
+
+  /* Paper is its own measure. The reading column is sized for a screen at a
+   * viewing distance; a page is narrower than that and already has margins. */
+  .reader-wrap,
+  .reader-wrap--wide,
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  .reader-layout {
+    display: block;
+  }
+
+  /* Notes and the source credit, open.
+   *
+   * `::details-content` is the hook the spec gives for the box a native
+   * `<details>` collapses, and it is the same one the ≥40em rule above uses.
+   * A browser without it prints whatever state the element was in — closed,
+   * unless the reader had opened it — which is the same fallback ADR-0027's
+   * rule already accepts and is recorded as ADR-0054's cost. */
+  .uslm-details::details-content {
+    content-visibility: visible !important;
+    block-size: auto !important;
+    overflow: visible !important;
+  }
+
+  /* The summary stays as the label above the block it opens, without the
+   * disclosure triangle, which points at nothing on paper. */
+  .uslm-details > summary {
+    list-style: none;
+    min-height: 0;
+    cursor: auto;
+  }
+
+  .uslm-details > summary::-webkit-details-marker,
+  .uslm-details > summary::marker {
+    display: none;
+    content: "";
+  }
+
+  /* Every reference's URL, after the words it is on. Angle brackets are the
+   * RFC 3986 convention for a URL inside running text, and they are what stops
+   * a trailing full stop being read as part of the address. `break-all`
+   * because a long identifier is not a word and hyphenating it is not on
+   * (`hyphens: manual` above); it may break anywhere rather than push the page
+   * sideways. */
+  .section-body a[data-print-url]::after {
+    content: " <" attr(data-print-url) ">";
+    font-family: var(--ui);
+    font-size: 0.78em;
+    font-weight: 400;
+    word-break: break-all;
+    color: #333333;
+  }
+
+  /* A link on paper is not a link. Underlining every cross reference in a
+   * section that has forty of them is a page of underscores. */
+  .section-body a {
+    text-decoration: none;
+    color: #000000;
+  }
+
+  /* A table has nowhere to scroll to, so the box that scrolls on screen opens
+   * up and the table takes the width it needs. */
+  .uslm-tablewrap {
+    overflow: visible;
+  }
+
+  /* Keep what can be kept whole on one page. A heading orphaned at the foot of
+   * a page is the cheap one to fix; a provision is not — some run for pages,
+   * and `break-inside: avoid` on those would leave whole pages blank. */
+  .section-body .uslm-heading,
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  .uslm-tablewrap,
+  .uslm-quotedContent {
+    break-inside: avoid;
+  }
+}
+
+/* The running header itself. Off-screen at all times except on paper, where it
+ * sits in the page's top margin — `@page` reserves 22mm and this hangs 14mm up
+ * into it, clear of the first line of text on every page. */
+.printhead {
+  display: none;
+}
+
+/* …and on `/app/design`, where the specimen is the component and has to be
+ * looked at (ADR-0053). Static rather than fixed: the print rule pins it to
+ * the page margin, which on screen would put it over the top of the document. */
+.spec__printhead .printhead {
+  display: flex;
+  position: static;
+  gap: 1.5em;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.4rem;
+}
+
+.spec__printhead .printhead__cite {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.spec__printhead .printhead__source {
+  margin-left: auto;
+}
+
+@media print {
+  .printhead {
+    display: flex;
+    position: fixed;
+    top: -14mm;
+    left: 0;
+    right: 0;
+    gap: 1.5em;
+    align-items: baseline;
+    font-family: var(--ui);
+    font-size: 8.5pt;
+    line-height: 1.3;
+    color: #333333;
+    border-bottom: 0.5pt solid #999999;
+    padding-bottom: 1.5mm;
+  }
+
+  .printhead__cite {
+    font-weight: 700;
+    color: #000000;
+  }
+
+  /* Pushed to the far edge, so the middle of the band is the release point and
+   * the two things a reader looks for — what and as of when — are together. */
+  .printhead__source {
+    margin-left: auto;
   }
 }

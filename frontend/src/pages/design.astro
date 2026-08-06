@@ -44,6 +44,7 @@ import CitationNotFound from "../components/CitationNotFound.astro";
 import CopyColumn from "../components/CopyColumn.astro";
 import NoResults from "../components/NoResults.astro";
 import Neighbors from "../components/Neighbors.astro";
+import PrintHeader from "../components/PrintHeader.astro";
 import ReleaseContext from "../components/ReleaseContext.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
 import SearchFacets from "../components/SearchFacets.astro";
@@ -92,10 +93,59 @@ const SPECIMEN_BEFORE = `<section xmlns="http://xml.house.gov/schemas/uslm/1.0"
       expended.</content>
     </paragraph>
   </subsection>
+  <subsection identifier="/us/usc/t0/s1/c">
+    <num value="c">(c)</num>
+    <heading>Conditions</heading>
+    <paragraph identifier="/us/usc/t0/s1/c/1">
+      <num value="1">(1)</num>
+      <chapeau>A specimen published under subsection (a) shall be accompanied by—</chapeau>
+      <subparagraph identifier="/us/usc/t0/s1/c/1/A">
+        <num value="A">(A)</num>
+        <content>a statement of the authority under <ref href="/us/usc/t0/s2">section 2 of
+        this title</ref>; and</content>
+      </subparagraph>
+      <subparagraph identifier="/us/usc/t0/s1/c/1/B">
+        <num value="B">(B)</num>
+        <clause identifier="/us/usc/t0/s1/c/1/B/i">
+          <num value="i">(i)</num>
+          <content>the date on which the specimen was prepared, and</content>
+        </clause>
+        <clause identifier="/us/usc/t0/s1/c/1/B/ii">
+          <num value="ii">(ii)</num>
+          <subclause identifier="/us/usc/t0/s1/c/1/B/ii/I">
+            <num value="I">(I)</num>
+            <content>the name of the officer who prepared it, or</content>
+          </subclause>
+          <subclause identifier="/us/usc/t0/s1/c/1/B/ii/II">
+            <num value="II">(II)</num>
+            <content>if no officer prepared it, a statement to that effect.</content>
+          </subclause>
+        </clause>
+      </subparagraph>
+    </paragraph>
+  </subsection>
+  <subsection identifier="/us/usc/t0/s1/d">
+    <num value="d">(d)</num>
+    <heading>Schedule of specimen fees</heading>
+    <table>
+      <caption>Fees payable under subsection (d)</caption>
+      <thead><tr><th>Class of specimen</th><th>Fee</th><th>Effective</th></tr></thead>
+      <tbody>
+        <tr><td>First class</td><td>$120</td><td>Jan. 1, 2024</td></tr>
+        <tr><td>Second class</td><td>$60</td><td>Jan. 1, 2024</td></tr>
+        <tr><td>Third class</td><td>$15</td><td>Jan. 1, 2026</td></tr>
+      </tbody>
+    </table>
+  </subsection>
   <sourceCredit>(Specimen, § 1, Jan. 1, 2024, 0 Stat. 0.)</sourceCredit>
   <notes>
     <note><heading>Specimen note</heading><p>This section is a specimen used by the design
     system page. It is not part of the United States Code.</p></note>
+    <note><heading>Amendment</heading><p><b>2026</b>—Subsec. (b)(1). Specimen Act of 2026
+    amended paragraph (1) by striking <quotedContent>$5,000,000</quotedContent> and inserting
+    the following:</p><quotedContent><p>$7,500,000 for each of fiscal years 2024 through 2030,
+    of which not more than 5 percent may be used for administrative expenses.</p>
+    </quotedContent></note>
   </notes>
 </section>`;
 
@@ -105,14 +155,17 @@ const SPECIMEN_AFTER = SPECIMEN_BEFORE.replace(
   "$5,000,000 for each of fiscal years\n      2024 through 2028.",
   "$7,500,000 for each of fiscal years\n      2024 through 2030.",
 ).replace(
-  "</subsection>\n  <sourceCredit>",
-  `  <paragraph identifier="/us/usc/t0/s1/b/3">
+  // Anchored on the paragraph it follows rather than on the subsection's close
+  // tag, which every subsection has: the specimen grew a (c) and a (d) and the
+  // added paragraph landed after the fee table.
+  "expended.</content>\n    </paragraph>",
+  `expended.</content>
+    </paragraph>
+    <paragraph identifier="/us/usc/t0/s1/b/3">
       <num value="3">(3)</num>
       <content>Not later than 1 year after each disbursement, the Secretary shall submit
       to Congress a report on amounts expended under this subsection.</content>
-    </paragraph>
-  </subsection>
-  <sourceCredit>`,
+    </paragraph>`,
 );
 
 const specimen = parseFragment(SPECIMEN_AFTER);
@@ -352,6 +405,8 @@ const TYPE_ROLES = [
     <p class="apidocs__contents-item"><a href="#chrome">Navigation chrome</a></p>
     <p class="apidocs__contents-item"><a href="#versions">Versions and redlines</a></p>
     <p class="apidocs__contents-item"><a href="#text">Statutory text and the copy control</a></p>
+    <p class="apidocs__contents-item"><a href="#density">Reading density</a></p>
+    <p class="apidocs__contents-item"><a href="#print">Print</a></p>
     <p class="apidocs__contents-item"><a href="#search">Search results</a></p>
     <p class="apidocs__contents-item"><a href="#messages">Messages</a></p>
   </nav>
@@ -660,15 +715,102 @@ const TYPE_ROLES = [
   <h2 class="toc-group" id="text">Statutory text and the copy control</h2>
 
   <p>
-    Statutory text, its indentation, its source credit and its notes — with the copy control
-    above it and a copy button in the gutter beside every provision. The controls appear only
-    when scripting is available, since there is no other way to write to a clipboard.
-    Subsection (b)(1) is highlighted the way a provision named in the URL is.
+    Five things share the reading column, and the specimen below carries all of them:
+    <strong>operative text</strong> in Spectral; <strong>quoted amending text</strong>, also in
+    Spectral because it is also statutory text, on a panel labelled <em>Quoted</em>;
+    <strong>editorial notes</strong> and the <strong>source credit</strong> in Archivo, the
+    face the site writes <em>about</em> the law in; and a <strong>table</strong> in Archivo with
+    tabular figures, inside a box that scrolls sideways and takes a tab stop so a keyboard can
+    reach the scroll.
+  </p>
+
+  <p>
+    The <strong>subsection ladder</strong> — (a), (1), (A), (i), (I) — is one step of
+    <code>--indent-step</code> per level, cumulative through the nesting, with the number
+    hanging into the step so that the numbers at one depth line up with the text at the depth
+    above. The step is <code>3ch</code> of the reading face, <code>2ch</code> below 40em; a
+    designator wider than the step pushes the words beside it along that line rather than
+    wrapping them under itself. The ladder goes seven deep in the corpus and 91.8% of sections
+    stop at three (<code>docs/verification/ladder.json</code>, from
+    <code>scripts/ladder.py</code>).
+  </p>
+
+  <p>
+    The copy control sits above the text with a button in the gutter beside every provision.
+    The controls appear only when scripting is available, since there is no other way to write
+    to a clipboard. Subsection (b)(1) is highlighted the way a provision named in the URL is.
   </p>
 
   <CopyColumn identifiers={copyTargets} release={null} />
 
   <article class="section-body" set:html={specimenHtml} />
+
+  {/* --------------------------------------------------------------- density */}
+  <h2 class="toc-group" id="density">Reading density</h2>
+
+  <p>
+    Two settings, chosen with the control in the header and remembered in
+    <code>localStorage</code> under <code>usc-density</code>. Comfortable is the default.
+    Compact moves three tokens — the reading size, the leading, and the space between
+    paragraphs — and nothing else. The setting is stamped on <code>&lt;html&gt;</code> before
+    first paint by the same head script that stamps the theme, so a page never renders at one
+    density and reflows to the other.
+  </p>
+
+  <p>
+    <code>--measure</code> is a multiple of <code>--reading-size</code> rather than a fixed
+    width, so the column narrows with the text and a compact page holds the same 62–70
+    characters a line. <code>--indent-step</code> is in <code>ch</code> of the reading face, so
+    the ladder narrows with it too. The readout below is the values in force right now.
+  </p>
+
+  <div class="spec">
+    <table class="usa-table usa-table--borderless pairs" data-density-table>
+      <thead>
+        <tr><th scope="col">Token</th><th scope="col">In force</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row"><code>data-density</code></th><td data-density-value>—</td></tr>
+        <tr><th scope="row"><code>--reading-size</code></th><td data-density-size>—</td></tr>
+        <tr><th scope="row"><code>--reading-leading</code></th><td data-density-leading>—</td></tr>
+        <tr><th scope="row"><code>--reading-gap</code></th><td data-density-gap>—</td></tr>
+        <tr><th scope="row"><code>--indent-step</code></th><td data-density-step>—</td></tr>
+        <tr><th scope="row"><code>--measure</code></th><td data-density-measure>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  {/* ----------------------------------------------------------------- print */}
+  <h2 class="toc-group" id="print">Print</h2>
+
+  <p>
+    Printing a section drops the chrome — navigation, search, the rail, the copy column, the
+    release picker, the footer — and keeps the document: the text, the notes and the source
+    credit, which are forced open whatever state their <code>&lt;details&gt;</code> was in on
+    screen. The theme does not travel: the printed page is black on white from either one.
+  </p>
+
+  <p>
+    A running header repeats at the top of every sheet, in the page's top margin. It carries
+    the citation, the release point, and the address the page was printed from. The specimen
+    below is the component, forced visible.
+  </p>
+
+  <div class="spec spec__printhead">
+    <PrintHeader
+      identifier="/us/usc/t0/s1/b/1"
+      release="119-102not101"
+      source="uscode.linkedlegislation.org/app/us/usc/t0/s1"
+    />
+  </div>
+
+  <p>
+    Every cross reference prints its URL after the words it sits on, in angle brackets — the
+    citation URL rather than the reader's own <code>/app</code> path, carrying the release point
+    so the printed reference resolves to the same vintage as the page it came from. In the
+    specimen above, <code>section 2 of this title</code> prints as
+    <code>&lt;/us/usc/t0/s2&gt;</code>.
+  </p>
 
   {/* ---------------------------------------------------------------- search */}
   <h2 class="toc-group" id="search">Search results</h2>
@@ -830,16 +972,46 @@ const TYPE_ROLES = [
           measureToken.textContent = token("--measure") || "unset";
           measureWidth.textContent = `${Math.round(sample.getBoundingClientRect().width)}px`;
         }
+
+        /* The density readout, on the same principle as the colour table:
+         * what is in force, not what is declared. `--indent-step` and
+         * `--measure` are read off the statutory text rather than off `<html>`,
+         * because `ch` and the `calc()` only become a length where they are
+         * used — the value on the root is the unresolved token text. */
+        const body = document.querySelector(".section-body");
+        const table = document.querySelector("[data-density-table]");
+        if (body && table) {
+          const text = getComputedStyle(body);
+          const rung = document.querySelector(".section-body .prov");
+          const wrap = document.querySelector(".reader-wrap");
+          const fill = (selector, value) => {
+            const cell = table.querySelector(selector);
+            if (cell) cell.textContent = value;
+          };
+          fill("[data-density-value]", root.dataset.density || "comfortable (default)");
+          fill("[data-density-size]", text.fontSize);
+          fill("[data-density-leading]", text.lineHeight);
+          fill("[data-density-gap]", token("--reading-gap") || "unset");
+          fill(
+            "[data-density-step]",
+            rung ? getComputedStyle(rung).paddingLeft : "unset",
+          );
+          fill(
+            "[data-density-measure]",
+            wrap ? getComputedStyle(wrap).maxWidth : "unset",
+          );
+        }
       }
 
       paint();
 
-      // The theme is an attribute on <html>, set by the header's toggle and by
-      // the pre-paint bootstrap. Watching it is what keeps this table honest
-      // without the toggle having to know this page exists.
+      // The theme and the density are attributes on <html>, set by the header's
+      // two toggles and by the pre-paint bootstrap. Watching them is what keeps
+      // these tables honest without either toggle having to know this page
+      // exists.
       new MutationObserver(paint).observe(root, {
         attributes: true,
-        attributeFilter: ["data-theme"],
+        attributeFilter: ["data-theme", "data-density"],
       });
 
       // The measured column width is a fact about the viewport, so it changes

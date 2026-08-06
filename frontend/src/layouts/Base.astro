@@ -16,6 +16,7 @@ import Breadcrumbs from "../components/Breadcrumbs.astro";
 import ReleaseContext from "../components/ReleaseContext.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
 import SectionBar from "../components/SectionBar.astro";
+import PrintHeader from "../components/PrintHeader.astro";
 import type { Entry, Release } from "../lib/types";
 import "../styles/site.scss";
 
@@ -95,6 +96,15 @@ const hasReleaseBlock = releaseContext !== null || picker !== null;
  *  two-column layout and the wide measure with nothing in the first column. */
 const hasRail = rail;
 const mainClass = wide || hasRail ? "reader-wrap reader-wrap--wide" : "reader-wrap";
+
+/** Where this page came from, for the printed running header (ADR-0054).
+ *
+ *  From the request's own `Host` rather than a configured canonical origin,
+ *  because there is no configured canonical origin — the same image serves
+ *  `localhost:8000` in development and `uscode.linkedlegislation.org` on the
+ *  box, and the URL worth printing is the one the reader actually used. The
+ *  scheme is left off: it is noise on paper and the host answers on both. */
+const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathname}`;
 ---
 
 <html lang="en">
@@ -156,6 +166,14 @@ const mainClass = wide || hasRail ? "reader-wrap reader-wrap--wide" : "reader-wr
         if (stored === "dark" || stored === "light") {
           document.documentElement.dataset.theme = stored;
         }
+        /* Reading density, on the same terms and for the same reason
+           (ADR-0054): it moves the reading size, so applied any later it
+           reflows the column in front of the reader. Same script, so it costs
+           no second blocking round trip. */
+        const density = localStorage.getItem("usc-density");
+        if (density === "compact" || density === "comfortable") {
+          document.documentElement.dataset.density = density;
+        }
       } catch {
         // No storage (private mode, blocked cookies) — the default stands.
       }
@@ -211,6 +229,13 @@ const mainClass = wide || hasRail ? "reader-wrap reader-wrap--wide" : "reader-wr
   </head>
   <body>
     <a class="usa-skipnav" href="#main">Skip to main content</a>
+
+    {/* The printed page's running header (ADR-0054). `display: none` on screen,
+        repeated in the top margin of every sheet in `@media print`. A direct
+        child of `<body>`, because a `position: fixed` box only repeats across
+        pages when nothing between it and the page is establishing a containing
+        block of its own. */}
+    <PrintHeader identifier={current?.identifier} release={release} source={printSource} />
 
     {/* One sticky stack, so scrolling statutory text never costs you the answer
         to "where am I" or "as of when". Desktop keeps the whole thing; below

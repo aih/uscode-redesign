@@ -11,6 +11,7 @@
 import AuthNav from "./AuthNav.astro";
 import ComingSoon from "./ComingSoon.astro";
 import SiteSearch from "./SiteSearch.astro";
+import DensityToggle from "./DensityToggle.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import {
   ACCOUNTS_ENABLED,
@@ -104,8 +105,9 @@ const { searchValue = null } = Astro.props;
           and still not worth two controls — the reader knows what they typed,
           the server can tell which it is, and two boxes sharing this row meant
           both were slivers below ~50em. `SiteSearch` is the merged one; the
-          theme toggle is the only thing left here that is about reading comfort
-          rather than navigation. */}
+          two toggles at the end are the reading-comfort controls rather than
+          navigation — the theme (ADR-0027) and the reading density
+          (ADR-0054), which is why they sit together. */}
       <div class="navtools">
         <SiteSearch value={searchValue} />
         {/* `AuthNav` is the island that asks `/api/v1/auth/me` who the reader
@@ -129,6 +131,7 @@ const { searchValue = null } = Astro.props;
             />
           </span>
         )}
+        <DensityToggle />
         <ThemeToggle />
       </div>
     </nav>

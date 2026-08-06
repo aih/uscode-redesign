@@ -1,0 +1,46 @@
+---
+/**
+ * The running header of a printed page (ADR-0054).
+ *
+ * Invisible on screen and repeated at the top of every sheet, carrying the
+ * three facts a printout of statutory text is useless without: which provision
+ * it is, which release point it was read at, and where it came from.
+ *
+ * The repetition is `position: fixed` in `@media print` (`site.scss`), which
+ * paged media repeats on each page, at a negative `top` so it sits in the
+ * page's top margin rather than over the first line of the text.
+ *
+ * It renders only for a page that is a provision — a page that has an
+ * identifier to name. The front page and the search results have nothing to put
+ * in a running header, and an empty band at the top of every sheet is worse
+ * than none.
+ */
+import { formatCitation } from "../lib/cite";
+
+interface Props {
+  /** The provision on screen. Nothing renders without one. */
+  identifier?: string | null;
+  /** The release point the text was served from. */
+  release?: string | null;
+  /** Host and path, from the request — the URL a reader would type to get this
+   * page back. Built by `Base.astro`, which is the only place that has the
+   * request. */
+  source?: string | null;
+}
+
+const { identifier, release, source } = Astro.props;
+---
+
+{
+  identifier && (
+    <div class="printhead">
+      <span class="printhead__cite">{formatCitation(identifier)}</span>
+      {release && (
+        <span class="printhead__rp">
+          Release point {release}
+        </span>
+      )}
+      {source && <span class="printhead__source">{source}</span>}
+    </div>
+  )
+}
