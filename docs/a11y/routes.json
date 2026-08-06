@@ -217,6 +217,10 @@
       "name": "the release switcher open in the sticky bar (ADR-0056)"
     },
     {
+      "id": "menus-open",
+      "name": "the header and footer menus open at a phone width (ADR-0058)"
+    },
+    {
       "id": "diff-source-expanded",
       "name": "redline with the source-XML details open (ADR-0026)"
     },

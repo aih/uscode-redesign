@@ -295,6 +295,22 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await page.locator("#asof").waitFor({ timeout: 5000 });
     },
   },
+  "menus-open": {
+    routeId: "section",
+    setup: async (page) => {
+      // Both site menus are `<details>` below 64em (ADR-0058), so this is the
+      // one scan in the matrix that reaches them as menus at all — the rest of
+      // it sees the navbar's list as a row and the footer's as a row. The
+      // viewport is set here rather than by the describe block: at 1280 the
+      // summary is `display: none` and there is nothing to open.
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator(".navmenu__summary").click();
+      await expect(page.locator(".navmenu")).toHaveAttribute("open", "");
+      await page.locator(".footmenu__summary").click();
+      await expect(page.locator(".footmenu")).toHaveAttribute("open", "");
+    },
+  },
   "diff-source-expanded": {
     routeId: "diff",
     setup: async (page) => {

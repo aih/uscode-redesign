@@ -263,6 +263,24 @@ test.describe("what the chrome costs", () => {
       expect(open).toBe(closed);
     });
   }
+
+  test("at 700px opening the site menu costs the stack nothing either", async ({ page }) => {
+    // The navbar is sticky in this band, so the hamburger's panel has to be out
+    // of flow for the same reason the release switcher's is (ADR-0056,
+    // ADR-0058). Seven links in flow is ~300px of header while it is open.
+    await page.setViewportSize({ width: 700, height: 900 });
+    await page.goto(SECTION);
+
+    const headerHeight = () =>
+      page.locator(".usa-header").evaluate((el) => el.getBoundingClientRect().height);
+
+    const closed = await headerHeight();
+    await page.locator(".navmenu__summary").click();
+    await expect(page.locator(".navmenu")).toHaveAttribute("open", "");
+    await expect(page.locator(".usa-nav__primary")).toBeVisible();
+
+    expect(await headerHeight()).toBe(closed);
+  });
 });
 
 test.describe("the chapter rail stays put while the text scrolls", () => {
