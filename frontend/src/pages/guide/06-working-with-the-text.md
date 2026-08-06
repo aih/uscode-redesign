@@ -2,10 +2,10 @@
 layout: ../../layouts/GuideLayout.astro
 title: Working with the text
 order: 6
-summary: Copying a provision with its citation, reading a cross reference without losing your place, citing an exact text, and the two settings the reader keeps.
+summary: Copying a provision with its citation, reading a cross reference without losing your place, citing an exact text, and the three reading settings the browser keeps.
 covers:
   routes: ["/app/settings"]
-  adrs: [3, 24, 27, 33, 41]
+  adrs: [3, 24, 27, 33, 41, 54]
 ---
 
 ## Copying a provision
@@ -127,6 +127,33 @@ steps:
     caption: One control in the header switches it.
   - expect: { selector: ".theme-toggle__label", contains: "Light" }
     caption: The choice is remembered, and lands before the page paints.
+```
+
+## Reading density
+
+**Comfortable or compact.** A second control in the header sets how much law fits on the screen.
+Comfortable is the default. Compact tightens the space between lines and between paragraphs and
+sets the text a little smaller. Like the theme, the choice is kept in the browser and applied
+before the page paints.
+
+The column narrows with the text, so a compact page holds the same number of characters per line as
+a comfortable one — the lines do not get longer, there are just more of them on the screen. On a
+long section compact is 11% to 16% shorter to scroll (`docs/verification/measure.json`). On a short
+one, or one built mostly of tables, it makes no difference or adds a percent or two, because a
+narrower column gives a table more rows to wrap into.
+
+```scenario
+id: density-toggle
+title: Switch the reading density to compact
+demo: true
+demoOrder: 135
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: Comfortable is the default setting.
+  - click: .density-toggle
+    caption: The control beside the theme toggle switches it.
+  - expect: { selector: ".density-toggle__label", contains: "Comfortable" }
+    caption: Compact is in force, and the control now offers the way back.
 ```
 
 **Links open in new tabs.** Cross references and search results open in a new tab by default, so you can stay in the section you were reading. [Settings](/app/settings) changes that to

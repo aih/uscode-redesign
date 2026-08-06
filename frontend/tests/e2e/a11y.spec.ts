@@ -257,6 +257,20 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     },
   },
+  "density-compact": {
+    routeId: "section",
+    setup: async (page) => {
+      // The other reading setting (ADR-0054). It moves the reading size, the
+      // leading and the paragraph gap, so it is a different rendering of the
+      // same page rather than a different widget on it — the same reason
+      // ADR-0027's themes are a whole axis of this matrix rather than a state.
+      // It is one scan and not an axis because the tokens it moves are sizes,
+      // and none of the rules here reads a size except through what it paints.
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator("[data-density-toggle]").click();
+      await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+    },
+  },
   "diff-source-expanded": {
     routeId: "diff",
     setup: async (page) => {

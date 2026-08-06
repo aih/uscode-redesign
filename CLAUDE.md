@@ -37,7 +37,8 @@ ratchet refuses a reader route or an ADR that no chapter accounts for. See Docum
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
 runs axe-core over the route matrix in `docs/a11y/routes.json` — 28 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and six
-interactive states, **265 scans in ~1m45s**, against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
+interactive states plus one for the compact reading density (ADR-0054), **266 scans in ~1m45s**,
+against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
 `waiveSeverity`. Every entry carries the task that owns the fix; the measured baseline is
@@ -146,15 +147,41 @@ compiler. **`WatchButton` is the one component the page does not cover**: accoun
 renders nowhere, and its island calls `/auth/me` on mount, which the page's no-data property and
 the test enforcing it will not have.
 
-`make test` = **545** Python tests; `make test-web` = **278** frontend tests; `make test-e2e` = **405**
-Playwright tests, 265 of which are the accessibility scan (**all three are required** — reader
+**The statute is set to a spec, and the spec is measured** (ADR-0054). **The subsection ladder did
+not exist**: `--indent-step` reached only the *source's* `indentN` classes, so `(a)`, `(1)` and
+`(A)` sat flush at one left edge on every section page. `uslm.ts` now marks every level below the
+section root `prov` from its own `LEVEL_TAGS` — the stylesheet names no USLM element — and `.prov`
+spends one step of `padding-left` per rung with the `<num>` hanging back into it. **One scale means
+the structural one wins on a level**: `.prov` zeroes the source's `margin-left`/`text-indent`, which
+were composing with it (§ 45f's subsections started 78px in, and two siblings at one depth sat 25px
+apart because the source wrote `indent1` on one and `indent0` on the other). The step is **`1.5em`,
+`1em` below 40em** — `em` and not `ch`, because **`.uslm-num` is bold and 3ch of Spectral Bold is
+3px wider than 3ch of Spectral**, so every designator hung 3px into the column above. `scripts/ladder.py`
+measures what it has to hold into `docs/verification/ladder.json`: **depth 7 at `/us/usc/t16/s1391`,
+11 of 11,512 sections, 91.8% within depth 3, median designator 3 characters and 8 at worst**. Inside
+the column, **the law is Spectral and everything written about the law is Archivo** — notes, source
+credit and tables move to the interface face, and quoted amending text is a `<blockquote>` on a
+labelled panel that keeps the reading face, because it is statutory text sitting inside a note that
+is not. Tables arrive in a keyboard-reachable region named from their `<caption>`, **766 of which
+USLM 2.x writes and which fell through to the `<div>` fallback** — invalid inside a `<table>`, so
+the browser hoisted each one out. **`--measure` is `calc(38 * var(--reading-size))`** so the
+character count rather than the width is held constant: **median 67, p10–p90 62–71, in both
+densities** (`make measure`, which now exits non-zero outside 62–70). The **reading-density control**
+(comfortable / compact) is `<html data-density>` stamped by the theme's own pre-paint bootstrap;
+**0px of `--sticky-h` at 700/1024/1280** and 56px of header on a phone, where the header is not
+sticky. **Print** drops the chrome, keeps the release facts, forces the notes open, and repeats a
+running header carrying the citation and the release point; every `<ref>` prints `data-print-url` —
+the citation URL, not the reader's `/app` path.
+
+`make test` = **545** Python tests; `make test-web` = **286** frontend tests; `make test-e2e` = **421**
+Playwright tests, 266 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(51 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(52 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -199,7 +226,15 @@ hops from the text it compares and the API diff is 5.1 s per request. State and 
 are in `claude-code/WORKSTREAM-B-STATE.md`; (2) rebuild the deployed search index and finish the
 deployment's open items (`docs/deploy-status.md`); (3) Day 7 hardening.**
 
-Open debts: **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
+Open debts: **the source's `indentUp0/1/2/3`, `indentDown1/2`, `indentTo54pts`,
+`indentTo65ptsHang`, `indent0And43pts` and `rightIndent1` classes are styled by nothing** — 8,733
+occurrences across the committed samples, all inside notes and tables. `[class*="indent"]` used to
+give each of them exactly one step, which was wrong for all of them; naming the levels leaves them
+unstyled rather than wrongly styled (ADR-0054's recorded cost), and reading them properly is its own
+task. **A headed level still breaks after its heading** — `(a) In general` then the text below,
+where the printed Code runs the two together: USLM 1.x writes no separator and 2.x writes
+`<inline class="noSmallCaps">.—</inline>` inside the heading, so running them in needs the renderer
+to tell those cases apart. **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **`/app/diff` is two hops from the text it compares**
 (section → version history → pick two → diff), which task B5 owns; **`previewHref` in `lib/url.ts`
@@ -386,6 +421,11 @@ uv run python scripts/inline_elements.py
                 # recount which USLM elements occur in running prose across the committed
                 # samples → docs/verification/inline-elements.json, which tests/uslm.test.ts
                 # reads element by element (ADR-0040). No database, no network.
+uv run python scripts/ladder.py
+                # how deep the (a)/(1)/(A)/(i) ladder goes and how wide its numbers get,
+                # across the committed samples → docs/verification/ladder.json (ADR-0054).
+                # frontend/tests/e2e/typography.spec.ts reads the depth it reports. No
+                # database, no network.
 uv run python scripts/contrast.py
                 # compute every declared colour pair from site.scss's token block, both
                 # themes → docs/verification/contrast.json (ADR-0042). Exits non-zero on a
@@ -394,9 +434,10 @@ uv run --with "fonttools[woff]" python scripts/fonts.py
                 # rebuild the two self-hosted faces from pinned google/fonts commits →
                 # frontend/public/fonts/ + docs/verification/fonts.json (ADR-0052). Byte
                 # reproducible; fontTools is deliberately not a project dependency.
-make measure    # characters per rendered line of statutory text at 375/768/1280, and the
-                # scroll length of three sections → docs/verification/measure.json
-                # (ADR-0052). Needs `make dev-all` running.
+make measure    # characters per rendered line of statutory text at 375/768/1280 in both
+                # reading densities, and the scroll length of three sections in each
+                # → docs/verification/measure.json (ADR-0052, ADR-0054). Exits non-zero
+                # when a median leaves 62–70. Needs `make dev-all` running.
 uv run python scripts/search_eval.py score
                 # score every scoring profile in storage/searchquery.py against
                 # docs/verification/search-judgements.json → search-relevance.json

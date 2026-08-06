@@ -153,14 +153,14 @@ describe("structure", () => {
     });
 
     expect(html).toContain('id="/us/usc/t16/s45f/a"');
-    expect(html).toMatch(/class="uslm-subsection target"/u);
+    expect(html).toMatch(/class="uslm-subsection prov target"/u);
   });
 
   it("copies the source @class through, so indentN styling survives (BUILDLOG 008 item 1)", () => {
     const xml = `<section ${NS}><subsection class="indent2 firstIndent-2"><content>text</content></subsection></section>`;
     const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
 
-    expect(html).toContain('class="uslm-subsection indent2 firstIndent-2"');
+    expect(html).toContain('class="uslm-subsection prov indent2 firstIndent-2"');
   });
 
   it("renders a table with real HTML table tags, not divs", () => {
@@ -170,6 +170,99 @@ describe("structure", () => {
     expect(html).toContain("<table");
     expect(html).toContain("<tr");
     expect(html).toContain("<td");
+  });
+});
+
+/* ------------------------------------------------------------- ADR-0054
+ *
+ * The typography spec is mostly `site.scss`, but three things it needs cannot
+ * be expressed in a stylesheet: which elements are rungs of the ladder, that a
+ * block quotation is a quotation in the markup, and that a table arrives inside
+ * something a keyboard can reach.
+ */
+describe("the subsection ladder", () => {
+  const LADDER = `<section ${NS} identifier="/us/usc/t0/s1"><num>§ 1.</num>
+    <subsection identifier="/us/usc/t0/s1/a"><num>(a)</num>
+      <paragraph identifier="/us/usc/t0/s1/a/1"><num>(1)</num>
+        <subparagraph identifier="/us/usc/t0/s1/a/1/A"><num>(A)</num>
+          <clause identifier="/us/usc/t0/s1/a/1/A/i"><num>(i)</num>
+            <content>text</content></clause></subparagraph></paragraph></subsection></section>`;
+
+  it("marks every level below the section as a rung, and the section as none", () => {
+    const html = render(parseFragment(LADDER), { target: null, release: null, labels: {} });
+
+    for (const level of ["subsection", "paragraph", "subparagraph", "clause"]) {
+      expect(html).toContain(`class="uslm-${level} prov"`);
+    }
+    // The section is the column the ladder is drawn in, not a rung in it: one
+    // step of indent here would push every provision on the page right by one.
+    expect(html).toContain('class="uslm-section"');
+  });
+
+  it("nests the rungs, so the indent is cumulative rather than counted", () => {
+    const html = render(parseFragment(LADDER), { target: null, release: null, labels: {} });
+    const opens = html.split("<div").length - 1;
+
+    // Four levels, four divs, each inside the last — the stylesheet adds one
+    // step per rung and the nesting does the arithmetic.
+    expect(opens).toBe(5);
+    expect(html.indexOf("uslm-subsection")).toBeLessThan(html.indexOf("uslm-paragraph"));
+    expect(html.indexOf("uslm-clause")).toBeLessThan(html.indexOf("</div>"));
+  });
+});
+
+describe("quoted amending text", () => {
+  it("renders a block quotation as <blockquote>", () => {
+    const xml = `<section ${NS}><quotedContent><p>inserted words</p></quotedContent></section>`;
+    const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
+
+    expect(html).toContain('<blockquote class="uslm-quotedContent"');
+    expect(html).toContain("</blockquote>");
+  });
+
+  it("leaves a quotation inside a sentence inline (ADR-0040)", () => {
+    const xml = `<section ${NS}><p>by striking <quotedContent>and</quotedContent> each place</p></section>`;
+    const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
+
+    expect(html).not.toContain("<blockquote");
+    expect(html).toContain("uslm-inlined");
+  });
+});
+
+describe("tables", () => {
+  it("wraps a table in a region a keyboard can scroll", () => {
+    const xml = `<section ${NS}><table><tr><td>a</td></tr></table></section>`;
+    const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
+
+    expect(html).toContain('class="uslm-tablewrap" role="region" tabindex="0"');
+    expect(html).toContain('aria-label="Table"');
+  });
+
+  it("names the region from the table's own caption", () => {
+    const xml = `<section ${NS}><table><caption>Fees payable</caption><tr><td>a</td></tr></table></section>`;
+    const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
+
+    expect(html).toContain('aria-label="Fees payable"');
+    // USLM 2.x writes 766 of these and they used to fall through to a `<div>`,
+    // which is not valid inside a `<table>`.
+    expect(html).toContain('<caption class="uslm-caption"');
+  });
+});
+
+describe("printable reference URLs", () => {
+  it("gives an internal reference the citation URL, not the reader's own", () => {
+    const xml = `<section ${NS}><p><ref href="/us/usc/t16/s1">§ 1</ref></p></section>`;
+    const html = render(parseFragment(xml), { target: null, release: "119-99", labels: {} });
+
+    expect(html).toContain('href="/app/us/usc/t16/s1?release=119-99"');
+    expect(html).toContain('data-print-url="/us/usc/t16/s1?release=119-99"');
+  });
+
+  it("prints a govinfo link as the URL it already is", () => {
+    const xml = `<section ${NS}><p><ref href="/us/stat/100/1">100 Stat. 1</ref></p></section>`;
+    const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
+
+    expect(html).toMatch(/data-print-url="https:\/\/[^"]*govinfo\.gov[^"]*"/u);
   });
 });
 

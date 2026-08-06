@@ -1637,3 +1637,83 @@ here distinguishes the two cases, so the pattern is worth avoiding rather than r
 Verified on the running site: `/app/us/usc/t16/s45f` now serves `§ 45e Violations of park
 regulations; penalty`. Re-ran all three suites (545 / 278 / 405) and `make shots`; the byte budget
 is unchanged at 20,412 against 21,000, since none of the four ships script.
+
+## 053 — 2026-08-05 — Session 31: workstream C task C3, statute typography
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Task C3, the statute typography spec. Measure 62–70 characters at the default size,
+  `text-wrap: pretty`, no justification. The subsection ladder — (a) (1) (A) (i) — as one
+  indentation scale with hanging numbers, scannable when deeply nested and still readable at 320px,
+  where the ladder degrades to a smaller step rather than wrapping into the number. Distinguish,
+  visually and semantically, operative text, quoted amending text, editorial notes, source credit
+  and the tables USLM 2.x carries. A print stylesheet: citation and release point in the running
+  header, notes retained, chrome gone, URLs of `<ref>`s printed. An optional reading-density
+  control as a token switch, persisted like the theme, with no layout shift.
+- **Decided:** **[ADR-0054](docs/adr/0054-typography-for-statutory-text.md)**.
+  - **The subsection ladder did not exist.** `--indent-step` was documented as the lever for
+    provision depth and reached only `[class*="indent"]` — the *source's* `indentN` classes, which
+    occur inside notes and tables. No rule indented a `<subsection>`, a `<paragraph>` or a
+    `<clause>`, so on every section page in the corpus `(a)`, `(1)` and `(A)` sat flush at one left
+    edge. `uslm.ts` now marks every level below the section root `prov` from its own `LEVEL_TAGS`
+    (architecture rule 5 — the stylesheet names no USLM element), and `.prov` spends one step of
+    `padding-left`, cumulative through the nesting, with the `<num>` pulled back by exactly that
+    step.
+  - **One scale means the structural one wins on a level element.** `.prov` zeroes `margin-left`
+    and `text-indent`, so `<subsection class="indent2 firstIndent-2">` no longer composes with the
+    ladder. Outside a level, where the source's scale is the only one there is, `indent0` through
+    `indent7` spend N steps and `firstIndent-N` is the negative `text-indent` it describes —
+    replacing `[class*="indent"]`, which gave exactly one step to all 28,142 `indent0` (meaning no
+    indent) and to `indentUp0`, `indentDown2` and `indentTo54pts` (meaning three other things).
+  - **The step is `1.5em`, `1em` below 40em** — `em`, not `ch`, and that mattered: `.uslm-num` is
+    bold, 3ch of Spectral Bold is 3px wider than 3ch of Spectral, and every designator hung 3px
+    into the column above it. `em` is font-*size* relative and weight does not change font size.
+  - **The law is Spectral and everything written about the law is Archivo**, applied inside the
+    reading column. Notes, source credit and tables move to the interface face; quoted amending
+    text becomes a `<blockquote>` on a labelled panel and keeps the reading face, because it is
+    statutory text and almost always sits inside a note that is not.
+  - **Tables arrive in a keyboard-reachable region** named from their own `<caption>` — 766 of
+    which USLM 2.x writes and which were falling through to the `<div>` fallback, invalid inside a
+    `<table>` and hoisted out of it by the browser.
+  - **`--measure` is a multiple of `--reading-size`**, so the character count rather than the width
+    is what is held constant, and `--measure-wide` is `calc(var(--measure) + 18rem)` for the same
+    reason.
+  - **Reading density** as `<html data-density>`, `usc-density` in `localStorage`, stamped by the
+    same pre-paint bootstrap as the theme. Three tokens move and nothing else.
+  - **Print**: a `position: fixed` running header in the page's top margin carrying the citation,
+    the release point and the host and path; notes forced open; the chrome gone and the release
+    *facts* kept; `data-print-url` on every `<ref>` so the citation URL prints rather than the
+    reader's `/app` path.
+- **Produced:** commits `1bdcc38..917149d`. `scripts/ladder.py` +
+  `docs/verification/ladder.json`; `frontend/src/components/{DensityToggle,PrintHeader}.astro`;
+  `frontend/tests/e2e/typography.spec.ts`; changes to `uslm.ts`, `site.scss`, `Base.astro`,
+  `SiteHeader.astro`, `design.astro`, `measure.mjs`, `uslm.test.ts`, `docs/js-budgets.json`,
+  `docs/a11y/routes.json`, `a11y.spec.ts`, guide chapters 02 and 06, and 48 screenshots.
+- **Verified:**
+  - `uv run python scripts/ladder.py` → 11,512 sections across the four committed samples. Depth 7
+    at `/us/usc/t16/s1391` (11 sections), 91.8% within depth 3, median designator 3 characters and
+    8 at worst, 39 numbers with an editorial footnote body parked inside them, 56 distinct source
+    `indent`-bearing class attributes.
+  - `make measure` → median **67** characters, p10–p90 **62–71**, at 768 and 1280, in **both**
+    densities (columns 606px and 576px). The script now exits non-zero outside 62–70. Compact is
+    11.2%–16.0% shorter to scroll on the two long sections and +1.3%/+1.7% on the short and the
+    table-heavy one.
+  - `make test` **545**, `make test-web` **286**, `make test-e2e` **421** (up from 405; 266 of them
+    the axe scan, which gains a compact-density state and still reports **8 violation/route pairs
+    over 1,794 nodes**). `make shots` clean but for the known `/app/docs` 3px reflow.
+  - Header cost of the density control, measured in `typography.spec.ts`: **0px at 700, 1024 and
+    1280**, so `--sticky-h` is unchanged and no anchor jump moves. At 375 it wraps `.navtools` to a
+    fourth row and the header grows 56px, where the header is not sticky.
+- **Candidate tasks found and not done here:**
+  - **`indentUp0/1/2/3`, `indentDown1/2`, `indentTo54pts`, `indentTo65ptsHang`, `indent0And43pts`
+    and `rightIndent1` are now styled by nothing** — 8,733 occurrences across the samples, all
+    inside notes and tables. They were each getting one step from the substring selector, which was
+    wrong for all of them; reading them properly is its own task.
+  - **A headed level still breaks after its heading.** `(a) In general` then the text below, where
+    the printed Code runs the two together. USLM 1.x writes no separator and USLM 2.x writes
+    `<inline class="noSmallCaps">.—</inline>` inside the heading; running the two in needs the
+    renderer to tell those cases apart.
+  - **USLM 2.x's `designator`, `label`, `referenceItem`, `headingItem`, `groupItem`, `listItem` and
+    `listContent` are in no vocabulary in `uslm.ts`** and fall through to the `<div>` fallback.
+    Mostly inside `<toc>`, which is skipped, but `Uslm2Parser`'s table work will meet them.
+  - **The running header depends on `@page { margin-top: 22mm }` staying larger than it is**, and
+    nothing asserts the relationship.

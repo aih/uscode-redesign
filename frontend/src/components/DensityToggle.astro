@@ -1,0 +1,71 @@
+---
+/**
+ * How much law fits on the screen — comfortable or compact (ADR-0054).
+ *
+ * The same shape as `ThemeToggle` beside it, deliberately: one button, one
+ * attribute on `<html>`, one `localStorage` key, and no cookie, so statutory
+ * text stays one cacheable response for every reader (ADR-0018).
+ *
+ * Comfortable is the default and is what every number in
+ * `docs/verification/measure.json` is measured at. Compact spends less on the
+ * space between lines and between paragraphs; it does not shrink the column's
+ * character count, because `--measure` is a multiple of the reading size
+ * (`site.scss`), so a compact page is the same 62–70 characters a line in a
+ * narrower column rather than a wider line in the same one.
+ *
+ * Three things about it are deliberate, and the first two are `ThemeToggle`'s
+ * reasons repeated because they are the same reasons.
+ *
+ *   * **Applied before first paint, in `Base.astro`.** This setting moves the
+ *     reading size and the leading. Applied by this island, it would reflow the
+ *     provision the reader is looking at, a beat after they see it.
+ *   * **Hidden until scripted.** Without JavaScript the button cannot do
+ *     anything, and a dead control in the chrome is worse than no control.
+ *   * **The label is a fixed width.** It names the setting the click will move
+ *     to, so it alternates between "Compact" and "Comfortable" — two different
+ *     widths, in a flex row, which without a reserved width would shove the
+ *     theme toggle sideways on every click.
+ */
+---
+
+<button
+  type="button"
+  class="usa-button usa-button--unstyled density-toggle"
+  data-density-toggle
+  hidden
+>
+  <span class="density-toggle__icon" aria-hidden="true">≡</span>
+  <span class="density-toggle__label">Compact</span>
+</button>
+
+<script is:inline>
+  {
+    const KEY = "usc-density";
+    const root = document.documentElement;
+    const button = document.querySelector("[data-density-toggle]");
+    const label = button.querySelector(".density-toggle__label");
+
+    function paint() {
+      // The label names the destination, not the current state.
+      const compact = root.dataset.density === "compact";
+      label.textContent = compact ? "Comfortable" : "Compact";
+      const name = `Switch to ${compact ? "comfortable" : "compact"} reading density`;
+      button.setAttribute("aria-label", name);
+      button.title = name;
+    }
+
+    button.addEventListener("click", () => {
+      const next = root.dataset.density === "compact" ? "comfortable" : "compact";
+      root.dataset.density = next;
+      try {
+        localStorage.setItem(KEY, next);
+      } catch {
+        // No storage — it applies here and is not remembered.
+      }
+      paint();
+    });
+
+    paint();
+    button.hidden = false;
+  }
+</script>
