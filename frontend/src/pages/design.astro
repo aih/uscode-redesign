@@ -676,9 +676,12 @@ const TYPE_ROLES = [
   <p class="spec__label">Release switcher</p>
 
   <p>
-    Two GET forms, no scripting: the newest text, a named release point, or a date. Two rather
-    than one because <code>?release=</code> beats <code>?date=</code> when both arrive, so a single
-    form would silently ignore whichever control the reader had just set.
+    A disclosure in the context bar, whose closed summary is the release point the page is
+    reading. Open it for two GET forms, no scripting: the newest text, a named release point, or a
+    date. Two rather than one because <code>?release=</code> beats <code>?date=</code> when both
+    arrive, so a single form would silently ignore whichever control the reader had just set.
+    Closed, it is the same one line the bar carried when the release point was only stated there,
+    so the sticky stack costs the same either way.
   </p>
 
   <div class="spec">

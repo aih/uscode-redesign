@@ -1020,8 +1020,9 @@ main[id] {
   color: var(--ink);
 }
 
-/* The release point, in the sticky bar, as text. `--muted` on `--panel` is a
- * measured pair (`scripts/contrast.py`). */
+/* The release point, in the sticky bar, as text — the fallback for a page that
+ * knows which release it is showing and has no list of the others to offer.
+ * `--muted` on `--panel` is a measured pair (`scripts/contrast.py`). */
 .contextbar__rp {
   margin: 0;
   font-size: 0.9rem;
@@ -1034,15 +1035,144 @@ main[id] {
 
 /* Below 40em the context bar scrolls away with the rest of the chrome (only
  * `.sectionbar` pins), so this repeats the release band a few pixels above it
- * and buys nothing. It earns its line only where it stays on screen. */
+ * and buys nothing. It earns its line only where it stays on screen. The
+ * *switcher* below is not hidden the same way: it is the only route to another
+ * release point, and a control the phone cannot reach is a feature the phone
+ * does not have. */
 @media (max-width: 39.99em) {
   .contextbar__rp {
     display: none;
   }
 }
 
-/* Which text this is, and how to ask for a different one — one block, directly
- * under the chrome, above the page's own heading. */
+/* ------------------------------------------------- the release switcher
+ *
+ * A `<details>` in the sticky bar. Closed, it is one line the same size as the
+ * `.contextbar__rp` it replaces, so `--sticky-h` is unchanged. Open, the panel
+ * is taken out of flow — otherwise the stack grows by the height of a date
+ * field and every anchor jump on the page lands behind the bar.
+ *
+ * `position: relative` here rather than on `.contextbar__inner`, so the panel
+ * is positioned against the control at every use — including `/app/design`,
+ * which renders this component outside the chrome (ADR-0053's rule: a component
+ * whose layout depends on an ancestor class it does not own is a component that
+ * is right in one place). */
+.rpswitch {
+  position: relative;
+  font-size: 0.9rem;
+  /* As wide as the words in it. In the context bar it is a flex item and would
+   * shrink to that anyway; `/app/design` renders it as a block, where without
+   * this the summary is a full-width slab that looks like nothing the bar
+   * shows. */
+  width: fit-content;
+}
+
+/* A border rather than a caret alone. The words in this bar were a statement
+ * until now, and a reader who has seen them there for eight sessions has no
+ * reason to try clicking them; the outline is what says this one is a control.
+ * `--rule` is the decorative token, which is right here — the affordance is not
+ * carried by the border alone, since the summary is a real disclosure widget
+ * and announces itself as one. */
+.rpswitch__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  white-space: nowrap;
+  cursor: pointer;
+  /* Bigger than the line box it replaces, and small enough that the line box is
+   * still what sets the bar's height. */
+  padding: 0.2rem 0.5rem;
+  margin: -0.2rem 0;
+  border: 1px solid var(--rule);
+  border-radius: 0.15rem;
+  list-style: none;
+}
+
+/* Safari draws its own triangle through a pseudo-element that `list-style` does
+ * not reach. */
+.rpswitch__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The affordance, drawn rather than taken from the list marker, so it can point
+ * down when closed and up when open. `--muted` is the pair already measured
+ * against `--panel`. */
+.rpswitch__summary::after {
+  content: "▾";
+  color: var(--muted);
+  margin-left: 0.15rem;
+}
+
+.rpswitch[open] > .rpswitch__summary::after {
+  content: "▴";
+}
+
+.rpswitch__summary:hover {
+  background: var(--field);
+  border-color: var(--edge);
+}
+
+/* The same ring `.copybtn` and the hover card draw. A bare `<summary>` is not
+ * one of USWDS's components, so nothing gives it one otherwise. */
+.rpswitch__summary:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: 0;
+}
+
+.rpswitch__what {
+  color: var(--muted);
+}
+
+/* The panel drops from the right edge of the summary, because the summary sits
+ * at the right end of the bar and a panel hung from its left would run off a
+ * 375px screen.
+ *
+ * `z-index` above `.sectionbar`'s 500: below 40em `.topbar` is `display:
+ * contents` (see the sticky stack), so this panel and the pinned section bar
+ * are siblings in the body's own stacking context and the later one would
+ * otherwise paint over it. */
+.rpswitch__panel {
+  position: absolute;
+  z-index: 600;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  /* Stated rather than shrink-to-fit. Left to size itself the panel takes the
+   * width of the longest release label in the menu — `119-102not101 —
+   * 07/12/2026` and a `<select>`'s own chrome — which is a control whose width
+   * is decided by the corpus. */
+  width: 21rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.75rem 1rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 0.25rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* On a phone the panel is as wide as the bar, so the control it hangs from has
+ * to be too: an 18rem panel anchored to the right edge of a 12rem summary runs
+ * off whichever side of the screen the summary is not against. A row of its
+ * own, and the panel takes both edges of it — which keeps the panel positioned
+ * against the switcher at every width, rather than against an ancestor that
+ * `display: contents` has dissolved in this band. */
+@media (max-width: 29.99em) {
+  .rpswitch {
+    flex-basis: 100%;
+    width: auto;
+  }
+
+  .rpswitch__panel {
+    left: 0;
+    right: 0;
+    /* `left`, `right` and `width` together over-constrain the box, and it is
+     * `right` that the browser drops. The edges are what this band wants. */
+    width: auto;
+    max-width: none;
+  }
+}
+
+/* Which text this is — the release facts, directly under the chrome, above the
+ * page's own heading. */
 .releaseblock {
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
@@ -1091,20 +1221,32 @@ main[id] {
   color: var(--muted);
 }
 
-/* iOS zooms the page when a control's text is under 16px; tap targets follow
+/* The two forms inside the switcher's panel. A column rather than the wrapping
+ * row this was while it sat across the page body: the panel is 18rem wide, and
+ * two labelled controls with their buttons do not fit beside each other in it.
+ *
+ * iOS zooms the page when a control's text is under 16px; tap targets follow
  * the 44px guidance. Both were BUILDLOG 008 findings. */
 .picker {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 1rem 2rem;
-  margin-top: 1rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
 }
 
 .picker__form {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
+}
+
+/* The label-and-control pair takes whatever the Go button beside it leaves.
+ * `min-width: 0` because a flex item's default minimum is its content, and a
+ * `<select>` whose longest option is a release label and a date will not shrink
+ * below it — the button went off the edge of the panel instead. */
+.picker__form > div {
+  flex: 1;
+  min-width: 0;
 }
 
 .picker__form--date {
@@ -1129,9 +1271,22 @@ main[id] {
   min-height: 2.75rem;
 }
 
+/* USWDS gives `.usa-button` `width: 100%` below its full-width breakpoint —
+ * 480px — which is right for a button that owns its row and wrong for one
+ * sitting beside the control it submits. At 320px it took the whole line and
+ * squeezed the release menu beside it to nothing. */
+.picker__go {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* The release labels carry their currency date — `119-102not101 — 07/12/2026` —
+ * so the menu is given the panel's whole width rather than being truncated to
+ * the label the reader is choosing between. */
 .picker__select {
   margin-top: 0;
-  max-width: 15rem;
+  width: 100%;
+  max-width: none;
 }
 
 .picker__label {
@@ -4576,6 +4731,7 @@ dialog.shortcuts {
   .contents,
   .shortcuts,
   .picker,
+  .rpswitch,
   .neighbors,
   .theme-toggle,
   .density-toggle,

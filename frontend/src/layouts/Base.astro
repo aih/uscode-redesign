@@ -84,10 +84,11 @@ const {
   rail = false,
   wide = false,
 } = Astro.props;
-const hasContext = crumbs.length > 0 || current !== null;
-/** The release band and the switcher under it: one block, at the top of the
- *  content, on every page that knows which release point it is showing. */
-const hasReleaseBlock = releaseContext !== null || picker !== null;
+const hasContext = crumbs.length > 0 || current !== null || picker !== null;
+/** The release facts, at the top of the content, on every page that knows which
+ *  release point it is showing. The *switcher* is no longer under them — it is
+ *  in the sticky bar, folded into the line that states the release point. */
+const hasReleaseBlock = releaseContext !== null;
 /** Whether this page is supplying the `rail` slot, and so wants the two-column
  *  reading layout. The guide asks for `wide` directly; a rail implies it.
  *
@@ -253,17 +254,27 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
           <div class="contextbar">
             <div class="contextbar__inner">
               <Breadcrumbs crumbs={crumbs} current={current} release={release} />
-              {/* The release point as text, not as a control. The switcher used
-                  to live here; the date field it grew would not fit — at 700px
-                  the sticky stack has 19px of headroom under `--sticky-h`, and
-                  that token is what `scroll-margin-top` spends. So the answer
-                  to "as of when" stays pinned and the means of changing it sits
-                  with the rest of the release facts, below. */}
-              {release && (
-                <p class="contextbar__rp">
-                  <span class="contextbar__rplabel">Release point</span> {release}
-                </p>
-              )}
+              {/* "As of when", stated and changed in one place. The switcher is
+                  a `<details>` whose closed summary carries the same words the
+                  plain `<p>` below it carries, so the sticky stack costs the
+                  same either way and `--sticky-h` does not move; the panel it
+                  opens is absolutely positioned and paints over the page.
+
+                  The `<p>` is the fallback for a page that knows its release
+                  point and has no list of the others to offer — a title or
+                  chapter table of contents whose release lookup failed, and the
+                  design system's own specimen. */}
+              {
+                picker ? (
+                  <ReleasePicker {...picker} />
+                ) : (
+                  release && (
+                    <p class="contextbar__rp">
+                      <span class="contextbar__rplabel">Release point</span> {release}
+                    </p>
+                  )
+                )
+              }
             </div>
           </div>
         )
@@ -283,8 +294,7 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
           {
             hasReleaseBlock && (
               <div class="releaseblock">
-                {releaseContext && <ReleaseContext {...releaseContext} />}
-                {picker && <ReleasePicker {...picker} />}
+                <ReleaseContext {...releaseContext!} />
               </div>
             )
           }

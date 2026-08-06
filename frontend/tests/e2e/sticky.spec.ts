@@ -185,23 +185,25 @@ test.describe("what sticks at each width", () => {
 
     await expect(page.locator(".usa-header")).toBeInViewport();
     await expect(page.locator(".usa-breadcrumb")).toBeInViewport();
-    // The release point, not the switcher. `.picker` used to be here and moved
-    // out of the sticky stack in ADR-0044: the date field it grew did not fit
-    // in the headroom `--sticky-h` had left. What has to stay pinned is the
-    // *answer* to "as of when", and that is this.
-    await expect(page.locator(".contextbar__rp")).toBeInViewport();
-    await expect(page.locator(".contextbar__rp")).toContainText("119-102not101");
+    // The release point — the answer to "as of when", and now also the control
+    // that changes it. The switcher's closed summary carries the same words the
+    // plain `<p>` here used to, which is what let it back into the stack: the
+    // date field that pushed it out in ADR-0044 is in a panel that is only laid
+    // out when the disclosure is open, and out of flow when it is.
+    await expect(page.locator(".rpswitch__summary")).toBeInViewport();
+    await expect(page.locator(".rpswitch__rp")).toContainText("119-102not101");
     await expect(page.locator(BAR)).toBeInViewport();
   });
 });
 
-test.describe("what moving the switcher out of the sticky stack bought", () => {
+test.describe("what the chrome costs", () => {
   /**
-   * The reason `.picker` is no longer pinned (ADR-0044). `--sticky-h` is what
-   * `scroll-margin-top` spends, so every rem the chrome takes is a rem of the
-   * viewport a deep-linked provision starts below. The switcher grew a date
-   * field; rather than raise the token in a band the backlog already flags for
-   * carrying 19rem of chrome, the control moved down to the release facts.
+   * `--sticky-h` is what `scroll-margin-top` spends, so every rem the chrome
+   * takes is a rem of the viewport a deep-linked provision starts below. The
+   * release switcher is back in this stack as a `<details>`, and this is the
+   * assertion that says it was free: its closed summary is one line where the
+   * release point was already one line, and the panel that holds the date field
+   * is `position: absolute`, so opening it moves nothing.
    *
    * Asserted as headroom rather than as a number: the point is that the stack
    * fits inside the token with room to spare, and a future addition that eats
@@ -238,6 +240,27 @@ test.describe("what moving the switcher out of the sticky stack bought", () => {
       });
 
       expect(spare).toBeGreaterThanOrEqual(size.headroom);
+    });
+
+    test(`at ${size.name} (${size.width}px) opening the release switcher costs the stack nothing`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await page.goto(SECTION);
+
+      const barHeight = () =>
+        page.locator(".contextbar").evaluate((el) => el.getBoundingClientRect().height);
+
+      const closed = await barHeight();
+      await page.locator(".rpswitch__summary").click();
+      await expect(page.locator(".rpswitch")).toHaveAttribute("open", "");
+      await expect(page.locator("#asof")).toBeVisible();
+      const open = await barHeight();
+
+      // The panel is out of flow. In flow it is a label, a menu, a label, a
+      // field, two buttons and a hint — about 180px of bar, which is the whole
+      // reason ADR-0044 moved this control out of the chrome in the first place.
+      expect(open).toBe(closed);
     });
   }
 });
