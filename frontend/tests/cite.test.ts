@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { formatCitation } from "../src/lib/cite";
+import { formatCitation, resultCitation } from "../src/lib/cite";
 import { CITATION_FORMS } from "../src/lib/citationforms";
 
 describe("formatCitation", () => {
@@ -84,4 +84,34 @@ describe("the documented citation forms round-trip", () => {
       }
     },
   );
+});
+
+describe("resultCitation", () => {
+  it("names the title a search hit is in", () => {
+    // `§ 232` is a section number in 58 titles, and the row it labelled said
+    // which one only in the URL under it.
+    expect(resultCitation("5", "§ 232.", "section")).toBe("5 U.S.C. § 232.");
+  });
+
+  it("writes an appendix title the way a citation writes it", () => {
+    expect(resultCitation("5a", "§ 3.", "section")).toBe("5 U.S.C. App. § 3.");
+  });
+
+  it("keeps the source's own num verbatim", () => {
+    // An en dash is what OLRC writes and no keyboard has (gotcha 17); the
+    // section symbol is already there and must not be added twice.
+    expect(resultCitation("16", "§ 45a\u20131.", "section")).toBe("16 U.S.C. § 45a\u20131.");
+  });
+
+  it("keeps a structural node's own word for its level", () => {
+    // `16 U.S.C. ch. 1` is the citation form; `CHAPTER 1` is what the source
+    // prints and what the reader is looking at.
+    expect(resultCitation("16", "CHAPTER 1\u2014", "structure")).toBe("Title 16, CHAPTER 1\u2014");
+  });
+
+  it("falls back to whichever half it has", () => {
+    expect(resultCitation(null, "§ 232.", "section")).toBe("§ 232.");
+    expect(resultCitation("16", null, "structure")).toBe("Title 16");
+    expect(resultCitation(null, null, "section")).toBeNull();
+  });
 });

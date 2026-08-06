@@ -15,6 +15,7 @@
  * Extracted from `search.astro` so `/app/design` renders this component rather
  * than a copy of its markup.
  */
+import { resultCitation } from "../lib/cite";
 import type { SearchResultItem } from "../lib/types";
 import { appHref, versionsHref } from "../lib/url";
 import { highlightHtml } from "../lib/uslm";
@@ -30,6 +31,10 @@ const { result, release = null } = Astro.props;
 
 const headingHit = result.snippets.find((s) => s.field === "heading");
 const body = result.snippets.filter((s) => s.field !== "heading");
+
+// `§ 232` is a section number in 58 titles. The row leads with the whole
+// citation instead, which is the form a reader can write down.
+const citation = resultCitation(result.title_num, result.num, result.type);
 ---
 
 <li class="searchresult">
@@ -38,7 +43,9 @@ const body = result.snippets.filter((s) => s.field !== "heading");
       the other nineteen. `data-newtab` lets the reader's preference undo it. */}
   <h3 class="searchresult__title">
     <a href={appHref(result.identifier, release)} target="_blank" rel="noopener" data-newtab>
-      {result.num ? `${result.num} ` : ""}
+      {/* The trailing space is inside the expression: a bare text node between
+          two expressions does not survive the Astro compiler. */}
+      {citation ? <span class="searchresult__cite">{`${citation} `}</span> : ""}
       {
         headingHit ? (
           <span set:html={highlightHtml(headingHit.text)} />
