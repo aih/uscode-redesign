@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { diffLinesHtml, documentDiff, sourceDelta } from "../src/lib/diffdoc";
+import { diffLinesHtml, diffSummary, documentDiff, sourceDelta } from "../src/lib/diffdoc";
 import { parseFragment, readingBlocks } from "../src/lib/uslm";
 
 const NS = 'xmlns="http://xml.house.gov/schemas/uslm/1.0"';
@@ -207,5 +207,28 @@ describe("sourceDelta", () => {
     expect(sourceDelta("<section id='idAAA'>T.</section>", "<section id='idCCC'>T.</section>")).toBe(
       "guids-only",
     );
+  });
+});
+
+describe("diffSummary", () => {
+  const summaryOf = (changed: number, inserted: number, deleted: number) =>
+    diffSummary({ lines: [], changed, inserted, deleted });
+
+  it("says nothing changed in the words a reader asked for", () => {
+    // The line the page leads with. What the source did to the markup while
+    // saying the same thing goes in the paragraph under it.
+    expect(summaryOf(0, 0, 0)).toBe("No text changes");
+  });
+
+  it("carries the unit on every part", () => {
+    // "2 added" was a count of nothing in particular on a section that had
+    // only gained text.
+    expect(summaryOf(0, 2, 0)).toBe("2 lines added");
+    expect(summaryOf(0, 0, 3)).toBe("3 lines removed");
+    expect(summaryOf(1, 0, 0)).toBe("1 line changed");
+  });
+
+  it("reads in the order the redline does", () => {
+    expect(summaryOf(3, 1, 2)).toBe("3 lines changed, 1 line added, 2 lines removed");
   });
 });
