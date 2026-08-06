@@ -1697,7 +1697,7 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     densities (columns 606px and 576px). The script now exits non-zero outside 62–70. Compact is
     11.2%–16.0% shorter to scroll on the two long sections and +1.3%/+1.7% on the short and the
     table-heavy one.
-  - `make test` **545**, `make test-web` **286**, `make test-e2e` **420** (up from 405; 266 of them
+  - `make test` **545**, `make test-web` **286**, `make test-e2e` **421** (up from 405; 266 of them
     the axe scan, which gains a compact-density state and still reports **8 violation/route pairs
     over 1,794 nodes**). `make shots` clean but for the known `/app/docs` 3px reflow.
   - Header cost of the density control, measured in `typography.spec.ts`: **0px at 700, 1024 and

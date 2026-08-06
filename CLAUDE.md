@@ -173,7 +173,7 @@ sticky. **Print** drops the chrome, keeps the release facts, forces the notes op
 running header carrying the citation and the release point; every `<ref>` prints `data-print-url` —
 the citation URL, not the reader's `/app` path.
 
-`make test` = **545** Python tests; `make test-web` = **286** frontend tests; `make test-e2e` = **420**
+`make test` = **545** Python tests; `make test-web` = **286** frontend tests; `make test-e2e` = **421**
 Playwright tests, 266 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
