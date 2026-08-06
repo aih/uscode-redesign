@@ -36,9 +36,10 @@ ratchet refuses a reader route or an ADR that no chapter accounts for. See Docum
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
 runs axe-core over the route matrix in `docs/a11y/routes.json` — 29 route entries (one expanding to
-every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and six
-interactive states plus one for the compact reading density (ADR-0054) and one for the open shortcut
-dialog (ADR-0055) and one for the open release switcher (ADR-0056), **268 scans in ~1m45s**,
+every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and ten
+interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
+(ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
+(ADR-0058) — **269 scans in ~1m45s**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -220,15 +221,38 @@ offset of its own: `--sticky-h` is a scroll-margin budget rounded up over the ta
 (`.topbar` alone), so honouring 19rem as a `top` offset started the list 180px below the bar — the
 reason the rule there had read "not sticky, deliberately".
 
-`make test` = **545** Python tests; `make test-web` = **299** frontend tests; `make test-e2e` = **449**
-Playwright tests, 268 of which are the accessibility scan (**all three are required** — reader
+**The site menus collapse into a hamburger below 64em** (ADR-0058, amending ADR-0011). `SiteHeader`
+argued the other way — "a menu you must tap to see is worse than four links you can already read" —
+when there were four links; there are seven, and nine in the footer, and measured on
+`/us/usc/t16/s45f` that was **416px of header and 326px of footer nav at 375px** on an 812px screen.
+Both are now a native `<details>`, the disclosure ADR-0056 chose for the release switcher, so it
+still costs no script and `<summary>` carries its own expanded state. The header's panel is
+`position: absolute` — the header is sticky between 40em and 64em, so a panel in flow would be
+`--sticky-h` growing while it is open — and the footer's is in flow, since nothing down there is
+pinned; the disclaimer stays outside the disclosure. From 64em up the summary is hidden and
+**`::details-content` is forced visible**, which is the only way to reach a closed `<details>`'s
+content, with an `@supports not selector(::details-content)` fallback that leaves the hamburger
+rather than leaving the nav unreachable. **`--sticky-h` drops 25rem → 23rem** in the 40em band
+(sticky stack 393 → 297px at 640, 337 → 241 at 700; header 416 → 232 at 375, 216 → 120 at 700).
+Two traps: **USWDS's `*, ::before, ::after { box-sizing: inherit }` matches no pseudo-element**, so
+`::details-content` broke the chain, every link inherited `content-box`, and USWDS's `height: 100%`
+on `.usa-nav__link` made that **28px of extra desktop header** — at widths that never see the
+hamburger; and **USWDS's small-width `.usa-nav` is a centred flex *column***, so overriding it with
+`display: flex` alone stacked the chrome and read `.navtools`' 16rem `flex-basis` as a height. The
+same session: a search result leads with its citation (`resultCitation` in `lib/cite.ts` — `16
+U.S.C. § 3831`, or `Title 16, CHAPTER 1—` for a structural node), and the redline's top line is the
+result alone — `No text changes`, or `2 lines added` — with the three `sourceDelta` cases moved to
+the paragraph under it.
+
+`make test` = **545** Python tests; `make test-web` = **307** frontend tests; `make test-e2e` = **457**
+Playwright tests, 269 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(56 ADRs, numbered to 0057 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(57 ADRs, numbered to 0058 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -454,7 +478,7 @@ make test-web   # vitest: the USLM renderer + reading-text extraction, the refer
                 # the document redline, url/cache/preview helpers — and the guide ratchet
                 # (ADR-0038), which fails when a route or an ADR is in no guide chapter
 make test-a11y  # the accessibility scan alone (ADR-0039): axe-core over docs/a11y/routes.json at
-                # three viewports, both themes, forced-colors and six interactive states →
+                # three viewports, both themes, forced-colors and ten interactive states →
                 # docs/verification/a11y.json. Fails on any violation not in
                 # docs/a11y/known-violations.json. Needs `make dev-all` running.
 make test-e2e   # playwright: what only a browser can answer — the theme toggle (light default,
