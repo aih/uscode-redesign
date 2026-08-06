@@ -1804,3 +1804,19 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `make shots` — 48 PNGs, no horizontal overflow at 320 CSS px or at 1280 zoomed to 200%, apart from the known `/app/docs` 3px (task A4).
   - Two layout defects found by screenshotting rather than by a test: USWDS gives `.usa-button` `width: 100%` below 480px, so at 320px the Go button took the row and the release menu beside it collapsed to nothing; and below 30em `.topbar` is `display: contents`, so a panel positioned against anything but `.rpswitch` itself had no containing block short of the viewport and `top: 100%` put it a screen height down the page.
   - The JS budgets rose by one 500-byte step on 14 routes (`/app/us/usc` 37,500 → 38,000) for the `bottom` case in `KeyboardNav`'s inline island. `/app/design`, `/app/login`, `/app/provisions` and `/app/settings` still pass at their old ceilings.
+
+## 056 — 2026-08-06 — Session 34: documentation audit; the task list, not the fixes
+
+- **Tool/model:** Claude Code, Fable 5 (audit and task list); the fix session is assigned to Opus.
+- **Asked:** Audit every documentation surface for accuracy and consistency — the user guide, demo captions, style guide, keyboard shortcuts, search guide, API documentation, README — and prepare a task list for a future Opus session. Consistency first; second, remove the prose tics the style rules forbid (the named example: `guide/index.astro:32-34`, "Those steps are not an illustration… rather than sit here misleading you").
+- **Decided:** No fixes this session; findings go to [claude-code/DOC-AUDIT-TASKS.md](claude-code/DOC-AUDIT-TASKS.md) in five tiers with file:line evidence, a verified-correct list, and constraints for the fix session. No ADR — nothing here changes a design.
+- **Findings (headline):**
+  - Guide 09 says "six interactive states"; `docs/a11y/routes.json` has nine. Guide 01's "three-minute demo" is 4 m 33 s. Guide 05's "repeating a prefix widens it" holds for three of the six prefixes. The search syntax page says `release:`/`date:` work "only through the URL" while its own operator table documents them working in the box.
+  - README (last touched 2026-08-03) carries test counts 474/185/74 against the current 545/299/449, says the site is local-only with deploy as the next step, and never names `uscode.linkedlegislation.org`.
+  - `docs/ia-map.md:109-113` still places the release switcher outside the sticky stack (reversed by ADR-0056). `docs/backlog.md` B1/B2 rest on stale premises (18rem, `site.scss:106`, ~1,270 lines vs 4,909). `docs/deploy-status.md` contradicts itself on PR #18 and the index rebuild, and carries a third test count (475).
+  - CLAUDE.md's own two errors: "56 ADRs" (55 files; ADR-0048 never existed) and "28 route entries" (29).
+  - OpenAPI never mentions rate limits; 429 is declared on three routes and undeclared on three others that return it; 15 routes have no summary; the labels 100-identifier bound is enforced but unstated.
+  - ~90 prose-rule violations across the guide, captions, about page, syntax page and README, each quoted with file:line in the task file.
+  - Verified correct and recorded as such: all corpus numbers everywhere they appear, the full 13-binding shortcut table, guide 03's ADR-0056 switcher section, guide 04's redline claims, README's links and corpus table.
+- **Produced:** `claude-code/DOC-AUDIT-TASKS.md`; this entry. One commit.
+- **Verified:** Findings were produced by three parallel read-only audit passes and the load-bearing ones re-checked by hand before recording: `ls docs/adr/*.md | wc -l` → 55; `routes.json` → 29 routes / 9 states; `scenes.json` `totalMs` → 272,967; README:75 counts; `docs/backlog.md` holds only B1/B2 while B5 lives in `claude-code/WORKSTREAM-B-STATE.md` (so `ia-map`'s B5 reference stands, corrected from a draft finding). Re-check any item by opening the file:line the task names.
