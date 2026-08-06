@@ -1,4 +1,4 @@
-"""Release-point label parsing (CLAUDE.md gotcha 4 / PLAN §9.3).
+"""Release-point label parsing (CLAUDE.md gotcha 4 / PLAN §9.4).
 
 Labels like `119-102not101` don't sort lexically, and skip suffixes can
 compound (`277not255not268`). Everything that needs release ordering uses the

@@ -12,11 +12,14 @@ This file is for work with no ADR behind it.
 
 ## B1. The smart sticky header
 
-`--sticky-h: 18rem` between 40em and 64em (`frontend/src/styles/site.scss:106`)
+*Partly overtaken by ADR-0056 (2026-08-05), which answers the "re-measure before
+designing" item below. The rest of the proposal stands.*
+
+`--sticky-h: 19rem` between 40em and 64em (`frontend/src/styles/site.scss:442`)
 permanently occupies roughly 37% of a landscape-tablet viewport, and
-`scroll-margin-top` reserves 296px above every anchor jump so that a deep-linked
-provision clears the bar. Below 40em the mitigation is real and well-engineered
-(`site.scss:319-331`); the middle breakpoint has none.
+`scroll-margin-top` reserves that much plus 0.5rem above every anchor jump so that a
+deep-linked provision clears the bar (`site.scss:775`). Below 40em the mitigation is
+real and well-engineered; the middle breakpoint has none.
 
 The proposal is a "smart scroll" chrome: hide the main `.topbar` on scroll down,
 restore it on scroll up, and keep only the compact `SectionBar` pinned at all times.
@@ -28,25 +31,26 @@ rather than a patch:
   are added one at a time and measured. The refresh in Session 10 added ~3 KB total.
 - `--sticky-h` currently drives `scroll-margin-top`. If the bar's height becomes a
   function of scroll direction, the anchor-jump guarantee has to be re-derived — the
-  e2e assertion that holds the 18rem figure honest (`make test-e2e`) is testing a
+  e2e assertion that holds the 19rem figure honest (`make test-e2e`) is testing a
   static number today.
-- ADR-0027's measurement is the authority on the real stack height, and it
-  disagrees with the 18rem figure quoted in the (now deleted) unapproved UI plan.
-  Re-measure before designing.
+- The stack has since been measured three times: ADR-0044 (19px of headroom under
+  `--sticky-h` at 700px), ADR-0054 (0px of `--sticky-h` at 700, 1024 and 1280, and
+  56px of non-sticky header on a phone) and ADR-0056 (89px at 700px, asserted in
+  `frontend/tests/e2e/sticky.spec.ts`). Those are the figures to design against.
 
 *Origin: the surviving half of `docs/ui-improvements-plan-unapproved.md`, folded in
 here 2026-07-30 when that untracked file was deleted.*
 
 ## B2. Break up the monolithic `site.scss`
 
-`frontend/src/styles/site.scss` is ~1,270 lines in one file. Component-specific
+`frontend/src/styles/site.scss` is ~4,900 lines in one file. Component-specific
 rules could move into the `<style>` block of the Astro component they belong to and
 get Astro's scoping for free, leaving `site.scss` for tokens, resets, and the USWDS
 `@forward` list.
 
 This is worth doing mainly because of what it would have caught: `signup.astro`'s
 `usa-hint` class renders unstyled because `site.scss` never `@forward`s that USWDS
-package, and nothing about a 1,270-line global file makes that visible. Any refactor
+package, and nothing about a 4,900-line global file makes that visible. Any refactor
 must keep the ADR-0027 theme tokens (`--page`, `--ink`, `--muted`, `--panel`,
 `--link`) global — they are stamped on `<html data-theme>` before first paint and
 every component reads them.
@@ -69,7 +73,9 @@ in, so that a later reader does not go looking for it:
   claim is that the law is legible. Not adopted.
 - **Typography upgrade to a webfont** (Inter for the UI apparatus) — a webfont is a
   render-blocking external asset on a server-rendered site whose page weight is
-  currently one ~3 KB island. Not adopted at that price.
+  currently one ~3 KB island. Not adopted at that price. *Overtaken by ADR-0052
+  (2026-08-05): two faces are now served from this origin, Latin-subset WOFF2 built
+  by `scripts/fonts.py` — 125,720 bytes, 45,872 of it preloaded, no external host.*
 - **Micro-animations / `transition: all 0.2s ease`** — `transition: all` is a
   performance and accessibility footgun, and nothing here honours
   `prefers-reduced-motion`. Not adopted as written.

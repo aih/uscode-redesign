@@ -39,14 +39,22 @@ class SettingsUpdateIn(BaseModel):
     open_links_in_new_tab: bool
 
 
-@settings.get("", response_model=SettingsOut)
+@settings.get(
+    "",
+    response_model=SettingsOut,
+    summary="This account's reading preferences",
+)
 def get_settings(user: RequireUserDep, accounts: AccountsDep) -> SettingsOut:
     """Defaults for a user who has never saved a preference — `get_settings`
     does not write, so reading this costs no row (storage/accounts.py)."""
     return SettingsOut.of(accounts.get_settings(user.id))
 
 
-@settings.put("", response_model=SettingsOut)
+@settings.put(
+    "",
+    response_model=SettingsOut,
+    summary="Change this account's reading preferences",
+)
 def update_settings(
     body: SettingsUpdateIn, user: RequireUserDep, accounts: AccountsDep, _csrf: RequireCsrfDep
 ) -> SettingsOut:

@@ -9,8 +9,7 @@ covers:
 ---
 
 There is one box in the header and it answers two kinds of question. Type a citation and it goes
-straight there; type anything else and it searches the text. You do not have to tell it which you
-meant.
+straight there; type anything else and it searches the text.
 
 ```scenario
 id: citation-box
@@ -19,13 +18,13 @@ demo: true
 demoOrder: 90
 steps:
   - goto: /app/
-    caption: One box takes a citation or a phrase — you do not have to say which.
+    caption: One box takes a citation or a phrase.
   - fill: { selector: ".navtools .sitesearch__input", value: "16 usc 45f" }
     caption: Type a citation in more or less any written form.
   - click: .navtools .sitesearch__go
     caption: And it goes straight to the provision.
   - expect: { selector: ".doc-title", contains: "45f" }
-    caption: 16 U.S.C. § 45f — no need to know the URL scheme at all.
+    caption: 16 U.S.C. § 45f.
 ```
 
 ## Going to a citation
@@ -33,13 +32,11 @@ steps:
 Fourteen written forms are accepted — `16 U.S.C. § 45f`, `16 usc 45f`, `16 USC 45f(c)(5)`,
 `/us/usc/t16/s45f` and the rest. The [search and citation guide](/app/search/syntax#citations)
 lists every one of them with a worked example, and each example there prints the identifier it
-resolves to. That list is generated from the parser's own table, so it cannot describe a form the
-site does not accept.
+resolves to. That list is generated from the parser's own table.
 
-Two things to look out for: a bare section number with no title
-(`523`) is searched rather than resolved, because it is not a citation; and an appendix citation
-like `5 U.S.C. App. 3` parses but resolves to nothing, because the OLRC publishes nothing at that
-flat address.
+A bare section number with no title (`523`) is searched rather than resolved. An appendix citation
+like `5 U.S.C. App. 3` parses and resolves to nothing: the OLRC publishes no section at that flat
+address.
 
 ```scenario
 id: citation-forms-listed
@@ -60,8 +57,8 @@ the [syntax guide](/app/search/syntax#operators).
 
 ### Scoping a search
 
-Six prefixes narrow a search without changing the words in it. They can be combined, and they can
-be mixed with the operators above.
+These prefixes narrow a search without changing the words in it. They combine with each other and
+with the operators above.
 
 | Prefix | Example | What it does |
 |---|---|---|
@@ -74,8 +71,10 @@ be mixed with the operators above.
 
 A value with a space in it goes in quotes: `heading:"wild horses"`.
 
-Repeating a prefix widens it — `title:16 title:33` searches both. Using two different prefixes
-narrows — `title:16 status:repealed` is repealed provisions of Title 16 alone.
+Repeating `title:`, `chapter:` or `status:` widens the search: `title:16 title:33` searches both
+titles. Repeating `heading:` narrows it — every term must appear in the heading. Repeating
+`release:` or `date:` keeps the last value given. Two different prefixes narrow: `title:16
+status:repealed` is repealed provisions of Title 16 alone.
 
 ```scenario
 id: search-scope-title
@@ -134,9 +133,12 @@ steps:
 ### Narrowing what you got back
 
 Above the results are the titles and statuses the matches fall into, each with a count. Selecting
-one adds it to the query rather than to a separate control, so the address bar always holds the
-whole search — the words, the filters, the release point and the order. A search you paste into a
-brief or a ticket arrives as the search you ran.
+one adds it to the query rather than to a separate control, and the address bar holds the whole
+search — the words, the filters, the release point and the order. A search pasted elsewhere is the
+search you ran.
+
+Each group lists at most twelve values. A group whose single value covers every result is left out,
+unless that value is a filter already applied.
 
 ```scenario
 id: search-facet-goes-in-the-url
@@ -149,17 +151,19 @@ steps:
   - click: .facets__value--status
     caption: Selecting one narrows the search.
   - expect: { url: "status" }
-    caption: The filter is written into the query, so the URL is the whole search.
+    caption: The filter is written into the query, and the URL is the whole search.
 ```
 
 ### Ordering the results
 
-Results come back by relevance. Two other orders are available:
+Results come back by relevance, which is `sort=relevance` in the address. The **Order** control
+above the results writes the other two values:
 
-- **Citation order** — the Code's own order, title by title. Chapter and subchapter headings sort
-  ahead of every section of their title rather than immediately before the sections they contain.
-- **Recently amended** — newest text first, by the release point at which each provision's current
-  text first appeared.
+- **Citation order**, `sort=citation` — the Code's own order, title by title. Chapter and
+  subchapter headings sort ahead of every section of their title rather than immediately before the
+  sections they contain.
+- **Recently amended**, `sort=recent` — newest text first, by the release point at which each
+  provision's current text first appeared.
 
 ```scenario
 id: search-sort-citation
@@ -175,13 +179,13 @@ steps:
 A match in a section's heading counts for more than one in its body, and a section whose text
 carries the words together counts for more than one that merely contains all of them somewhere.
 
-The ordering is measured rather than asserted. `docs/verification/search-judgements.json` holds 37
+The ordering is measured. `docs/verification/search-judgements.json` holds 37
 queries with the provisions a drafter would expect for each, and
 `uv run python scripts/search_eval.py score` scores the ranking against them. The result is in
 `docs/verification/search-relevance.json`.
 
-Ranking by words has a limit worth knowing: it cannot favour a provision whose heading does not
-contain the words you searched for. The Freedom of Information Act is 5 U.S.C. § 552, headed
+Ranking by words has one limit. It cannot favour a provision whose heading does not contain the
+words you searched for. The Freedom of Information Act is 5 U.S.C. § 552, headed
 *Public information; agency rules, opinions, orders, records, and proceedings*, and a search for
 `freedom of information` does not put it first.
 
@@ -197,16 +201,15 @@ steps:
     caption: Matches are highlighted, and each result says where it sits in the Code.
 ```
 
-A search that finds nothing offers you the loosened version of your own query rather than a blank
-page, and links to the syntax guide.
+A search that finds nothing offers the loosened version of the query you typed, and links to the
+syntax guide.
 
 ### Searching at a release point
 
 Add `&release=` or `&date=` to a search and it runs against the text as it stood then, and
-`release:` and `date:` in the box do the same. The results page always says which it did — *“In the
-text as of release point …”* or *“Searching the law currently in force.”* — so you can tell from
-the answer which question was asked. When both a parameter and a prefix name a release point, the
-parameter wins.
+`release:` and `date:` in the box do the same. The results page says which it did — *“In the text as
+of release point …”* or *“Searching the law currently in force.”* When both a parameter and a prefix
+name a release point, the parameter wins.
 
 A search of the text in force also reports where the words used to be. A result reading *“also
 matched in 4 earlier versions”* is a provision whose current text no longer contains what you
@@ -214,15 +217,18 @@ searched for; the link goes to its version history.
 
 Where the source publishes more than one provision under a single identifier at one release point,
 the index holds one of them and the result says so. The section page shows every occurrence. This
-affects 49 identifiers across 14 titles.
+affects 49 identifiers across 14 titles — 160 (identifier, release point) pairs, 9 of them in the
+text currently in force.
 
 ### Asking what cites a provision
 
-Prefixing a query with `cites` — `cites 26 usc 501` — searches for the text of that citation. Note that this is a keyword search rather than a structured reverse-citation index.
+Prefixing a query with `cites` — `cites 26 usc 501` — searches for the text of that citation. It is
+a keyword search over that text, not a structured reverse-citation index, and the results page says
+so.
 
 ```scenario
 id: cites-is-honest
-title: The "cites" prefix says what it actually is
+title: The "cites" prefix says what it is
 steps:
   - goto: /app/search?q=cites+16+usc+45f&cites=1
   - expect: { selector: "main", contains: "keyword search" }

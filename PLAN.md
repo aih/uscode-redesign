@@ -9,6 +9,8 @@ Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering al
 > **Two findings worth carrying forward.** (1) Loading a *real* second release point showed the content-hash dedupe collapsing nothing — guids regenerate at every RP by design (§9.1), so an untouched section's raw XML differs at every one of them: 0 of 5,095 Title 16 sections had identical raw XML between the two RPs, 5,093 were identical once `@id` was stripped, 2 had really been amended. Hashing is now over guid-stripped content ([ADR-0007](docs/adr/0007-dedupe-on-guid-stripped-content.md)); §9.1 and §9.10 were both already written down, and what was missing was the observation that the first defeats the second. (2) Building the reader showed that **every browser had been getting raw XML at the demo URL**: `Accept:` was substring-matched, and Chrome asks for `application/xml;q=0.9`. `?format=html` had covered for it in every test. Content negotiation now reads q-values ([ADR-0009](docs/adr/0009-one-url-per-provision-negotiated-by-accept.md)) — and a hand-written `Accept:` header in a test is not the header a browser sends.
 >
 > **Progress (Day 2–3):** Sessions 1–8 built ✅ — prior art (`docs/prior-art.md`), the resumable backfill tool (ADR-0012, BUILDLOG 010), the S3 mirror + disposable EC2 box (ADR-0013, docs/remote-ops.md), and the ledger-driven bulk load + a real `make verify` (ADR-0014). **Session 7 is done and merged into main (BUILDLOG 014, 016): the surfaces are separated per ADR-0010 — reader at `/app/us/usc/…`, API at `/api/v1/…`, the bare citation URL a 307 redirector — and the `/app` reader is Astro 5 + TypeScript + USWDS per ADR-0011, behind one Caddy origin (ADR-0015), with the Jinja reader retired.** `make test` is 209 Python tests and `make test-web` 27 frontend tests; reader coverage lives in Vitest now, so **CI must run both suites**. In flight on main: the local backfill (~1,742/3,197 ledger entries, 5.1 GB) and the bulk load, running concurrently; hand off to EC2 per remote-ops §2–3 or let the local run finish. Next: finish the backfill + load, then full-corpus `make verify-deep` (the dedupe ratio is the headline number), then Day 4 polish (keyboard nav, notes toggles, version timeline, diffs) on the Astro layout. Still open: `Uslm2Parser` table/indent parity (Day 7).
+>
+> **Progress (2026-08-06).** Everything in the paragraph above is done and its figures are superseded. The backfill is complete (3,153 `ok` / 44 `unavailable`, 9.7 GB, mirrored to S3) and so is the load — 3,153 title-releases across 58 titles and 381 loaded release points, 65,938 sections, 489,738 `section_versions`, 91.0% deduped, 27 GB on disk. `make verify --deep` has recounted all 3,153 from source with 0 mismatches. The suites are **545 Python / 299 frontend / 449 browser tests**, all three required by CI. Days 4–6 shipped (version timeline, redlines, search, accounts-built-and-off, deploy) and the site is live at `uscode.linkedlegislation.org`. Still open: `Uslm2Parser` table/indent parity, and Day 7 hardening. **The current picture is [CLAUDE.md](CLAUDE.md) and [BUILDLOG.md](BUILDLOG.md); the sections below are the plan as written, with dated notes where a decision was later taken another way.**
 
 ---
 
@@ -54,6 +56,13 @@ Goal: a working, demonstrable site in 1 day; a robust site in 1 week covering al
                    │  later)      │
                    └─────────────┘
 ```
+
+*Superseded in Session 7 (2026-07-30):* `web/` is empty. The reader is `frontend/` — Astro 5 +
+TypeScript + USWDS at `/app` ([ADR-0011](docs/adr/0011-astro-uswds-frontend-at-app.md)) — and it
+reaches `api/` over HTTP rather than sharing a process
+([ADR-0010](docs/adr/0010-reader-and-api-separated-behind-a-redirecting-citation-url.md),
+[ADR-0015](docs/adr/0015-one-origin-two-services-renderer-in-the-frontend.md)). Top-level `main.py`
+composes the app, `params.py` holds what the surfaces share, and `citation.py` is the redirector.
 
 Hard rule: **API and UI talk only to a `Repository` interface** (get_section(identifier, release), get_toc(...), resolve_id(...), neighbors(...)). The Postgres implementation is v1; xcitedb becomes a second implementation later with no API/UI changes.
 
@@ -153,6 +162,26 @@ Prev/next: `seq_in_title` within the resolved RP, skipping nothing (repealed sec
 
 Content negotiation: `Accept: application/xml` returns raw USLM fragment; HTML rendering reuses OLRC's CSS conventions (`usctitle.css` classes are already in the XML `@class`/`@style`) so display fidelity is nearly free.
 
+*Amended, 2026-08-06.* What shipped differs from the table above in four ways.
+
+1. **Every route is under `/api/v1`**, including the identifier and guid lookups, which the first
+   two rows write without the prefix. The bare `/us/usc/…` form is the citation redirector, not the
+   API ([ADR-0010](docs/adr/0010-reader-and-api-separated-behind-a-redirecting-citation-url.md)).
+2. **The API serves no HTML at all**, so the OLRC-CSS sentence above describes nothing that exists.
+   Rendering is `frontend/src/lib/uslm.ts`, the one place outside the parsers allowed to know USLM
+   element names. `?format=xml` still returns the stored fragment verbatim.
+3. **There is no OAuth.** Accounts are email and password only
+   ([ADR-0017](docs/adr/0017-auth-sessions-argon2-csrf-double-submit.md)), and the whole feature is
+   switched off in the reader ([ADR-0034](docs/adr/0034-features-built-and-switched-off-say-so.md)).
+4. **Six routes the table does not list** shipped: `GET /api/v1/search`
+   ([ADR-0028](docs/adr/0028-keyword-search-opensearch-current-by-default.md)),
+   `GET /api/v1/citation` ([ADR-0023](docs/adr/0023-citations-parse-server-side-to-an-identifier.md)),
+   `GET /api/v1/labels`, `GET /api/v1/status`
+   ([ADR-0036](docs/adr/0036-record-every-check-of-the-source.md)),
+   `GET /api/v1/sections/{identifier}/diff`
+   ([ADR-0016](docs/adr/0016-diff-computes-server-side-presents-in-the-frontend.md)), and
+   `GET`/`PUT /api/v1/settings`. The live surface is `/docs`, `/redoc` and `/app/docs`.
+
 ---
 
 ## 5. Day 1 — demonstrable MVP (Title 16, 2 release points)
@@ -170,7 +199,7 @@ Content negotiation: `Accept: application/xml` returns raw USLM fragment; HTML r
 ## 6. Week 1 — day-by-day
 
 - **Day 2:** All 54+ titles (incl. appendices) at current RP. Bulk downloader: port `downloadusc.py` from loadusc-xcitedb (modern Python, checksum cache, polite rate limiting). **The inventory half moves earlier** — loading `uscreleasepoints.json` into `release_points` is now a Day 1 prerequisite (item 3), because both the second release point and `?date=` resolution depend on real currency dates and a true global `seq`; what remains here is the bulk, resumable download. HTML rendering polish; citation-style search box ("16 USC 45f(c)(5)" → identifier).
-- **Day 3:** Backfill prior RPs (~324, back to 2013). Downloader runs as a resumable queue (bandwidth-bound; measured ~9 GB of zips under `titlesAffected` — start it Day 2 night; corpus of record on the S3 mirror, ADR-0013 / docs/remote-ops.md). Ingest driven by `titlesAffected` per RP, hash-dedupe as verification; build `guid_map` per RP.
+- **Day 3:** Backfill prior RPs (~324, back to 2013 — *the real count is 382 published, per §1; 381 loaded*). Downloader runs as a resumable queue (bandwidth-bound; measured ~9 GB of zips under `titlesAffected` — start it Day 2 night; corpus of record on the S3 mirror, ADR-0013 / docs/remote-ops.md). Ingest driven by `titlesAffected` per RP, hash-dedupe as verification; build `guid_map` per RP.
 - **Days 2–3, parallel track — reader interface overhaul (Session 7, worktree, independent of the backfill):** the Session-5 reader is the demo minimum and its review (BUILDLOG 008) found five things to fix before polish makes sense: **(1) mobile-first restyle** — base styles authored for ~360 px with `min-width` media queries upward; indents become a CSS-variable step (small on phones, 1.6rem wide) instead of fixed 1.6–6.4rem margins; ≥16px form controls (iOS zoom), ≥44px tap targets. **(2) A real site navbar** above everything: brand + Titles + Release points + API docs (Watchlist joins Day 5), no JS; breadcrumbs + release picker move to a contextual bar *below* it. **(3) The section title fixed**: `§ 45f. Mineral King Valley addition authorized` as one reading-face line (num inline, not a gray eyebrow), badge after. **(4) Navigation top *and* bottom**: compact prev/next + up-a-level strip under the title bar, full neighbors block and a site footer at the bottom. **(5) `<ref>` handling** — internal `/us/usc/` refs carry the page's `?release=` and get hover text (`title=` with the cited section's num + heading, batched in one repository query per page); `/us/pl/` and `/us/stat/` refs currently render as broken relative links and must link out (govinfo link service `/link/plaw/{congress}/public/{law}`, statviewer/`/link/statute/{vol}/{page}`) or degrade to spans — never a local 404.
 - **Day 4:** Reader UX on top of the overhaul: keyboard nav, notes/sourceCredit toggles, version timeline per section ("changed at these RPs"), diffs between two versions — port/adapt the diff approach from dreamproit/versions rather than writing one from scratch.
 - **Day 5:** Auth + watchlists (provision, section, or whole-chapter items; optional pinned release). "My provisions" home page. Email is out of scope for v1 (no notifications yet — but schema supports it).
@@ -212,12 +241,21 @@ Working rhythm per module: Plan mode (Opus) → approve plan → implement (assi
 **Development.**
 - GitHub repo (you have one initialized here already) + optionally the Claude Code GitHub App for PR review.
 - Local: Docker Desktop, Python 3.12 + uv, Node 20+ (Astro frontend, ADR-0011), `lxml`, Postgres 16 via compose.
-- Disk: ~100 GB free for the RP zip archive, or an S3/Backblaze B2 bucket (~$5/mo) as the zip cache.
+- Disk: ~100 GB free for the RP zip archive, or an S3/Backblaze B2 bucket (~$5/mo) as the zip cache. *(Measured: the zips are 9.7 GB and the database 27 GB.)*
 
 **Hosting (Day 6).**
 - Simple: **Fly.io or Render** (FastAPI + managed Postgres). Postgres with all RPs deduped is likely 10–40 GB — check managed-tier pricing, or
 - Cheaper for storage-heavy DB: a **Hetzner/DO VPS** (~$20–40/mo) running compose, with Cloudflare (free) in front for caching immutable section responses.
 - Domain (~$12/yr) + Cloudflare DNS, optional.
+
+*Superseded, 2026-08-01.* None of these was taken. The site runs on **one EC2 box** with Compose
+behind Caddy, images built by Actions on arm64 and pushed to ECR and deploys carried by SSM
+([ADR-0020](docs/adr/0020-deploy-one-ec2-box-compose-caddy.md),
+[ADR-0035](docs/adr/0035-images-from-ecr-deploys-from-actions.md)); DNS is Route 53 and the
+certificate is Caddy's. There is **no CDN in front of the spine**
+([ADR-0047](docs/adr/0047-no-shared-cache-in-front-of-the-spine.md)), so the "Cloudflare in front
+for caching immutable section responses" line above describes an arrangement that was considered
+and declined. Live state is [docs/deploy-status.md](docs/deploy-status.md).
 
 **No credentials needed** for uscode.house.gov — downloads are public. Be polite: sequential downloads, ~1 req/sec, cache everything, set a descriptive User-Agent.
 
@@ -225,21 +263,28 @@ Working rhythm per module: Plan mode (Opus) → approve plan → implement (assi
 
 ## 9. Risks & gotchas (encode these in CLAUDE.md)
 
+*Renumbered 2026-08-06.* This list used to run 1, 1a, 2, 3 …, which put every entry after the first
+one place behind the same entry in CLAUDE.md's gotcha list — and `api/routes.py` cites those by
+number ("gotcha 4", "gotcha 9"). The numbering below is CLAUDE.md's, and entry 10 — cited as
+"§9.10" by `ingest/load.py`, ADR-0007 and ADR-0012, and stated in §1's release-points bullet but
+never in this list — is written out here so those references land on it.
+
 1. **`@id` GUIDs are regenerated at each RP by design** — a GUID means (provision, release point). Treat it as a globally unique version pin, and never as a cross-release identity (that's `@identifier`'s job).
-1a. **Dual schemas** — never hard-code USLM 1.x element paths outside `Uslm1Parser`; all schema knowledge lives in the parser implementations.
-2. **Renumbering/transfers** break `@identifier` continuity — track `status="transferred"` and consider a redirects table; a section identifier may disappear at an RP without being repealed.
-3. **RP labels don't sort** — always use parsed (congress, law, exclusions, update) + `seq`; handle compound `notXnotY` and the `u1` re-issue suffix.
-4. **"not" laws vs `?date`** — at RP `119-102not101` the text is *not* fully current through 07/12/2026; the UI must show the exception, not just the date.
-5. **Title 42 is huge** (multiples of Title 16) — parser must stream (`iterparse` + element clearing), never load whole trees; DB writes batched.
-6. **Appendix titles** (`05a` etc.) have their own files and sometimes looser structure — treat as distinct titles.
-7. **Early RPs (2013–2015)** use older USLM 1.0 converter output — expect attribute drift; validate ingest counts per title per RP.
-8. **Repealed/omitted sections** still occupy reading order — keep them in prev/next with badges.
-9. **xcitedb future** — everything version-resolution-related stays behind the Repository interface; no raw SQL in API handlers. The existing loader (dreamproit/loadusc-xcitedb) is the starting point for the XCiteDB Repository implementation and the nightly auto-update job.
+2. **Dual schemas** — never hard-code USLM 1.x element paths outside `Uslm1Parser`; all schema knowledge lives in the parser implementations.
+3. **Renumbering/transfers** break `@identifier` continuity — track `status="transferred"` and consider a redirects table; a section identifier may disappear at an RP without being repealed.
+4. **RP labels don't sort** — always use parsed (congress, law, exclusions, update) + `seq`; handle compound `notXnotY` and the `u1` re-issue suffix.
+5. **"not" laws vs `?date`** — at RP `119-102not101` the text is *not* fully current through 07/12/2026; the UI must show the exception, not just the date.
+6. **Title 42 is huge** (multiples of Title 16) — parser must stream (`iterparse` + element clearing), never load whole trees; DB writes batched.
+7. **Appendix titles** (`05a` etc.) have their own files and sometimes looser structure — treat as distinct titles.
+8. **Early RPs (2013–2015)** use older USLM 1.0 converter output — expect attribute drift; validate ingest counts per title per RP.
+9. **Repealed/omitted sections** still occupy reading order — keep them in prev/next with badges.
+10. **Every RP republishes all titles**, but few of them changed — full-corpus ingest must dedupe by content hash or storage explodes (~300 RPs × ~1 GB/RP uncompressed). `titlesAffected` from the RP inventory drives ingest; hashing verifies. *(Written out 2026-08-06 from §1; it was always cited as §9.10 and never printed here.)*
+11. **xcitedb future** — everything version-resolution-related stays behind the Repository interface; no raw SQL in API handlers. The existing loader (dreamproit/loadusc-xcitedb) is the starting point for the XCiteDB Repository implementation and the nightly auto-update job.
 
 ## 10. Demo definition of done
 
 Day 1: open the site → browse Title 16 TOC → open §45f → highlight (c)(5) via URL → flip release picker between two RPs → prev/next works. **Done (BUILDLOG 006–007)** — `docker compose up -d --build`, then `http://localhost:8000/us/usc/t16/s45f/c/5?date=07/12/2026`.
-Day 7: any citation, any of ~324 RPs, by `?release` or `?date`; log in; watch `/us/usc/t16/s45f/c/5`; reopen it from watchlist in one click; section version timeline visible; both USLM 1.x and 2.x files ingest cleanly.
+Day 7: any citation, any of ~324 RPs (*382 published, 381 loaded — §1*), by `?release` or `?date`; log in; watch `/us/usc/t16/s45f/c/5`; reopen it from watchlist in one click; section version timeline visible; both USLM 1.x and 2.x files ingest cleanly.
 
 ## 11. Documentation & provenance (for the blog series and for AI-skeptical users)
 

@@ -37,14 +37,14 @@ steps:
   - goto: /app/us/usc/t16/s45f/c/5
     caption: Ask for subsection (c)(5) —
   - expect: { selector: ".target", visible: true }
-    caption: — and it is highlighted inside the whole section, never stranded out of context.
+    caption: — and it is highlighted in place, inside the whole section.
 ```
 
 ### The bare citation URL
 
 The address also works without the `/app` prefix. `/us/usc/t16/s45f` is a **citation URL**: it
 redirects a browser to the reader and a program to the API, based on what the caller says it can
-accept. One URL is safe to paste into a brief, an email or a script.
+accept.
 
 ```scenario
 id: citation-url-redirects
@@ -97,7 +97,7 @@ steps:
     caption: Repealed and transferred sections show their status here, before you click one.
 ```
 
-Three more ways to move:
+The other ways to move:
 
 - The **sticky bar** at the top of a section carries previous, next and up-one-level, and stays put
   while you scroll. Each step names its neighbour — `← § 45e`, `§ 45g →` — except on a narrow
@@ -114,7 +114,7 @@ demo: true
 demoOrder: 40
 steps:
   - goto: /app/us/usc/t16/s45f
-    caption: Reading order is preserved, so you can move through a chapter section by section.
+    caption: Reading order is preserved, and a chapter can be read section by section.
   - click: .sectionbar a[rel="next"]
     caption: The sticky bar carries previous, next and up-one-level.
   - expect: { selector: ".doc-title", contains: "45g" }
@@ -130,7 +130,8 @@ steps:
   - expect: { url: "/us/usc/t16/s45e" }
 ```
 
-**Repealed and omitted sections keep their place in reading order.** They are not skipped or hidden. A section that was repealed remains part of the structure of the chapter around it. They appear in prev/next with a badge saying what happened to them.
+Repealed and omitted sections keep their place in reading order. They appear in prev/next and in
+the chapter rail, with a badge saying what happened to them.
 
 ## Moving around inside a section
 
@@ -149,13 +150,13 @@ steps:
   - expect: { selector: ".contents__link", visible: true }
     caption: Every top-level provision, with its heading.
   - click: .contents__link[href="#section-notes"]
-    caption: One click to the notes, past however many subsections are in between.
+    caption: One click to the notes.
   - expect: { url: "#section-notes" }
-    caption: The notes, without scrolling the length of the section to find them.
+    caption: The notes, at the foot of the section.
 ```
 
 The section number in the **sticky bar** — `§ 45f` — is a link back to the top of the page. The bar
-stays put at every width, so it is reachable from any scroll position.
+stays put at every width.
 
 ```scenario
 id: sectionbar-top
@@ -178,7 +179,7 @@ Press <kbd>?</kbd> on any page for this list, or use the **Keyboard shortcuts** 
 | <kbd>→</kbd> or <kbd>k</kbd> | Next section in reading order |
 | <kbd>u</kbd> | Up to the chapter or subchapter that contains it |
 
-**Moving inside a section:**
+**Moving inside a section**, on a section page:
 
 | Key | |
 |---|---|
@@ -198,12 +199,12 @@ Press <kbd>?</kbd> on any page for this list, or use the **Keyboard shortcuts** 
 | <kbd>?</kbd> | The shortcut list |
 | <kbd>Esc</kbd> | Close the shortcut list, or a citation preview |
 
-A key typed into a search box or a date field is left alone, and so is any combination held with
-Ctrl, Alt or ⌘. A jump inside a page takes the keyboard with it, so <kbd>Tab</kbd> continues from
-where you landed.
+A key typed into any input, textarea, select or editable element is left alone, and so is any
+combination held with Ctrl, Alt or ⌘. A jump inside a page takes the keyboard with it: <kbd>Tab</kbd>
+continues from where you landed.
 
-<kbd>[</kbd> and <kbd>]</kbd> step through the rows of the contents list, so a section with no
-subsections has nothing to step through.
+<kbd>[</kbd> and <kbd>]</kbd> step through the provision rows of the contents list, not its source
+credit and notes rows. A section with no subsections has nothing to step through.
 
 <kbd>t</kbd> goes to the top of the page's content, past the navigation. <kbd>b</kbd> goes to the
 foot of the page, where the site's own links are.
@@ -256,9 +257,8 @@ steps:
 ## What the markings mean
 
 **Status badges.** A section can be marked `repealed`, `omitted`, `transferred`, `renumbered` or
-`reserved`. The badge prints whatever the source says, rather than mapping it onto a fixed list —
-the OLRC uses words this site did not anticipate, and inventing a category for them would be
-editorialising.
+`reserved`. The badge prints whatever the source says. A status this site has not seen before keeps
+the plain badge and prints its own word.
 
 **Notes and source credit** are collapsed under the text on a narrow screen and open beside it on a
 wide one. They come from the source XML unchanged.
@@ -274,7 +274,7 @@ steps:
   - goto: /app/us/usc/t16/s45f
     caption: A section whose notes carry amendment dates.
   - expect: { selector: "span.uslm-date", visible: true }
-    caption: Each date is part of the running text, not a line of its own.
+    caption: Each date is part of the running text.
 ```
 
 **Occurrence 1 of 2.** Occasionally the source publishes more than one element under a single
@@ -284,15 +284,13 @@ in the file, with a note saying how many there are.
 ## Notes on formatting
 
 **Section numbers use an en dash, not a hyphen.** The OLRC writes `45a–1` with U+2013 — 5,697
-sections in the corpus contain one, and not a single one contains an ASCII hyphen. No keyboard has
-that key, so the search box accepts either and finds the right provision; a URL typed with a hyphen
-by hand will not resolve on its own.
+sections in the corpus contain one, and none contains an ASCII hyphen. The search box accepts either
+and finds the right provision. A URL typed with a hyphen by hand will not resolve.
 
 **Titles sort numerically, and `5a` is its own title.** The appendix titles (`5a`, `11a`, `18a`,
-`28a`, `50a`) are separate titles with their own structure, not appendices bolted onto the title
-they are named for. Note that a citation in the form `5 U.S.C. App. 3` is understood but resolves
-to nothing, because the OLRC publishes no section at that flat address — the site explains this
-rather than showing a bare 404.
+`28a`, `50a`) are separate titles with their own structure. A citation in the form `5 U.S.C. App. 3`
+is understood and resolves to nothing: the OLRC publishes no section at that flat address. The site
+says so on the page.
 
 ## How the text is set
 
@@ -301,8 +299,7 @@ breadcrumbs, badges, the release picker, search, and the editorial notes and sou
 section — is set in Archivo, a sans serif. Identifiers, guids and API examples use whatever
 fixed-width face your system provides.
 
-Both faces are served from this site. No font is fetched from Google Fonts or any other host, so
-the page renders its type without a request to a third party.
+Both faces are served from this site. No font is fetched from Google Fonts or any other host.
 
 The reading column holds a median of 67 characters per line — 62 to 71 across the tenth and
 ninetieth percentiles, counted from where the browser broke the lines
@@ -313,10 +310,10 @@ hyphenated automatically.
 ### The subsection ladder
 
 Each level of a provision — (a), then (1), then (A), then (i), then (I) — is indented one step
-further than the level containing it, and its number hangs out to the left of the text, so the
-numbers at one depth line up with the text at the depth above. The step is about three characters
-wide, and two below 40em, where the screen has less to spend. A long number such as `(xxviii)`
-pushes the words beside it along that line rather than wrapping them underneath itself.
+further than the level containing it, and its number hangs out to the left of the text. The numbers
+at one depth line up with the text at the depth above. The step is about three characters wide, and
+two below 40em. A long number such as `(xxviii)` pushes the words beside it along that line rather
+than wrapping them underneath itself.
 
 A level with no heading runs in behind its number — "(1) There is authorized to be
 appropriated…" — the way the printed Code sets it. A level with a heading keeps the heading beside
@@ -325,7 +322,7 @@ the number and starts its text on the next line.
 The deepest provision in the Code is seven levels down. 91.8% of sections stop at three
 (`docs/verification/ladder.json`).
 
-### Five kinds of text in one column
+### The kinds of text in one column
 
 | | How it is set |
 |---|---|
@@ -336,9 +333,8 @@ The deepest provision in the Code is seven levels down. 91.8% of sections stop a
 | Tables | Archivo, with figures aligned in columns |
 
 Quoted amending text is words an act is moving around rather than words in force. Most of it sits
-inside an editorial note describing the amendment that made it. It keeps the reading face, because
-it is statutory text, and takes the panel and the label so that it is not read as the note's own
-prose.
+inside an editorial note describing the amendment that made it. It keeps the reading face, on a
+tinted panel under a **Quoted** label.
 
 A table wider than the column scrolls inside its own box rather than pushing the page sideways.
 The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll it.
@@ -346,23 +342,21 @@ The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll 
 ## Printing
 
 Printing a section gives you the document. The navigation, the search box, the copy column, the
-chapter rail, the release picker and the footer are all left off the page. The notes and the source
-credit are printed open whatever state they were in on screen. The page is black on white whether
+chapter rail, the release picker, the **In this section** panel, the previous/next cards and the
+footer are all left off the page. The notes and the source credit are printed open whatever state
+they were in on screen. The page is black on white whether
 or not you were reading in night mode.
 
 Every printed sheet carries a running header with the citation, the release point, and the address
-the page was printed from — so a page that has left your printer still says which provision it is
-and as of when.
+the page was printed from.
 
 Every cross reference prints its URL after the words it sits on, in angle brackets. The printed URL
-is the citation URL, carrying the release point, so following it later lands on the same text you
-printed.
+is the citation URL, carrying the release point of the page it came from.
 
 **Limitations.** Notes print open only in browsers that support the `::details-content` selector;
 in others they print in whatever state you left them, which is closed unless you opened them. A
 provision longer than a page is broken across pages wherever it falls.
 
-Colour carries three meanings and no others. Green marks an insertion and the release currently in
-force. Red marks a deletion, a repeal and an error. Amber marks the provision you asked for. Every
-one of them is also spelled out in text or shape, so none of it depends on being able to tell the
-colours apart.
+**Colour.** Green marks an insertion and the release currently in force. Red marks a deletion, a
+repeal and an error. Amber marks the provision you asked for. Each is also spelled out in text or
+shape.

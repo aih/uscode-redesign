@@ -136,7 +136,8 @@ def citation_sort_key(identifier: str | None, seq_in_title: int | None) -> str |
     section of it, rather than each one immediately before the sections it
     contains. Giving them a true position means deriving one from the first
     section beneath each node, and that is a join this pass does not do. The
-    sort control says so.
+    user guide records it, under "Ordering the results" in chapter 05; nothing
+    on the results page itself does.
     """
     title = title_num_of(identifier)
     if title is None:

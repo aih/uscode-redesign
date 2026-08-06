@@ -2,6 +2,13 @@
 
 This guide assumes no prior experience with Claude Code. Follow it top to bottom. Companion documents: [PLAN.md](PLAN.md) (what we're building and why), [BUILDLOG.md](BUILDLOG.md) (the running record of how).
 
+> **Historical, as of 2026-08-06.** This is the guide as written on 2026-07-28, for a build that has
+> since happened: Sessions 1–13 are done, the corpus is loaded, and the site is deployed at
+> `uscode.linkedlegislation.org`. It is kept as the record of how the build was set up and driven.
+> Where a step has been overtaken, a dated note says so inline. For the current state of the project
+> read [CLAUDE.md](CLAUDE.md) and [BUILDLOG.md](BUILDLOG.md); for the deployment,
+> [docs/deploy-status.md](docs/deploy-status.md).
+
 ---
 
 ## 1. What Claude Code is, in one paragraph
@@ -20,7 +27,7 @@ Claude Code is Anthropic's coding agent that runs **in your terminal, inside a p
    - **Max 5x ($100/mo)** if budget-constrained; expect to pause occasionally mid-afternoon.
    - You can downgrade after the build week; billing is monthly.
 2. **Keep the $100 API credits in reserve.** Two uses: (a) the Claude GitHub Action for automatic PR review (Step 9), which bills to the API key; (b) overflow — if your Max session hits its limit at a bad moment, run `claude` with an API key instead (it will offer the choice at login, or use `/login` to switch). Rough API cost awareness: an hour of heavy Opus work can run $10–30, so credits are for surgical use, not the default.
-3. **No other accounts needed to start.** GitHub you have (this repo). Hosting accounts (Fly.io/Render/Hetzner) aren't needed until Day 6. uscode.house.gov requires no credentials.
+3. **No other accounts needed to start.** GitHub you have (this repo). Hosting accounts (Fly.io/Render/Hetzner) aren't needed until Day 6. uscode.house.gov requires no credentials. *(2026-08-01: the site went to one EC2 box instead — ADR-0020, ADR-0035. The account needed was AWS.)*
 
 ## 3. Install the tools (one-time, ~30 minutes)
 
@@ -66,6 +73,9 @@ Rule of thumb from PLAN.md §7: **plan and review in Opus, implement in Sonnet.*
 
 ## 5. Add the USLM 2.x samples (before Session 1)
 
+*Done, 2026-07-28.* `samples/uslm1/usc16.xml` and `samples/uslm2/USLM2/` are committed. The steps
+below are how they got there; there is nothing to run.
+
 ```bash
 cd ~/Documents/workspace/aih/uscode-redesign
 mkdir -p samples/uslm1 samples/uslm2
@@ -75,7 +85,7 @@ unzip /tmp/uslm2samples.zip -d samples/uslm2/
 git add samples && git commit -m "Add USLM 1.x and 2.x sample files from uscode.house.gov"
 ```
 
-(Note: the full usc16.xml is 32 MB — that's fine for git, but don't commit the ~324 release-point zips later; `.gitignore` the `data/` directory.)
+(Note: the full usc16.xml is 32 MB — that's fine for git, but don't commit the ~324 release-point zips later; `.gitignore` the `data/` directory.) *(2026-08-06: the real count is 382 published release points, and `data/` is gitignored as planned. One exception was made deliberately: a single 5 MB Title 16 zip is committed so `make ci-data` can seed CI with no network — ADR-0013.)*
 
 ## 6. Session 0 — teach Claude Code the project (~20 min)
 
@@ -89,7 +99,7 @@ Review what it writes, then: `git add CLAUDE.md && git commit`. CLAUDE.md is aut
 
 Work one session per module. **Always:** start in plan mode (Shift+Tab), read the plan it proposes, approve or redirect, let it implement, make sure tests pass, then end with the documentation prompt (Step 8). `/clear` between sessions.
 
-**Session 1 — Scaffold (Sonnet):**
+**Session 1 — Scaffold (Sonnet): ✅ done, BUILDLOG 002.** *(`web/` is now empty — the reader moved to `frontend/` in Session 7, ADR-0011.)*
 > Execute PLAN.md Day 1 item 1: repo scaffold with ingest/, api/, web/, db/ packages, pyproject via uv, docker-compose.yml with Postgres 16, Alembic wired up, pytest configured, Makefile with `make dev`, `make test`, `make verify` targets. Commit in small steps.
 
 **Session 2 — Parser layer (Opus; the hardest session): ✅ done, BUILDLOG 004.**
@@ -154,7 +164,7 @@ Measured, not estimated: OLRC serves ~50 KB/s, so the full run is **40–50 hour
 > 5. **Refs**: internal /us/usc/ refs keep the page's ?release= and get title="§ num — heading" hover text from ONE batched lookup per page (no N+1); /us/pl/ and /us/stat/ refs map to the govinfo link service (verify URL patterns at govinfo.gov first) or degrade to spans — never a local 404. Tests: internal rewriting, pl/stat mapping, unknown-ref degradation, and no rendered page contains a relative /us/pl/ or /us/stat/ href.
 > 6. Statutory text ships as server-rendered HTML with zero client JS by default; islands only where interaction demands it (the release picker stays a GET form). Run make test + frontend tests, screenshot before/after, update BUILDLOG.md and README, commit in small steps. When all six pass in Astro, retire the Jinja templates (git keeps them) and record it.
 
-**Session 9 — Corpus completion + deep verification (Sonnet): ⬅ UNBLOCKED — the backfill is complete** (ledger: 3,197 planned, 3,153 ok, 44 recorded unavailable). This is the next session to run:
+**Session 9 — Corpus completion + deep verification (Sonnet): ✅ done, BUILDLOG 023** (ledger: 3,197 planned, 3,153 ok, 44 recorded unavailable; `make verify --deep` recounted all 3,153 from source with 0 mismatches). Original prompt kept for the record:
 > The backfill is done (check: python -m ingest backfill --plan-only reports nothing left but recorded unavailables). Re-run make load-all for every zip that landed since the last pass, then push the final corpus state to the mirror (python -m ingest mirror push). Run make verify-deep over the WHOLE corpus — the independent recount from source XML, not the loader's bookkeeping — and commit docs/verification/database.json. Every count mismatch is a finding: classify it (parser gap / source inconsistency like 113-36's missing 18A / loader bug) and either fix it or record it explicitly; do not average it away. Report the headline numbers: corpus-wide dedupe ratio, total sections stored vs section×RP pairs, database disk size, guid_map row count. Update README's Status section with the final numbers. BUILDLOG entry and commit.
 
 **Session 10 — Day 4 reader polish: ✅ done (BUILDLOG 019, ADR-0016).** Version timeline, source-level diff view, keyboard-nav island, no-JS collapsibles, heading-depth fix — plus the session's real find: `frontend/src/lib/` had never been in git (an unanchored `lib/` line in `.gitignore`), so `make test-web` had been testing nothing. Original prompt kept for the record:
@@ -169,13 +179,13 @@ Measured, not estimated: OLRC serves ~50 KB/s, so the full run is **40–50 hour
 **Session 11 — Day 5 auth + watchlist: ✅ done (BUILDLOG 020, ADR-0017).** Argon2, server-side sessions keyed by `sha256(token)`, double-submit CSRF, watchlist CRUD with ownership checks, Watch button + My Provisions. Named scope cuts: no email verification, no password reset, no login rate-limiting; the multi-list CRUD has no UI yet. Original prompt kept for the record:
 > Implement auth and watchlists per PLAN §4: email+password signup/login in api/ (argon2 hashing, HTTP-only session cookies, CSRF on state-changing routes; users/watchlists/watchlist_items tables already exist from Session 1). API routes: watchlist CRUD, items = identifier + optional pinned release + note. Reader: a "Watch" button on section pages (island), a My Provisions page listing watched items with one-click open at current-or-pinned release, and status badges if a watched section went repealed/transferred since being added. Architecture rules hold: auth lives in api/, the reader consumes /api/v1, no SQL outside storage/. Tests incl. auth-required boundaries and the architecture suite. BUILDLOG, commits.
 
-**Session 12 — Day 6 performance, CI, deploy, and the auth debts (Opus plan first, then Sonnet):**
+**Session 12 — Day 6 performance, CI, deploy, and the auth debts (Opus plan first, then Sonnet): ✅ done, BUILDLOG 024–028.** Caching is ADR-0018, rate limits ADR-0029, security headers ADR-0030, login throttling and throwaway accounts ADR-0019, the deploy ADR-0020 and ADR-0035 — one EC2 box, not Fly.io or a VPS. Original prompt kept for the record:
 > Performance: (a) a (section, release) response is immutable — set ETag (already the content hash) + long Cache-Control on /api/v1 and /app section pages, with the Caddy config caching accordingly, and make sure the auth/watchlist routes and any page rendered for a logged-in user are explicitly no-store (a cached "My Provisions" served to the wrong person is the failure mode to design against); (b) fix the recorded debt that a section page's breadcrumbs cost an extra get_toc call; (c) quick load test (hey or locust) against the top routes, numbers in the BUILDLOG.
 > CI: add a GitHub Actions workflow running make test + make test-web on every push (Postgres service container, dev-data fixture load) — this closes the standing gap that no independent machine re-runs the suites.
 > Auth debts before public exposure (BUILDLOG 020 named these as scope cuts; deploying without them is what makes them real): login rate-limiting / lockout on repeated failures, and a decision recorded either way on password reset — either implement it or state in the ADR that accounts are throwaway until email exists. Also verify the session cookie gets `secure` when served behind Caddy over HTTPS: `api/auth.py` decides from `request.url.scheme`, which is http behind a proxy unless proxy headers are trusted — check it end-to-end on the deployed box, don't assume.
 > Deploy: plan-mode first — pick between a Hetzner/DO VPS running compose vs Fly.io given the measured database size from Session 9; then deploy db+api+frontend+Caddy behind HTTPS with the S3 mirror as the data source (mirror pull, load-all on the box). Record the choice as an ADR; smoke-test the demo URL publicly; BUILDLOG.
 
-**Session 13 — Day 7 hardening (Opus):**
+**Session 13 — Day 7 hardening (Opus): partly done.** The accessibility pass shipped as a ratchet (ADR-0039, ADR-0042), and the "skeptic's page" shipped as **`/app/about` plus guide chapter 09**, not `/about/how`. Still open: `Uslm2Parser` table and indent parity. Original prompt kept for the record:
 > 1. Uslm2Parser to full parity: TOC, tables, and the indent model against samples/uslm2 (usc49 is the table-heavy fixture), cross-schema parity tests extended beyond s45f; when OLRC flips to 2.x, ingest must not notice.
 > 2. Accessibility pass on the reader: axe-core audit in CI, heading outline (done in Session 10 — verify), focus order, skip links, contrast in both color schemes, screen-reader labels on the picker/badges/diff view.
 > 3. The skeptic's page: a public /about/how page in the reader that tells the build story — data provenance (manifests, mirror, verify-deep results), the test counts, links to BUILDLOG and the ADRs on GitHub. This is the walkthrough the repo's documentation regime has been feeding all week.
@@ -187,7 +197,7 @@ For each: plan mode first, one module per session, tests before merge. Sessions 
 
 `.claude/settings.json` (checked in) is set up so a session runs a full PLAN.md task **without permission prompts**:
 
-- **`defaultMode: "acceptEdits"`** — all file edits in this repo are auto-approved.
+- **`permissions.defaultMode: "acceptEdits"`** — all file edits in this repo are auto-approved.
 - **Allow list** — every command the build actually uses (uv, make, pytest, alembic upgrade/revision, docker compose up/build/logs, git add/commit/push/branch/worktree/merge, curl, unzip, psql, file utilities) runs without asking. WebFetch is allowed only for uscode.house.gov, GitHub, and the core library docs.
 - **Ask list** — genuinely destructive-but-sometimes-needed operations still prompt: `alembic downgrade`, `docker compose down`, `docker volume rm`, package uninstalls. These are rare, so sessions stay hands-off in practice.
 - **Deny list** — never allowed, even if requested: `sudo`, `rm -rf` outside the repo, force-push, `git reset --hard`, `git clean`, reading `.env`.
@@ -215,6 +225,9 @@ This is the raw material for your blog posts and the site's "how it was built" p
 Once you're pushing to GitHub: in a Claude Code session run `/install-github-app` and follow the prompts (this installs the Claude GitHub Action; it bills the API key, which is what your $100 is for). Then work in branches — every pull request gets an independent Opus review before you merge. An independent reviewer with fresh context catches what the authoring session can't see, and the review comments become part of the public provenance trail.
 
 ## 10. Parallel work (Days 2+, optional)
+
+*Historical, 2026-08-06: Sessions 7, 8 and the backfill all completed. The worktree pattern below is
+still how concurrent sessions are run in this repo.*
 
 With Sessions 1–6 merged (1 ✅ 1.5 ✅ 2 ✅ 3 ✅ 3.5 ✅ 4 ✅ 5 ✅ 6 ✅), the three live tracks are fully independent and can all run at once: **the backfill run** (no Claude session — see Session 6 above; it's just bandwidth), **Session 7** (frontend: separation + Astro/USWDS reader), and — once zips are on disk — **Session 8** (bulk load; works on a partial corpus). Day 4's deeper polish (keyboard nav, notes toggles, version timeline, diffs) follows Session 7, since it builds on that layout. If running Sessions 7 and 8 together, use worktrees (`frontend/`+`web/`+`api/` vs `ingest/` — disjoint):
 

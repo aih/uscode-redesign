@@ -67,7 +67,8 @@ they are listed here so the state is recorded rather than assumed.
 **`/app/diff` is two hops from the text it compares.** The only link into it from outside itself is
 on `/app/versions`, and the only link to `/app/versions` is one line under the section heading. A
 reader on `§ 45f` who wants to know what changed goes: section → version history → pick two
-releases → diff. Task B5 owns the "Compare with…" affordance that shortens this.
+releases → diff. Task B5 owns the "Compare with…" affordance that shortens this; B5 is defined in
+`claude-code/WORKSTREAM-B-STATE.md`, not in `docs/backlog.md`.
 
 **`/app/demo` has one inbound link**, on the front page, and only for a reader who has not scrolled
 past the first paragraph.
@@ -108,9 +109,10 @@ ADR-0044. Before those, only `us/usc/[...identifier].astro` passed `crumbs`, `re
    link, carrying `aria-current="page"`.
 3. **`ReleaseContext`** — which release point is being read, its currency date, whether it is the
    newest, the exception on a `not` label, and the release the answer actually came from when that
-   differs from the one asked for. Under it, `ReleasePicker`: the newest, a date, or a named release
-   point, each preserving the provision. Both sit at the top of the content rather than in the
-   sticky stack, for the measured reason in ADR-0044.
+   differs from the one asked for. `ReleasePicker` — the newest, a date, or a named release point,
+   each preserving the provision — is a `<details>` in `.contextbar` whose closed summary is the
+   release-point line the bar already carried, and whose open panel is absolutely positioned
+   (ADR-0056, amending ADR-0044's placement of both in the page body).
 4. **`SectionBar`** — sticky: the section's own number, heading and status, with prev/next naming
    the neighbour and an up link to the parent.
 5. **`ChapterRail`** — the sections either side of this one in the parent subdivision, in reading

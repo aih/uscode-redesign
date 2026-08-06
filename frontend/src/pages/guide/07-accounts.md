@@ -2,13 +2,14 @@
 layout: ../../layouts/GuideLayout.astro
 title: Accounts and watchlists
 order: 7
-summary: What an account will be for, why it is switched off, and everything that works without one.
+summary: What an account will be for, its current status, and what works without one.
 covers:
   routes: ["/app/provisions", "/app/login", "/app/signup"]
   adrs: [17, 19, 34]
 ---
 
-**Accounts are currently inactive.** So are bulk downloads. Their controls are still visible on the page to explain their intended functionality.
+**Accounts are currently inactive.** So are bulk downloads. Their controls are still on the page,
+saying what they would do.
 
 ```scenario
 id: accounts-explain-themselves
@@ -18,21 +19,20 @@ steps:
   - expect: { selector: ".usa-alert__heading", visible: true }
 ```
 
-## Why they are inactive
+## Status
 
-The accounts system has been built but currently lacks an email integration for verification and password resets. Until this is added, the user interface for accounts is turned off. The underlying API routes remain active and tested.
+The accounts system is built and tested. It has no email integration, so there is no address
+verification and no password reset, and the user interface for accounts is switched off. The API
+routes are unaffected and answer a direct caller — see [The API](/app/guide/08-api).
 
 ## What an account will be for
 
-**My Provisions** — a watchlist of provisions you care about, each optionally pinned to a release
-point, so you can come back to *this section as it stood then* in one click, with your own note on
-it.
+**My Provisions** — a watchlist of provisions, each optionally pinned to a release point and each
+carrying your own note. A pinned item reopens at the text as it stood at that release point.
 
 ## Features that don't require an account
 
-The core features that do not require accounts:
-
-- reading any provision at any of 382 release points;
+- reading any provision at any of the 381 loaded release points;
 - seeing which titles each release point changed;
 - the version history of a section, and a redline between any two release points;
 - search, and going straight to a citation;
