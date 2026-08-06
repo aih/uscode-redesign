@@ -38,14 +38,15 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 | `/app/guide` | `guide/index.astro` | Contents of the user guide (ADR-0038) | `SiteHeader:55`, `SiteFooter:31`, `index.astro:38`, `demo.astro:50,56`, `GuideLayout:45,77` | any chapter | header, footer |
 | `/app/guide/<chapter>` | `guide/*.md` | One chapter, nine of them | `guide/index.astro`, the pager in `GuideLayout` | the next and previous chapter, the routes it documents | header, footer, wide |
 | `/app/demo` | `demo.astro` | The captioned demo video, recorded from the guide's scenarios | `index.astro:37` | `/app/guide` | header, footer |
-| `/app/about` | `about.astro` | What this site is, and what it is not | `SiteHeader:70`, `SiteFooter:34,51` | `/app/releases`, `/app/docs`, `/app/search/syntax`, OLRC, the repository | header, footer |
+| `/app/design` | `design.astro` | The design system: every component the reader is built from, with specimen data, and the contrast of every declared colour pair computed in the browser (ADR-0053) | `SiteFooter:34` | nothing — every link on it is a specimen under title 0, which OLRC does not publish | header, footer |
+| `/app/about` | `about.astro` | What this site is, and what it is not | `SiteHeader:70`, `SiteFooter:35,52` | `/app/releases`, `/app/docs`, `/app/search/syntax`, OLRC, the repository | header, footer |
 | `/app/docs` | `docs.astro` | The OpenAPI schema in this site's chrome, rather than the bare Swagger page | `SiteHeader:62`, `SiteFooter:33`, `about.astro:77`, `AccountsOff:47` | `/docs`, `/redoc`, `/openapi.json` | header, footer |
 | `/app/provisions` | `provisions.astro` | The watchlist. Switched off in the UI (ADR-0034) | `SiteHeader:49`, `AuthNav:48` | a watched provision, `/app/login` | header, footer |
 | `/app/settings` | `settings.astro` | How links open, and the theme. Switched off in the UI | `AuthNav:49` only — **see Unreachable routes** | `/app/login` | header, footer |
 | `/app/login` | `login.astro` | Sign in. Switched off in the UI | `provisions.astro:46`, `settings.astro:52`, `signup.astro:53`, `AuthNav:35` | `/app/signup`, the `?next=` destination | header, footer |
 | `/app/signup` | `signup.astro` | Create an account. Switched off in the UI | `login.astro:58`, `AuthNav:37` | `/app/login`, the `?next=` destination | header, footer |
 | `/app/404` | `404.astro` | Anything under `/app` that is not a citation | any wrong URL | `/app/` | header, footer |
-| `/app/preview/…` | `preview/[...identifier].ts` | The rendered fragment the hover card fetches (ADR-0024). An endpoint, not a page | `CitePreview.astro:176`, by `fetch` | — | none |
+| `/app/preview/…` | `preview/[...identifier].ts` | The rendered fragment the hover card fetches (ADR-0024). An endpoint, not a page | `CitePreview.astro:199`, by `fetch` | — | none |
 | `/app/healthz` | `healthz.ts` | Liveness for the container | the orchestrator | — | none |
 | `/us/usc/…` | served by FastAPI (`citation.py`) | The bare citation URL; 307s to `/app` or `/api/v1` by `Accept:` (ADR-0010) | printed on every section page; anything a reader pastes | the reader or the API | none |
 

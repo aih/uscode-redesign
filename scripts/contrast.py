@@ -7,10 +7,14 @@ questions, and "it looks fine" answers neither.
 
 The values are read from `frontend/src/styles/site.scss` rather than typed in
 here: the token block is the source of truth, and a table maintained beside it
-would be wrong the first time somebody nudged a hex. What *is* declared here is
-the list of pairs — which token is painted on which, and what the criterion
-asks of that combination — because that is a fact about the design, not about
-the file.
+would be wrong the first time somebody nudged a hex.
+
+The list of pairs — which token is painted on which, and what the criterion
+asks of that combination — is `frontend/src/data/color-pairs.json`, and is read
+rather than declared here because it has a second reader. `/app/design` renders
+the same list against the tokens the *running page* resolves, so the two answers
+can be compared (ADR-0053); a copy of the list in this file would be a copy that
+could disagree with the page about which pairs exist.
 
     uv run python scripts/contrast.py
 
@@ -27,56 +31,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 STYLES = ROOT / "frontend" / "src" / "styles" / "site.scss"
+PAIRS_FILE = ROOT / "frontend" / "src" / "data" / "color-pairs.json"
 OUT = ROOT / "docs" / "verification" / "contrast.json"
 
-#: (foreground token, background token, what it is, required ratio).
-#:
-#: `AA` on text is 4.5:1; large text and non-text UI parts are 3:1. Where a pair
-#: is painted in both roles the stricter number is used.
-PAIRS: list[tuple[str, str, str, float]] = [
-    ("--ink", "--page", "body text on the page", 4.5),
-    ("--ink", "--panel", "body text on a panel or summary box", 4.5),
-    ("--ink", "--field", "text typed into a form control", 4.5),
-    ("--muted", "--page", "secondary text: notes, source credit, captions", 4.5),
-    ("--muted", "--panel", "secondary text inside a panel", 4.5),
-    ("--link", "--page", "a link in running text", 4.5),
-    ("--link", "--panel", "a link inside a panel", 4.5),
-    ("--link", "--field", "a link on a form control", 4.5),
-    ("--danger", "--page", "error text", 4.5),
-    ("--danger-ink", "--danger", "the repealed / omitted badge's own text", 4.5),
-    # The selected sort option and the applied facet are filled pills. Their
-    # text is `--danger-ink` for the reason that token exists — text on a filled
-    # colour cannot inherit `--ink`, which inverts with the theme while the fill
-    # under it does not. Same shape as the badge above, a different fill.
-    ("--danger-ink", "--link", "text inside a selected sort or facet pill", 4.5),
-    # The brand reserves one green for version semantics and puts it nowhere
-    # else (ADR-0052): the insertion side of a redline, the marker on the
-    # release in force. It is read as text and as a 3px rule, so it is held to
-    # the text ratio, which is the stricter of the two.
-    ("--version", "--page", "an insertion in a redline, and the current-release marker", 4.5),
-    ("--version", "--panel", "the same, on a panel", 4.5),
-    ("--edge", "--field", "the boundary of an input, select or textarea", 3.0),
-    ("--edge", "--page", "a control's boundary against the page", 3.0),
-    ("--edge", "--panel", "a control's boundary inside a panel", 3.0),
-    ("--target-edge", "--page", "the focus ring, and the edge of a highlighted provision", 3.0),
-    ("--target-edge", "--panel", "the focus ring over a panel", 3.0),
-]
-
-#: Pairs measured and reported, but held to no ratio, with the reason.
-#:
-#: SC 1.4.11 asks 3:1 of "visual information required to identify user interface
-#: components and states" — a control's boundary. A divider between two
-#: paragraphs identifies nothing: remove it entirely and the page still says
-#: everything it said. Holding it to 3:1 anyway would put every hairline on the
-#: site at #949494 or darker, which is a visibly heavier reader bought for no
-#: conformance gain. `--edge` above is the half of the old `--rule` that does
-#: carry meaning, and it is held to the ratio.
-DECORATIVE: list[tuple[str, str, str]] = [
-    ("--rule", "--page", "dividers, the edge of a note, table cell borders"),
-    ("--rule", "--panel", "a divider drawn on a panel"),
-]
-
 HEX = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+
+def read_pairs() -> list[dict]:
+    """The declared pairs, in order. `requires: null` is a decorative pair."""
+    return json.loads(PAIRS_FILE.read_text(encoding="utf-8"))["pairs"]
 
 
 def read_tokens() -> dict[str, dict[str, str]]:
@@ -156,21 +119,20 @@ def main() -> None:
                 failures.append(f"{usage} [{theme}]: {fg} on {bg} is {value}:1, needs {need}:1")
         results.append(entry)
 
-    for fg, bg, usage, need in PAIRS:
-        record(fg, bg, usage, need)
-    for fg, bg, usage in DECORATIVE:
-        record(fg, bg, usage, None)
+    for pair in read_pairs():
+        record(pair["foreground"], pair["background"], pair["usage"], pair["requires"])
 
     report = {
         "_comment": (
             "Generated by scripts/contrast.py. Do not hand-edit — re-run it. Token values are "
-            "read from frontend/src/styles/site.scss; the list of pairs is declared in the "
-            "script, because which colour is painted on which is a fact about the design. "
-            "WCAG 2.1 AA: 4.5:1 for text, 3:1 for large text and non-text UI parts (1.4.3, "
-            "1.4.11). Pairs whose value is not an opaque colour are reported as skipped rather "
-            "than guessed at."
+            "read from frontend/src/styles/site.scss; the list of pairs is read from "
+            "frontend/src/data/color-pairs.json, which /app/design renders against the tokens "
+            "the running page resolves (ADR-0053). WCAG 2.1 AA: 4.5:1 for text, 3:1 for large "
+            "text and non-text UI parts (1.4.3, 1.4.11). Pairs whose value is not an opaque "
+            "colour are reported as skipped rather than guessed at."
         ),
         "source": str(STYLES.relative_to(ROOT)),
+        "pairs_declared_in": str(PAIRS_FILE.relative_to(ROOT)),
         "tokens": tokens,
         "pairs": results,
         "summary": {

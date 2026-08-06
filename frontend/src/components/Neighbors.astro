@@ -27,8 +27,12 @@ const { previous = null, next = null, release = null } = Astro.props;
         {previous && (
           <a href={appHref(previous.identifier, release)} rel="prev">
             <span class="neighbors__dir">Previous</span>
+            {/* `{" "}` and not a bare space: alone inside an element, the text
+                node between two expressions does not survive the compiler, and
+                every section page read `§ 45eViolations of park regulations`
+                until `/app/design` rendered this component on its own. */}
             <span>
-              {trimNum(previous.num)} {previous.heading}
+              {trimNum(previous.num)}{" "}{previous.heading}
             </span>
             <StatusBadge status={previous.status} />
           </a>
@@ -39,7 +43,7 @@ const { previous = null, next = null, release = null } = Astro.props;
           <a href={appHref(next.identifier, release)} rel="next">
             <span class="neighbors__dir">Next</span>
             <span>
-              {trimNum(next.num)} {next.heading}
+              {trimNum(next.num)}{" "}{next.heading}
             </span>
             <StatusBadge status={next.status} />
           </a>

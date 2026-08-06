@@ -42,6 +42,11 @@ const PAGES = [
   // sideways if its CSS is wrong, which is precisely what the assertion below
   // is for.
   ["demo-video", "/app/demo"],
+  // Session 30: the design system (ADR-0053). Every component the reader has,
+  // on one page, which makes it the one shot where a token change is visible
+  // without knowing which route to open — and a table of colour pairs, which is
+  // the other shape that pushes a phone sideways.
+  ["design", "/app/design"],
 ];
 
 /**

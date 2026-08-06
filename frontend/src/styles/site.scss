@@ -858,7 +858,16 @@ main[id] {
   justify-content: space-between;
 }
 
-.contextbar .usa-breadcrumb {
+/* The breadcrumb takes the colour of whatever it is placed on.
+ *
+ * USWDS paints it `$theme-breadcrumb-background-color`, which is a compile-time
+ * value assuming a light page while the theme is chosen at runtime (ADR-0027) —
+ * so left alone it is a white slab on a dark page, with `--ink` written on it.
+ * This rule used to be scoped to `.contextbar`, which was every use of the
+ * component until `/app/design` rendered one outside the sticky chrome and the
+ * slab came back. A component whose colours depend on an ancestor class it does
+ * not own is a component that is right in one place. */
+.usa-breadcrumb {
   background: transparent;
   padding: 0;
   margin: 0;
@@ -1595,6 +1604,18 @@ main[id] {
    * icon here would read as "× repealed" to the one group of readers who
    * needed no help distinguishing them. */
   border: 2px solid transparent;
+
+  /* The neutral pill is the *default*, not a case (gotcha 13: the status set is
+   * not closed). A status this file has never heard of used to fall through to
+   * USWDS's own `.usa-tag` — a filled badge in `base-dark`, a colour the
+   * palette does not name and `docs/verification/contrast.json` therefore never
+   * measured, carrying the same visual emphasis as `repealed`. An unknown
+   * status is not an emphatic one; it is a word this site cannot interpret, and
+   * printing the word is the whole of what it can honestly do. Seen on
+   * `/app/design`, which is the only page that renders one (ADR-0053). */
+  background-color: transparent;
+  color: var(--ink);
+  border-color: var(--ink);
 }
 
 .status-tag--repealed,
@@ -1614,17 +1635,9 @@ main[id] {
 }
 
 /* Gotcha 13: the status set is not closed — USLM 2.x adds `renumbered`, and a
- * subchapter can be `reserved`. These three are the ones the source is known to
- * emit; anything else keeps the plain pill, still with its word printed, which
- * is the part that actually carries the meaning. */
-.status-tag--transferred,
-.status-tag--renumbered,
-.status-tag--reserved {
-  background-color: transparent;
-  color: var(--ink);
-  border-color: var(--ink);
-}
-
+ * subchapter can be `reserved`. These are the ones the source is known to emit
+ * and they take the neutral pill set above, each with its own border, so the
+ * distinction survives a monochrome print. */
 .status-tag--reserved {
   border-style: dashed;
 }
@@ -3476,6 +3489,232 @@ main[id] {
   color: inherit;
 }
 
+/* ------------------------------------------------------------ /app/design
+ *
+ * The design system page (ADR-0053). Almost all of it is other rules in this
+ * file doing their ordinary job on real components; what is below is the
+ * scaffolding around them — a frame that separates one specimen from the next,
+ * a swatch, and the two type specimens that name a face rather than a role.
+ *
+ * Deliberately small. Every rule here is a rule the page is *not* documenting,
+ * so a design guide that needed a stylesheet of its own would be showing the
+ * reader something the reader does not have. */
+
+.spec {
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  padding: 1rem;
+  margin: 0.75rem 0 1.5rem;
+  background: var(--page);
+}
+
+/* The specimen list of search results is a `.toc` as well, which carries its
+ * own border and padding — two frames, one inside the other. */
+.spec.searchresults {
+  padding: 0.25rem 1rem;
+}
+
+.spec__label {
+  margin: 1.25rem 0 0.25rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.spec > .spec__label:first-child {
+  margin-top: 0;
+}
+
+.spec__meta {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.spec__row {
+  border-top: 1px solid var(--rule);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.spec__row:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+/* The two faces, named rather than shown in a role — this is the only place on
+ * the site where the typeface is the subject rather than the vehicle. */
+.spec__spectral {
+  font-family: var(--reading);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.spec__archivo {
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+/* The measure, made visible: the column the reading text is set in, with its
+ * edge drawn so the width is a thing on screen rather than a number. */
+.spec__measure {
+  font-family: var(--reading);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  max-width: var(--measure);
+  border-left: 2px solid var(--edge);
+  border-right: 2px solid var(--edge);
+  padding: 0 0.75rem;
+  margin: 0;
+}
+
+.spec__focus,
+.spec__badges,
+.spec__cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Each control keeps its own label. As bare flex children the two separated —
+ * "A select" ended up beside the buttons with its `<select>` on the next row,
+ * which is a specimen of a label pointing at nothing. */
+.spec__focus > div {
+  align-self: flex-end;
+}
+
+.spec__focus .usa-label {
+  margin-top: 0;
+}
+
+.spec__focus .usa-input,
+.spec__focus .usa-select {
+  margin-top: 0.25rem;
+  width: 12rem;
+  max-width: 100%;
+}
+
+/* Two cards to a row where there is room for two, stacked where there is not.
+ * The live card is `width: min(28rem, …)`, which at the frame's width wraps
+ * one card per row and leaves half the frame empty. */
+.spec__cards .cite-preview--specimen {
+  flex: 1 1 15rem;
+  width: auto;
+  min-width: 0;
+}
+
+.spec__badges .status-tag {
+  margin-left: 0;
+}
+
+/* Two components that pin themselves in place, shown here where they are
+ * written instead.
+ *
+ * Below 40em `.sectionbar` is the one thing on a reader page that sticks, at
+ * `top: 0` with a z-index over everything — so a specimen of it in the page
+ * flow would detach on a phone and follow the reader down the design page,
+ * over whatever it passed. The specimen is a picture of the row, not a second
+ * copy of the chrome. */
+.spec .sectionbar {
+  position: static;
+  z-index: auto;
+}
+
+/* `.neighbors` separates itself from the statutory text above it with 2.5rem
+ * and a rule. Inside a specimen frame there is nothing above it to be separated
+ * from, and the margin is an empty half of the box. */
+.spec .neighbors {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* The failure card, shown in the flow rather than in the top layer. The live
+ * one is a `popover` and therefore `position: fixed`; a specimen of it has to
+ * sit where it is written. */
+.cite-preview--specimen {
+  position: static;
+  width: min(20rem, 100%);
+  max-height: none;
+  box-shadow: none;
+}
+
+.swatches {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* A border on every chip, not only on the pale ones: `--page` against the page
+ * is a swatch with no edge of its own, and an outline drawn in `--edge` is the
+ * one token guaranteed to be visible against both. */
+.swatch__chip {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 0.2rem;
+}
+
+.swatch__value {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+/* Four columns, one of them a pair of token names and one of them a sentence.
+ * At 320 CSS pixels that is 288px of usable width, so nothing in here may
+ * declare a minimum: the token names break where they have to, the cells take
+ * the tighter padding, and the verdict wraps under its ratio rather than
+ * holding a column open with `white-space: nowrap`. WCAG 1.4.10 asks the page
+ * not to scroll sideways at that width, and this table is the widest thing on
+ * the page by some way. */
+.pairs {
+  font-size: 0.9rem;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.pairs th,
+.pairs td {
+  padding: 0.5rem 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.pairs code {
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
+/* Pass and fail are words before they are colours — the cell says "pass" or
+ * "FAIL" — so this is emphasis on a distinction that is already made. */
+.pairs__pass {
+  color: var(--version);
+}
+
+.pairs__fail {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.pairs__deco {
+  color: var(--muted);
+}
+
 /* ------------------------------------------------ forced colours and motion */
 
 /* Windows High Contrast and its kin replace every colour on the page with the
@@ -3535,6 +3774,14 @@ main[id] {
   .copybtn {
     opacity: 1;
     border: 1px solid ButtonText;
+  }
+
+  /* A colour swatch under forced colours is a box painted Canvas: the one
+   * thing on `/app/design` that this mode takes away entirely. The chip keeps
+   * its outline so the row still reads as a swatch, and the resolved value
+   * beside it is the answer either way — it is text. */
+  .swatch__chip {
+    border-color: CanvasText;
   }
 }
 

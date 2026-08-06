@@ -17,13 +17,13 @@
  */
 import Base from "../layouts/Base.astro";
 import ErrorPage from "../components/ErrorPage.astro";
+import NoResults from "../components/NoResults.astro";
 import SearchFacets from "../components/SearchFacets.astro";
+import SearchResult from "../components/SearchResult.astro";
 import { ApiError, fetchSearch, releaseParams } from "../lib/api";
 import { CITES_KEYWORD } from "../lib/query";
-import { fuzzify } from "../lib/searchsyntax";
 import type { SearchResponse } from "../lib/types";
-import { appHref, gotoHref, searchHref, syntaxHref, versionsHref } from "../lib/url";
-import { highlightHtml } from "../lib/uslm";
+import { gotoHref, searchHref, syntaxHref } from "../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
 const offset = Math.max(0, Number(Astro.url.searchParams.get("offset") ?? "0") || 0);
@@ -196,96 +196,12 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
           </div>
         )}
 
-        {total === 0 && (
-          <div class="usa-alert usa-alert--info">
-            <div class="usa-alert__body">
-              <h3 class="usa-alert__heading">Nothing matched those words</h3>
-              <p class="usa-alert__text">
-                The search covers the text of sections and the headings above them. Every
-                word you type has to appear, so a long query narrows quickly.
-              </p>
-              {/* The single most useful thing to say to someone who got nothing
-                  back, now that the search no longer quietly tolerates two
-                  character edits per word (ADR-0031). A reader who mistyped, or
-                  who is guessing at a spelling, gets the old behaviour by
-                  asking for it — and this is where they find that out. */}
-              <p class="usa-alert__text">
-                Unsure of a spelling? Add <code>~1</code> to a word:{" "}
-                <a href={searchHref(fuzzify(query))}><code>{fuzzify(query)}</code></a>{" "}
-                also matches words one character away. Widen a query with{" "}
-                <code>|</code>, narrow it with <code>-</code>. See{" "}
-                <a href={syntaxHref()}>the full syntax</a>.
-              </p>
-              <p class="usa-alert__text">
-                <a href={gotoHref(query)}>Try “{query}” as a citation</a>
-              </p>
-            </div>
-          </div>
-        )}
+        {total === 0 && <NoResults query={query} />}
 
         <ul class="toc searchresults">
-          {results.map((result) => {
-            /* A heading snippet is the heading with the matched words wrapped —
-               so rendered as a quotation below the title it was the title
-               again, verbatim, for every structural hit. Used as the title
-               instead it earns its place: the reader sees *which* words
-               matched, in the line they were already reading. */
-            const headingHit = result.snippets.find((s) => s.field === "heading");
-            const body = result.snippets.filter((s) => s.field !== "heading");
-            return (
-              <li class="searchresult">
-                {/* New tab, like a cross reference and for the same reason: a
-                    results list is something you work *through*, and following
-                    a hit should not throw away the other nineteen.
-                    `data-newtab` lets the reader's preference undo it. */}
-                <h3 class="searchresult__title">
-                  <a
-                    href={appHref(result.identifier, params.release)}
-                    target="_blank"
-                    rel="noopener"
-                    data-newtab
-                  >
-                    {result.num ? `${result.num} ` : ""}
-                    {headingHit ? (
-                      <span set:html={highlightHtml(headingHit.text)} />
-                    ) : (
-                      result.heading || result.identifier
-                    )}
-                  </a>
-                </h3>
-                <p class="searchresult__meta">
-                  <code>{result.identifier}</code>
-                  {result.type === "structure" && result.level && <> · {result.level}</>}
-                  {result.status && <> · {result.status}</>}
-                  {result.first_release && <> · unchanged since {result.first_release}</>}
-                  {/* The words are in text this section no longer carries.
-                      Worth saying: the difference between a provision that
-                      does not mention the subject and one that stopped
-                      mentioning it is most of what a version history is for. */}
-                  {result.earlier_matches > 0 && (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <a href={versionsHref(result.identifier)}>
-                        also matched in {result.earlier_matches} earlier{" "}
-                        {result.earlier_matches === 1 ? "version" : "versions"}
-                      </a>
-                    </>
-                  )}
-                </p>
-                {result.id_collision && (
-                  <p class="searchresult__caveat">
-                    The source publishes more than one provision under this identifier at
-                    this release point. The index holds one of them; the section page shows
-                    every occurrence.
-                  </p>
-                )}
-                {body.map((snippet) => (
-                  <blockquote class="searchresult__snippet" set:html={highlightHtml(snippet.text)} />
-                ))}
-              </li>
-            );
-          })}
+          {results.map((result) => (
+            <SearchResult result={result} release={params.release} />
+          ))}
         </ul>
 
         {(offset > 0 || total > offset + PAGE_SIZE) && (

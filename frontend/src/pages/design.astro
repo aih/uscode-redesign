@@ -1,0 +1,850 @@
+---
+/**
+ * `/app/design` — the reader's design system, rendered by the reader (ADR-0053).
+ *
+ * Every specimen below is the *component*, imported and given data, or the
+ * output of the library function that builds the markup on the pages that use
+ * it. Nothing here is a hand-written likeness of something else on the site:
+ * a likeness drifts, and a style guide that has drifted is worse than none,
+ * because it is believed.
+ *
+ * That is what makes this page a regression surface rather than a gallery.
+ * `make shots` renders it at four widths and fails on horizontal overflow, the
+ * axe matrix scans it in both themes and under forced colours (ADR-0039), and
+ * `tests/e2e/design.spec.ts` compares the contrast ratios it computes against
+ * `docs/verification/contrast.json`. A component that is not on this page is
+ * covered by none of that.
+ *
+ * ## It reaches nothing
+ *
+ * No API call, no database, no release point. The page renders identically on
+ * an empty machine and on the deployed box, which is what lets the screenshot
+ * and accessibility suites treat it as a fixed target — every other route's
+ * appearance depends on what the corpus happens to hold.
+ *
+ * The cost of that is the specimen text below: it is a specimen, under title 0,
+ * which OLRC does not publish. Its citations and links therefore resolve to
+ * nothing, and the page says so rather than borrowing a real provision's
+ * identifier for words the Code does not contain.
+ *
+ * ## The colour table computes itself
+ *
+ * The pairs come from `src/data/color-pairs.json`, which `scripts/contrast.py`
+ * reads as well; the ratios are computed in the browser from the tokens the
+ * page has actually resolved. Two things follow. The table is right in both
+ * themes without a second palette written out anywhere, and it reports what is
+ * painted rather than what `site.scss` declares — the difference ADR-0042 was
+ * written about, where a USWDS component ignored the token and no audit of the
+ * token could see it.
+ */
+import Base from "../layouts/Base.astro";
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import ChapterRail from "../components/ChapterRail.astro";
+import CitationNotFound from "../components/CitationNotFound.astro";
+import CopyColumn from "../components/CopyColumn.astro";
+import NoResults from "../components/NoResults.astro";
+import Neighbors from "../components/Neighbors.astro";
+import ReleaseContext from "../components/ReleaseContext.astro";
+import ReleasePicker from "../components/ReleasePicker.astro";
+import SearchFacets from "../components/SearchFacets.astro";
+import SearchResult from "../components/SearchResult.astro";
+import SectionBar from "../components/SectionBar.astro";
+import StatusBadge from "../components/StatusBadge.astro";
+import Timeline from "../components/Timeline.astro";
+import COLOR_PAIRS from "../data/color-pairs.json";
+import { setPublicCache } from "../lib/cache";
+import { documentDiff, diffLinesHtml, diffSummary } from "../lib/diffdoc";
+import { previewFailureHtml } from "../lib/preview";
+import type { Citation, Entry, Release, SearchResultItem, VersionEntry } from "../lib/types";
+import { appHref } from "../lib/url";
+import { copyableIdentifiers, parseFragment, readingBlocks, render } from "../lib/uslm";
+
+/** Fixed markup with no per-reader content and no release point to pin it to. */
+setPublicCache(Astro.response.headers, null, false);
+
+/* ------------------------------------------------------------- specimen text
+ *
+ * Title 0 does not exist. Every identifier below is under it, so nothing here
+ * can be mistaken for a provision of the Code or collide with one, and the
+ * copy control's citations are visibly specimens.
+ */
+const SPECIMEN_BEFORE = `<section xmlns="http://xml.house.gov/schemas/uslm/1.0"
+  identifier="/us/usc/t0/s1" id="idspecimen00000000-0000-0000-0000-000000000001">
+  <num value="1">§ 1.</num>
+  <heading>Specimen provision</heading>
+  <subsection identifier="/us/usc/t0/s1/a">
+    <num value="a">(a)</num>
+    <heading>In general</heading>
+    <content>The Secretary shall publish a specimen in the Federal Register not later
+    than 30 days after the date of enactment of this section.</content>
+  </subsection>
+  <subsection identifier="/us/usc/t0/s1/b">
+    <num value="b">(b)</num>
+    <heading>Authorization of appropriations</heading>
+    <paragraph identifier="/us/usc/t0/s1/b/1">
+      <num value="1">(1)</num>
+      <content>There is authorized to be appropriated $5,000,000 for each of fiscal years
+      2024 through 2028.</content>
+    </paragraph>
+    <paragraph identifier="/us/usc/t0/s1/b/2">
+      <num value="2">(2)</num>
+      <content>Amounts made available under paragraph (1) shall remain available until
+      expended.</content>
+    </paragraph>
+  </subsection>
+  <sourceCredit>(Specimen, § 1, Jan. 1, 2024, 0 Stat. 0.)</sourceCredit>
+  <notes>
+    <note><heading>Specimen note</heading><p>This section is a specimen used by the design
+    system page. It is not part of the United States Code.</p></note>
+  </notes>
+</section>`;
+
+/** The same specimen, amended: one figure raised, one year extended, one
+ *  paragraph added. Three of the four marks a redline can draw. */
+const SPECIMEN_AFTER = SPECIMEN_BEFORE.replace(
+  "$5,000,000 for each of fiscal years\n      2024 through 2028.",
+  "$7,500,000 for each of fiscal years\n      2024 through 2030.",
+).replace(
+  "</subsection>\n  <sourceCredit>",
+  `  <paragraph identifier="/us/usc/t0/s1/b/3">
+      <num value="3">(3)</num>
+      <content>Not later than 1 year after each disbursement, the Secretary shall submit
+      to Congress a report on amounts expended under this subsection.</content>
+    </paragraph>
+  </subsection>
+  <sourceCredit>`,
+);
+
+const specimen = parseFragment(SPECIMEN_AFTER);
+const specimenHtml = render(specimen, { target: "/us/usc/t0/s1/b/1", release: null, labels: {} });
+const copyTargets = copyableIdentifiers(specimen);
+
+const redline = documentDiff(
+  readingBlocks(parseFragment(SPECIMEN_BEFORE)),
+  readingBlocks(specimen),
+);
+
+/* ---------------------------------------------------------- specimen records
+ *
+ * Shaped exactly as the API answers, because the components below read the API
+ * types. Labels and dates are real release points; the provisions they are
+ * attached to are the specimen's.
+ */
+const RP_OLD: Release = {
+  label: "119-99",
+  currency_date: "2026-06-12",
+  congress: 119,
+  law_num: 99,
+  excluded_laws: [],
+  update_num: null,
+  seq: 380,
+  is_partial: false,
+  caveat: null,
+  titles_affected: [],
+  ingested_titles: [],
+};
+
+const RP_NEW: Release = {
+  ...RP_OLD,
+  label: "119-102not101",
+  currency_date: "2026-07-12",
+  law_num: 102,
+  excluded_laws: [101],
+  seq: 381,
+  is_partial: true,
+  caveat:
+    "Current through Public Law 119-102, except 119-101. The text is not fully current " +
+    "through 07/12/2026.",
+};
+
+const CRUMBS: Entry[] = [
+  { identifier: "/us/usc/t0", level: "title", num: "Title 0", heading: "SPECIMENS" },
+  { identifier: "/us/usc/t0/ch1", level: "chapter", num: "CHAPTER 1—", heading: "SPECIMENS" },
+];
+
+const CURRENT_CRUMB: Entry = {
+  identifier: "/us/usc/t0/s1",
+  level: "section",
+  num: "§ 1.",
+  heading: "Specimen provision",
+  is_section: true,
+};
+
+const RAIL_PARENT: Entry = {
+  identifier: "/us/usc/t0/ch1",
+  level: "chapter",
+  num: "CHAPTER 1—",
+  heading: "SPECIMENS",
+};
+
+/** Reading order with the gaps left in it (gotcha 9): a repealed and an omitted
+ *  section keep their place, badged, so a reader sees them before clicking. */
+const RAIL_ENTRIES: Entry[] = [
+  { identifier: "/us/usc/t0/s1", level: "section", num: "§ 1.", heading: "Specimen provision", is_section: true },
+  { identifier: "/us/usc/t0/s2", level: "section", num: "§ 2.", heading: "Second specimen", status: "repealed", is_section: true },
+  { identifier: "/us/usc/t0/s3", level: "section", num: "§ 3.", heading: "Third specimen", status: "omitted", is_section: true },
+  { identifier: "/us/usc/t0/s4", level: "section", num: "§ 4.", heading: "Fourth specimen", is_section: true },
+];
+
+const VERSIONS: VersionEntry[] = [
+  {
+    content_hash: "0000000000000000000000000000000000000000000000000000000000000001",
+    first_seen: RP_OLD,
+    releases: ["119-99", "119-100", "119-101"],
+    num: "§ 1.",
+    heading: "Specimen provision",
+    status: null,
+  },
+  {
+    content_hash: "0000000000000000000000000000000000000000000000000000000000000002",
+    first_seen: RP_NEW,
+    releases: ["119-102not101"],
+    num: "§ 1.",
+    heading: "Specimen provision",
+    status: null,
+  },
+];
+
+/** The neighbours of § 2, and the subdivision above it — what `SectionBar` and
+ *  `Neighbors` step through. */
+const PREVIOUS: Entry = RAIL_ENTRIES[0];
+const NEXT: Entry = RAIL_ENTRIES[2];
+
+/** Counts over a whole result set, which is what makes a facet worth reading.
+ *  The query carries `title:16`, so that value renders as the applied filter —
+ *  the one pill on the site painted `--danger-ink` on `--link`. */
+const FACETS = {
+  titles: [
+    { value: "16", count: 118 },
+    { value: "42", count: 64 },
+    { value: "7", count: 12 },
+  ],
+  statuses: [
+    { value: "none", count: 180 },
+    { value: "repealed", count: 14 },
+  ],
+};
+
+const RESULTS: SearchResultItem[] = [
+  {
+    identifier: "/us/usc/t0/s1",
+    heading: "Specimen provision",
+    num: "§ 1.",
+    level: null,
+    type: "section",
+    snippets: [
+      {
+        field: "text",
+        text:
+          "There is authorized to be appropriated $7,500,000 for each of fiscal years 2024 " +
+          "through 2030, to remain available until <em>expended</em>.",
+      },
+    ],
+    first_release: "119-102not101",
+    is_current: true,
+    title_num: "0",
+    status: null,
+    earlier_matches: 2,
+    id_collision: false,
+  },
+  {
+    identifier: "/us/usc/t0/s2",
+    heading: "Second specimen",
+    num: "§ 2.",
+    level: null,
+    type: "section",
+    snippets: [
+      { field: "heading", text: "Second <em>specimen</em>" },
+      { field: "text", text: "Repealed. Pub. L. 000-00, § 2, Jan. 1, 2024, 0 Stat. 0." },
+    ],
+    first_release: "119-99",
+    is_current: true,
+    title_num: "0",
+    status: "repealed",
+    earlier_matches: 0,
+    id_collision: true,
+  },
+  {
+    identifier: "/us/usc/t0/ch1",
+    heading: "SPECIMENS",
+    num: "CHAPTER 1—",
+    level: "chapter",
+    type: "structure",
+    snippets: [{ field: "heading", text: "<em>SPECIMENS</em>" }],
+    first_release: null,
+    is_current: true,
+    title_num: "0",
+    status: null,
+    earlier_matches: 0,
+    id_collision: false,
+  },
+];
+
+/** The standing case for a citation that parses and names nothing: the five
+ *  appendix titles, whose sections OLRC publishes under the enacting
+ *  instrument rather than a flat section number. The `message` is the API's. */
+const APPENDIX: Citation = {
+  query: "5 U.S.C. App. 3",
+  identifier: "/us/usc/t5a/s3",
+  section_identifier: "/us/usc/t5a/s3",
+  title_num: "5a",
+  section_num: "3",
+  subdivisions: [],
+  kind: "section",
+  note: false,
+  et_seq: false,
+  exists: false,
+  heading: null,
+  num: null,
+  release: null,
+  message:
+    "Title 5 appendix sections are published under the law that enacted them, not under a " +
+    "flat section number — /us/usc/t5a/pl/92/463/s1, for example. None of the 461 appendix " +
+    "sections uses the form this citation was read as, so there is nothing at " +
+    "/us/usc/t5a/s3 to show.",
+};
+
+/** Every colour token that takes part in a declared pair, in first-seen order.
+ *  The swatches and the table are the same list read twice. */
+const TOKENS = [
+  ...new Set(COLOR_PAIRS.pairs.flatMap((pair) => [pair.foreground, pair.background])),
+];
+
+/** The reader's own type roles, each shown in the class the site sets it with.
+ *  Sizes are not restated here — the specimen is the size. */
+const TYPE_ROLES = [
+  { cls: "doc-title", face: "Spectral", what: "A section's own heading, the one h1 on a reader page" },
+  { cls: "lede", face: "Archivo", what: "The opening paragraph of a page that explains itself" },
+  { cls: "toc-group", face: "Archivo", what: "The label above a list — a group heading, not a title" },
+  { cls: "doc-meta", face: "Archivo", what: "Apparatus: links to the version history, formats, provenance" },
+];
+---
+
+<Base title="Design system · U.S. Code">
+  <h1 class="doc-title">Design system</h1>
+
+  <p class="lede">
+    Every part the reader is built from, on one page, rendered by the same components the rest
+    of the site renders. The type, the palette with its measured contrast, the focus ring, the
+    status badges, the navigation chrome and the release switcher, the version timeline and the
+    redline, the copy control, a search result row with its facets, and each message the site can
+    put in front of you.
+  </p>
+
+  <p>
+    This page reaches no data. The provision it shows is a specimen under title 0, which the
+    Office of the Law Revision Counsel does not publish: its citations and links resolve to
+    nothing, and its words are not law.
+  </p>
+
+  <p class="doc-meta">
+    The colour table computes itself from the tokens this page has resolved, so it is correct
+    in whichever theme you are reading. Use the <strong>Dark</strong> control in the header to
+    see the other one.
+  </p>
+
+  <nav class="apidocs__contents" aria-label="On this page">
+    <p class="apidocs__contents-item"><a href="#type">Type</a></p>
+    <p class="apidocs__contents-item"><a href="#measure">The reading measure</a></p>
+    <p class="apidocs__contents-item"><a href="#colour">Colour</a></p>
+    <p class="apidocs__contents-item"><a href="#focus">Focus</a></p>
+    <p class="apidocs__contents-item"><a href="#status">Status badges</a></p>
+    <p class="apidocs__contents-item"><a href="#chrome">Navigation chrome</a></p>
+    <p class="apidocs__contents-item"><a href="#versions">Versions and redlines</a></p>
+    <p class="apidocs__contents-item"><a href="#text">Statutory text and the copy control</a></p>
+    <p class="apidocs__contents-item"><a href="#search">Search results</a></p>
+    <p class="apidocs__contents-item"><a href="#messages">Messages</a></p>
+  </nav>
+
+  {/* ------------------------------------------------------------------ type */}
+  <h2 class="toc-group" id="type">Type</h2>
+
+  <p>
+    Two faces, both served from this origin. Statutory text is set in <strong>Spectral</strong>;
+    everything about the text — navigation, labels, notes, this sentence — is
+    <strong>Archivo</strong>. Identifiers and guids are the system monospace stack. The files,
+    their byte sizes and the commits they were built from are in
+    <code>docs/verification/fonts.json</code>.
+  </p>
+
+  <div class="spec">
+    <p class="spec__label">Spectral, the reading face</p>
+    <p class="spec__spectral">
+      There is authorized to be appropriated $7,500,000 for each of fiscal years 2024 through
+      2030. <em>Emphasis</em> and <strong>weight</strong> are both reachable from the text of
+      the Code itself, so all four serif files are declared.
+    </p>
+    <p class="spec__label">Archivo, the interface face</p>
+    <p class="spec__archivo">
+      Release point 119-102not101, current through 07/12/2026. <em>Emphasis</em> and
+      <strong>weight</strong>, one variable file per style.
+    </p>
+    <p class="spec__label">The system monospace stack</p>
+    <p><code>/us/usc/t16/s45f/c/5</code> · <code>id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd</code></p>
+  </div>
+
+  <p class="toc-group">Roles</p>
+
+  <div class="spec">
+    {
+      TYPE_ROLES.map((role) => (
+        <div class="spec__row">
+          <p class={role.cls}>{role.what}</p>
+          <p class="spec__meta">
+            <code>.{role.cls}</code> — {role.face}
+          </p>
+        </div>
+      ))
+    }
+  </div>
+
+  {/* --------------------------------------------------------------- measure */}
+  <h2 class="toc-group" id="measure">The reading measure</h2>
+
+  <p>
+    One token, <code>--measure</code>, sets the width of the reading column and of the chrome
+    that spans it. The block below is that width. Characters per rendered line are counted by
+    <code>make measure</code> into <code>docs/verification/measure.json</code> rather than
+    estimated from a glyph width.
+  </p>
+
+  <div class="spec">
+    <p class="spec__measure" data-measure-sample>
+      The Secretary shall publish a specimen in the Federal Register not later than 30 days
+      after the date of enactment of this section, and shall thereafter maintain it in a form
+      that can be read at the width the reader was designed for rather than the width the
+      window happens to be.
+    </p>
+    <p class="spec__meta">
+      <code>--measure</code> resolves here to <span data-measure-token>—</span>, and the
+      paragraph above is <span data-measure-width>—</span> wide at this viewport.
+    </p>
+  </div>
+
+  {/* ---------------------------------------------------------------- colour */}
+  <h2 class="toc-group" id="colour">Colour</h2>
+
+  <p>
+    Every colour the reader paints is a custom property, and both themes are the same set of
+    names with different values. The swatches are those properties; the table below is every
+    declared pair — which colour is painted on which — with the ratio computed from what this
+    page resolved, in the theme you are reading it in.
+  </p>
+
+  <ul class="swatches" data-swatches>
+    {
+      TOKENS.map((token) => (
+        <li class="swatch">
+          <span class="swatch__chip" style={`background: var(${token})`} aria-hidden="true" />
+          <span class="swatch__name"><code>{token}</code></span>
+          <span class="swatch__value" data-swatch-value={token}>—</span>
+        </li>
+      ))
+    }
+  </ul>
+
+  <table class="usa-table usa-table--borderless pairs" data-pairs>
+    <caption>
+      Declared colour pairs, with the contrast ratio computed in this theme. WCAG 2.1 AA asks
+      4.5:1 of text and 3:1 of the parts of a control that identify it.
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col">Painted on</th>
+        <th scope="col">Used for</th>
+        <th scope="col">Needs</th>
+        <th scope="col">Measured</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        COLOR_PAIRS.pairs.map((pair) => (
+          <tr data-pair-fg={pair.foreground} data-pair-bg={pair.background} data-pair-needs={pair.requires ?? ""}>
+            <th scope="row">
+              <code>{pair.foreground}</code> on <code>{pair.background}</code>
+            </th>
+            <td>{pair.usage}</td>
+            <td>{pair.requires === null ? "decorative" : `${pair.requires}:1`}</td>
+            <td data-pair-result>—</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+
+  <p class="doc-meta">
+    The same pairs are computed from <code>frontend/src/styles/site.scss</code> by
+    <code>uv run python scripts/contrast.py</code>, which writes
+    <code>docs/verification/contrast.json</code> and exits non-zero on a failure. The two
+    answers are compared in the browser suite.
+  </p>
+
+  {/* ----------------------------------------------------------------- focus */}
+  <h2 class="toc-group" id="focus">Focus</h2>
+
+  <p>
+    Tab through the controls below to see the focus ring. It is USWDS's, drawn at the same
+    weight on every kind of control, and it is one compile-time colour rather than a token:
+    the theme is chosen in the browser and this is chosen when the stylesheet is built.
+  </p>
+
+  <div class="spec spec__focus">
+    <div><a href="#focus">A link</a></div>
+    <div><button class="usa-button" type="button">A button</button></div>
+    <div>
+      <button class="usa-button usa-button--outline" type="button">An outline button</button>
+    </div>
+    <div>
+      <label class="usa-label" for="design-select">A select</label>
+      <select class="usa-select" id="design-select">
+        <option>119-102not101</option>
+        <option>119-99</option>
+      </select>
+    </div>
+    <div>
+      <label class="usa-label" for="design-input">A text field</label>
+      <input class="usa-input" id="design-input" type="text" value="16 usc 45f" />
+    </div>
+  </div>
+
+  {/* ---------------------------------------------------------------- status */}
+  <h2 class="toc-group" id="status">Status badges</h2>
+
+  <p>
+    A repealed, omitted, transferred or reserved provision keeps its place in reading order and
+    arrives badged. The status set is not closed — USLM 2.x adds <code>renumbered</code>, and
+    the source may publish a value nothing here has seen. An unrecognised status keeps the plain
+    pill and prints its own word, which is the part that carries the meaning; the colour and the
+    border are emphasis, and the word survives a monochrome print without them.
+  </p>
+
+  <p class="spec spec__badges">
+    {
+      ["repealed", "omitted", "transferred", "reserved", "renumbered", "vacated"].map((status) => (
+        <StatusBadge status={status} />
+      ))
+    }
+  </p>
+
+  <p class="doc-meta">
+    <code>vacated</code> is not a status this site knows. It is here to show what happens to one
+    that arrives anyway.
+  </p>
+
+  {/* ---------------------------------------------------------------- chrome */}
+  <h2 class="toc-group" id="chrome">Navigation chrome</h2>
+
+  <p>
+    The breadcrumb ends at the thing on screen, unlinked and marked as the current page. The
+    rail lists the sections of the subdivision around it, in reading order, badged in place.
+  </p>
+
+  <div class="spec">
+    <p class="spec__label">Breadcrumbs</p>
+    <Breadcrumbs crumbs={CRUMBS} current={CURRENT_CRUMB} release="119-102not101" />
+
+    <p class="spec__label">Chapter rail</p>
+    <ChapterRail
+      parent={RAIL_PARENT}
+      entries={RAIL_ENTRIES}
+      current="/us/usc/t0/s1"
+      release="119-102not101"
+      isNewest={false}
+    />
+  </div>
+
+  <p class="spec__label">Section bar</p>
+
+  <p>
+    The one row that stays put while the text scrolls, and below 40em the only thing that does.
+    Each step names its neighbour from 40em up; below that the arrow stands alone, because this
+    row may not wrap. A section at the edge of its subdivision has nothing to step to and the
+    arrow greys out rather than disappearing, so the row keeps its shape.
+  </p>
+
+  <div class="spec">
+    <SectionBar
+      num="§ 2."
+      heading="Second specimen"
+      status="repealed"
+      previous={PREVIOUS}
+      next={NEXT}
+      up={RAIL_PARENT}
+      release="119-102not101"
+    />
+  </div>
+
+  <div class="spec">
+    <SectionBar
+      num="§ 1."
+      heading="The only section in its subdivision — both steps off"
+      up={RAIL_PARENT}
+      release="119-102not101"
+    />
+  </div>
+
+  <p class="spec__label">Neighbours</p>
+
+  <p>
+    The same two exits at the foot of the page, with their headings and their badges. A repealed
+    or omitted neighbour is shown rather than skipped: it keeps its place in the Code's reading
+    order, and a reader who cannot see the gap cannot tell a repeal from a renumbering. The second
+    specimen is the last section of a subdivision, which has a previous and no next.
+  </p>
+
+  <div class="spec">
+    <Neighbors previous={PREVIOUS} next={NEXT} release="119-102not101" />
+  </div>
+
+  <div class="spec">
+    <Neighbors previous={NEXT} release="119-102not101" />
+  </div>
+
+  <p class="spec__label">Release switcher</p>
+
+  <p>
+    Two GET forms, no scripting: the newest text, a named release point, or a date. Two rather
+    than one because <code>?release=</code> beats <code>?date=</code> when both arrive, so a single
+    form would silently ignore whichever control the reader had just set.
+  </p>
+
+  <div class="spec">
+    <ReleasePicker
+      action={appHref("/us/usc/t0/s1")}
+      options={[RP_NEW, RP_OLD]}
+      selected="119-102not101"
+    />
+  </div>
+
+  <p class="spec__label">Release context</p>
+
+  <p>
+    Which text this is, stated rather than left to be inferred: the release point, its currency
+    date, and whether it is the newest. A <code>not</code> release point carries a caveat, because
+    at <code>119-102not101</code> the text is current through 07/12/2026 <em>except</em> for one
+    public law.
+  </p>
+
+  <div class="spec">
+    <ReleaseContext served={RP_NEW} isNewest={true} />
+  </div>
+
+  <div class="spec">
+    <ReleaseContext served={RP_OLD} isNewest={false} newestHref={appHref("/us/usc/t0/s1")} />
+  </div>
+
+  {/* -------------------------------------------------------------- versions */}
+  <h2 class="toc-group" id="versions">Versions and redlines</h2>
+
+  <p>
+    The timeline is one entry per distinct text, not one per release point: the Code republishes
+    every title at every release point whether or not anything in it changed, so a row each
+    would be hundreds of identical rows.
+  </p>
+
+  <div class="spec">
+    <Timeline identifier="/us/usc/t0/s1" entries={VERSIONS} />
+  </div>
+
+  <p class="spec__label">Redline</p>
+
+  <p>
+    The redline compares what two release points of a provision <em>say</em>. The specimen below
+    raises a figure, extends a period and adds a paragraph: {diffSummary(redline)}. The summary
+    line is the one the redline page prints.
+  </p>
+
+  <div class="diff-view diff-view--text" set:html={diffLinesHtml(redline.lines)} />
+
+  {/* ------------------------------------------------------------------ text */}
+  <h2 class="toc-group" id="text">Statutory text and the copy control</h2>
+
+  <p>
+    Statutory text, its indentation, its source credit and its notes — with the copy control
+    above it and a copy button in the gutter beside every provision. The controls appear only
+    when scripting is available, since there is no other way to write to a clipboard.
+    Subsection (b)(1) is highlighted the way a provision named in the URL is.
+  </p>
+
+  <CopyColumn identifiers={copyTargets} release={null} />
+
+  <article class="section-body" set:html={specimenHtml} />
+
+  {/* ---------------------------------------------------------------- search */}
+  <h2 class="toc-group" id="search">Search results</h2>
+
+  <p>
+    A result row carries the identifier, the release point at which this exact text first
+    appeared, and — when the words are in text the section no longer holds — a link to the
+    versions that did hold them. The second row shows the caveat a section carries when the
+    source published more than one provision under one identifier at one release point.
+  </p>
+
+  <ul class="toc searchresults spec">
+    {RESULTS.map((result) => <SearchResult result={result} />)}
+  </ul>
+
+  <p class="spec__label">Facets</p>
+
+  <p>
+    A facet is a link that edits the query rather than a control beside it, so the URL of a
+    filtered search is the whole search. Counts are over the entire result set, not the page. The
+    applied filter is the filled pill — the one place on the site that paints
+    <code>--danger-ink</code> on <code>--link</code>.
+  </p>
+
+  <div class="spec">
+    <SearchFacets facets={FACETS} query="conservation title:16" total={194} />
+  </div>
+
+  {/* -------------------------------------------------------------- messages */}
+  <h2 class="toc-group" id="messages">Messages</h2>
+
+  <p class="spec__label">Nothing matched</p>
+  <NoResults query="conservtion easement" />
+
+  <p class="spec__label">A citation that parses and names nothing</p>
+  <CitationNotFound found={APPENDIX} query="5 U.S.C. App. 3" />
+
+  <p class="spec__label">A hover preview that could not load</p>
+
+  <p>
+    The preview endpoint is rate-limited per caller, and a reader working down a section dense
+    with cross references will meet the limit. The card says so and offers the link rather than
+    declining to open.
+  </p>
+
+  <div class="spec spec__cards">
+    <div
+      class="cite-preview cite-preview--specimen"
+      set:html={previewFailureHtml(appHref("/us/usc/t0/s1"), 429)}
+    />
+    <div
+      class="cite-preview cite-preview--specimen"
+      set:html={previewFailureHtml(appHref("/us/usc/t0/s1"))}
+    />
+  </div>
+
+  <p class="spec__label">A release point that answered for another</p>
+
+  <p>
+    A request for a release point that was never loaded is answerable from the newest one at or
+    before it, because the title did not change in between. The answer is right, and the release
+    context says where it came from rather than letting the substitution pass unremarked.
+  </p>
+
+  <div class="spec">
+    <ReleaseContext
+      served={RP_OLD}
+      isNewest={false}
+      newestHref={appHref("/us/usc/t0/s1")}
+      note="You asked for release point 119-101, which was never loaded here. Title 0 did not change between 119-99 and 119-101, so this is 119-99's text and is the text that was in force."
+    />
+  </div>
+
+  <script is:inline>
+    {
+      /* The colour table, computed from what the page resolved.
+       *
+       * Reading `getComputedStyle` rather than a table of hexes is the whole
+       * point: it reports the colour in force, in the theme in force, which is
+       * the thing a token audit cannot see. The pairs and their requirements
+       * are server-rendered into the rows; this fills in the last column.
+       */
+      const root = document.documentElement;
+
+      function channel(v) {
+        const c = v / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      }
+
+      /** `#rgb`, `#rrggbb` and `rgb()`/`rgba()` with alpha 1. Anything else —
+       *  a translucent wash, a gradient — has no single ratio to state, and is
+       *  reported as such rather than guessed at, the same way the Python
+       *  checker skips it. */
+      function rgb(value) {
+        const text = String(value).trim();
+        const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
+        if (hex) {
+          const d =
+            hex[1].length === 3
+              ? [...hex[1]].map((c) => c + c).join("")
+              : hex[1];
+          return [0, 2, 4].map((i) => parseInt(d.slice(i, i + 2), 16));
+        }
+        const fn = /^rgba?\(([^)]+)\)$/i.exec(text);
+        if (fn) {
+          const parts = fn[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+          if (parts.length === 3 || parts[3] === 1) return parts.slice(0, 3);
+        }
+        return null;
+      }
+
+      function luminance(parts) {
+        const [r, g, b] = parts.map(channel);
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+
+      function ratio(fg, bg) {
+        const a = luminance(fg);
+        const b = luminance(bg);
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      }
+
+      const token = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+
+      function paint() {
+        for (const cell of document.querySelectorAll("[data-swatch-value]")) {
+          cell.textContent = token(cell.dataset.swatchValue) || "unset";
+        }
+
+        for (const row of document.querySelectorAll("[data-pair-fg]")) {
+          const cell = row.querySelector("[data-pair-result]");
+          const fg = rgb(token(row.dataset.pairFg));
+          const bg = rgb(token(row.dataset.pairBg));
+          if (!fg || !bg) {
+            cell.textContent = "not an opaque colour";
+            cell.className = "";
+            continue;
+          }
+          const value = ratio(fg, bg);
+          const needs = row.dataset.pairNeeds ? Number(row.dataset.pairNeeds) : null;
+          // Two decimals, matching what contrast.py rounds to, so the two
+          // answers are comparable digit for digit.
+          const shown = value.toFixed(2);
+          cell.dataset.ratio = shown;
+          if (needs === null) {
+            cell.textContent = `${shown}:1`;
+            cell.className = "pairs__deco";
+            continue;
+          }
+          const passes = value >= needs;
+          cell.textContent = `${shown}:1 ${passes ? "pass" : "FAIL"}`;
+          cell.className = passes ? "pairs__pass" : "pairs__fail";
+        }
+
+        const sample = document.querySelector("[data-measure-sample]");
+        const measureToken = document.querySelector("[data-measure-token]");
+        const measureWidth = document.querySelector("[data-measure-width]");
+        if (sample && measureToken && measureWidth) {
+          measureToken.textContent = token("--measure") || "unset";
+          measureWidth.textContent = `${Math.round(sample.getBoundingClientRect().width)}px`;
+        }
+      }
+
+      paint();
+
+      // The theme is an attribute on <html>, set by the header's toggle and by
+      // the pre-paint bootstrap. Watching it is what keeps this table honest
+      // without the toggle having to know this page exists.
+      new MutationObserver(paint).observe(root, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
+
+      // The measured column width is a fact about the viewport, so it changes
+      // when the viewport does.
+      window.addEventListener("resize", paint);
+    }
+  </script>
+</Base>

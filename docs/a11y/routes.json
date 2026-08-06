@@ -20,6 +20,7 @@
     { "id": "home", "path": "/app/", "name": "home / title list" },
     { "id": "about", "path": "/app/about", "name": "about" },
     { "id": "demo", "path": "/app/demo", "name": "demo video" },
+    { "id": "design", "path": "/app/design", "name": "design system — every component, both themes, and the states no corpus-driven route renders (ADR-0053)" },
     { "id": "docs", "path": "/app/docs", "name": "API reference (reader's own)" },
     { "id": "goto", "path": "/app/goto", "name": "citation box landing" },
     { "id": "releases", "path": "/app/releases", "name": "release points / currency" },
@@ -68,7 +69,6 @@
     { "path": "/app/healthz", "reason": "not a page — a health endpoint" },
     { "path": "/app/preview/*", "reason": "not a page — the fragment endpoint behind the hover preview; covered by the preview-focus state" },
     { "path": "/static/apidocs/", "reason": "an asset directory, not a page. The pages those assets render are /docs and /redoc, both in the matrix" },
-    { "path": "/app/design", "reason": "not built yet — task C2" },
     { "path": "/app/accessibility", "reason": "not built yet — task A10; add to this matrix in the same commit that adds the page" }
   ],
 

@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "Which colour token is painted on which, and what WCAG 2.1 AA asks of that combination.",
+    "A fact about the design rather than about any one file, so it is declared here and read twice:",
+    "by scripts/contrast.py, which resolves the tokens out of frontend/src/styles/site.scss and",
+    "writes docs/verification/contrast.json; and by /app/design, which resolves them out of the",
+    "running page and computes the same ratios in the browser, in whichever theme is on.",
+    "Those two answers are compared in frontend/tests/e2e/design.spec.ts.",
+    "It lives under frontend/src/ because that is the only tree the reader's build can import from:",
+    "frontend/Dockerfile's build context is ./frontend, so nothing under docs/ exists at build time.",
+    "AA is 4.5:1 on text; large text and non-text parts of a control are 3:1 (1.4.3, 1.4.11). Where a",
+    "pair is painted in both roles the stricter number is used. requires: null means measured and",
+    "reported but held to no ratio — see reason."
+  ],
+  "pairs": [
+    { "foreground": "--ink", "background": "--page", "usage": "body text on the page", "requires": 4.5 },
+    { "foreground": "--ink", "background": "--panel", "usage": "body text on a panel or summary box", "requires": 4.5 },
+    { "foreground": "--ink", "background": "--field", "usage": "text typed into a form control", "requires": 4.5 },
+    { "foreground": "--muted", "background": "--page", "usage": "secondary text: notes, source credit, captions", "requires": 4.5 },
+    { "foreground": "--muted", "background": "--panel", "usage": "secondary text inside a panel", "requires": 4.5 },
+    { "foreground": "--link", "background": "--page", "usage": "a link in running text", "requires": 4.5 },
+    { "foreground": "--link", "background": "--panel", "usage": "a link inside a panel", "requires": 4.5 },
+    { "foreground": "--link", "background": "--field", "usage": "a link on a form control", "requires": 4.5 },
+    { "foreground": "--danger", "background": "--page", "usage": "error text", "requires": 4.5 },
+    { "foreground": "--danger-ink", "background": "--danger", "usage": "the repealed / omitted badge's own text", "requires": 4.5 },
+    {
+      "foreground": "--danger-ink",
+      "background": "--link",
+      "usage": "text inside a selected sort or facet pill",
+      "requires": 4.5,
+      "note": "The selected sort option and the applied facet are filled pills. Their text is --danger-ink for the reason that token exists: text on a filled colour cannot inherit --ink, which inverts with the theme while the fill under it does not."
+    },
+    {
+      "foreground": "--version",
+      "background": "--page",
+      "usage": "an insertion in a redline, and the current-release marker",
+      "requires": 4.5,
+      "note": "The brand reserves one green for version semantics and puts it nowhere else (ADR-0052). It is read as text and as a 3px rule, so it is held to the text ratio, the stricter of the two."
+    },
+    { "foreground": "--version", "background": "--panel", "usage": "the same, on a panel", "requires": 4.5 },
+    { "foreground": "--edge", "background": "--field", "usage": "the boundary of an input, select or textarea", "requires": 3.0 },
+    { "foreground": "--edge", "background": "--page", "usage": "a control's boundary against the page", "requires": 3.0 },
+    { "foreground": "--edge", "background": "--panel", "usage": "a control's boundary inside a panel", "requires": 3.0 },
+    { "foreground": "--target-edge", "background": "--page", "usage": "the focus ring, and the edge of a highlighted provision", "requires": 3.0 },
+    { "foreground": "--target-edge", "background": "--panel", "usage": "the focus ring over a panel", "requires": 3.0 },
+    {
+      "foreground": "--rule",
+      "background": "--page",
+      "usage": "dividers, the edge of a note, table cell borders",
+      "requires": null,
+      "reason": "SC 1.4.11 asks 3:1 of visual information required to identify user interface components and states — a control's boundary. A divider between two paragraphs identifies nothing: remove it entirely and the page still says everything it said. Holding it to 3:1 anyway would put every hairline on the site at #949494 or darker, a visibly heavier reader bought for no conformance gain. --edge is the half of the old --rule that does carry meaning, and it is held to the ratio."
+    },
+    {
+      "foreground": "--rule",
+      "background": "--panel",
+      "usage": "a divider drawn on a panel",
+      "requires": null,
+      "reason": "As above."
+    }
+  ]
+}

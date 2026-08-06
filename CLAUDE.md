@@ -37,7 +37,7 @@ ratchet refuses a reader route or an ADR that no chapter accounts for. See Docum
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
 runs axe-core over the route matrix in `docs/a11y/routes.json` — 28 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and six
-interactive states, **258 scans in ~1m30s**, against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
+interactive states, **265 scans in ~1m45s**, against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
 `waiveSeverity`. Every entry carries the task that owns the fix; the measured baseline is
@@ -62,7 +62,9 @@ axe scan miss opposite things: the scan cannot see a pair no scanned route rende
 a status badge**, so none was ever measured, and dark's was 2.25:1), and a token audit cannot see a
 colour that is not a token (**USWDS's `.usa-nav__link` was 2.5:1 on every reader page** below 64em).
 `--rule` is split: **`--edge`** bounds controls and is held to 3:1; `--rule` stays decorative and is
-reported without a requirement. Two traps, both hit here: **`.usa-alert`'s background is on
+reported without a requirement. The list of pairs now lives in
+`frontend/src/data/color-pairs.json`, which `/app/design` reads as well (ADR-0053). Two traps, both
+hit here: **`.usa-alert`'s background is on
 `__body`** (same shape as ADR-0027's footer note), and **a token used for a role it was not defined
 for** — `.endpoint__method` took its *text* colour from `--panel`, which inverts, over a fixed
 background.
@@ -119,15 +121,40 @@ what costs the scroll, **8,798 → 9,117, +3.6%**. The focus ring is still USWDS
 assigns it the indigo, and `$theme-focus-color` is one compile-time value while the theme is chosen at
 runtime.
 
-`make test` = **545** Python tests; `make test-web` = **277** frontend tests; `make test-e2e` = **393**
-Playwright tests, 258 of which are the accessibility scan (**all three are required** — reader
+**The design system has a page, and the page is the regression surface** (ADR-0053). `/app/design`
+renders every part the reader is built from — the two faces and their roles, the reading measure,
+the palette, the focus ring, the status badges, the breadcrumb and rail, the timeline, the redline,
+the copy control, a search result row, and the four messages the site shows when it cannot answer.
+Every specimen is the **component**, given specimen data, or the output of the library function that
+builds that markup elsewhere; four blocks that were inline in a page became components to make that
+true (`Timeline`, `SearchResult`, `NoResults`, `CitationNotFound`). It **reaches no data** — no API
+call, no release point — so it renders the same on an empty machine as on the deployed box, which is
+what lets `make shots` and the axe matrix treat it as a fixed target; the specimen provision is
+under **title 0**, which OLRC does not publish, so its citations resolve to nothing. The contrast
+table **computes itself in the browser** from the tokens the page resolved, so it is right in either
+theme and reports the colour *in force* rather than the colour declared; the pair list moved to
+`frontend/src/data/color-pairs.json` because `frontend/Dockerfile`'s build context is `./frontend`
+and nothing under `docs/` exists at image-build time, and `tests/e2e/design.spec.ts` compares every
+pair against `contrast.json`. Two defects it rendered into view, both components that were right in
+exactly one place: an **unrecognised `@status` fell through to USWDS's `.usa-tag`** — a filled badge
+in a colour the palette does not name and `contrast.json` never measured — and
+**`.usa-breadcrumb`'s transparent background was scoped to `.contextbar`**, so outside the sticky
+chrome the dark trail came back as a white slab; and **`Neighbors` dropped the space between a
+section's number and its heading** — `§ 45eViolations of park regulations` on every section page,
+because alone inside an element the text node between two expressions does not survive the Astro
+compiler. **`WatchButton` is the one component the page does not cover**: accounts are off so it
+renders nowhere, and its island calls `/auth/me` on mount, which the page's no-data property and
+the test enforcing it will not have.
+
+`make test` = **545** Python tests; `make test-web` = **278** frontend tests; `make test-e2e` = **405**
+Playwright tests, 265 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(50 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(51 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -176,10 +203,10 @@ Open debts: **`/app/settings` is reachable from no rendered page** — `AuthNav`
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **`/app/diff` is two hops from the text it compares**
 (section → version history → pick two → diff), which task B5 owns; **`previewHref` in `lib/url.ts`
-has no caller** — `CitePreview.astro:176` builds `` `/app/preview${identifier}` `` inline in browser
+has no caller** — `CitePreview.astro:199` builds `` `/app/preview${identifier}` `` inline in browser
 JavaScript, a reader href built outside `url.ts` against architecture rule 5, and the exact inlining
 that function's docstring says it replaced; **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 1,780 nodes**, down from 41 over 2,251, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 1,794 nodes**, down from 41 over 2,251, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by

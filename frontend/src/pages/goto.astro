@@ -29,6 +29,7 @@
  * explains rather than 404s.
  */
 import Base from "../layouts/Base.astro";
+import CitationNotFound from "../components/CitationNotFound.astro";
 import { ApiError, lookupCitation, releaseParams } from "../lib/api";
 import { setNoStore } from "../lib/cache";
 import { parseCites } from "../lib/query";
@@ -100,31 +101,7 @@ const EXAMPLES = [
   }
 
   {
-    found && !found.exists && (
-      <div class="usa-alert usa-alert--warning" role="alert">
-        <div class="usa-alert__body">
-          <h2 class="usa-alert__heading">
-            Read as <code>{found.identifier}</code>, but nothing is published there
-          </h2>
-          <p class="usa-alert__text">
-            {found.message ??
-              `Nothing is published at ${found.section_identifier}${
-                found.release ? ` at release point ${found.release.label}` : ""
-              }. The citation parsed correctly, so this is a gap in the Code or in what this site has loaded, not a typo.`}
-          </p>
-          <p class="usa-alert__text">
-            <a href={appHref(`/us/usc/t${found.title_num}`)}>
-              Open Title {found.title_num} and look from there
-            </a>
-          </p>
-          {/* It parsed, so it never reached the search fallback — but a reader
-              whose citation names nothing usually still wants the words. */}
-          <p class="usa-alert__text">
-            <a href={searchHref(query)}>Search the text for “{query}” instead</a>
-          </p>
-        </div>
-      </div>
-    )
+    found && !found.exists && <CitationNotFound found={found} query={query} />
   }
 
   <p class="toc-group">Forms that work</p>
