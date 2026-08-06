@@ -4,16 +4,17 @@
   "excluded": "CopyColumn's <script type=\"application/json\" data-copy-targets> — its size is the section's provision list rather than code, so it varies per URL and is measured nowhere.",
   "client_bundles": "None. `astro build` emits no client JavaScript for this site; dist/client/_astro holds only CSS, because every island is is:inline and Astro never bundles those.",
   "validated_against": "The rendered page — see docs/adr/0046 for the comparison against a live /app/us/usc/… response.",
-  "total_bytes": 201499,
+  "total_bytes": 276501,
   "routes": [
     {
       "route": "/app/",
       "page": "pages/index.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -21,11 +22,12 @@
     {
       "route": "/app/404",
       "page": "pages/404.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -33,11 +35,12 @@
     {
       "route": "/app/about",
       "page": "pages/about.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -45,11 +48,12 @@
     {
       "route": "/app/demo",
       "page": "pages/demo.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -57,12 +61,13 @@
     {
       "route": "/app/design",
       "page": "pages/design.astro",
-      "bytes": 23322,
-      "scripts": 7,
+      "bytes": 27536,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
         "CopyColumn.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "design.astro"
@@ -71,11 +76,12 @@
     {
       "route": "/app/diff",
       "page": "pages/diff/[...identifier].astro",
-      "bytes": 9885,
-      "scripts": 6,
+      "bytes": 14099,
+      "scripts": 7,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "[...identifier].astro"
@@ -84,11 +90,12 @@
     {
       "route": "/app/docs",
       "page": "pages/docs.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -96,11 +103,12 @@
     {
       "route": "/app/goto",
       "page": "pages/goto.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -108,11 +116,12 @@
     {
       "route": "/app/guide",
       "page": "pages/guide/index.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -120,11 +129,12 @@
     {
       "route": "/app/login",
       "page": "pages/login.astro",
-      "bytes": 9866,
-      "scripts": 6,
+      "bytes": 14080,
+      "scripts": 7,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "login.astro"
@@ -133,11 +143,12 @@
     {
       "route": "/app/provisions",
       "page": "pages/provisions.astro",
-      "bytes": 9149,
-      "scripts": 6,
+      "bytes": 13363,
+      "scripts": 7,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "RemoveWatchItem.astro",
         "ThemeToggle.astro",
         "Base.astro"
@@ -146,11 +157,12 @@
     {
       "route": "/app/releases",
       "page": "pages/releases.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -158,11 +170,12 @@
     {
       "route": "/app/search",
       "page": "pages/search.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -170,11 +183,12 @@
     {
       "route": "/app/search/syntax",
       "page": "pages/search/syntax.astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -182,11 +196,12 @@
     {
       "route": "/app/settings",
       "page": "pages/settings.astro",
-      "bytes": 12808,
-      "scripts": 6,
+      "bytes": 17022,
+      "scripts": 7,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "settings.astro"
@@ -195,11 +210,12 @@
     {
       "route": "/app/signup",
       "page": "pages/signup.astro",
-      "bytes": 9554,
-      "scripts": 6,
+      "bytes": 13768,
+      "scripts": 7,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "signup.astro"
@@ -208,7 +224,7 @@
     {
       "route": "/app/us/usc",
       "page": "pages/us/usc/[...identifier].astro",
-      "bytes": 33811,
+      "bytes": 37175,
       "scripts": 10,
       "components": [
         "AuthNav.astro",
@@ -225,11 +241,12 @@
     {
       "route": "/app/versions",
       "page": "pages/versions/[...identifier].astro",
-      "bytes": 8464,
-      "scripts": 5,
+      "bytes": 12678,
+      "scripts": 6,
       "components": [
         "AuthNav.astro",
         "DensityToggle.astro",
+        "KeyboardNav.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]

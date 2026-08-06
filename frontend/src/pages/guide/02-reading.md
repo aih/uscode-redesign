@@ -2,10 +2,10 @@
 layout: ../../layouts/GuideLayout.astro
 title: Reading the Code
 order: 2
-summary: Going to a provision by its citation, moving around it, and reading what the badges and notes on it mean.
+summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55]
 ---
 
 ## The address of a provision
@@ -104,8 +104,8 @@ Three more ways to move:
   screen, where the row has space for the arrows alone.
 - **Previous / next cards** at the foot of the section show what is either side, with headings.
 - The **keyboard**: <kbd>←</kbd> or <kbd>j</kbd> for the previous section, <kbd>→</kbd> or
-  <kbd>k</kbd> for the next, <kbd>u</kbd> to go up a level. Keys typed into a search box are left
-  alone, and so is any combination using Ctrl, Alt, Shift or Cmd.
+  <kbd>k</kbd> for the next, <kbd>u</kbd> to go up a level. The full list is under
+  [Keyboard shortcuts](#keyboard-shortcuts) below.
 
 ```scenario
 id: neighbors-next
@@ -131,6 +131,114 @@ steps:
 ```
 
 **Repealed and omitted sections keep their place in reading order.** They are not skipped or hidden. A section that was repealed remains part of the structure of the chapter around it. They appear in prev/next with a badge saying what happened to them.
+
+## Moving around inside a section
+
+Above the text of a section is **In this section** — its top-level provisions with their headings,
+then its source credit and its notes. Each row is a link to that block. Past about nine rows the
+list scrolls inside itself.
+
+```scenario
+id: section-contents
+title: Jump to the notes from the top of a section
+demo: true
+demoOrder: 45
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: Above the text, a section's own contents — its subsections, its source credit, its notes.
+  - expect: { selector: ".contents__link", visible: true }
+    caption: Every top-level provision, with its heading.
+  - click: .contents__link[href="#section-notes"]
+    caption: One click to the notes, past however many subsections are in between.
+  - expect: { url: "#section-notes" }
+    caption: The notes, without scrolling the length of the section to find them.
+```
+
+The section number in the **sticky bar** — `§ 45f` — is a link back to the top of the page. The bar
+stays put at every width, so it is reachable from any scroll position.
+
+```scenario
+id: sectionbar-top
+title: Return to the top of a section from the sticky bar
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - click: .sectionbar__top
+  - expect: { url: "#main" }
+```
+
+## Keyboard shortcuts
+
+Press <kbd>?</kbd> on any page for this list, or use the **Keyboard shortcuts** link in the footer.
+
+**Moving between sections**, on a section page:
+
+| Key | |
+|---|---|
+| <kbd>←</kbd> or <kbd>j</kbd> | Previous section in reading order |
+| <kbd>→</kbd> or <kbd>k</kbd> | Next section in reading order |
+| <kbd>u</kbd> | Up to the chapter or subchapter that contains it |
+
+**Moving inside a section:**
+
+| Key | |
+|---|---|
+| <kbd>c</kbd> | The contents list |
+| <kbd>[</kbd> | Previous subsection |
+| <kbd>]</kbd> | Next subsection |
+| <kbd>s</kbd> | Source credit |
+| <kbd>n</kbd> | Notes |
+
+**Anywhere on the site:**
+
+| Key | |
+|---|---|
+| <kbd>t</kbd> | Top of the page |
+| <kbd>/</kbd> | Search or go to a citation |
+| <kbd>?</kbd> | The shortcut list |
+| <kbd>Esc</kbd> | Close the shortcut list, or a citation preview |
+
+A key typed into a search box or a date field is left alone, and so is any combination held with
+Ctrl, Alt or ⌘. A jump inside a page takes the keyboard with it, so <kbd>Tab</kbd> continues from
+where you landed.
+
+<kbd>[</kbd> and <kbd>]</kbd> step through the rows of the contents list, so a section with no
+subsections has nothing to step through.
+
+```scenario
+id: keyboard-help
+title: Open the shortcut list from the keyboard
+demo: true
+demoOrder: 46
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: Press ? anywhere on the site.
+  - press: "?"
+    caption: The list opens over whatever you were reading.
+  - expect: { selector: "#shortcuts", visible: true }
+    caption: Every shortcut the reader has, on every page.
+  - press: Escape
+    caption: Escape closes it —
+  - expect: { selector: "#shortcuts", visible: false }
+    caption: — and you are back where you were.
+```
+
+```scenario
+id: keyboard-notes
+title: Jump to the notes from the keyboard
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - press: n
+  - expect: { selector: "#section-notes", visible: true }
+```
+
+```scenario
+id: keyboard-search
+title: Reach the search box from the keyboard
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - press: /
+  - expect: { selector: "#site-q:focus", visible: true }
+```
 
 ## What the markings mean
 

@@ -37,7 +37,8 @@ ratchet refuses a reader route or an ADR that no chapter accounts for. See Docum
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
 runs axe-core over the route matrix in `docs/a11y/routes.json` — 28 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and six
-interactive states plus one for the compact reading density (ADR-0054), **266 scans in ~1m45s**,
+interactive states plus one for the compact reading density (ADR-0054) and one for the open shortcut
+dialog (ADR-0055), **267 scans in ~1m45s**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -173,15 +174,39 @@ sticky. **Print** drops the chrome, keeps the release facts, forces the notes op
 running header carrying the citation and the release point; every `<ref>` prints `data-print-url` —
 the citation URL, not the reader's `/app` path.
 
-`make test` = **545** Python tests; `make test-web` = **286** frontend tests; `make test-e2e` = **421**
-Playwright tests, 266 of which are the accessibility scan (**all three are required** — reader
+**Inside a section there is now somewhere to go, and one keyboard map for the site** (ADR-0055).
+The ladder had reached the reading column and not the hover card, where ADR-0054's global
+`.firstIndent-N` still pulled a first line two steps left with no padding to spend — so `(a)`,
+`(b)` and `(c)` rendered **outside the card's padding box on `/us/usc/t16/s1391` and its
+`overflow-y: auto` clipped them**, invisible, every line under them short its first character. The
+ladder selectors are shared with `.cite-preview__body` and the card sets its **own
+`--indent-step: 1em`**; halving the variable halves `firstIndent-N` too, which the
+`[class*="indent"]` override it replaces could not do. Above the text, `SectionContents` renders
+**`uslm.outline()`** — top-level provisions with their headings, then the source credit and the
+notes. Provisions need no new anchor (`@identifier` is already their `id`); the apparatus does, so
+**`RenderOptions.anchors` is opt-in and used once per document** — the section, a further
+occurrence under one identifier (ADR-0021) and the hover card all render this markup into one page
+and only the first may claim `#section-source`/`#section-notes`. The **section bar's number links
+to `#main`**, because nothing new may be pinned: `--sticky-h` is what `scroll-margin-top` spends.
+`KeyboardNav` moved into `Base` and binds `t c [ ] s n / ?` on top of `←/j →/k u`, all of it from
+**`lib/shortcuts.ts`**, which the dialog renders, `/app/design` renders as a panel, and the island
+receives as JSON — an `is:inline` script imports nothing, so a binding written in the script would
+be a second copy of the printed one. The help is a modal `<dialog>`. Two costs: **every route pays
+3,678 more bytes of inline script** (`/app/` 9,000 → 13,000, `/app/us/usc` 34,500 → 37,500), which
+is why that island's rationale is in its frontmatter docstring — written beside the code it was
+6,500 a route; and **`j` is previous and `k` is next**, the reverse of the convention, now printed
+on every page rather than in one sentence, left as ADR-0038's guide and `guide.spec.ts` already
+have it.
+
+`make test` = **545** Python tests; `make test-web` = **299** frontend tests; `make test-e2e` = **441**
+Playwright tests, 267 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(52 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(53 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -234,7 +259,14 @@ unstyled rather than wrongly styled (ADR-0054's recorded cost), and reading them
 task. **A headed level still breaks after its heading** — `(a) In general` then the text below,
 where the printed Code runs the two together: USLM 1.x writes no separator and 2.x writes
 `<inline class="noSmallCaps">.—</inline>` inside the heading, so running them in needs the renderer
-to tell those cases apart. **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
+to tell those cases apart. **`j` is previous and `k` is next**, which is the reverse of the
+convention every reader who knows those keys has; it is what the guide documents and
+`guide.spec.ts` asserts, and ADR-0055 left it rather than flipping a documented binding unasked.
+**`[` and `]` are silent on a section with no contents list** — a one-paragraph repeal has no
+top-level provisions, so the keys do nothing and nothing says why. **A jump to `#section-notes`
+below 40em lands on a closed `<details>`**; above 40em `site.scss` forces the panel visible without
+opening the element, the same mismatch ADR-0043 recorded against `ChapterRail`. **Nothing tells a
+reader the shortcuts exist** unless they press `?` or read the footer. **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **`/app/diff` is two hops from the text it compares**
 (section → version history → pick two → diff), which task B5 owns; **`previewHref` in `lib/url.ts`
