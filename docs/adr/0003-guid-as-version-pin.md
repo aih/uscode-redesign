@@ -15,4 +15,4 @@ Observed in the data: OLRC's converter assigns fresh GUIDs per publication (usc1
 
 ## Consequences
 
-`guid_map` is large (every element × every RP with changed content) — index it well and populate during ingest. GUIDs must never be used to correlate a provision across releases; that's `@identifier`'s job, with renumbering/transfer handled by a redirects table (PLAN §9.2).
+`guid_map` is large (every element × every RP with changed content) — index it well and populate during ingest. GUIDs must never be used to correlate a provision across releases; that's `@identifier`'s job, with renumbering/transfer handled by a redirects table (PLAN §9.3, renumbered from §9.2 on 2026-08-06).
