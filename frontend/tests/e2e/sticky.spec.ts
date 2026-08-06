@@ -322,3 +322,92 @@ test.describe("the chapter rail stays put while the text scrolls", () => {
     expect(position).toBe("static");
   });
 });
+
+test.describe("the guide's chapter list stays put while the chapter scrolls", () => {
+  /**
+   * The same arrangement as the rail above, and the same reason. It is a
+   * separate block because the offset is a different number: `.rail` pins at
+   * `--sticky-h`, the scroll-margin budget rounded up over the tallest chrome a
+   * *section* page carries, and a guide page carries none of what makes that
+   * stack tall — no context bar, no section bar.
+   *
+   * So the guide's rule writes 8rem, and this is what keeps that number honest.
+   * The chrome above it is measured rather than assumed: it drifts every time
+   * the navbar changes, which is the trap `--sticky-h`'s own comment has a
+   * paragraph about.
+   */
+  const CHAPTER = "/app/guide/02-reading";
+
+  test("at 1280px the chapter list holds its place through a long scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(CHAPTER);
+    const nav = page.locator(".guide__nav");
+    await expect(nav).toBeVisible();
+
+    const before = (await nav.boundingBox())!.y;
+    await page.evaluate(() => window.scrollTo(0, 2500));
+    await page.waitForTimeout(300);
+    const after = (await nav.boundingBox())!.y;
+
+    expect(Math.abs(after - before)).toBeLessThan(40);
+    expect(after).toBeGreaterThan(0);
+  });
+
+  test("it pins under the chrome rather than behind it or below it", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(CHAPTER);
+    await page.evaluate(() => window.scrollTo(0, 2500));
+    await page.waitForTimeout(300);
+
+    const measured = await page.evaluate(() => {
+      let chrome = 0;
+      for (const element of document.querySelectorAll("body *")) {
+        const style = getComputedStyle(element);
+        if (style.position !== "sticky" && style.position !== "fixed") continue;
+        if (element.closest(".guide__nav")) continue;
+        const box = element.getBoundingClientRect();
+        if (box.height > 0 && box.top < 400 && box.bottom > chrome) chrome = box.bottom;
+      }
+      const nav = document.querySelector(".guide__nav") as HTMLElement;
+      return { chrome, top: nav.getBoundingClientRect().top };
+    });
+
+    // Under it — the whole point of the pin — and not so far under it that the
+    // list starts a third of the way down an empty column.
+    expect(measured.top).toBeGreaterThanOrEqual(measured.chrome);
+    expect(measured.top - measured.chrome).toBeLessThan(40);
+  });
+
+  test("it is bounded by the viewport and scrolls inside it", async ({ page }) => {
+    // A short window, because the list is 355px of links and an assertion about
+    // a list that fits is an assertion about nothing. 420px leaves 268 under
+    // the chrome.
+    await page.setViewportSize({ width: 1280, height: 420 });
+    await page.goto(CHAPTER);
+
+    const box = await page.evaluate(() => {
+      const nav = document.querySelector(".guide__nav") as HTMLElement;
+      return {
+        height: nav.getBoundingClientRect().height,
+        overflowY: getComputedStyle(nav).overflowY,
+        scrollHeight: nav.scrollHeight,
+        clientHeight: nav.clientHeight,
+      };
+    });
+
+    expect(box.overflowY).toBe("auto");
+    expect(box.height).toBeLessThanOrEqual(420);
+    expect(box.scrollHeight).toBeGreaterThan(box.clientHeight);
+  });
+
+  test("below 64em it is not pinned", async ({ page }) => {
+    // Stacked under the chapter on a phone, where a pinned contents list would
+    // be ten links held over the prose they lead to.
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(CHAPTER);
+    const position = await page.evaluate(
+      () => getComputedStyle(document.querySelector(".guide__nav") as HTMLElement).position,
+    );
+    expect(position).toBe("static");
+  });
+});

@@ -4107,18 +4107,42 @@ dialog.shortcuts {
   /* Side by side, the contents belong on the left — which is where the markup
    * already puts them, so the phone's reordering is undone rather than
    * repeated. */
+  /* Pinned, and scrolling on its own — the arrangement ADR-0050 settled for
+   * `.rail`, for the same reason: a chapter runs to several screens, and a
+   * contents list that scrolls away with the first of them is a contents list
+   * you have to go back for.
+   *
+   * `--sticky-h` is NOT the offset, and that is what made an earlier attempt at
+   * this look wrong enough to be recorded as "deliberately not sticky". That
+   * token is a scroll-margin budget: 19rem here, rounded up over the tallest
+   * chrome any reader page carries, so an anchor jump lands under the bar
+   * rather than behind it. A guide page carries none of what makes that stack
+   * tall — no context bar, no section bar — and its sticky chrome measures
+   * **124px** at 1024, 1280 and 1440 (`.topbar` alone: the navbar and the
+   * search row). Honouring 304px as a `top` offset started the contents 180px
+   * below the bar they belong under.
+   *
+   * 8rem is 128px, so 4px of clearance. `tests/e2e/sticky.spec.ts` measures the
+   * real chrome against this number, because it is the kind of value that
+   * drifts every time the navbar changes — the same trap `--sticky-h` has its
+   * own paragraph about.
+   *
+   * The height is bounded and the list scrolls inside it. That is the half
+   * ADR-0050's first attempt was missing: pinning alone lets a list longer than
+   * the viewport push its own tail off the bottom of the screen, reachable only
+   * by scrolling the document, which moves the prose the reader was holding
+   * still. `overscroll-behavior: contain` keeps a scroll that reaches the end
+   * of the list out of the page underneath it. */
   .guide__nav {
     order: 0;
     border-top: 0;
     padding-top: 0;
+    position: sticky;
+    top: calc(8rem + 0.5rem);
+    max-height: calc(100vh - 8rem - 1.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-
-  /* Not sticky, deliberately. The obvious `position: sticky; top: calc(var(
-   * --sticky-h) + 1rem)` puts the contents 320px down the page before you have
-   * scrolled at all: `--sticky-h` is 19rem here, and it is a scroll-margin
-   * budget rather than a measurement of the chrome, so a sticky element
-   * honouring it as a `top` offset starts below where it belongs. The chapter
-   * list is nine short links; it does not need to follow the reader. */
 }
 
 .guide__nav ul {
