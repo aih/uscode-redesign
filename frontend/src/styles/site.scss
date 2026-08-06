@@ -425,8 +425,15 @@
      * band was landing 34px behind the bar. 25rem is 400px, so 14px of
      * headroom. The lesson is the one already written above and is worth
      * restating because it was not obeyed: adding a nav item is a change to
-     * this number. */
-    --sticky-h: 25rem;
+     * this number.
+     *
+     * ADR-0058 collapsed the nav into a hamburger below 64em, which took those
+     * bands back out: **297px measured** at 640px and **241px** at 700, 800 and
+     * 1023, on `/us/usc/t16/s470a`. 640 is the worst case here because it is
+     * the narrowest width in the band and the breadcrumb wraps furthest. 23rem
+     * is 368px, so 71px of headroom at 640 and 127 at 700 — and 32px of every
+     * anchor jump in this band given back to the text. */
+    --sticky-h: 23rem;
   }
 }
 
@@ -647,37 +654,179 @@
   }
 }
 
-/* USWDS hides the primary navigation behind a JavaScript menu button below the
- * desktop breakpoint. This reader ships no JavaScript (ADR-0011), so on small
- * screens the nav becomes what it is on paper: a short row of links that wraps.
- * Three links do not need a drawer. */
+/* ------------------------------------------------ the menus, and the hamburger
+ *
+ * USWDS hides the primary navigation behind a JavaScript menu button below the
+ * desktop breakpoint, and this reader ships no JavaScript for chrome
+ * (ADR-0011), so the nav used to be forced open here: a short row of links that
+ * wraps. Three links did not need a drawer. Seven do — at 375px they wrapped to
+ * three 44px bands, and between 40em and 64em all of it is sticky, so the menu
+ * was spending 88px of `--sticky-h` on every anchor jump.
+ *
+ * `<details>` is the drawer, so it still ships no script (ADR-0058). The two
+ * halves of that arrangement are here:
+ *
+ *   below 64em — the summary is a hamburger and the list is a panel, absolutely
+ *     positioned so opening it does not push the statute down or grow the
+ *     sticky stack. Same shape as `ReleasePicker`'s (ADR-0056).
+ *   from 64em up — the summary is hidden and `::details-content` is forced
+ *     visible, so the list is a plain row again whether or not the element
+ *     carries `open`. A closed `<details>` hides its content through that
+ *     pseudo-element and nothing else can reach it; where the browser does not
+ *     implement it, the `@supports` block below leaves the hamburger on screen
+ *     rather than leaving the nav unreachable.
+ */
+
+.navmenu__summary,
+.footmenu__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  /* Both halves of removing the disclosure triangle: `list-style` is what
+   * Firefox and current Chrome read, the pseudo-element is what WebKit reads. */
+  list-style: none;
+}
+
+.navmenu__summary::-webkit-details-marker,
+.footmenu__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* `::details-content` is a box the disclosure puts between the element and its
+ * panel, and USWDS's reset is `*, ::before, ::after { box-sizing: inherit }`,
+ * which matches no pseudo-element. So the chain broke here and every link in
+ * both menus inherited `content-box` — invisible below 64em, and 28px of extra
+ * header from 64em up, where USWDS gives `.usa-nav__link` `height: 100%` on top
+ * of 1rem of padding. That is chrome `--sticky-h` pays for on the widths that
+ * never see the hamburger at all. */
+.navmenu::details-content,
+.footmenu::details-content {
+  box-sizing: border-box;
+}
+
+.navmenu__summary:hover,
+.footmenu__summary:hover {
+  color: var(--link);
+}
+
+/* One icon per state, and the element's own `open` decides which. */
+.navmenu__icon--close,
+.footmenu__icon--close,
+[open] > .navmenu__summary .navmenu__icon--open,
+[open] > .footmenu__summary .footmenu__icon--open {
+  display: none;
+}
+
+[open] > .navmenu__summary .navmenu__icon--close,
+[open] > .footmenu__summary .footmenu__icon--close {
+  display: inline;
+}
+
 @media (max-width: 63.99em) {
+  /* `width: 100%` and a full-basis `flex` because `.usa-nav-container` is a
+   * flex row: with the nav's content down to a hamburger it stopped being wide
+   * enough to force a wrap and became a shrink-to-fit column beside the logo,
+   * which stacked the search box and both toggles — 308px of header at 700px,
+   * where the whole point of the exercise was to spend less. One line under the
+   * brand, as before; what changed is what is on it. */
   .usa-nav {
-    display: block;
+    display: flex;
+    /* Both written out: USWDS's small-width nav is a centred *column* — it is
+     * the off-canvas drawer — so `display: flex` alone stacked the hamburger
+     * above the search box above each toggle and read `flex-basis` as a
+     * height. */
+    flex-direction: row;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 0.75rem;
     position: static;
-    width: auto;
+    flex: 1 1 100%;
+    width: 100%;
     height: auto;
     overflow: visible;
     background: transparent;
     padding: 0 1rem 0.5rem;
   }
 
-  .usa-nav__primary {
+  /* The panel hangs off this, so it is the containing block. `flex: none` keeps
+   * the hamburger at its own width and lets `.navtools` take the rest of the
+   * row — at 40em and up the search box sits beside it rather than under it. */
+  .navmenu {
+    flex: none;
+    position: relative;
+  }
+
+  .navmenu > .usa-nav__primary {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 600;
     display: flex;
-    flex-wrap: wrap;
-    gap: 0 1.25rem;
+    flex-direction: column;
+    gap: 0;
     margin: 0;
+    padding: 0.25rem 0;
+    /* Wide enough to read a label, and never wider than the viewport it hangs
+     * in — `make shots` fails a page that scrolls sideways at 320px, and an
+     * absolutely positioned panel is exactly the thing that does it. */
+    min-width: 13rem;
+    max-width: calc(100vw - 2rem);
+    background: var(--page);
+    border: 1px solid var(--edge);
+    border-radius: 0.25rem;
+    box-shadow: 0 6px 16px rgb(0 0 0 / 22%);
   }
 
   .usa-nav__primary-item {
     border-top: none;
+    width: 100%;
   }
 
-  .usa-nav__primary > li > a {
-    padding: 0.5rem 0;
+  /* A row of the panel rather than a word in a line: the whole width is the
+   * target, which is what a menu on a phone has to be. */
+  .navmenu .usa-nav__primary > li > a,
+  .navmenu .usa-nav__primary > li > .soon__trigger {
+    padding: 0.5rem 1rem;
     min-height: 2.75rem;
-    display: inline-flex;
+    width: 100%;
+    display: flex;
     align-items: center;
+  }
+
+}
+
+@media (min-width: 64em) {
+  .navmenu__summary,
+  .footmenu__summary {
+    display: none;
+  }
+
+  .navmenu::details-content,
+  .footmenu::details-content {
+    content-visibility: visible;
+  }
+
+  /* `display: contents` so the list is the flex item `.usa-nav` sees, exactly
+   * as it was before the disclosure wrapped it. As a box of its own the
+   * `<details>` cost the desktop header 28px — chrome the sticky stack pays for
+   * at every anchor jump, on the widths that never see the hamburger. */
+  .navmenu {
+    display: contents;
+  }
+
+  @supports not selector(::details-content) {
+    /* No way to force the list open, so leave the control that opens it. A
+     * hamburger on a desktop is a worse menu; a menu with no way in is not one. */
+    .navmenu__summary,
+    .footmenu__summary {
+      display: inline-flex;
+    }
   }
 }
 
@@ -1554,6 +1703,20 @@ main[id] {
   padding: 0 1rem 0.75rem;
 }
 
+/* Below the desktop breakpoint `.usa-nav` is the flex row and owns the side
+ * padding, so this is a flex item in it rather than a block under it: the
+ * hamburger and the search box share a line wherever there is room for both.
+ * Written here rather than beside the rest of the small-width nav rules because
+ * the base rule above would otherwise win on source order — a media query adds
+ * no specificity. */
+@media (max-width: 63.99em) {
+  .navtools {
+    flex: 1 1 16rem;
+    min-width: 0;
+    padding: 0 0 0.25rem;
+  }
+}
+
 /* It grows into whatever the toggle and the account control do not need. The
  * basis is what it asks for before sharing: enough that the input is a usable
  * width on a small phone rather than a sliver. The padding is zero because
@@ -1570,6 +1733,11 @@ main[id] {
  * would be `--sticky-h` growing, which is why this is scoped rather than the
  * default. */
 @media (max-width: 39.99em) {
+  /* The block keeps sharing its line with the hamburger, and only the box
+   * inside it takes the full width. Measured both ways at 375px: giving
+   * `.navtools` the whole line puts the hamburger on a line of its own and the
+   * account control and the two toggles still need two lines between them —
+   * 276px of header against 230px for this. */
   .navtools .sitesearch {
     flex-basis: 100%;
   }
@@ -3355,6 +3523,19 @@ dialog.shortcuts {
   gap: 0.5rem 2rem;
   margin: 0;
   padding: 0;
+}
+
+/* The same nine links, behind the same disclosure the navbar uses, below the
+ * same breakpoint (ADR-0058). Nothing down here is sticky, so this panel opens
+ * in flow: the footer grows and the page scrolls, which is what a reader who
+ * asked for the links wants. Written after the row rules above because they
+ * would otherwise win on source order. */
+@media (max-width: 63.99em) {
+  .usa-footer__nav .footmenu > .usa-list--unstyled {
+    flex-direction: column;
+    gap: 0;
+    padding: 0.25rem 0 0;
+  }
 }
 
 .usa-footer__nav .usa-list--unstyled > li {

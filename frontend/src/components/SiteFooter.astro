@@ -17,6 +17,12 @@
  * The disclaimer stays where it has always been and is now also a link: it is
  * the most important sentence on the page for anyone who arrived from a search
  * engine, and it had no room here to say anything more.
+ *
+ * Below 64em the nine links collapse into `.footmenu`, the same `<details>`
+ * disclosure the navbar uses (ADR-0058). Nothing here is sticky, so this panel
+ * opens in flow rather than over the page. The disclaimer below it is not part
+ * of the disclosure: it is the sentence a reader who arrived from a search
+ * engine most needs, and it stays on screen.
  */
 import { APP, syntaxHref } from "../lib/url";
 ---
@@ -25,37 +31,72 @@ import { APP, syntaxHref } from "../lib/url";
   <div class="usa-footer__primary-section">
     <div class="usa-footer__primary-container grid-row">
       <nav class="usa-footer__nav" aria-label="Footer">
-        <ul class="usa-list usa-list--unstyled">
-          <li><a class="usa-footer__primary-link" href={`${APP}/`}>Titles</a></li>
-          <li><a class="usa-footer__primary-link" href={`${APP}/releases`}>Release points</a></li>
-          <li><a class="usa-footer__primary-link" href={`${APP}/guide`}>User guide</a></li>
-          <li><a class="usa-footer__primary-link" href={syntaxHref()}>Search guide</a></li>
-          {/* An `<a>` and not a `<button>`, deliberately. Without the island it
-              goes to the chapter that lists the same shortcuts in prose; with
-              it, `KeyboardNav` intercepts the click and opens the dialog. A
-              button would be a control that does nothing when the script has
-              not run, and the destination behind it is a real page. The same
-              progressive-enhancement shape `data-newtab` uses in `Base`. */}
-          <li>
-            <a
-              class="usa-footer__primary-link"
-              href={`${APP}/guide/02-reading#keyboard-shortcuts`}
-              data-shortcuts-open
+        <details class="footmenu">
+          <summary class="footmenu__summary">
+            <svg
+              class="footmenu__icon footmenu__icon--open"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
             >
-              Keyboard shortcuts
-            </a>
-          </li>
-          <li><a class="usa-footer__primary-link" href={`${APP}/docs`}>API documentation</a></li>
-          <li><a class="usa-footer__primary-link" href={`${APP}/design`}>Design system</a></li>
-          <li><a class="usa-footer__primary-link" href={`${APP}/about`}>About</a></li>
-          <li>
-            <a
-              class="usa-footer__primary-link usa-link usa-link--external"
-              rel="noopener"
-              href="https://uscode.house.gov/download/download.shtml">Source XML (OLRC)</a
+              <path
+                d="M3 6h18M3 12h18M3 18h18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"></path>
+            </svg>
+            <svg
+              class="footmenu__icon footmenu__icon--close"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
             >
-          </li>
-        </ul>
+              <path
+                d="M5 5l14 14M19 5L5 19"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"></path>
+            </svg>
+            <span class="footmenu__label">Site links</span>
+          </summary>
+          <ul class="usa-list usa-list--unstyled">
+            <li><a class="usa-footer__primary-link" href={`${APP}/`}>Titles</a></li>
+            <li><a class="usa-footer__primary-link" href={`${APP}/releases`}>Release points</a></li>
+            <li><a class="usa-footer__primary-link" href={`${APP}/guide`}>User guide</a></li>
+            <li><a class="usa-footer__primary-link" href={syntaxHref()}>Search guide</a></li>
+            {/* An `<a>` and not a `<button>`, deliberately. Without the island it
+                goes to the chapter that lists the same shortcuts in prose; with
+                it, `KeyboardNav` intercepts the click and opens the dialog. A
+                button would be a control that does nothing when the script has
+                not run, and the destination behind it is a real page. The same
+                progressive-enhancement shape `data-newtab` uses in `Base`. */}
+            <li>
+              <a
+                class="usa-footer__primary-link"
+                href={`${APP}/guide/02-reading#keyboard-shortcuts`}
+                data-shortcuts-open
+              >
+                Keyboard shortcuts
+              </a>
+            </li>
+            <li><a class="usa-footer__primary-link" href={`${APP}/docs`}>API documentation</a></li>
+            <li><a class="usa-footer__primary-link" href={`${APP}/design`}>Design system</a></li>
+            <li><a class="usa-footer__primary-link" href={`${APP}/about`}>About</a></li>
+            <li>
+              <a
+                class="usa-footer__primary-link usa-link usa-link--external"
+                rel="noopener"
+                href="https://uscode.house.gov/download/download.shtml">Source XML (OLRC)</a
+              >
+            </li>
+          </ul>
+        </details>
       </nav>
     </div>
   </div>
