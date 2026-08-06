@@ -8,8 +8,8 @@ covers:
   adrs: [29, 32, 57]
 ---
 
-Everything the reader shows comes from a public API at `/api/v1`, and the reader has no privileged
-access to anything. The full reference — every route, every parameter, generated from the live
+Everything the reader shows comes from a public API at `/api/v1`. The reader calls the same routes
+any caller can. The full reference — every route, every parameter, generated from the live
 schema — is at [API documentation](/app/docs), with an interactive "try it" version at `/docs` and
 a reference layout at `/redoc`.
 

@@ -2,7 +2,7 @@
 layout: ../../layouts/GuideLayout.astro
 title: Reading at a point in time
 order: 3
-summary: Release points, the three ways to ask for one, and the four facts every page tells you about the text you are looking at.
+summary: Release points, how to ask for one, and what every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
   adrs: [18, 36, 44, 45, 56]
@@ -12,7 +12,7 @@ The Code is republished in full at a **release point**, named for the last publi
 `119-99`, `118-22u1`, `119-102not101`. The OLRC has published 382 of them, from July 2013 to July
 2026; this site has loaded the text at 381.
 
-## Three ways to ask
+## Asking for a release point
 
 **By release point**, when you know which one you want:
 
@@ -25,7 +25,7 @@ steps:
   - goto: /app/us/usc/t16/s45f?release=119-99
     caption: Add ?release= to any address to read it as it stood at that release point.
   - expect: { selector: ".releasebar__rp", contains: "119-99" }
-    caption: The page names the release point it answered from — every page does.
+    caption: The page names the release point it answered from.
 ```
 
 **By date**, when you know when rather than which. `?date=MM/DD/YYYY` resolves to the latest
@@ -55,8 +55,8 @@ from any scroll position. Both keep the provision you are reading: switching rel
 
 The switcher opens and closes by clicking its summary. `Esc` does not close it.
 
-The **Release point** menu is rebuilt at most every five minutes, so a release point loaded within
-the last few minutes may not be listed yet. Typing its label into the address as `?release=` reaches
+The **Release point** menu is rebuilt at most every five minutes. A release point loaded within the
+last few minutes may not be listed yet. Typing its label into the address as `?release=` reaches
 it immediately, and the release point a page is reading is always read fresh — the menu is the only
 thing on that schedule. `/app/releases` lists every release point this site holds.
 
@@ -73,14 +73,14 @@ steps:
   - select: { selector: "#release", value: "119-102not101" }
     caption: Choose a different release point.
   - click: "form:has(#release) button[type=submit]"
-    caption: The address keeps the provision — you move in time, not in the text.
+    caption: The address keeps the provision, and changes the release point.
   - expect: { url: "/app/us/usc/t16/s45f/c/5?release=119-102not101" }
     caption: Still (c)(5), now at release point 119-102not101.
 ```
 
 ## What every page tells you about the text
 
-Four facts, in one band above the section:
+In one band above the section:
 
 **The release point and its date** — what you are looking at.
 
@@ -108,19 +108,17 @@ steps:
   - expect: { selector: ".releasebar__caveat", contains: "except" }
 ```
 
-**Where the answer came from.** Most release points republish a title without changing it, so this
-site does not store multiple copies of an unchanged section. If you ask for a release point that was
-not separately ingested, the answer comes from the newest one at or before it, and **the page tells you that it did**.
+**Where the answer came from.** Not every release point is separately stored. If you ask for one
+that is not, the answer comes from the newest release point at or before it, and the page says so.
 
 The [version history](/app/versions/us/usc/t16/s45f) and [redline](/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101)
-pages carry no release band. The first spans every release point at which the section changed and
-the second is about two of them, so neither is reading one.
+pages carry no release band. The first spans every release point at which the section changed; the
+second is about two of them.
 
 ## Every release point, and how current the site is
 
 [Release points](/app/releases) lists all of them, newest first, with the date each is current
-through and which titles it changed. Titles the OLRC changed but this site does not hold are greyed
-with a dagger, rather than omitted.
+through and which titles it changed. Titles the OLRC changed but this site does not hold are greyed with a dagger.
 
 ```scenario
 id: releases-list
@@ -132,12 +130,11 @@ steps:
 
 The same page says when the site last looked for a new release point — *“Checked uscode.house.gov
 for new release points 3 hours ago.”* It is a plain line when everything is current and a warning
-when it is not, including when the last check **failed**. This makes the site's update status visible to readers. The API answers the same question at
+when it is not, including when the last check **failed**. The API answers the same question at
 `/api/v1/status`.
 
 ## A note on caching
 
-A page you pinned with `?release=` can be cached forever, because that text will never change: a
-release point is a fixed thing. A page without a release point — or one asked for by `?date=` — is
-cached briefly and revalidated, because tomorrow it may resolve somewhere else. This is why a
-pinned URL is the one to put in a citation.
+A page you pinned with `?release=` can be cached forever. The text at a named release point does
+not change. A page without a release point, or one asked for by `?date=`, is cached briefly and
+revalidated, since tomorrow it may resolve somewhere else.

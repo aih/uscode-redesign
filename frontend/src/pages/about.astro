@@ -58,9 +58,9 @@ setPublicCache(Astro.response.headers, null, false);
     <code>@identifier</code> used in the official XML. For example, <code
       >/us/usc/t16/s45f/c/5</code
     > is subsection (c)(5) of section 45f of title 16; add <code>?release=</code> or{" "}
-    <code>?date=</code> and you get that provision as it was as of that date or release. The citation is
-    human-readable and it still works later. In addition, each provision carries a unique ID and that ID can also be used to
-    pull up the provision, in the context of its section, on this site.
+    <code>?date=</code> and you get that provision as it was as of that date or release. Each
+    provision also carries a unique ID, and that ID pulls up the provision in the context of
+    its section.
   </p>
 
   <h2 class="toc-group">How to check anything on it</h2>
@@ -99,18 +99,16 @@ setPublicCache(Astro.response.headers, null, false);
 
   <p>
     Every section page links to its own version history, listing each release point where
-    the text changed, and to an automated redline (difference) between any two of them. If something here is
-    wrong, that is where it will show.
+    the text changed, and to an automated redline (difference) between any two of them.
   </p>
 
   <h2 class="toc-group">How it is built</h2>
 
   <p>
     The corpus is the official USLM XML — 3,153 title-releases across 58 titles and 381
-    loaded release points — parsed and stored section by section. Text that a release point
-    republished unchanged is stored once, avoiding duplication. About 91% of the stored
-    text is a republication, because the Code republishes every title at every release
-    point, whether there were changes to it or not.
+    loaded release points — parsed and stored section by section. The Code republishes every
+    title at every release point whether or not anything in it changed, and about 91% of the
+    stored text is such a republication. Each is stored once.
   </p>
 
   <p class="doc-meta">

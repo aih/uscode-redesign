@@ -15,9 +15,7 @@ This site is not an official publication of the United States government. If you
 currency of a title, go to [uscode.house.gov](https://uscode.house.gov/). Every page on this site
 names the release point its text came from and links to the source file it was parsed from.
 
-## The idea
-
-Every provision of the United States Code has an address, at every point in time it has existed.
+## Addresses
 
 The address corresponds directly to the citation. For example, section 45f of Title 16 is at `/us/usc/t16/s45f`,
 and subsection (c)(5) of it is at `/us/usc/t16/s45f/c/5`. That path follows the official `@identifier` scheme in USLM.
@@ -49,13 +47,13 @@ Two features described in this guide are currently inactive: **accounts** and **
 Their controls are still visible on the page to explain their intended functionality — see
 [Accounts and watchlists](/app/guide/07-accounts).
 
-The site also serves a `robots.txt` disallowing search engine crawlers. The addressable space is effectively unbounded, so this prevents automated crawling from consuming excessive resources.
+The site also serves a `robots.txt` disallowing search engine crawlers.
 
 ## Video demonstration
 
 There is a [demo video](/app/demo) of the site — a citation, a release point, a version
 history, a redline, the search box, the copy control and a hover preview. It is recorded from this
-guide: every scene is one of the walkthroughs below, and the captions are the guide's own sentences, and is kept in sync with the Guide through automated CI/CD.
+guide: every scene is one of the walkthroughs below, and the captions are the guide's own sentences.
 
 ```scenario
 id: demo-page
@@ -69,10 +67,7 @@ steps:
 
 Every feature in these chapters carries a **“How this is verified”** box listing the
 steps that demonstrate it. Those steps run as Playwright tests on every push, and the ones marked
-*in the demo video* are also the script the demo recording follows. A claim here that stopped being
-true would fail in testing.
-
-This approach ensures that the documentation remains accurate as the application evolves.
+*in the demo video* are also the script the demo recording follows.
 
 ```scenario
 id: about-disclaimer

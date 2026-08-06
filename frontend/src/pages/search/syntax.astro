@@ -56,8 +56,7 @@ const RELEASE_EXAMPLE = {
 
   <p class="lede">
     There is one box in the header and it answers two kinds of question. Type a citation
-    and it goes straight there; type anything else and it searches the text. You do not
-    have to tell it which you meant — it reads what you wrote.
+    and it goes straight there; type anything else and it searches the text.
   </p>
 
   <p>
@@ -99,7 +98,7 @@ const RELEASE_EXAMPLE = {
     }
   </ul>
 
-  <h3 class="toc-group">Two things that will catch you out</h3>
+  <h3 class="toc-group">Limits</h3>
 
   <ul class="syntax-list">
     {
@@ -125,9 +124,8 @@ const RELEASE_EXAMPLE = {
   <h2 class="toc-group" id="operators">Searching the text</h2>
 
   <p class="lede">
-    By default a search matches the words you typed, and every one of them has to
-    appear. The operators below are how you loosen that deliberately — including
-    asking for near-spellings when you are not sure how a word is written.
+    A search matches the words you typed, and every one of them has to appear. The
+    operators below loosen that, including asking for near-spellings.
   </p>
 
   <div class="usa-summary-box" role="region" aria-labelledby="strict-heading">
@@ -136,10 +134,9 @@ const RELEASE_EXAMPLE = {
       <div class="usa-summary-box__text">
         <p>
           Searching for <code>compare</code> finds provisions containing the word
-          <em>compare</em> — not <em>compact</em> or <em>company</em>. This site used to
-          return all three, because it ran every search with a two-character-edit
-          tolerance nobody asked for. In a body of law a different word is a different
-          rule, so that tolerance is now something you request.
+          <em>compare</em>. It does not find <em>compact</em> or <em>company</em>, each
+          two character edits away. A tolerance for near-spellings is something you ask
+          for, per word.
         </p>
         <p>
           If you are unsure of a spelling, add <code>~1</code> to the word:{" "}
@@ -238,9 +235,8 @@ const RELEASE_EXAMPLE = {
         <span class="syntaxop__name">by date</span>
       </p>
       <p class="syntaxop__what">
-        <code>MM/DD/YYYY</code>, resolved to the release point in force on that day. Usually
-        easier than looking up a label. The results page names the release point it landed
-        on, so you can see which one answered.
+        <code>MM/DD/YYYY</code>, resolved to the release point in force on that day. The
+        results page names the release point it landed on.
       </p>
       <p class="syntaxop__try">
         <a href={searchHref(RELEASE_EXAMPLE.query, { date: RELEASE_EXAMPLE.date })}>
@@ -274,14 +270,13 @@ const RELEASE_EXAMPLE = {
           from the text as it stood then rather than from today's.
         </p>
         <p>
-          One known gap, and it is small. Where the source publishes several elements under
-          a single <code>@identifier</code> at a single release point, they share one
-          document and the index keeps one of them — 160 documents across the whole corpus,
-          9 of them in current text. Those provisions are complete in the reader; it is the
-          search index that holds one of the pair.
+          One gap. Where the source publishes several elements under a single
+          <code>@identifier</code> at a single release point, they share one document and
+          the index keeps one of them — 160 documents across the whole corpus, 9 of them in
+          current text. The section pages show every occurrence; the index holds one.
         </p>
         <p>
-          You can always tell which text you searched: the results page says either{" "}
+          The results page says which text it searched, either{" "}
           <em>“In the text as of release point …”</em> or{" "}
           <em>“Searching the law currently in force.”</em>
         </p>
@@ -294,8 +289,7 @@ const RELEASE_EXAMPLE = {
   <p>
     Prefix a citation with <code>cites</code> — <a href={gotoHref("cites 26 usc 501")}
       ><code>cites 26 usc 501</code></a
-    > — and the search looks for provisions that refer to it. This is a keyword search
-    over the citation's text for now, not a real cross-reference index, and the results
-    page says so rather than letting the answer pass for the finished thing.
+    > — and the search looks for provisions that refer to it. It is a keyword search over
+    the citation's text, not a cross-reference index, and the results page says so.
   </p>
 </Base>

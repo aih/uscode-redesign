@@ -8,14 +8,13 @@ covers:
   adrs: [7, 13, 39, 42, 53]
 ---
 
-This is not an official publication. This chapter explains how to verify the text against official sources.
+This chapter is how to check the text on this site against the official sources.
 
 ## Follow any page back to its source
 
 Every section page names the release point its text came from and links to the OLRC file it was
-parsed from. `?format=xml` on the API returns the source USLM **verbatim** — not a
-re-serialisation, but the stored fragment as published — so you can compare what you are reading directly with
-what the OLRC put out, byte for byte.
+parsed from. `?format=xml` on the API returns the stored fragment as published — the source USLM
+verbatim, not a re-serialisation — which compares byte for byte against what the OLRC put out.
 
 Every ingest also writes a provenance manifest: the source URL, the download timestamp, the sha256
 of the zip, and per-title element counts. Anyone can re-download the same zip and confirm the hash.
@@ -25,19 +24,18 @@ of the zip, and per-title element counts. Anyone can re-download the same zip an
 The corpus is 3,153 title-releases across 58 titles and 381 loaded release points: 65,938 distinct
 sections, 5,466,652 (section, release) pairs, stored as 489,738 texts.
 
-That last pair of numbers is the one worth understanding. The Code republishes **every** title at
-**every** release point whether or not anything in it changed, so about 91% of those pairs are
-republications of text that already existed. Storing them once and pointing many release points at
-the same text is what makes the corpus 27 GB instead of hundreds.
+The Code republishes every title at every release point whether or not anything in it changed, so
+about 91% of those pairs are republications of text that already existed. Each is stored once and
+pointed at by every release point that publishes it, which is what makes the corpus 27 GB.
 
-The deduplication is done on the text with the `@id` guids stripped out, because guids regenerate
-at every release point by design — hashing the raw XML dedupes nothing at all, which was measured
-rather than assumed: of 5,095 Title 16 sections between two adjacent release points, **zero** were
-byte-identical, and 5,093 were identical once the guids were removed.
+The deduplication is done on the text with the `@id` guids stripped out. Guids regenerate at every
+release point by design, so hashing the raw XML dedupes nothing: of 5,095 Title 16 sections between
+two adjacent release points, zero were byte-identical and 5,093 were identical once the guids were
+removed.
 
-One consequence you can see: a deduplicated fragment carries the guids of the release point where
-its text first appeared. The guid the site resolves for a `(provision, release point)` pair is
-still correct, but the guids *inside* a shared fragment belong to that first release.
+A deduplicated fragment carries the guids of the release point where its text first appeared. The
+guid the site resolves for a `(provision, release point)` pair is still correct; the guids *inside*
+a shared fragment belong to that first release.
 
 ## Automated verification
 
@@ -46,7 +44,7 @@ run over the whole corpus: **3,153 of 3,153 title-versions recounted, 0 source m
 incomplete loads.** The result is committed to the repository as a file.
 
 The six count mismatches it does report are the source publishing several elements under one
-identifier at one release point, which is [shown rather than smoothed away](/app/guide/02-reading).
+identifier at one release point. The reader [shows every occurrence](/app/guide/02-reading).
 
 ## Accessibility
 
@@ -63,7 +61,7 @@ currently holds two horizontally scrollable regions with no keyboard route into 
 reference pages missing a language attribute, and the Swagger UI and ReDoc pages, which carry
 violations from the bundles the site vendors.
 
-Colour is checked separately, because a scan only sees the pages it is pointed at. Every pair of
+Colour is checked separately, since a scan only sees the pages it is pointed at. Every pair of
 colours the design defines — text on its background, a link, a form control's edge, the focus ring —
 is computed in both themes and committed as a file. Text meets 4.5:1 and controls and focus rings
 meet 3:1; dividers are reported without being held to a ratio, and the numbers are in the file
@@ -91,12 +89,12 @@ densities, the print layout, a search result row, and each message the site can 
 answer — no results, a rate-limited preview, a citation that parses and names nothing, and a
 release point that answered for another.
 
-Each specimen is the component itself, given specimen data, rather than a picture of it. The page
-reaches no data of its own; the provision it shows is under title 0, which the Office of the Law
-Revision Counsel does not publish, so its citations resolve to nothing and its words are not law.
+Each specimen is the component itself, given specimen data. The page reaches no data of its own.
+The provision it shows is under title 0, which the Office of the Law Revision Counsel does not
+publish: its citations resolve to nothing and its words are not law.
 
 The colour table on that page computes its ratios in your browser, from the colours the page has
-resolved, so it is correct in whichever theme you are reading. Switching the theme with the control
+resolved, and is correct in whichever theme you are reading. Switching the theme with the control
 in the header recomputes it. The same pairs are computed from the stylesheet by
 `scripts/contrast.py` and committed as a file; the two are compared in the browser test suite.
 
@@ -116,9 +114,9 @@ steps:
       contains: "vacated"
 ```
 
-An unrecognised status is the last of those steps. The set of statuses is not fixed — the source
-may publish one this site has never seen — and a status it does not know keeps the plain badge and
-prints its own word.
+An unrecognised status is the last of those steps. A status this site does not know keeps the plain
+badge and prints its own word. The set of statuses is not fixed: the source may publish one this
+site has never seen.
 
 ## Limitations
 

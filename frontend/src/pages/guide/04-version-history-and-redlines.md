@@ -14,7 +14,8 @@ Every section page links to its **version history**: one entry per distinct text
 each showing the release point where that text first appeared and the release points it stood
 unchanged through.
 
-This timeline shows when changes actually occurred. Because the Code republishes every title at every release point whether or not anything changed, this list shows only changed entries.
+The Code republishes every title at every release point whether or not anything changed. The
+timeline lists only the release points at which the text of this section changed.
 
 ```scenario
 id: versions-timeline
@@ -23,17 +24,18 @@ demo: true
 demoOrder: 70
 steps:
   - goto: /app/versions/us/usc/t16/s45f
-    caption: "The version history: one entry per distinct text, not one per release point."
+    caption: "The version history: one entry per distinct text."
   - expect: { selector: "main", contains: "119-99" }
     caption: Each entry says when that text first appeared, and what it stood unchanged through.
 ```
 
-## What changed?
+## The redline
 
 From the timeline, or from the From/To picker at the foot of it, you get a **redline** between any
 two release points: removed words struck through, added words underlined, in the reading text.
 
-The redline is of the **reading text**, not of the source XML. The user can also show the redline of the source XML, which includes changes to the @id and other metadata.
+The redline compares the **reading text**. A second view compares the source XML, and shows
+changes to `@id` and the rest of the markup.
 
 ```scenario
 id: diff-real-change
@@ -45,7 +47,7 @@ steps:
   - goto: /app/diff/us/usc/t16/s45f?from=113-21&to=119-99
     caption: A redline between any two release points, in the reading text.
   - expect: { selector: "main", contains: "Comparing" }
-    caption: Removed words struck through, added words underlined — the amendment, not the markup.
+    caption: Removed words struck through, added words underlined.
 ```
 
 ### Summary of changes
@@ -63,13 +65,12 @@ steps:
 ### The source redline
 
 Under the reading redline there is a link to the same comparison at the level of the source XML,
-behind `?source=1` rather than open by default — computing it is the expensive part, and most
-readers want the words. The API returns the same comparison as JSON; see
+behind `?source=1` and closed by default. The API returns the same comparison as JSON; see
 [The API](/app/guide/08-api).
 
 ## Notes on redlines
 
-**Cross-reference links are dropped inside the redline.** The comparison is over text, so a
+**Cross-reference links are dropped inside the redline.** The comparison is over text, and a
 citation that is a link in the section view is plain text here.
 
-**A change in whitespace alone is not shown in the reading redline**, since it compares displayed text. The source view will show whitespace changes.
+**A change in whitespace alone is not shown in the reading redline.** The source view shows it.

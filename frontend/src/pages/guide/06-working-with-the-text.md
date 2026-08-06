@@ -2,7 +2,7 @@
 layout: ../../layouts/GuideLayout.astro
 title: Working with the text
 order: 6
-summary: Copying a provision with its citation, reading a cross reference without losing your place, citing an exact text, and the three reading settings the browser keeps.
+summary: Copying a provision with its citation, reading a cross reference without losing your place, citing an exact text, and the reading settings the browser keeps.
 covers:
   routes: ["/app/settings"]
   adrs: [3, 24, 27, 33, 41, 54]
@@ -44,13 +44,14 @@ steps:
     caption: The page says what it copied, out loud, for a screen reader too.
 ```
 
-**Copying does not include notes or credits:** The copy function does not include notes or source credits. A designator and its sentence stay on one line.
+**Copying does not include notes or source credits.** A designator and its sentence stay on one
+line.
 
 ## Reading a cross reference without leaving the page
 
 Hovering over a linked citation — or reaching it with
 the keyboard — opens a small card with the cited provision's heading, status and opening words, and
-a link to the whole thing. You find out whether you need to go there without going there.
+a link to the whole thing.
 
 The card is hoverable (you can move the pointer into it), dismissible with <kbd>Escape</kbd>, and
 stays while you are pointing at it.
@@ -79,8 +80,8 @@ steps:
 ```
 
 **When a preview cannot be fetched** the card says so and offers the citation instead of appearing
-empty. Previews are rate-limited, so moving quickly down a section with many references can reach
-the limit; the message says that is what happened.
+empty. Previews are rate-limited. Moving quickly down a section with many references can reach the
+limit, and the message says when that is what happened.
 
 ```scenario
 id: hover-preview
@@ -93,7 +94,7 @@ steps:
   - hover: a[data-cite]
     caption: Hover one and the cited provision comes to you —
   - expect: { selector: "#cite-preview", visible: true }
-    caption: — heading, status and opening words, without losing your place.
+    caption: — heading, status and opening words.
 ```
 
 ## Citing an exact text
@@ -106,9 +107,6 @@ The other is a **guid**: `/us/usc/?id=id0b32dff7-810c-11f1-b7ce-bdea3d14cbdd`. A
 provision at one release point, so it needs no `?release=` and no date. It means *this exact text,
 as it stood at this point in time*.
 
-For "this provision over time", the citation URL is the right address; for "the words I am
-quoting", use the guid.
-
 ```scenario
 id: guid-permalink
 title: A guid resolves to one exact text with no release parameter
@@ -120,7 +118,8 @@ steps:
 
 ## Night mode
 
-**Light or dark.** There is a control in the header to toggle the theme. Light is the default setting. The choice is kept in the browser and applied before the page paints, preventing flashes between pages.
+**Light or dark.** There is a control in the header to toggle the theme. Light is the default
+setting. The choice is kept in the browser and applied before the page paints.
 
 ```scenario
 id: theme-toggle
@@ -144,10 +143,9 @@ sets the text a little smaller. Like the theme, the choice is kept in the browse
 before the page paints.
 
 The column narrows with the text, so a compact page holds the same number of characters per line as
-a comfortable one — the lines do not get longer, there are just more of them on the screen. On a
-long section compact is 11% to 16% shorter to scroll (`docs/verification/measure.json`). On a short
-one, or one built mostly of tables, it makes no difference or adds a percent or two, because a
-narrower column gives a table more rows to wrap into.
+a comfortable one. On a long section compact is 11% to 16% shorter to scroll
+(`docs/verification/measure.json`). On a short one, or one built mostly of tables, it makes no
+difference or adds a percent or two: a narrower column gives a table more rows to wrap into.
 
 ```scenario
 id: density-toggle
@@ -160,9 +158,9 @@ steps:
   - click: .density-toggle
     caption: The control beside the theme toggle switches it.
   - expect: { selector: ".density-toggle__label", contains: "Comfortable" }
-    caption: Compact is in force, and the control now offers the way back.
+    caption: The control now reads Comfortable, which is the way back.
 ```
 
-**Links open in new tabs.** Cross references and search results open in a new tab by default, so you can stay in the section you were reading. [Settings](/app/settings) changes that to
-the same tab. It is stored on your account, which means it is currently a preference you can only
+**Links open in new tabs.** Cross references and search results open in a new tab by default.
+[Settings](/app/settings) changes that to the same tab. It is stored on your account, which means it is currently a preference you can only
 set if accounts are on — see the next chapter.
