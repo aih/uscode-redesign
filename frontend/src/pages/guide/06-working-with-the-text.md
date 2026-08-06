@@ -10,20 +10,23 @@ covers:
 
 ## Copying a provision
 
-Beside every identified provision is a copy control, and above them a **mode** that says what
-copying means:
+Beside each provision inside a section is a copy control in the gutter. The section as a whole has
+a **Whole section** button in the bar above the text, and beside that button a **mode** that says
+what copying means:
 
 - **Text** — the words alone.
 - **Citation** — `16 U.S.C. § 45f(c)(5)`, computed by the server from the identifier.
 - **Citation + text** — both, in the order you would paste them into a brief.
-- **Link** — a URL. Pasted into anything that understands rich text, it arrives as a hyperlink
+- **Link** — a URL carrying the release point the page is reading, so a link copied from a pinned
+  page stays pinned. Pasted into anything that understands rich text, it arrives as a hyperlink
   labelled with the citation.
 
 The mode is remembered. For the one-off exception, hold a modifier as you click: <kbd>Shift</kbd>
 for the citation, <kbd>Alt</kbd> for both, <kbd>Ctrl</kbd>/<kbd>⌘</kbd> for a link — for that click
 only, without disturbing the setting.
 
-There is also a **Whole section** button to copy the entirety of a section at once.
+The copy controls need JavaScript. With scripting off the whole column is absent, gutter and bar
+alike.
 
 ```scenario
 id: copy-whole-section
@@ -50,12 +53,16 @@ the keyboard — opens a small card with the cited provision's heading, status a
 a link to the whole thing. You find out whether you need to go there without going there.
 
 The card is hoverable (you can move the pointer into it), dismissible with <kbd>Escape</kbd>, and
-stays while you are pointing at it. On a touchscreen, tapping a citation simply follows the link rather than opening the hover card.
+stays while you are pointing at it.
 
 **From the keyboard**, focusing a citation opens the same card. <kbd>Tab</kbd> moves into it, so the
 "Open full section" link and any citations inside are reachable; <kbd>Escape</kbd> closes it and puts
 you back on the citation you started from, at the same place on the page. Tabbing past the end of
 the card does the same. A card you have dismissed stays closed until you look at another reference.
+
+**Previews need a hovering pointer.** The card is built only where the browser reports
+`(hover: hover) and (pointer: fine)` — a mouse or a trackpad. On a touchscreen there is no card by
+hover or by focus, and a citation opens as a link.
 
 ```scenario
 id: preview-keyboard

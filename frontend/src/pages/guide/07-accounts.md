@@ -32,7 +32,7 @@ it.
 
 The core features that do not require accounts:
 
-- reading any provision at any of 382 release points;
+- reading any provision at any of the 381 loaded release points;
 - seeing which titles each release point changed;
 - the version history of a section, and a redline between any two release points;
 - search, and going straight to a citation;

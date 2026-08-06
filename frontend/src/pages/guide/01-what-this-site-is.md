@@ -53,7 +53,7 @@ The site also serves a `robots.txt` disallowing search engine crawlers. The addr
 
 ## Video demonstration
 
-There is a [three-minute demo](/app/demo) of the site — a citation, a release point, a version
+There is a [demo video](/app/demo) of the site — a citation, a release point, a version
 history, a redline, the search box, the copy control and a hover preview. It is recorded from this
 guide: every scene is one of the walkthroughs below, and the captions are the guide's own sentences, and is kept in sync with the Guide through automated CI/CD.
 

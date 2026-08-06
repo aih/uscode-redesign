@@ -9,8 +9,8 @@ covers:
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
-`119-99`, `118-22u1`, `119-102not101`. There are 382 of them, from July 2013 to July 2026, and this
-site holds the text at each one.
+`119-99`, `118-22u1`, `119-102not101`. The OLRC has published 382 of them, from July 2013 to July
+2026; this site has loaded the text at 381.
 
 ## Three ways to ask
 
@@ -49,9 +49,11 @@ the newest release point this site holds, and follows new ones as they are loade
 Every page that shows a provision carries all three as controls, in the bar under the navigation.
 The bar names the release point the page is reading — **Release point 119-99** — and that name is
 the control: open it for a **Release point** menu whose first entry is *Newest — follows new
-releases*, and an **As of date** box. The bar stays on screen as you read, so both are reachable
+releases*, and an **As of date** box. The bar stays on screen as you read, and both are reachable
 from any scroll position. Both keep the provision you are reading: switching release on
-`/app/us/usc/t16/s45f/c/5` returns `(c)(5)` at the release point you chose, not the top of § 45f.
+`/app/us/usc/t16/s45f/c/5` returns `(c)(5)` at the release point you chose.
+
+The switcher opens and closes by clicking its summary. `Esc` does not close it.
 
 The **Release point** menu is rebuilt at most every five minutes, so a release point loaded within
 the last few minutes may not be listed yet. Typing its label into the address as `?release=` reaches

@@ -62,8 +62,8 @@ const RELEASE_EXAMPLE = {
 
   <p>
     Both halves can also ask about the past. A citation can name a release point and land
-    on the provision as it stood then, and a search can name one too — though only through
-    the URL for now, and with a limit worth reading first. See{" "}
+    on the provision as it stood then; a search can name one in the box with{" "}
+    <code>release:</code> or <code>date:</code>, or on the results URL. See{" "}
     <a href="#release">searching at a release point</a>.
   </p>
 
@@ -183,8 +183,7 @@ const RELEASE_EXAMPLE = {
   <p>
     The text of sections and the headings above them — chapters, subchapters, parts. A
     search covers the law <strong>currently in force</strong> unless you name a release
-    point, which is done from the URL and is described{" "}
-    <a href="#release">in the next section</a>.
+    point, described <a href="#release">in the next section</a>.
   </p>
 
   <p class="doc-meta">
@@ -193,18 +192,26 @@ const RELEASE_EXAMPLE = {
     .
   </p>
 
+  <h3 class="toc-group">Ordering the results</h3>
+
+  <p>
+    Results come back by relevance. <code>&amp;sort=</code> on the results URL takes{" "}
+    <code>relevance</code>, <code>citation</code> — the Code's own order, title by title —
+    or <code>recent</code>, newest text first by the release point at which each provision's
+    current text first appeared. The <strong>Order</strong> control above the results sets
+    the same parameter.
+  </p>
+
   <h2 class="toc-group" id="release">Searching at a release point</h2>
 
   <p class="lede">
-    You can search the Code as it stood at a past release point. This is the one place on
-    the site where the answer is not yet complete, so both halves are set out below: how to
-    ask, and what comes back.
+    You can search the Code as it stood at a past release point.
   </p>
 
   <p>
-    The search box has no control for this yet, so you add the release point to the results
-    URL. There are two parameters, the same two a citation URL takes: the label of a
-    release point, or a date.
+    Type <code>release:</code> or <code>date:</code> into the search box, or add the same
+    two parameters a citation URL takes to the results URL: the label of a release point,
+    or a date. When both name a release point, the parameter wins.
   </p>
 
   <ul class="syntax-list">

@@ -22,7 +22,7 @@ of the zip, and per-title element counts. Anyone can re-download the same zip an
 
 ## What the numbers mean
 
-The corpus is 3,153 title-releases across 58 titles and 381 release points: 65,938 distinct
+The corpus is 3,153 title-releases across 58 titles and 381 loaded release points: 65,938 distinct
 sections, 5,466,652 (section, release) pairs, stored as 489,738 texts.
 
 That last pair of numbers is the one worth understanding. The Code republishes **every** title at
@@ -52,10 +52,11 @@ identifier at one release point, which is [shown rather than smoothed away](/app
 
 The reader is scanned against WCAG 2.1 Level AA on every push. The scan covers every route in a
 declared matrix at three widths — 320, 375 and 1280 pixels — in both themes, once with forced
-colours, and in six interactive states: a citation preview opened by keyboard, the same preview
+colours, and in nine interactive states: a citation preview opened by keyboard, the same preview
 dismissed with Escape, the copy control after use, the theme immediately after toggling, the
-redline with its source pane rendered, and the search box holding a query. The results are
-committed to the repository as a file.
+compact reading density in force, the keyboard shortcut list open as a dialog, the release switcher
+open in the sticky bar, the redline with its source pane rendered, and the search box holding a
+query. The results are committed to the repository as a file.
 
 Violations that are known and not yet fixed are listed with the task that owns each. The list
 currently holds two horizontally scrollable regions with no keyboard route into them, the API
@@ -83,10 +84,12 @@ agree.
 
 [/app/design](/app/design) shows every part the reader is built from on one page: the two
 typefaces and the roles they are used in, the reading measure, the colour palette, the focus ring,
-the status badges, the breadcrumb and chapter rail, the version timeline, the redline, the copy
-control, a search result row, and each message the site can show when it cannot answer — no
-results, a rate-limited preview, a citation that parses and names nothing, and a release point that
-answered for another.
+the status badges, the navigation chrome — breadcrumb, chapter rail, section bar, neighbour cards,
+release switcher and release context band — the section contents panel and the keyboard shortcut
+list, the version timeline, the redline, the statutory text with its copy control, the two reading
+densities, the print layout, a search result row, and each message the site can show when it cannot
+answer — no results, a rate-limited preview, a citation that parses and names nothing, and a
+release point that answered for another.
 
 Each specimen is the component itself, given specimen data, rather than a picture of it. The page
 reaches no data of its own; the provision it shows is under title 0, which the Office of the Law

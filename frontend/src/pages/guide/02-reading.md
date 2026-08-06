@@ -178,7 +178,7 @@ Press <kbd>?</kbd> on any page for this list, or use the **Keyboard shortcuts** 
 | <kbd>→</kbd> or <kbd>k</kbd> | Next section in reading order |
 | <kbd>u</kbd> | Up to the chapter or subchapter that contains it |
 
-**Moving inside a section:**
+**Moving inside a section**, on a section page:
 
 | Key | |
 |---|---|
@@ -198,12 +198,12 @@ Press <kbd>?</kbd> on any page for this list, or use the **Keyboard shortcuts** 
 | <kbd>?</kbd> | The shortcut list |
 | <kbd>Esc</kbd> | Close the shortcut list, or a citation preview |
 
-A key typed into a search box or a date field is left alone, and so is any combination held with
-Ctrl, Alt or ⌘. A jump inside a page takes the keyboard with it, so <kbd>Tab</kbd> continues from
-where you landed.
+A key typed into any input, textarea, select or editable element is left alone, and so is any
+combination held with Ctrl, Alt or ⌘. A jump inside a page takes the keyboard with it, and
+<kbd>Tab</kbd> continues from where you landed.
 
-<kbd>[</kbd> and <kbd>]</kbd> step through the rows of the contents list, so a section with no
-subsections has nothing to step through.
+<kbd>[</kbd> and <kbd>]</kbd> step through the provision rows of the contents list, not its source
+credit and notes rows. A section with no subsections has nothing to step through.
 
 <kbd>t</kbd> goes to the top of the page's content, past the navigation. <kbd>b</kbd> goes to the
 foot of the page, where the site's own links are.
@@ -346,8 +346,9 @@ The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll 
 ## Printing
 
 Printing a section gives you the document. The navigation, the search box, the copy column, the
-chapter rail, the release picker and the footer are all left off the page. The notes and the source
-credit are printed open whatever state they were in on screen. The page is black on white whether
+chapter rail, the release picker, the **In this section** panel, the previous/next cards and the
+footer are all left off the page. The notes and the source credit are printed open whatever state
+they were in on screen. The page is black on white whether
 or not you were reading in night mode.
 
 Every printed sheet carries a running header with the citation, the release point, and the address

@@ -74,8 +74,10 @@ be mixed with the operators above.
 
 A value with a space in it goes in quotes: `heading:"wild horses"`.
 
-Repeating a prefix widens it — `title:16 title:33` searches both. Using two different prefixes
-narrows — `title:16 status:repealed` is repealed provisions of Title 16 alone.
+Repeating `title:`, `chapter:` or `status:` widens the search: `title:16 title:33` searches both
+titles. Repeating `heading:` narrows it — every term must appear in the heading. Repeating
+`release:` or `date:` keeps the last value given. Two different prefixes narrow: `title:16
+status:repealed` is repealed provisions of Title 16 alone.
 
 ```scenario
 id: search-scope-title
@@ -134,9 +136,11 @@ steps:
 ### Narrowing what you got back
 
 Above the results are the titles and statuses the matches fall into, each with a count. Selecting
-one adds it to the query rather than to a separate control, so the address bar always holds the
-whole search — the words, the filters, the release point and the order. A search you paste into a
-brief or a ticket arrives as the search you ran.
+one adds it to the query rather than to a separate control, and the address bar holds the whole
+search — the words, the filters, the release point and the order.
+
+Each group lists at most twelve values. A group whose single value covers every result is left out,
+unless that value is a filter already applied.
 
 ```scenario
 id: search-facet-goes-in-the-url
@@ -154,12 +158,14 @@ steps:
 
 ### Ordering the results
 
-Results come back by relevance. Two other orders are available:
+Results come back by relevance, which is `sort=relevance` in the address. The **Order** control
+above the results writes the other two values:
 
-- **Citation order** — the Code's own order, title by title. Chapter and subchapter headings sort
-  ahead of every section of their title rather than immediately before the sections they contain.
-- **Recently amended** — newest text first, by the release point at which each provision's current
-  text first appeared.
+- **Citation order**, `sort=citation` — the Code's own order, title by title. Chapter and
+  subchapter headings sort ahead of every section of their title rather than immediately before the
+  sections they contain.
+- **Recently amended**, `sort=recent` — newest text first, by the release point at which each
+  provision's current text first appeared.
 
 ```scenario
 id: search-sort-citation
@@ -214,7 +220,8 @@ searched for; the link goes to its version history.
 
 Where the source publishes more than one provision under a single identifier at one release point,
 the index holds one of them and the result says so. The section page shows every occurrence. This
-affects 49 identifiers across 14 titles.
+affects 49 identifiers across 14 titles — 160 (identifier, release point) pairs, 9 of them in the
+text currently in force.
 
 ### Asking what cites a provision
 
