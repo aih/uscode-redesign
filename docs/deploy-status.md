@@ -6,8 +6,19 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-08-03 — the crawl that had the box pinned, and the daily check proving itself
-unattended.
+**Last updated:** 2026-08-06 — the documentation audit reconciled the contradictions this file had
+accumulated as a running narrative. The sections below are written in the order the work happened,
+so an earlier passage may state a position a later one supersedes; where that happens the earlier
+passage now names the later one. The state of record is:
+
+- The search index is complete on the box — 489,578 documents, 65,929 current, 423,649 superseded,
+  built 2026-08-02. `?release=` search reaches back through superseded text.
+- PRs #17 and #18 are merged; the streaming fix is in the running image, not copied into a
+  container.
+- The 160- and 9-document shortfalls against the database counts are ADR-0021, not a failed run.
+
+Before that: the crawl that had the box pinned, and the daily check proving itself unattended
+(2026-08-03).
 
 ## The box
 
@@ -262,12 +273,13 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps api \
     uv run python -m ingest.reindex_search --if-changed
 ```
 
-`--if-changed` indexes current text only (66k documents). `--all-versions` has the memory problem
-described below, so `?release=` search reaches back only as far as whatever `--all-versions` pass
-last succeeded.
+`--if-changed` indexes current text only (66k documents). `--all-versions` had the memory problem
+described below; it was fixed, and the full pass has since completed — see *Done — the whole corpus
+is indexed* further down, which is the state of record.
 
 **Current text is built and live: 65,938 documents in `uscode_sections`, 9,916 in
-`uscode_structure`.** A query for "conservation" returns 199 hits (`/us/usc/t16/s2903`
+`uscode_structure`.** (The count settled at 65,929 after the full pass; the 9-document difference is
+ADR-0021, reconciled below.) A query for "conservation" returns 199 hits (`/us/usc/t16/s2903`
 "Conservation plans", `/us/usc/t16/s3831` "Conservation reserve"). That retires CLAUDE.md's
 "4,000-document smoke slice" debt for the deployed box — dev is unchanged.
 
@@ -296,7 +308,7 @@ option on the statement is what opens a server-side cursor. Measured against the
 | 60,000 | 1,020 MB, still climbing | 283 MB, flat |
 
 The whole patched `_index_sections` over 80,000 rows peaks at 448 MB. The fix is in **PR #18**
-(`ingest/reindex_search.py`), with all 475 tests passing.
+(`ingest/reindex_search.py`), with the Python suite green — 475 tests at the time, 545 now.
 
 Two things were done to the box along the way and both should stay:
 
@@ -308,9 +320,9 @@ Two things were done to the box along the way and both should stay:
   Start/Stop), which is worth adding. Everything came back on its own: containers restarted, swap
   remounted from fstab, the Elastic IP stayed attached.
 
-The patched file was copied into the running container (`docker cp`), since the fix is not merged
-yet. **Merging #18 and letting deploy.yml rebuild the image is what makes it permanent** — the
-copy is lost the next time the container is recreated.
+The patched file was copied into the running container (`docker cp`) while the fix was unmerged.
+**#18 has since been merged and deploy.yml has rebuilt the image**, so the fix is baked in rather
+than living in a container that the next recreate would discard.
 
 **Done — the whole corpus is indexed, superseded text included.**
 

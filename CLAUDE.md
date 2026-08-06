@@ -35,7 +35,7 @@ Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 28 route entries (one expanding to
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 29 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and six
 interactive states plus one for the compact reading density (ADR-0054) and one for the open shortcut
 dialog (ADR-0055) and one for the open release switcher (ADR-0056), **268 scans in ~1m45s**,
@@ -228,7 +228,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(56 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(55 ADRs, numbered to 0056 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
