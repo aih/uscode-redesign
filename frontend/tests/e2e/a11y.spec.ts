@@ -282,6 +282,19 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await expect(page.locator("#shortcuts")).toBeVisible({ timeout: 5000 });
     },
   },
+  "release-switcher-open": {
+    routeId: "section",
+    setup: async (page) => {
+      // A `<details>` in the sticky bar (ADR-0056). Closed, the panel is not
+      // rendered at all, so the two labelled controls and their buttons are
+      // markup no other scan in this matrix reaches — and the panel is
+      // absolutely positioned over the page, which is exactly the arrangement
+      // that puts a control on top of another control's name.
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator(".rpswitch__summary").click();
+      await page.locator("#asof").waitFor({ timeout: 5000 });
+    },
+  },
   "diff-source-expanded": {
     routeId: "diff",
     setup: async (page) => {

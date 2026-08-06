@@ -294,7 +294,7 @@ test.describe("printing", () => {
   test("drops the chrome and keeps the document", async ({ page }) => {
     await page.goto(SECTION);
 
-    for (const gone of [".usa-header", ".usa-footer", ".copycol", ".rail", ".picker"]) {
+    for (const gone of [".usa-header", ".usa-footer", ".copycol", ".rail", ".rpswitch"]) {
       const count = await page.locator(gone).count();
       if (count === 0) continue;
       await expect(page.locator(gone).first(), `${gone} is not printed`).toBeHidden();

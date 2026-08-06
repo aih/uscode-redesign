@@ -38,7 +38,7 @@ ratchet refuses a reader route or an ADR that no chapter accounts for. See Docum
 runs axe-core over the route matrix in `docs/a11y/routes.json` — 28 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and six
 interactive states plus one for the compact reading density (ADR-0054) and one for the open shortcut
-dialog (ADR-0055), **267 scans in ~1m45s**,
+dialog (ADR-0055) and one for the open release switcher (ADR-0056), **268 scans in ~1m45s**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -86,7 +86,8 @@ because `?release=` beats `?date=` in `resolve_release`) posting to the **reques
 since building the action from `section.identifier` **dropped the provision anchor** on every switch.
 The switcher **left the sticky stack** on a measurement: 19px of headroom under `--sticky-h` at
 700px against a date field costing ~80, in the band `docs/backlog.md` already flags for 19rem of
-chrome — 89px after the move, asserted in `sticky.spec.ts`. Two traps: **`Astro.slots.has(name)` is
+chrome — 89px after the move, asserted in `sticky.spec.ts`. **ADR-0056 puts it back** as a
+`<details>`, which answers that measurement rather than overruling it. Two traps: **`Astro.slots.has(name)` is
 true for a slot whose content sits behind a false condition**, and **the first non-link text in the
 breadcrumb bar inherits USWDS's own ink** (`$theme-breadcrumb-background-color`, light-page
 assumption) and failed contrast in dark on every reader page — ADR-0042's `.usa-nav__link` again.
@@ -188,7 +189,7 @@ notes. Provisions need no new anchor (`@identifier` is already their `id`); the 
 occurrence under one identifier (ADR-0021) and the hover card all render this markup into one page
 and only the first may claim `#section-source`/`#section-notes`. The **section bar's number links
 to `#main`**, because nothing new may be pinned: `--sticky-h` is what `scroll-margin-top` spends.
-`KeyboardNav` moved into `Base` and binds `t c [ ] s n / ?` on top of `←/j →/k u`, all of it from
+`KeyboardNav` moved into `Base` and binds `t b c [ ] s n / ?` on top of `←/j →/k u`, all of it from
 **`lib/shortcuts.ts`**, which the dialog renders, `/app/design` renders as a panel, and the island
 receives as JSON — an `is:inline` script imports nothing, so a binding written in the script would
 be a second copy of the printed one. The help is a modal `<dialog>`. Two costs: **every route pays
@@ -198,15 +199,36 @@ is why that island's rationale is in its frontmatter docstring — written besid
 on every page rather than in one sentence, left as ADR-0038's guide and `guide.spec.ts` already
 have it.
 
-`make test` = **545** Python tests; `make test-web` = **299** frontend tests; `make test-e2e` = **441**
-Playwright tests, 267 of which are the accessibility scan (**all three are required** — reader
+**The release switcher is back in the sticky bar, as a disclosure** (ADR-0056, amending ADR-0044).
+ADR-0044 had put the controls in the page body on a measurement — 19px of headroom under
+`--sticky-h` at 700px against a date field costing ~80 — and the cost was the release point written
+twice on every section page and ~180px of controls above the statute whether or not the reader
+meant to move in time. `ReleasePicker` is now a `<details>` in `.contextbar` whose **closed summary
+is the line the bar already carried**, so the stack is the height it was, and whose panel is
+`position: absolute`, so opening it moves nothing — asserted at 700px and 1280px in
+`sticky.spec.ts`, which measures `.contextbar`'s box open against closed. Native `<details>`, so it
+costs no script and the two GET forms are unchanged. Two traps: **USWDS gives `.usa-button`
+`width: 100%` below 480px**, which at 320px took the whole row and squeezed the release menu beside
+it to nothing; and below 30em `.topbar` is `display: contents`, so a panel positioned against
+anything but `.rpswitch` itself has no containing block short of the viewport and `top: 100%` puts
+it a screen height down the document. `b` joins the keyboard map — the `<footer>` with
+`block: "end"`, the counterpart to `t`'s `#main` — and the scenario vocabulary gains
+`expect: { inViewport: true }`, since `visible` is true of an element a screen below the fold.
+**The guide's chapter list is pinned and scrolls on its own**, the ADR-0050 arrangement, at an
+offset of its own: `--sticky-h` is a scroll-margin budget rounded up over the tallest chrome a
+*section* page carries, and a guide page's sticky chrome **measures 124px** at 1024/1280/1440
+(`.topbar` alone), so honouring 19rem as a `top` offset started the list 180px below the bar — the
+reason the rule there had read "not sticky, deliberately".
+
+`make test` = **545** Python tests; `make test-web` = **299** frontend tests; `make test-e2e` = **449**
+Playwright tests, 268 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(53 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(56 ADRs). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.

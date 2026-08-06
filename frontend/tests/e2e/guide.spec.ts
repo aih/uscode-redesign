@@ -181,6 +181,14 @@ async function runExpect(page: Page, value: any, where: string): Promise<void> {
     return;
   }
 
+  if (value.inViewport !== undefined) {
+    // Not `toBeVisible`, which is true of an element a screen below the fold.
+    // A scroll shortcut is only doing its job if the target is on screen.
+    if (value.inViewport) await expect(locator, where).toBeInViewport();
+    else await expect(locator, where).not.toBeInViewport();
+    return;
+  }
+
   if (value.visible !== undefined) {
     if (value.visible) await expect(locator, where).toBeVisible();
     else await expect(locator, where).toBeHidden();

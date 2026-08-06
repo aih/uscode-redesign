@@ -5,7 +5,7 @@ order: 3
 summary: Release points, the three ways to ask for one, and the four facts every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36, 44, 45]
+  adrs: [18, 36, 44, 45, 56]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
@@ -46,9 +46,11 @@ steps:
 **By neither**, which is the default: an address with no `?release=` and no `?date=` answers with
 the newest release point this site holds, and follows new ones as they are loaded.
 
-Every page that shows a provision carries all three as controls, under the section's address:
-a **Release point** menu whose first entry is *Newest — follows new releases*, and an **As of date**
-box. Both keep the provision you are reading. Switching release on
+Every page that shows a provision carries all three as controls, in the bar under the navigation.
+The bar names the release point the page is reading — **Release point 119-99** — and that name is
+the control: open it for a **Release point** menu whose first entry is *Newest — follows new
+releases*, and an **As of date** box. The bar stays on screen as you read, so both are reachable
+from any scroll position. Both keep the provision you are reading: switching release on
 `/app/us/usc/t16/s45f/c/5` returns `(c)(5)` at the release point you chose, not the top of § 45f.
 
 The **Release point** menu is rebuilt at most every five minutes, so a release point loaded within
@@ -64,6 +66,8 @@ demoOrder: 65
 steps:
   - goto: /app/us/usc/t16/s45f/c/5?release=119-99
     caption: Reading subsection (c)(5) of § 45f, pinned to release point 119-99.
+  - click: .rpswitch__summary
+    caption: The bar names the release point you are reading, and opens the ways to change it.
   - select: { selector: "#release", value: "119-102not101" }
     caption: Choose a different release point.
   - click: "form:has(#release) button[type=submit]"

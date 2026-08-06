@@ -226,10 +226,11 @@ function validateStep(step, where) {
     const has =
       value?.contains !== undefined ||
       value?.visible !== undefined ||
+      value?.inViewport !== undefined ||
       value?.count !== undefined ||
       value?.url !== undefined;
     if (!has) {
-      throw new Error(`${where}: expect needs one of contains, visible, count, url`);
+      throw new Error(`${where}: expect needs one of contains, visible, inViewport, count, url`);
     }
     if (value.url === undefined && !value.selector) {
       throw new Error(`${where}: expect needs a selector unless it is asserting url`);
@@ -279,6 +280,12 @@ export function describeStep(step) {
       }
       if (step.value.count !== undefined) {
         return `Expect ${step.value.count} of ${step.value.selector}`;
+      }
+      // `inViewport` is the stronger claim: `visible` is true of an element
+      // rendered a screen below the fold, which is no assertion at all about
+      // something whose whole job was to scroll there.
+      if (step.value.inViewport !== undefined) {
+        return `Expect ${step.value.selector} to be ${step.value.inViewport === false ? "off" : "on"} screen`;
       }
       return `Expect ${step.value.selector} to be ${step.value.visible === false ? "hidden" : "visible"}`;
     }

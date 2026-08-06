@@ -108,9 +108,9 @@ const targets = {
     const targets = read("[data-shortcut-targets]");
     const dialog = document.getElementById("shortcuts");
 
-    function goTo(el) {
+    function goTo(el, block) {
       if (!el) return false;
-      el.scrollIntoView({ block: "start", behavior: "smooth" });
+      el.scrollIntoView({ block: block || "start", behavior: "smooth" });
       if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
       el.focus({ preventScroll: true });
       return true;
@@ -153,6 +153,12 @@ const targets = {
       switch (action) {
         case "top":
           return goTo(document.getElementById("main"));
+        // `block: "end"` — the footer's own bottom edge against the viewport's,
+        // so `b` lands on the end of the page rather than on the top of the
+        // last element in it. `scroll-margin-top` is not spent here and does
+        // not need to be: nothing is pinned to the bottom of the viewport.
+        case "bottom":
+          return goTo(document.querySelector("footer"), "end");
         case "contents":
           return goTo(document.querySelector(".contents__link"));
         case "source":
