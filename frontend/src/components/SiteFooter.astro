@@ -25,6 +25,12 @@
  * engine most needs, and it stays on screen.
  */
 import { APP, syntaxHref } from "../lib/url";
+
+declare const __COMMIT_HASH__: string;
+const commitHash: string = __COMMIT_HASH__;
+const shortHash = commitHash.slice(0, 7);
+const repoUrl = "https://github.com/aih/uscode-redesign";
+const commitUrl = commitHash !== "unknown" ? `${repoUrl}/commit/${commitHash}` : repoUrl;
 ---
 
 <footer class="usa-footer usa-footer--slim">
@@ -106,6 +112,10 @@ import { APP, syntaxHref } from "../lib/url";
         A conceptual redesign of the Office of the Law Revision Counsel's site, built from the
         official USLM downloads. Not an official publication of the United States government.
         <a href={`${APP}/about`}>More about this site</a>.
+      </p>
+      <p class="doc-meta doc-meta--commit">
+        Source: <a class="usa-link usa-link--external" rel="noopener" href={repoUrl}>github.com/aih/uscode-redesign</a>{" "}
+        — commit <a class="usa-link usa-link--external" rel="noopener" href={commitUrl}><code>{shortHash}</code></a>
       </p>
     </div>
   </div>
