@@ -269,7 +269,11 @@ test.describe("reading density", () => {
     // Adding a control to `.navtools` is a change to `--sticky-h` if it wraps
     // the row, and that token is what `scroll-margin-top` spends (CLAUDE.md
     // says so by name). It does not wrap at the widths where the stack sticks.
-    for (const width of [700, 1024, 1280]) {
+    //
+    // 640 is the tightest of them — the first width at which the nav sticks —
+    // and it is in this list because 700 alone passed here with 1px of slack
+    // and failed in CI, where the scrollbar is 15px of the viewport.
+    for (const width of [640, 700, 1024, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(SECTION);
       const cost = await page.evaluate(() => {
@@ -282,6 +286,38 @@ test.describe("reading density", () => {
         return withIt - without;
       });
       expect(cost, `the control costs no header height at ${width}px`).toBe(0);
+    }
+  });
+
+  test("leaves room on the chrome's row", async ({ page }) => {
+    // The check above only sees a row that has already wrapped, and a row that
+    // fits by a pixel passes it on one machine and fails on the next. This
+    // measures the slack: what a flex line breaks on is the sum of its items'
+    // hypothetical sizes, so that sum is what has to stay under the width.
+    //
+    // Only the band between the two breakpoints, which is the band that both
+    // wraps and sticks. From 64em up the row is `flex-wrap: nowrap` on a line
+    // of its own, so there is nothing here to measure.
+    for (const width of [640, 700, 900, 1000]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(SECTION);
+      const slack = await page.evaluate(() => {
+        const row = document.querySelector(".navtools") as HTMLElement;
+        const kids = [...row.children].filter(
+          (c) => c.getBoundingClientRect().width > 0,
+        ) as HTMLElement[];
+        const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+        const basis = kids.reduce((sum, c) => {
+          const declared = parseFloat(getComputedStyle(c).flexBasis);
+          const box = c.getBoundingClientRect().width;
+          // `auto`/`content` parse to NaN, and an item that grew is wider than
+          // the basis it asked for — the smaller of the two is what it asked
+          // for either way.
+          return sum + (Number.isNaN(declared) ? box : Math.min(declared, box));
+        }, 0);
+        return row.getBoundingClientRect().width - basis - gap * (kids.length - 1);
+      });
+      expect(slack, `the row has room to spare at ${width}px`).toBeGreaterThan(24);
     }
   });
 });

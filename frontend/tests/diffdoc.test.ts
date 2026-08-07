@@ -217,7 +217,7 @@ describe("diffSummary", () => {
   it("says nothing changed in the words a reader asked for", () => {
     // The line the page leads with. What the source did to the markup while
     // saying the same thing goes in the paragraph under it.
-    expect(summaryOf(0, 0, 0)).toBe("No text changes");
+    expect(summaryOf(0, 0, 0)).toBe("No changes");
   });
 
   it("carries the unit on every part", () => {

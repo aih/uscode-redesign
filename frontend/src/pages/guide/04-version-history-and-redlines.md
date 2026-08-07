@@ -52,20 +52,23 @@ steps:
 
 ### Summary of changes
 
-The line under the two release points is the result: `No text changes`, or a count —
+The line under the two release points is the result: `No changes`, or a count —
 `2 lines added`, `3 lines changed, 1 line removed`.
 
-When nothing in the words changed, the paragraph under that line says what the source did to the
-markup while saying the same thing: served the same stored text, changed only the `@id` guids, or
-changed something else that carries no words — whitespace, `@temporalId`, another attribute.
+When the words are the same and the stored XML is not, the line under the result links to the
+source redline, which shows the metadata that changed — guids, whitespace, an attribute that
+carries no words.
+
+When both release points serve the same stored fragment, the note under the result names the
+release point whose `@id` guids that fragment carries.
 
 ```scenario
 id: diff-nothing-changed
-title: An unchanged section says which kind of unchanged it is
+title: An unchanged section says what the source did anyway
 steps:
   - goto: /app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101
-  - expect: { selector: ".lede", contains: "No text changes" }
-  - expect: { selector: "main", contains: "same stored text" }
+  - expect: { selector: ".lede", contains: "No changes" }
+  - expect: { selector: "main", contains: "Identical content is stored once" }
 ```
 
 ### The source redline

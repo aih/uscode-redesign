@@ -233,18 +233,23 @@ pinned; the disclaimer stays outside the disclosure. From 64em up the summary is
 **`::details-content` is forced visible**, which is the only way to reach a closed `<details>`'s
 content, with an `@supports not selector(::details-content)` fallback that leaves the hamburger
 rather than leaving the nav unreachable. **`--sticky-h` drops 25rem → 23rem** in the 40em band
-(sticky stack 393 → 297px at 640, 337 → 241 at 700; header 416 → 232 at 375, 216 → 120 at 700).
-Two traps: **USWDS's `*, ::before, ::after { box-sizing: inherit }` matches no pseudo-element**, so
+(sticky stack 393 → 241px at 640, 337 → 241 at 700; header 416 → 232 at 375, 216 → 120 at 700).
+Three traps: **USWDS's `*, ::before, ::after { box-sizing: inherit }` matches no pseudo-element**, so
 `::details-content` broke the chain, every link inherited `content-box`, and USWDS's `height: 100%`
 on `.usa-nav__link` made that **28px of extra desktop header** — at widths that never see the
-hamburger; and **USWDS's small-width `.usa-nav` is a centred flex *column***, so overriding it with
-`display: flex` alone stacked the chrome and read `.navtools`' 16rem `flex-basis` as a height. The
+hamburger; **USWDS's small-width `.usa-nav` is a centred flex *column***, so overriding it with
+`display: flex` alone stacked the chrome and read `.navtools`' 16rem `flex-basis` as a height; and
+**a flex line breaks on the sum of its items' hypothetical sizes, before any of them shrinks**, so
+the search box's 14rem of basis wrapped the chrome's row from 640 to 690 and left 1px of slack at
+700 — passing here and failing in CI, where the scrollbar is 15px of the viewport. `flex-basis:
+8rem` in the band is what the box asks for and not what it gets: it still renders 225px at 700, and
+640 now has 38px of slack and one row (ADR-0058's addendum). The
 same session: a search result leads with its citation (`resultCitation` in `lib/cite.ts` — `16
 U.S.C. § 3831`, or `Title 16, CHAPTER 1—` for a structural node), and the redline's top line is the
-result alone — `No text changes`, or `2 lines added` — with the three `sourceDelta` cases moved to
-the paragraph under it.
+result alone — `No changes`, or `2 lines added` — with the `sourceDelta` prose replaced by one line
+under it linking the source redline, and shown only when the stored XML actually differs.
 
-`make test` = **545** Python tests; `make test-web` = **307** frontend tests; `make test-e2e` = **457**
+`make test` = **545** Python tests; `make test-web` = **307** frontend tests; `make test-e2e` = **458**
 Playwright tests, 269 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
