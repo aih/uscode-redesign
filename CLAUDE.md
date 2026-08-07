@@ -242,8 +242,8 @@ hamburger; **USWDS's small-width `.usa-nav` is a centred flex *column***, so ove
 **a flex line breaks on the sum of its items' hypothetical sizes, before any of them shrinks**, so
 the search box's 14rem of basis wrapped the chrome's row from 640 to 690 and left 1px of slack at
 700 — passing here and failing in CI, where the scrollbar is 15px of the viewport. `flex-basis:
-8rem` in the band is what the box asks for and not what it gets: it still renders 225px at 700, and
-640 now has 38px of slack and one row (ADR-0058's addendum). The
+0` in the band removes the search box from the wrap calculation entirely — only the `flex: none`
+controls count — and `flex-grow` still hands the box everything left over (ADR-0058's addendum). The
 same session: a search result leads with its citation (`resultCitation` in `lib/cite.ts` — `16
 U.S.C. § 3831`, or `Title 16, CHAPTER 1—` for a structural node), and the redline's top line is the
 result alone — `No changes`, or `2 lines added` — with the `sourceDelta` prose replaced by one line

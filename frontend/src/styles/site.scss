@@ -1746,15 +1746,17 @@ main[id] {
 /* The band where the whole nav is sticky, so a wrapped row here is `--sticky-h`
  * growing. What decides the wrap is the basis and not the rendered width: a
  * flex line breaks when the items' hypothetical sizes overflow it, before any
- * of them shrinks. 14rem of basis, against the hamburger (66px), the account
- * control (149) and the two toggles (179), left 1px of slack at 700px — it fit
- * on this machine and wrapped in CI, where the scrollbar is 15px of the
- * viewport. 8rem is what it asks for, not what it gets: `flex-grow` still hands
- * it everything the rest of the row does not need, so the box is 166px wide at
- * 640 and 525 at 1000, exactly as before. */
+ * of them shrinks. The density toggle carries a `min-width: 6.6em` label, the
+ * account control and the theme toggle add up alongside it, and the usable
+ * navtools width at 640px (after the hamburger and nav padding) is tight enough
+ * that any positive basis here can push the sum over the edge — including in CI,
+ * where the scrollbar is 15px of the viewport. `flex-basis: 0` removes the
+ * search box from the wrap calculation entirely: only the `flex: none` controls
+ * count, and `flex-grow` still hands the box everything the rest of the row does
+ * not need, so it renders at the same width as before. */
 @media (min-width: 40em) and (max-width: 63.99em) {
   .navtools .sitesearch {
-    flex-basis: 8rem;
+    flex-basis: 0;
   }
 }
 
