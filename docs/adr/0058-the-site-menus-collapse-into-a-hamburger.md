@@ -145,3 +145,34 @@ make test-e2e      # chrome.spec: hidden at 375, a row at 1280, opens over the p
 make test-a11y     # the `menus-open` state — both panels open at 375, scanned
 make shots         # nothing scrolls sideways at 320, panel included
 ```
+
+## Addendum, 2026-08-07 — the chrome's row wrapped in the lower half of the band
+
+The "after" figures above hold from 700px up. Below it they did not: at 640–690 the row of controls
+wrapped and the header measured 176px rather than 120px, and CI failed
+`typography.spec.ts › reading density › costs the sticky stack nothing` at 700px, which passed on the
+machine it was written on with 1px of slack.
+
+What breaks a flex line is the sum of its items' hypothetical sizes, not their rendered widths — the
+line is broken before anything shrinks. `.navtools` asked for 14rem of basis for the search box, and
+against the hamburger (66px), the account control (149px) and the two toggles (179px) that came to
+589px in a 590px row. On CI the scrollbar is 15px of the viewport, so the same row was 575px.
+
+`flex-basis: 8rem` between 40em and 64em is what it asks for, not what it gets: `flex-grow` still
+hands it everything the rest of the row does not need, so the box renders at the width it did before
+(225px at 700, 525px at 1000) and 640px now has 38px of slack instead of −59px.
+
+Re-measured on `/us/usc/t16/s45f`, scrolled:
+
+| width | header, ADR-0058 | header, now | sticky stack, ADR-0058 | sticky stack, now |
+|---|---|---|---|---|
+| 640 | 176px | 120px | 297px | 241px |
+| 700 | 120px | 120px | 241px | 241px |
+| 1280 | 124px | 124px | 218px | 218px |
+
+`--sticky-h` stays at 23rem in the band. It is a budget rounded up over the tallest chrome, and 368px
+against a 241px stack is 127px of headroom rather than the 71px decision 3 was written against —
+worth re-cutting, and not on the same commit as the measurement that makes the case for it.
+
+`typography.spec.ts` gains a second test that measures the slack rather than the wrap, because a row
+that fits by a pixel passes the first one everywhere it is not run.
