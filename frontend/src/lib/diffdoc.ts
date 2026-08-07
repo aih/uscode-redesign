@@ -311,9 +311,9 @@ function plain(text: string): Span[] {
 
 /**
  * "3 lines changed, 1 line added" — the shape of the amendment, before the
- * reader starts reading it. "No text changes" when nothing did, which is the
- * whole of what the top line says; which of `sourceDelta`'s three cases the
- * caller found goes in the paragraph under it.
+ * reader starts reading it. "No changes" when nothing did, which is the whole
+ * of what the top line says; when `sourceDelta` found the stored XML differing
+ * anyway, the paragraph under it points at the source redline.
  *
  * Every part carries its unit. Naming it once and letting the rest inherit gave
  * "2 added" on a section that had only gained text, which is a count of
@@ -325,7 +325,7 @@ export function diffSummary(diff: DocumentDiff): string {
   if (diff.changed) parts.push(`${lines(diff.changed)} changed`);
   if (diff.inserted) parts.push(`${lines(diff.inserted)} added`);
   if (diff.deleted) parts.push(`${lines(diff.deleted)} removed`);
-  return parts.length > 0 ? parts.join(", ") : "No text changes";
+  return parts.length > 0 ? parts.join(", ") : "No changes";
 }
 
 /**

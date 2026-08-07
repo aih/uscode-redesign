@@ -96,24 +96,12 @@ const unchanged = diff !== null && diff.changed === 0 && diff.inserted === 0 && 
 
 // An empty redline establishes that nothing *readable* changed — never that the
 // source republished nothing, which it does at every release point (gotcha 1).
-// So when there is nothing to show, say which of the three cases this is rather
-// than letting "identical" stand for all of them.
+// So it decides whether the source redline has anything to show: `identical` is
+// two byte-for-byte equal fragments and nothing to send a reader to, and the
+// other two are metadata the reading view cannot display.
 const delta: SourceDelta | null =
   unchanged && before && after ? sourceDelta(before.xml, after.xml) : null;
-
-/** What the source did to this section while saying the same thing. */
-const UNCHANGED_NOTE: Record<SourceDelta, string> = {
-  identical:
-    "Both release points serve the same stored text, so nothing in the " +
-    "section's words or its markup differs.",
-  "guids-only":
-    "The stored XML differs only in its @id guids. A guid pins a " +
-    "(provision, release point) pair — it says nothing about the law itself.",
-  "beyond-guids":
-    "The stored XML differs by more than guids — whitespace, @temporalId, " +
-    "or another attribute that carries no words. This view diffs only the " +
-    "displayed text.",
-};
+const sourceDiffers = delta !== null && delta !== "identical";
 
 // The guids, which are the metadata most likely to have moved. `guid` is
 // resolved per (identifier, release) from `guid_map`, so it is release-specific
@@ -182,7 +170,7 @@ const currentCrumb: Entry | null = after
           <a href={versionsHref(identifier)}>Version history</a>
         </p>
 
-        {/* The result first, and only the result: "No text changes", "2 lines
+        {/* The result first, and only the result: "No changes", "2 lines
             added". What the source did to the markup while saying the same
             thing is a fact about USLM rather than about the law, and it used to
             arrive in the same sentence as the answer. */}
@@ -192,24 +180,21 @@ const currentCrumb: Entry | null = after
           <strong class="diff-verdict">{diffSummary(diff)}.</strong>
         </p>
 
-        {unchanged && delta && (
+        {/* One line, and only where there is something behind the link. Which
+            of `sourceDelta`'s two differing cases it is — guids alone, or an
+            attribute beyond them — is what the source redline itself shows, so
+            three paragraphs of prose were describing a view one click away. */}
+        {sourceDiffers && (
           <p class="doc-meta">
-            The text of this section is identical at both release points.{" "}
-            {UNCHANGED_NOTE[delta]}
-            {delta === "beyond-guids" && (
-              <>
-                {" "}
-                The{" "}
-                {/* No whitespace inside the anchor: Astro keeps it, and a newline
-                    becomes an underlined space hanging off the link. */}
-                <a
-                  href={showSource ? "#source" : `${sourceToggleHref(true)}#source`}
-                  rel="nofollow"
-                  data-source-render={showSource ? undefined : ""}
-                >source-level redline</a>{" "}
-                shows the changed metadata as well.
-              </>
-            )}
+            The{" "}
+            {/* No whitespace inside the anchor: Astro keeps it, and a newline
+                becomes an underlined space hanging off the link. */}
+            <a
+              href={showSource ? "#source" : `${sourceToggleHref(true)}#source`}
+              rel="nofollow"
+              data-source-render={showSource ? undefined : ""}
+            >source-level redline</a>{" "}
+            shows the changed metadata (e.g. guids, whitespace) as well.
           </p>
         )}
 
