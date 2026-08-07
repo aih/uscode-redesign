@@ -1,10 +1,19 @@
 // @ts-check
 import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
 
 import node from "@astrojs/node";
 import { defineConfig } from "astro/config";
 
 import { remarkScenario } from "./scripts/remark-scenario.mjs";
+
+const commitHash = (() => {
+  try {
+    return execSync("git rev-parse HEAD").toString().trim();
+  } catch {
+    return "unknown";
+  }
+})();
 
 /**
  * The reader, at /app (ADR-0010, ADR-0011).
@@ -39,6 +48,9 @@ export default defineConfig({
     remarkPlugins: [remarkScenario],
   },
   vite: {
+    define: {
+      __COMMIT_HASH__: JSON.stringify(commitHash),
+    },
     css: {
       preprocessorOptions: {
         scss: {
