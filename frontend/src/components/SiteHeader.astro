@@ -4,9 +4,15 @@
  * the three places a reader actually needs to reach from anywhere — the titles,
  * the release points, and the API.
  *
- * USWDS's basic header, and no JavaScript: the nav is a plain list that wraps on
- * a phone rather than a menu that has to be opened. A menu you must tap to see is
- * worse than four links you can already read.
+ * USWDS's basic header, and no JavaScript. The nav was a plain list that wrapped
+ * on a phone, on the reasoning that four links you can already read beat a menu
+ * you must tap to see. There are seven items now, and at 375px they wrapped to
+ * three 44px bands above the statute; between 40em and 64em they are also
+ * sticky, which is 88px of `--sticky-h` spent on the menu before the reader
+ * reaches a word of law. Below 64em they collapse into `.navmenu` — a native
+ * `<details>`, the same script-free disclosure `ReleasePicker` uses (ADR-0056),
+ * whose panel is `position: absolute` so opening it moves nothing. Above 64em
+ * the summary is hidden and the list is a row again (ADR-0058).
  */
 import AuthNav from "./AuthNav.astro";
 import ComingSoon from "./ComingSoon.astro";
@@ -39,61 +45,101 @@ const { searchValue = null } = Astro.props;
       </div>
     </div>
     <nav aria-label="Primary" class="usa-nav">
-      <ul class="usa-nav__primary usa-accordion">
-        <li class="usa-nav__primary-item">
-          <a class="usa-nav__link" href={`${APP}/`}><span>Titles</span></a>
-        </li>
-        <li class="usa-nav__primary-item">
-          <a class="usa-nav__link" href={`${APP}/releases`}><span>Release points</span></a>
-        </li>
-        <li class="usa-nav__primary-item">
-          <a class="usa-nav__link" href={`${APP}/provisions`}><span>My Provisions</span></a>
-        </li>
-        {/* The guide (ADR-0038). Ahead of the API reference because it is the
-            one thing here written for a reader who does not already know what
-            the site does. */}
-        <li class="usa-nav__primary-item">
-          <a class="usa-nav__link" href={`${APP}/guide`}><span>User guide</span></a>
-        </li>
-        {/* `/app/docs`, not FastAPI's `/docs`. The bare Swagger page is a
-            different site — no navbar, no footer, no way back — so the reader
-            who clicks "API docs" from here has left. The reader page wraps the
-            same OpenAPI schema in this chrome. */}
-        <li class="usa-nav__primary-item">
-          <a class="usa-nav__link" href={`${APP}/docs`}><span>API docs</span></a>
-        </li>
-        {/* The disclaimer this site has always carried in the footer — "a
-            conceptual redesign … not an official publication" — is the single
-            most important sentence on the page for anyone who lands on a
-            provision from a search engine, and it was in eight-point grey type
-            below the fold. It has a page now, and this is the way in. */}
-        <li class="usa-nav__primary-item">
-          <a class="usa-nav__link" href={`${APP}/about`}><span>About</span></a>
-        </li>
-        {/* Not a link, because there is nothing to link to yet — it explains
-            itself instead of 404ing. See `ComingSoon` for why it is not
-            `<button disabled>`. */}
-        {!DOWNLOADS_ENABLED && (
+      {/* `<summary>` is exposed as a button carrying its own expanded state, so
+          the disclosure needs no `aria-expanded` of its own and no script to
+          keep one in sync. The two icons are inline rather than `<img>`: they
+          have to take their colour from `--ink` in both themes, and an external
+          SVG cannot. */}
+      <details class="navmenu">
+        <summary class="navmenu__summary">
+          <svg
+            class="navmenu__icon navmenu__icon--open"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M3 6h18M3 12h18M3 18h18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"></path>
+          </svg>
+          <svg
+            class="navmenu__icon navmenu__icon--close"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M5 5l14 14M19 5L5 19"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"></path>
+          </svg>
+          <span class="navmenu__label">Menu</span>
+        </summary>
+        <ul class="usa-nav__primary usa-accordion">
           <li class="usa-nav__primary-item">
-            <ComingSoon
-              id="downloads"
-              label="Downloads"
-              heading={DOWNLOADS_NOTICE.heading}
-              lead={DOWNLOADS_NOTICE.lead}
-              detail={DOWNLOADS_NOTICE.detail}
-            >
-              <p class="soon__detail">
-                <a
-                  class="usa-link usa-link--external"
-                  rel="noopener"
-                  href="https://uscode.house.gov/download/download.shtml">
-                  Release-point downloads at the OLRC
-                </a>
-              </p>
-            </ComingSoon>
+            <a class="usa-nav__link" href={`${APP}/`}><span>Titles</span></a>
           </li>
-        )}
-      </ul>
+          <li class="usa-nav__primary-item">
+            <a class="usa-nav__link" href={`${APP}/releases`}><span>Release points</span></a>
+          </li>
+          <li class="usa-nav__primary-item">
+            <a class="usa-nav__link" href={`${APP}/provisions`}><span>My Provisions</span></a>
+          </li>
+          {/* The guide (ADR-0038). Ahead of the API reference because it is the
+              one thing here written for a reader who does not already know what
+              the site does. */}
+          <li class="usa-nav__primary-item">
+            <a class="usa-nav__link" href={`${APP}/guide`}><span>User guide</span></a>
+          </li>
+          {/* `/app/docs`, not FastAPI's `/docs`. The bare Swagger page is a
+              different site — no navbar, no footer, no way back — so the reader
+              who clicks "API docs" from here has left. The reader page wraps the
+              same OpenAPI schema in this chrome. */}
+          <li class="usa-nav__primary-item">
+            <a class="usa-nav__link" href={`${APP}/docs`}><span>API docs</span></a>
+          </li>
+          {/* The disclaimer this site has always carried in the footer — "a
+              conceptual redesign … not an official publication" — is the single
+              most important sentence on the page for anyone who lands on a
+              provision from a search engine, and it was in eight-point grey type
+              below the fold. It has a page now, and this is the way in. */}
+          <li class="usa-nav__primary-item">
+            <a class="usa-nav__link" href={`${APP}/about`}><span>About</span></a>
+          </li>
+          {/* Not a link, because there is nothing to link to yet — it explains
+              itself instead of 404ing. See `ComingSoon` for why it is not
+              `<button disabled>`. */}
+          {!DOWNLOADS_ENABLED && (
+            <li class="usa-nav__primary-item">
+              <ComingSoon
+                id="downloads"
+                label="Downloads"
+                heading={DOWNLOADS_NOTICE.heading}
+                lead={DOWNLOADS_NOTICE.lead}
+                detail={DOWNLOADS_NOTICE.detail}
+              >
+                <p class="soon__detail">
+                  <a
+                    class="usa-link usa-link--external"
+                    rel="noopener"
+                    href="https://uscode.house.gov/download/download.shtml">
+                    Release-point downloads at the OLRC
+                  </a>
+                </p>
+              </ComingSoon>
+            </li>
+          )}
+        </ul>
+      </details>
       {/* The chrome's controls share one row at every width — which is also
           what keeps them out of `--sticky-h`: a second block in the nav would
           add a whole 44px band to the sticky stack between 40em and 64em, and

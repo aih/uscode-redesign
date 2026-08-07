@@ -96,6 +96,31 @@ export function formatCitation(identifier: string): string {
   return identifier;
 }
 
+/**
+ * The citation a search result leads with: `16 U.S.C. § 45f`, not `§ 45f`.
+ *
+ * A section number on its own names 58 different provisions, one per title, and
+ * the title is the half of the citation a reader can carry away. It is on every
+ * indexed document already (`title_num`).
+ *
+ * `num` is the source's own — so an en dash stays an en dash, the section
+ * symbol is not added a second time, and the trailing period the source writes
+ * is kept. The title phrase is `formatCitation`'s, so an appendix title reads
+ * `5 U.S.C. App.` A structural node takes `Title 16, CHAPTER 1—` instead: the
+ * `ch. 1` of a citation drops the word the source and the reader both use.
+ */
+export function resultCitation(
+  titleNum: string | null | undefined,
+  num: string | null | undefined,
+  type: "section" | "structure",
+): string | null {
+  const trimmed = num?.trim() ?? "";
+  if (!titleNum) return trimmed || null;
+  if (!trimmed) return `Title ${titleNum}`;
+  if (type === "structure") return `Title ${titleNum}, ${trimmed}`;
+  return `${titlePhrase(titleNum)} ${trimmed}`;
+}
+
 /** What a copy target needs, computed once on the server. */
 export interface CopyTarget {
   /** The USLM `@identifier`, which is also the element's `id` in the page. */

@@ -132,6 +132,64 @@ test("About is in the nav and carries the disclaimer", async ({ page }) => {
   );
 });
 
+test.describe("the menus collapse below the desktop breakpoint (ADR-0058)", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test("the navbar's links are behind a hamburger, and the hamburger opens them", async ({
+    page,
+  }) => {
+    await page.goto("/app/");
+
+    const list = page.locator(".usa-nav__primary");
+    await expect(list).toBeHidden();
+
+    await page.locator(".navmenu__summary").click();
+    await expect(list).toBeVisible();
+    await expect(page.locator('.usa-nav__primary a[href="/app/about"]')).toBeVisible();
+  });
+
+  test("opening it paints over the page rather than pushing it down", async ({ page }) => {
+    // The same property `ReleasePicker` has to hold (ADR-0056): between 40em
+    // and 64em this bar is sticky, and a panel in flow would be `--sticky-h`
+    // growing while it happens to be open.
+    await page.goto("/app/us/usc/t16/s45f");
+    const top = () => page.locator("main").evaluate((el) => el.getBoundingClientRect().top);
+
+    const closed = await top();
+    await page.locator(".navmenu__summary").click();
+    await expect(page.locator(".navmenu")).toHaveAttribute("open", "");
+    expect(await top()).toBe(closed);
+  });
+
+  test("the footer's links are behind the same disclosure", async ({ page }) => {
+    await page.goto("/app/");
+
+    const list = page.locator(".usa-footer__nav ul");
+    await expect(list).toBeHidden();
+    // The disclaimer is not part of it: whoever arrived from a search engine
+    // needs that sentence without opening anything.
+    await expect(page.locator(".usa-footer__secondary-section")).toContainText(
+      "Not an official publication",
+    );
+
+    await page.locator(".footmenu__summary").click();
+    await expect(list).toBeVisible();
+  });
+});
+
+test("at desktop the menus are rows of links with no hamburger", async ({ page }) => {
+  // `<details>` hides its content through `::details-content`, and this is the
+  // assertion that the override forcing it visible from 64em up is in force —
+  // without it the whole site navigation is a closed drawer with no handle.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/app/");
+
+  await expect(page.locator(".usa-nav__primary")).toBeVisible();
+  await expect(page.locator(".usa-footer__nav ul")).toBeVisible();
+  await expect(page.locator(".navmenu__summary")).toBeHidden();
+  await expect(page.locator(".footmenu__summary")).toBeHidden();
+});
+
 test("the footer and the navbar style their links the same way", async ({ page }) => {
   await page.goto("/app/");
 

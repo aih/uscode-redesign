@@ -310,16 +310,22 @@ function plain(text: string): Span[] {
 }
 
 /**
- * "3 lines changed, 1 added" — the shape of the amendment, before the reader
- * starts reading it. Empty when nothing changed, which is the caller's cue to
- * say which of `sourceDelta`'s three cases it found instead.
+ * "3 lines changed, 1 line added" — the shape of the amendment, before the
+ * reader starts reading it. "No text changes" when nothing did, which is the
+ * whole of what the top line says; which of `sourceDelta`'s three cases the
+ * caller found goes in the paragraph under it.
+ *
+ * Every part carries its unit. Naming it once and letting the rest inherit gave
+ * "2 added" on a section that had only gained text, which is a count of
+ * nothing in particular.
  */
 export function diffSummary(diff: DocumentDiff): string {
   const parts: string[] = [];
-  if (diff.changed) parts.push(`${diff.changed} line${diff.changed === 1 ? "" : "s"} changed`);
-  if (diff.inserted) parts.push(`${diff.inserted} added`);
-  if (diff.deleted) parts.push(`${diff.deleted} removed`);
-  return parts.join(", ");
+  const lines = (n: number) => `${n} line${n === 1 ? "" : "s"}`;
+  if (diff.changed) parts.push(`${lines(diff.changed)} changed`);
+  if (diff.inserted) parts.push(`${lines(diff.inserted)} added`);
+  if (diff.deleted) parts.push(`${lines(diff.deleted)} removed`);
+  return parts.length > 0 ? parts.join(", ") : "No text changes";
 }
 
 /**

@@ -182,28 +182,36 @@ const currentCrumb: Entry | null = after
           <a href={versionsHref(identifier)}>Version history</a>
         </p>
 
+        {/* The result first, and only the result: "No text changes", "2 lines
+            added". What the source did to the markup while saying the same
+            thing is a fact about USLM rather than about the law, and it used to
+            arrive in the same sentence as the answer. */}
         <p class="lede">
           Comparing <strong>{before.release.label}</strong> to{" "}
           <strong>{after.release.label}</strong>.{" "}
-          {unchanged && delta
-            ? "The text of this section is identical at both release points. " +
-              UNCHANGED_NOTE[delta]
-            : diffSummary(diff) + "."}
-          {unchanged && delta === "beyond-guids" && (
-            <>
-              {" "}
-              The{" "}
-              {/* No whitespace inside the anchor: Astro keeps it, and a newline
-                  becomes an underlined space hanging off the link. */}
-              <a
-                href={showSource ? "#source" : `${sourceToggleHref(true)}#source`}
-                rel="nofollow"
-                data-source-render={showSource ? undefined : ""}
-              >source-level redline</a>{" "}
-              shows the changed metadata as well.
-            </>
-          )}
+          <strong class="diff-verdict">{diffSummary(diff)}.</strong>
         </p>
+
+        {unchanged && delta && (
+          <p class="doc-meta">
+            The text of this section is identical at both release points.{" "}
+            {UNCHANGED_NOTE[delta]}
+            {delta === "beyond-guids" && (
+              <>
+                {" "}
+                The{" "}
+                {/* No whitespace inside the anchor: Astro keeps it, and a newline
+                    becomes an underlined space hanging off the link. */}
+                <a
+                  href={showSource ? "#source" : `${sourceToggleHref(true)}#source`}
+                  rel="nofollow"
+                  data-source-render={showSource ? undefined : ""}
+                >source-level redline</a>{" "}
+                shows the changed metadata as well.
+              </>
+            )}
+          </p>
+        )}
 
         {unchanged && (guidsDiffer || fragmentFrom) && (
           <p class="doc-meta">
