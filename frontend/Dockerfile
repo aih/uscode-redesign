@@ -16,7 +16,13 @@ RUN NPM_CONFIG_FETCH_RETRIES=10 \
     npm ci
 
 COPY . .
-RUN npm run build
+
+# The commit the footer names. This context is `./frontend`, which holds no
+# `.git`, so `astro.config.mjs` cannot read it here and falls back to "unknown"
+# unless the build passes it in. `deploy.yml` passes the sha it built; compose
+# passes the working tree's HEAD.
+ARG COMMIT_SHA=unknown
+RUN COMMIT_SHA="$COMMIT_SHA" npm run build
 
 FROM node:22-alpine
 

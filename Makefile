@@ -17,8 +17,11 @@ dev-web:
 
 # The whole site on :8000 — Caddy in front of both surfaces, exactly as deployed.
 # This is the only target where a pasted citation URL redirects into the reader.
+# COMMIT_SHA is what the footer names. The frontend image builds from
+# ./frontend, which contains no .git, so the checkout's HEAD has to be handed
+# to the build rather than read inside it.
 dev-all:
-	docker compose up --build
+	COMMIT_SHA=$$(git rev-parse HEAD 2>/dev/null || echo unknown) docker compose up --build
 
 # Everything the API integration tests need: the release-point inventory, then
 # Title 16 at the two release points the tests assert against. Title 16 @ 119-99

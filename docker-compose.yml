@@ -89,7 +89,13 @@ services:
       ]
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # The footer names the commit it was built from. Nothing under
+        # ./frontend is a git checkout, so the value has to arrive as a build
+        # arg; `make dev-all` exports it from the working tree.
+        COMMIT_SHA: "${COMMIT_SHA:-unknown}"
     depends_on:
       - api
     environment:
