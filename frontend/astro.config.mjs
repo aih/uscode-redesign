@@ -7,9 +7,18 @@ import { defineConfig } from "astro/config";
 
 import { remarkScenario } from "./scripts/remark-scenario.mjs";
 
+/* The commit the footer names (SiteFooter.astro). `git rev-parse` only answers
+ * in a checkout, and the image that ships this reader is built from `./frontend`
+ * as its Docker context — no `.git` anywhere under it — so in every built image
+ * the git call throws and the footer said "unknown". COMMIT_SHA is how the
+ * build is told; the git call is the fallback for `npm run dev` in a checkout. */
 const commitHash = (() => {
+  const fromEnv = process.env.COMMIT_SHA?.trim();
+  if (fromEnv) return fromEnv;
   try {
-    return execSync("git rev-parse HEAD").toString().trim();
+    return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
   } catch {
     return "unknown";
   }

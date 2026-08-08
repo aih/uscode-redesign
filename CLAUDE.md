@@ -243,7 +243,16 @@ hamburger; **USWDS's small-width `.usa-nav` is a centred flex *column***, so ove
 the search box's 14rem of basis wrapped the chrome's row from 640 to 690 and left 1px of slack at
 700 — passing here and failing in CI, where the scrollbar is 15px of the viewport. `flex-basis:
 0` in the band removes the search box from the wrap calculation entirely — only the `flex: none`
-controls count — and `flex-grow` still hands the box everything left over (ADR-0058's addendum). The
+controls count — and `flex-grow` still hands the box everything left over (ADR-0058's addendum).
+**The row still did not fit, and what wrapped was inside the search box rather than the row**
+(ADR-0059): at 640 the box got 166px against the 164px its own label needs, so in CI "Search or go
+to a citation" ran to a second line and the header grew 11.5px — the density control costing
+`--sticky-h` after all. The two toggles now **keep their icons and drop their words below 64em**,
+which returns ~130px (box 166 → 302 at 640, header 232 → 176 at 375), and their accessible names
+were already written by their own islands. Two traps: **`.density-toggle__label`'s base
+`display: inline-block` is later in `site.scss` than the 40–64em rules**, and a media query adds no
+specificity, so the override has to sit beside it; and **a layout with 2px of slack passes on macOS
+and fails on Linux** — `.authnav` is 149px here and 154 there. The
 same session: a search result leads with its citation (`resultCitation` in `lib/cite.ts` — `16
 U.S.C. § 3831`, or `Title 16, CHAPTER 1—` for a structural node), and the redline's top line is the
 result alone — `No changes`, or `2 lines added` — with the `sourceDelta` prose replaced by one line

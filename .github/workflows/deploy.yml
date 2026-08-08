@@ -74,6 +74,10 @@ jobs:
           context: ./frontend
           platforms: linux/arm64
           push: true
+          # The footer names the commit it was built from. This context holds no
+          # .git, so the sha has to be passed in or the image says "unknown".
+          build-args: |
+            COMMIT_SHA=${{ steps.sha.outputs.sha }}
           tags: |
             ${{ env.ECR_REGISTRY }}/uscode-frontend:${{ steps.sha.outputs.sha }}
             ${{ env.ECR_REGISTRY }}/uscode-frontend:latest
