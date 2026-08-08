@@ -1746,14 +1746,9 @@ main[id] {
 /* The band where the whole nav is sticky, so a wrapped row here is `--sticky-h`
  * growing. What decides the wrap is the basis and not the rendered width: a
  * flex line breaks when the items' hypothetical sizes overflow it, before any
- * of them shrinks. The density toggle carries a `min-width: 6.6em` label, the
- * account control and the theme toggle add up alongside it, and the usable
- * navtools width at 640px (after the hamburger and nav padding) is tight enough
- * that any positive basis here can push the sum over the edge — including in CI,
- * where the scrollbar is 15px of the viewport. `flex-basis: 0` removes the
- * search box from the wrap calculation entirely: only the `flex: none` controls
- * count, and `flex-grow` still hands the box everything the rest of the row does
- * not need, so it renders at the same width as before. */
+ * of them shrinks. `flex-basis: 0` removes the search box from that calculation
+ * entirely: only the `flex: none` controls count, and `flex-grow` still hands
+ * the box everything the rest of the row does not need. */
 @media (min-width: 40em) and (max-width: 63.99em) {
   .navtools .sitesearch {
     flex-basis: 0;
@@ -1926,6 +1921,37 @@ main[id] {
   display: inline-block;
   min-width: 6.6em;
   text-align: left;
+}
+
+/* Below the desktop breakpoint the two toggles keep their icons and give up
+ * their words, which is what the nav beside them already does (ADR-0058).
+ * Written here rather than beside the other small-width nav rules because the
+ * `display: inline-block` above would otherwise win on source order — a media
+ * query adds no specificity.
+ *
+ * The row did not fit. At 640px `.navtools` is 530px and holds the search box,
+ * the account control (149), `≡ Compact` (119) and `☾ Dark` (60) with 36px of
+ * gaps between them — which left the search box 166px against the 164px its own
+ * label needs to stay on one line. Two pixels. In CI it lost them, "Search or go
+ * to a citation" wrapped to a second line, and the header grew 11.5px — so the
+ * density control cost `--sticky-h` after all, which `typography.spec.ts`
+ * measures. The box was also unusable at that width: a ~120px input.
+ *
+ * Dropping the labels returns ~130px, so the box is ~296px at 640 and the slack
+ * is a control's width rather than a rounding error. Both buttons already carry
+ * an `aria-label` and a `title` written by their own islands — the words are the
+ * visible half of a name that is stated twice, so removing them costs no
+ * accessible name. `display: none` rather than a visually-hidden class for the
+ * same reason: the name is not coming from this element.
+ *
+ * The `min-width: 6.6em` above goes with the label. It exists so the theme
+ * toggle does not jump when the word alternates between "Compact" and
+ * "Comfortable"; with no label rendered there is nothing to alternate. */
+@media (max-width: 63.99em) {
+  .density-toggle__label,
+  .theme-toggle__label {
+    display: none;
+  }
 }
 
 .sitesearch__hint {
