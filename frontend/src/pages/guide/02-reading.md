@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59]
 ---
 
 ## The address of a provision
@@ -64,6 +64,8 @@ From a script, the same address answers with JSON — `curl -L` follows the redi
 API reference — are a row at the top of every page and a row at the foot of it. On a window narrower
 than 1024 pixels both rows collapse: the top one behind a **Menu** button beside the search box, the
 bottom one behind **Site links**. The disclaimer under the footer menu stays on screen either way.
+At the same width the theme and reading-density controls keep their icons and drop their words; both
+still name themselves to a screen reader, and hovering either one shows the words.
 
 The header menu opens over the page rather than pushing it down, so the text stays where it was.
 Press the button again to close it.
