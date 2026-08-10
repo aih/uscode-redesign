@@ -1,8 +1,8 @@
-# ADR-0062 — The footer's links are grouped under four headings
+# ADR-0063 — The footer's links are grouped under four headings
 
 - **Status:** Accepted
 - **Date:** 2026-08-10
-- **Context:** Session 35, task B8 of `docs/menu-refinement-spec.md`
+- **Context:** Session 42, task B8 of `docs/menu-refinement-spec.md`
 - **Amends:** [ADR-0058](0058-the-site-menus-collapse-into-a-hamburger.md) (the same nine links,
   behind the same disclosure, in a different arrangement)
 

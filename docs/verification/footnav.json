@@ -1,5 +1,5 @@
 {
-  "_comment": "Height of the footer's link block, disclosure open, per viewport width. Regenerate with `make footnav` against a running site (ADR-0062).",
+  "_comment": "Height of the footer's link block, disclosure open, per viewport width. Regenerate with `make footnav` against a running site (ADR-0063).",
   "page": "/app/us/usc/t16/s45f",
   "results": [
     {

@@ -2101,7 +2101,7 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   25em, and check against `docs/ia-map.md` that no route loses its only footer inbound link.
 - **Decided:**
   - **Four groups, each named by a real `<h2>` that is also the list's accessible name**
-    ([ADR-0062](docs/adr/0062-the-footer-links-are-grouped-under-four-headings.md)). Sentence case in
+    ([ADR-0063](docs/adr/0063-the-footer-links-are-grouped-under-four-headings.md)). Sentence case in
     the markup and uppercased in CSS, so the accessible name is "Browse". The nine hrefs are
     unchanged and asserted as an ordered set in `chrome.spec.ts`: the ia-map records `/app/design` as
     reached from `SiteFooter` and nothing else, so a dropped row would take a page off the site.
@@ -2130,14 +2130,14 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     disclosure open, before → after: **576 → 675px at 320 and 375** (1 column), **576 → 442 at 420**
     (2), **566 → 290 at 640 and 700** (4), **124 → 195 at 1280** (4). The before column is the same
     command against a tree at `f5d49a0`. The grouping pays for itself from 420px up; the 99px at
-    phone widths and the 71px at desktop are ADR-0062's recorded costs.
-  - `make test` — **545 passed**. `make test-web` — **307 passed**, guide ratchet green with ADR-0062
-    claimed by chapter 02. `make test-e2e` — **460 passed, 2 skipped**, 462 against 459 before: two
-    chrome tests and the guide's `footer-groups` scenario.
-  - The a11y matrix holds at **8 route/rule pairs over 269 scans**. `docs/verification/a11y.json` is
-    left at its committed value: the only delta a run produced was `/docs at 320px in dark` dropping
-    out of `color-contrast` and `nested-interactive` (1955 → 1859 nodes), both inside the vendored
-    Swagger bundle this change does not touch.
+    phone widths and the 71px at desktop are ADR-0063's recorded costs.
+  - Re-verified after the rebase onto ADR-0061 and ADR-0062, since neither was in the tree these
+    numbers were first taken against. `make test` — **545 passed** (Python is untouched by this
+    branch). `make test-web` — **320 passed**, guide ratchet green with ADR-0063 claimed by chapter
+    02. `make test-e2e` — **488 passed, 2 skipped**.
+  - The a11y matrix holds at **8 route/rule pairs, now over 272 scans** — the two the header
+    consolidation added. `docs/verification/a11y.json` moves 1955 → **1787 nodes**: the same eight
+    pairs, with fewer nodes under them now that nine footer links are four labelled lists.
   - Three labels wrap at 640px — "Keyboard shortcuts", "API documentation" and "Source XML (OLRC)"
     take 83px of row against 57px for the other six. Measured in the browser, recorded in the ADR.
 - **Adjacent, not fixed:**

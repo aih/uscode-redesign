@@ -3976,7 +3976,7 @@ dialog.palette {
  * footer under every page.
  *
  * That became one wrapping flex row of nine links, and now four named groups
- * (ADR-0062) laid out as a grid: a reader looking for the API reference reads
+ * (ADR-0063) laid out as a grid: a reader looking for the API reference reads
  * one label rather than nine link texts. Four columns from 40em, two from 25em,
  * one below. Still nothing from USWDS's grid, which `site.scss` would have to
  * start forwarding.
