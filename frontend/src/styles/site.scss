@@ -3114,6 +3114,160 @@ dialog.shortcuts {
   font-size: 0.85rem;
 }
 
+/* --------------------------------------------------- the command palette */
+
+/* `CommandPalette.astro` (ADR-0062). Same split as `.shortcuts` next door: the
+ * `<dialog>` selector carries what only a modal needs, and the class carries
+ * what the `/app/design` specimen shares with it. */
+
+.palette {
+  width: calc(100vw - 2rem);
+  max-width: 38.75rem; /* 620px, the width the menu spec set for this panel. */
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.9rem;
+}
+
+dialog.palette {
+  /* Near the top rather than centred: the reader is typing into the first
+   * control in it, and a box that grows downward from a fixed top edge does not
+   * move that control while they type. The UA's `inset: 0; margin: auto` is
+   * what would otherwise centre it. */
+  top: 6vh;
+  margin-inline: auto;
+  box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 18%);
+}
+
+.palette::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.palette--panel {
+  width: auto;
+  max-height: none;
+}
+
+.palette__heading {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.palette__label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.palette__row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.palette__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+}
+
+.palette__go {
+  flex: none;
+  margin: 0;
+}
+
+.palette__hint {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.palette__group {
+  margin: 1.1rem 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.palette__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row is one control filling the line, so the whole row is the target rather
+ * than the words in it — the 44px the mobile spec asks of every hit target. */
+.palette__action {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 0.2rem;
+  background: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.palette__action:hover {
+  background: var(--panel);
+}
+
+/* Focus is the selection here — `↑`/`↓` move the real thing (ADR-0062), so the
+ * ring is not decoration on top of a separate highlight, it *is* the highlight. */
+.palette__action:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: -0.25rem;
+  background: var(--panel);
+}
+
+.palette__action-label {
+  display: block;
+}
+
+.palette__action-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.palette__empty {
+  margin: 0.5rem 0 0;
+  padding: 0.4rem 0.5rem;
+  color: var(--muted);
+}
+
+.palette__foot {
+  margin: 1rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.palette kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  border: 1px solid var(--rule);
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.35rem;
+  background: var(--panel);
+}
+
+
 /* ------------------------------------------------------- the citation preview */
 
 /* The hover card (ADR-0024). A `popover`, so it renders in the browser's top
@@ -5038,6 +5192,7 @@ dialog.shortcuts {
   .copybtn,
   .contents,
   .shortcuts,
+  .palette,
   .picker,
   .rpswitch,
   .neighbors,
