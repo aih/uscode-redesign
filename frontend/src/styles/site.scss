@@ -3975,29 +3975,57 @@ dialog.palette {
  * stacked rows of one short phrase each, which on a laptop is a screenful of
  * footer under every page.
  *
- * A flex row instead of adding the grid classes, because it wraps on its own at
- * any width and needs nothing from USWDS's grid that `site.scss` would have to
- * start forwarding. */
-.usa-footer__nav .usa-list--unstyled {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem 2rem;
-  margin: 0;
-  padding: 0;
+ * That became one wrapping flex row of nine links, and now four named groups
+ * (ADR-0062) laid out as a grid: a reader looking for the API reference reads
+ * one label rather than nine link texts. Four columns from 40em, two from 25em,
+ * one below. Still nothing from USWDS's grid, which `site.scss` would have to
+ * start forwarding.
+ *
+ * The nav is a flex item of `.usa-footer__primary-container.grid-row` and
+ * shrinks to its content there, which would size the columns to the longest
+ * label rather than to the footer. */
+.usa-footer__nav {
+  flex: 1 1 100%;
+  width: 100%;
 }
 
-/* The same nine links, behind the same disclosure the navbar uses, below the
- * same breakpoint (ADR-0058). Nothing down here is sticky, so this panel opens
- * in flow: the footer grows and the page scrolls, which is what a reader who
- * asked for the links wants. Written after the row rules above because they
- * would otherwise win on source order. */
-@media (max-width: 63.99em) {
-  .usa-footer__nav .footmenu > .usa-list--unstyled {
-    flex-direction: column;
-    gap: 0;
-    padding: 0.25rem 0 0;
+.usa-footer__nav .footnav {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem 2rem;
+  padding: 0.25rem 0 0;
+}
+
+@media (min-width: 25em) {
+  .usa-footer__nav .footnav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+@media (min-width: 40em) {
+  .usa-footer__nav .footnav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The group name, and the accessible name of the list under it. `--muted` on
+ * the footer's own background is the pair `.doc-meta` in the band below already
+ * paints (`frontend/src/data/color-pairs.json`), so this adds no colour pair.
+ * Uppercased in CSS rather than in the markup: the accessible name stays the
+ * word as written. */
+.footnav__label {
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.usa-footer__nav .usa-list--unstyled {
+  margin: 0;
+  padding: 0;
 }
 
 .usa-footer__nav .usa-list--unstyled > li {
@@ -4033,6 +4061,16 @@ dialog.palette {
 .usa-footer__nav .usa-footer__primary-link:focus {
   text-decoration: underline;
   color: var(--link);
+}
+
+/* USWDS draws a 1px rule above every `.usa-footer__primary-link` below 64em,
+ * which is the divider a stacked list of nine links wants. The four groups are
+ * that structure now, and the rule above each group's first link sits directly
+ * under the group's label, where it reads as an underline on the heading. */
+@media (max-width: 63.99em) {
+  .usa-footer__nav .usa-footer__primary-link {
+    border-top: 0;
+  }
 }
 
 /* ------------------------------------------------ a feature that is not on yet
