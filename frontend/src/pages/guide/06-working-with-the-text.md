@@ -118,8 +118,8 @@ steps:
 
 ## Night mode
 
-**Light or dark.** There is a control in the header to toggle the theme. Light is the default
-setting. The choice is kept in the browser and applied before the page paints.
+**Light or dark.** The **More** menu in the header holds the control, under **Display**. Light is
+the default setting. The choice is kept in the browser and applied before the page paints.
 
 ```scenario
 id: theme-toggle
@@ -129,15 +129,17 @@ demoOrder: 130
 steps:
   - goto: /app/us/usc/t16/s45f
     caption: Light is the default setting.
-  - click: .theme-toggle
-    caption: One control in the header switches it.
+  - click: .navdrop--more > summary
+    caption: More holds the display switches.
+  - click: .navdrop__list .theme-toggle
+    caption: One control switches the theme.
   - expect: { selector: ".theme-toggle__label", contains: "Light" }
     caption: The choice is remembered, and lands before the page paints.
 ```
 
 ## Reading density
 
-**Comfortable or compact.** A second control in the header sets how much law fits on the screen.
+**Comfortable or compact.** A second control under **Display** sets how much law fits on the screen.
 Comfortable is the default. Compact tightens the space between lines and between paragraphs and
 sets the text a little smaller. Like the theme, the choice is kept in the browser and applied
 before the page paints.
@@ -155,7 +157,9 @@ demoOrder: 135
 steps:
   - goto: /app/us/usc/t16/s45f
     caption: Comfortable is the default setting.
-  - click: .density-toggle
+  - click: .navdrop--more > summary
+    caption: More holds the display switches.
+  - click: .navdrop__list .density-toggle
     caption: The control beside the theme toggle switches it.
   - expect: { selector: ".density-toggle__label", contains: "Comfortable" }
     caption: The control now reads Comfortable, which is the way back.

@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61]
 ---
 
 ## The address of a provision
@@ -60,12 +60,52 @@ From a script, the same address answers with JSON — `curl -L` follows the redi
 
 ## Site navigation
 
-**The site menus.** The links to the rest of the site — Titles, Release points, the user guide, the
-API reference — are a row at the top of every page and a row at the foot of it. On a window narrower
-than 1024 pixels both rows collapse: the top one behind a **Menu** button beside the search box, the
-bottom one behind **Site links**. The disclaimer under the footer menu stays on screen either way.
-At the same width the theme and reading-density controls keep their icons and drop their words; both
-still name themselves to a screen reader, and hovering either one shows the words.
+**The site menus.** The top of every page carries four things: **Titles**, **My Provisions**, the
+search box, and **More**.
+
+Titles opens a short list of titles and a link to all of them. More holds the rest of the site under
+four headings — Reference (Release points, Downloads), Help (User guide, API docs, About), Display
+(the reading-density and theme switches), and Accounts.
+
+Both menus open over the page rather than pushing it down, and one is open at a time: opening either
+closes the other. **Esc** closes the open menu and puts the keyboard back on the button that opened
+it. So does clicking anywhere outside it.
+
+On a window narrower than 1024 pixels those four collapse behind a **Menu** button beside the search
+box, and the foot of the page collapses behind **Site links**. The disclaimer under the footer menu
+stays on screen either way.
+
+```scenario
+id: header-more-menu
+title: The rest of the site is behind More
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - expect: { selector: '.navdrop--more .navdrop__panel', visible: false }
+    caption: The top of the page carries Titles, My Provisions, the search box and More.
+  - click: .navdrop--more > summary
+    caption: More holds the release points, the guide, the API reference and the display switches.
+  - expect: { selector: '.navdrop a[href="/app/releases"]', visible: true }
+    caption: Release points is under Reference.
+  - expect: { selector: ".navdrop__list .theme-toggle", visible: true }
+    caption: The theme and reading-density switches are under Display.
+```
+
+```scenario
+id: header-one-menu-at-a-time
+title: Opening one menu closes the other
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - click: .navdrop--titles > summary
+  - expect: { selector: ".navdrop--titles .navdrop__panel", visible: true }
+    caption: Titles lists a few titles and a link to all of them.
+  - click: .navdrop--more > summary
+    caption: Opening More —
+  - expect: { selector: ".navdrop--titles .navdrop__panel", visible: false }
+    caption: — closes Titles.
+  - press: Escape
+  - expect: { selector: ".navdrop--more .navdrop__panel", visible: false }
+    caption: Esc closes the open menu.
+```
 
 The header menu opens over the page rather than pushing it down, so the text stays where it was.
 Press the button again to close it.
@@ -77,11 +117,14 @@ needs:
   viewport: mobile
 steps:
   - goto: /app/us/usc/t16/s45f
-    caption: On a phone the site links are behind one button, not three rows of them.
+    caption: On a phone the site links are behind one button.
   - click: .navmenu__summary
     caption: Menu opens them over the page.
-  - expect: { selector: '.usa-nav__primary a[href="/app/releases"]', visible: true }
-    caption: The same destinations the top of a wide window shows in a row.
+  - expect: { selector: '.usa-nav__primary a[href="/app/provisions"]', visible: true }
+    caption: The same four the top of a wide window shows in a row.
+  - click: .navdrop--more > summary
+  - expect: { selector: '.navdrop a[href="/app/releases"]', visible: true }
+    caption: More opens inside the menu rather than over it.
 ```
 
 **The breadcrumb** at the top of every page runs from the title down to the provision on screen:
