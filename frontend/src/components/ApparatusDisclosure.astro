@@ -1,0 +1,59 @@
+---
+/**
+ * The notes and source-credit disclosures, made to mean what they say
+ * (ADR-0060).
+ *
+ * `lib/uslm.ts` renders both as a closed `<details>`, and `site.scss` forced
+ * the collapsed box visible from 40em up — so on every desktop reader the
+ * summary was a control that toggled an attribute and changed nothing on
+ * screen. A native `<details>` cannot be defaulted open by viewport from CSS:
+ * the open state is an attribute, and only the markup or a script can set it.
+ * The markup cannot, because one cached document is served to every width
+ * (ADR-0018, the reasoning that keeps the theme out of the HTML too).
+ *
+ * So: the stylesheet's override stands until this runs, this sets the real
+ * attribute at the width that wants it, and `data-apparatus="live"` retires the
+ * override. Both paints show the same thing, so there is no flash, and a reader
+ * with scripting off keeps exactly the behaviour the site has always had.
+ *
+ * The viewport is read once, at load. A reader who resizes past 40em keeps the
+ * state they were reading in rather than having the page open or shut under
+ * them.
+ *
+ * It also opens whatever the URL fragment names, since `#section-notes` on a
+ * phone otherwise lands on a closed element with the answer inside it.
+ * `KeyboardNav` does the same for `c` and `n`, which scroll rather than
+ * navigate and so never touch the fragment.
+ *
+ * Mounted on the pages that render statutory text, not in `Base` — every route
+ * pays for what sits in the layout (ADR-0055), and the comments in an
+ * `is:inline` script ship with it, which is why the reasoning is up here and
+ * not down there (ADR-0046, `docs/js-budgets.json`).
+ */
+---
+
+<script is:inline>
+  {
+    const openFragment = () => {
+      const id = location.hash.slice(1);
+      const el = id ? document.getElementById(decodeURIComponent(id)) : null;
+      if (el instanceof HTMLDetailsElement) el.open = true;
+    };
+
+    const start = () => {
+      // The 40em the stylesheet's override is written at.
+      if (window.matchMedia("(min-width: 40em)").matches) {
+        for (const el of document.querySelectorAll(".uslm-details")) el.open = true;
+      }
+      document.documentElement.dataset.apparatus = "live";
+      openFragment();
+    };
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", start);
+    } else {
+      start();
+    }
+    window.addEventListener("hashchange", openFragment);
+  }
+</script>

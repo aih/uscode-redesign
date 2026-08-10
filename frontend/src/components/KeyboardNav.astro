@@ -44,6 +44,12 @@
  * as well as to a fragment jump, so nothing here has to know how tall the
  * sticky stack is at this viewport.
  *
+ * A jump whose target is a `<details>` opens it (ADR-0060). `c` and `n` name
+ * the source credit and the notes, which are closed on a narrow screen, and
+ * scrolling to a shut box is not arriving at the thing. These keys scroll
+ * rather than navigate, so the fragment never changes and
+ * `ApparatusDisclosure.astro`'s hash handler never sees them.
+ *
  * ## Stepping through provisions
  *
  * `[` and `]` read their targets off the rendered contents list rather than
@@ -110,6 +116,8 @@ const targets = {
 
     function goTo(el, block) {
       if (!el) return false;
+      // ADR-0060, and see the docstring above.
+      if (el instanceof HTMLDetailsElement) el.open = true;
       el.scrollIntoView({ block: block || "start", behavior: "smooth" });
       if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
       el.focus({ preventScroll: true });

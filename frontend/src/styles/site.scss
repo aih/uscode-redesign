@@ -2904,11 +2904,17 @@ main[id] {
 }
 
 
-/* Notes and the source credit collapse behind `<details>` — no JS (Day 4).
- * Closed is the real, honest default (also what a phone gets): a source
- * credit is citation apparatus, not the text of the law. Desktop overrides the
- * native collapse to stay open, because there the extra scroll cost is small
- * and readers doing comparative work want it visible without a tap. */
+/* Notes and the source credit collapse behind `<details>`. Closed is the real,
+ * honest default (also what a phone gets): a source credit is citation
+ * apparatus, not the text of the law. On a wide screen they start open, because
+ * there the extra scroll cost is small and readers doing comparative work want
+ * them visible without a tap.
+ *
+ * The summary is a control and is drawn as one, on `.rpswitch__summary`'s terms
+ * (ADR-0060): a box, a caret that points down closed and up open, a hover fill
+ * and a focus ring. Uppercase muted words alone read as a label — and
+ * `display: flex` here removes the native disclosure marker, so before this
+ * there was no caret at all. */
 .uslm-details > summary {
   cursor: pointer;
   font-weight: 700;
@@ -2919,6 +2925,47 @@ main[id] {
   min-height: 2.75rem;
   display: flex;
   align-items: center;
+  gap: 0.35rem;
+  /* A chip rather than a full-width row, so the caret sits against the word it
+   * belongs to instead of a column away from it. */
+  width: fit-content;
+  padding: 0 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.15rem;
+  list-style: none;
+}
+
+/* Safari draws its own triangle through a pseudo-element that `list-style`
+ * does not reach. */
+.uslm-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.uslm-details > summary::after {
+  content: "▾";
+  /* The glyph is the letterform of the interface face at the size of the label
+   * above it, which is small for a shape; a touch larger and it reads as a
+   * caret rather than as punctuation. */
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.uslm-details[open] > summary::after {
+  content: "▴";
+}
+
+.uslm-details > summary:hover {
+  color: var(--ink);
+  background: var(--field);
+  border-color: var(--edge);
+}
+
+/* The same ring `.copybtn`, the hover card and the release switcher draw. A
+ * bare `<summary>` is not one of USWDS's components, so nothing gives it one
+ * otherwise. */
+.uslm-details > summary:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: 0;
 }
 
 /* Chromium's native <details> collapses its content through an internal
@@ -2927,9 +2974,17 @@ main[id] {
  * `display` does nothing, because that box is what is actually collapsed.
  * `::details-content` is the author-facing hook the spec provides for exactly
  * this. Browsers without it simply keep the native per-viewport default
- * (closed, fully togglable) — a fine fallback, not a broken one. */
+ * (closed, fully togglable) — a fine fallback, not a broken one.
+ *
+ * `html:not([data-apparatus="live"])` is what makes the toggle real (ADR-0060).
+ * Forcing the content visible from 40em up wins over the element's own state,
+ * so on a wide screen the summary toggled an `open` attribute that changed
+ * nothing on screen. `ApparatusDisclosure.astro` sets that attribute for real
+ * and then stamps the flag, which retires this rule; until it runs — and for a
+ * reader with scripting off, permanently — the rule stands and the wide default
+ * is what it has always been. */
 @media (min-width: 40em) {
-  .uslm-details::details-content {
+  html:not([data-apparatus="live"]) .uslm-details::details-content {
     content-visibility: visible !important;
     block-size: auto !important;
     overflow: visible !important;
@@ -5019,13 +5074,17 @@ dialog.shortcuts {
   }
 
   /* The summary stays as the label above the block it opens, without the
-   * disclosure triangle, which points at nothing on paper. */
+   * disclosure triangle or the box around it, both of which point at nothing on
+   * paper. */
   .uslm-details > summary {
     list-style: none;
     min-height: 0;
     cursor: auto;
+    padding: 0;
+    border: 0;
   }
 
+  .uslm-details > summary::after,
   .uslm-details > summary::-webkit-details-marker,
   .uslm-details > summary::marker {
     display: none;

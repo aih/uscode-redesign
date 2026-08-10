@@ -12,6 +12,7 @@
  */
 import Base from "../../../layouts/Base.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
+import ApparatusDisclosure from "../../../components/ApparatusDisclosure.astro";
 import ChapterRail from "../../../components/ChapterRail.astro";
 import CitePreview from "../../../components/CitePreview.astro";
 import CopyColumn from "../../../components/CopyColumn.astro";
@@ -377,6 +378,12 @@ const releaseContext = served
         {/* One card for every citation in the text above (ADR-0024). Mounted
             only on a section page, because that is the only page that renders
             statutory text with references in it. */}
+        {/* The notes and the source credit open and close for real, and the
+            fragment a link or the keyboard map names opens on arrival
+            (ADR-0060). After the article, so the elements it sets exist even if
+            the browser runs it before `DOMContentLoaded`. */}
+        <ApparatusDisclosure />
+
         <CitePreview />
 
         <p class="formats">
