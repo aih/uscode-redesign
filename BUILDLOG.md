@@ -2092,3 +2092,69 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - **`.navdrop--titles`'s links are unverified against the corpus.** Seven title numbers are
     hard-coded; nothing checks that `/us/usc/t26` is a title this deployment holds, and the CI
     fixture corpus holds only Title 16, so a broken one would not turn a suite red.
+
+## 064 — 2026-08-10 — Session 42: the footer's nine links become four named groups
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Task B8 of `docs/menu-refinement-spec.md` — regroup `SiteFooter` into BROWSE / LEARN /
+  DEVELOPERS / SITE, the same nine links, attribution band verbatim, columns stacking at 40em and
+  25em, and check against `docs/ia-map.md` that no route loses its only footer inbound link.
+- **Decided:**
+  - **Four groups, each named by a real `<h2>` that is also the list's accessible name**
+    ([ADR-0062](docs/adr/0062-the-footer-links-are-grouped-under-four-headings.md)). Sentence case in
+    the markup and uppercased in CSS, so the accessible name is "Browse". The nine hrefs are
+    unchanged and asserted as an ordered set in `chrome.spec.ts`: the ia-map records `/app/design` as
+    reached from `SiteFooter` and nothing else, so a dropped row would take a page off the site.
+  - **`Accounts (SOON)` is not in the footer**, though the spec's own mockup shows it under SITE. The
+    task said the same nine links, and the header already carries one `ComingSoon` control for a
+    feature ADR-0034 switched off; a second is a second dead affordance. Recorded in the ADR.
+  - **A grid on `.footnav`** — four columns from 40em, two from 25em, one below, the spec's
+    breakpoints. `.usa-footer__nav` needed `flex: 1 1 100%`: it is a flex item of
+    `.usa-footer__primary-container.grid-row` and shrank to its content there, which sized the
+    columns to the longest label rather than to the footer.
+  - **ADR-0058's disclosure is untouched.** All four groups still collapse behind **Site links**
+    below 64em and the disclaimer still sits outside it, so the closed footer is the 44px summary it
+    was.
+  - **USWDS's `border-top` on `.usa-footer__primary-link` goes below 64em.** It is the divider a
+    stacked list of nine wants; with the links grouped it lands directly under each group's label,
+    where it reads as an underline on the heading.
+- **Produced:** `2a9f5ee`, `c7c6d5c`, `1e263b7`, `a589b0d` on `b8-footer-grouping`.
+  `docs/adr/0062-*.md`;
+  `frontend/src/components/SiteFooter.astro`, `frontend/src/styles/site.scss`;
+  `frontend/scripts/footnav.mjs` and a `make footnav` target → `docs/verification/footnav.json`; two
+  new tests in `frontend/tests/e2e/chrome.spec.ts` and two locators fixed there (`.usa-footer__nav
+  ul` now matches four elements); guide chapter 02 and its `footer-groups` scenario;
+  `docs/ia-map.md` — the eight `SiteFooter:NN` line references and the chrome section.
+- **Verified:**
+  - `make footnav` → `docs/verification/footnav.json`. `.usa-footer__nav` on `/us/usc/t16/s45f`,
+    disclosure open, before → after: **576 → 675px at 320 and 375** (1 column), **576 → 442 at 420**
+    (2), **566 → 290 at 640 and 700** (4), **124 → 195 at 1280** (4). The before column is the same
+    command against a tree at `f5d49a0`. The grouping pays for itself from 420px up; the 99px at
+    phone widths and the 71px at desktop are ADR-0062's recorded costs.
+  - `make test` — **545 passed**. `make test-web` — **307 passed**, guide ratchet green with ADR-0062
+    claimed by chapter 02. `make test-e2e` — **460 passed, 2 skipped**, 462 against 459 before: two
+    chrome tests and the guide's `footer-groups` scenario.
+  - The a11y matrix holds at **8 route/rule pairs over 269 scans**. `docs/verification/a11y.json` is
+    left at its committed value: the only delta a run produced was `/docs at 320px in dark` dropping
+    out of `color-contrast` and `nested-interactive` (1955 → 1859 nodes), both inside the vendored
+    Swagger bundle this change does not touch.
+  - Three labels wrap at 640px — "Keyboard shortcuts", "API documentation" and "Source XML (OLRC)"
+    take 83px of row against 57px for the other six. Measured in the browser, recorded in the ADR.
+- **Adjacent, not fixed:**
+  - **A second agent was editing this working tree throughout the session** — B7 and part of B10
+    (`SiteHeader`, `SiteSearch`, `KeyboardNav`, `Base`, `lib/shortcuts.ts`, new `data/nav-titles.ts`
+    and `lib/palette.ts`), including ~233 lines in `site.scss` and edits to the same guide chapter
+    and spec file. It claimed **ADR-0061** mid-session, which is why this is 0062. B8 was moved to a
+    worktree at `../uscode-b8` off `f5d49a0` and verified there against a scratch Caddy on :8010, so
+    :8000 stayed with the other session. Nothing here depends on B7 landing.
+  - **`docs/verification/a11y.json` is not reproducible run to run.** The vendored `/docs` page
+    reported 96 fewer violating nodes at 320px dark in one run of six, with no code change between
+    them. Worth a look before anyone treats a node-count delta there as a regression.
+  - **The footer's `min-height: 2.75rem` per link is what makes the phone column 675px.** Nine 44px
+    targets plus four labels. B9 owns the phone chrome and has the header measurements to trade
+    against.
+  - **`CLAUDE.md` is deliberately untouched on this branch.** Its e2e count (459) and its ADR count
+    ("59 ADRs, numbered to 0060") both depend on whether B7 lands, and both agents would have edited
+    the same two sentences. Whoever merges second owns them: this branch alone makes it 462 e2e
+    tests and ADRs numbered to 0062.
+
