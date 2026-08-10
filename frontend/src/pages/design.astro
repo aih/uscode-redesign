@@ -38,6 +38,7 @@
  * token could see it.
  */
 import Base from "../layouts/Base.astro";
+import ApparatusDisclosure from "../components/ApparatusDisclosure.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import ChapterRail from "../components/ChapterRail.astro";
 import CitationNotFound from "../components/CitationNotFound.astro";
@@ -799,6 +800,7 @@ const TYPE_ROLES = [
   <CopyColumn identifiers={copyTargets} release={null} />
 
   <article class="section-body" set:html={specimenHtml} />
+  <ApparatusDisclosure />
 
   {/* --------------------------------------------------------------- density */}
   <h2 class="toc-group" id="density">Reading density</h2>

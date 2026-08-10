@@ -45,6 +45,15 @@
  * `(hover: hover) and (pointer: fine)`. Hover does not exist on a phone, and
  * every workaround (first-tap-opens, long-press) fights either the OS or the
  * reader's expectation that a link is a link. A tap opens the citation.
+ *
+ * ## The fragment arrives with its disclosures closed
+ *
+ * `lib/uslm.ts` renders a section's source credit and notes as a closed
+ * `<details>`, and `ApparatusDisclosure.astro` opens them at load — which this
+ * fragment misses, arriving later (ADR-0060). A repealed section is often
+ * nothing *but* apparatus, so the card would show a shut box, and its first
+ * focusable would be a link inside `content-visibility: hidden` that Tab from
+ * the trigger cannot focus. Opened here, on the way in.
  */
 import { PREVIEW_HREF, previewFailureHtml } from "../lib/preview";
 
@@ -253,6 +262,8 @@ const FAILURES = {
         if (!link.matches(":hover") && document.activeElement !== link) return;
 
         card.innerHTML = html;
+        // A preview shows what it has. See the docstring above (ADR-0060).
+        for (const el of card.querySelectorAll(".uslm-details")) el.open = true;
         card.setAttribute(
           "aria-label",
           `Preview: ${link.getAttribute("title") || link.textContent?.trim() || "cited provision"}`,

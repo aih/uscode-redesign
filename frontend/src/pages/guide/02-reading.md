@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60]
 ---
 
 ## The address of a provision
@@ -284,8 +284,35 @@ steps:
 `reserved`. The badge prints whatever the source says. A status this site has not seen before keeps
 the plain badge and prints its own word.
 
-**Notes and source credit** are collapsed under the text on a narrow screen and open beside it on a
-wide one. They come from the source XML unchanged.
+**Notes and source credit** sit at the end of the section, under a **Source** and a **Notes**
+button. Each carries a caret — pointing down when the block is closed, up when it is open — and
+opens and closes on a click or on <kbd>Enter</kbd>. They start open on a window wider than 640
+pixels and closed below that. They come from the source XML unchanged.
+
+Following a link to `#section-source` or `#section-notes` opens the block it names, as do the
+<kbd>c</kbd> and <kbd>n</kbd> shortcuts.
+
+```scenario
+id: apparatus-toggle
+title: Close and reopen the notes
+demo: true
+demoOrder: 47
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: A section, with its source credit and its notes at the end of the text.
+  - scroll: .uslm-notes > summary
+    caption: On a wide window both start open.
+  - expect: { selector: ".uslm-notes .uslm-note", visible: true }
+    caption: The amendment history, in full.
+  - click: .uslm-notes > summary
+    caption: The Notes button closes them, and the caret turns over.
+  - expect: { selector: ".uslm-notes .uslm-note", visible: false }
+    caption: The text of the section, without the apparatus around it.
+  - click: .uslm-notes > summary
+    caption: Pressing it again brings them back.
+  - expect: { selector: ".uslm-notes .uslm-note", visible: true }
+    caption: The notes, open again.
+```
 
 Dates inside a note read as part of the sentence they sit in. The source marks every date as its
 own element, and the amendment histories are largely made of them — "Pub. L. 95–625 struck out

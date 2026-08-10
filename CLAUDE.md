@@ -258,7 +258,22 @@ U.S.C. § 3831`, or `Title 16, CHAPTER 1—` for a structural node), and the red
 result alone — `No changes`, or `2 lines added` — with the `sourceDelta` prose replaced by one line
 under it linking the source redline, and shown only when the stored XML actually differs.
 
-`make test` = **545** Python tests; `make test-web` = **307** frontend tests; `make test-e2e` = **458**
+**The Source and Notes disclosures toggle, and look like they do** (ADR-0060). They could not: the
+rule forcing `.uslm-details::details-content` visible from 40em up wins over the element's own state,
+so on every desktop reader the summary flipped `open` and **changed nothing on screen** — and there
+was no caret either, since a `<summary>` draws its marker on a `display: list-item` box and this one
+is `display: flex` for the touch target. The summary is now a chip on `.rpswitch__summary`'s terms —
+box, `▾`/`▴`, hover fill, focus ring — and `ApparatusDisclosure.astro` sets `open` at 40em and up,
+stamps `data-apparatus="live"` and thereby retires the override, which is now
+`html:not([data-apparatus="live"])`: CSS cannot default a `<details>` open by viewport, because the
+open state is an attribute and one cached document is served to every width. Both paints show the
+same thing, so nothing flashes, and scripting-off keeps the old behaviour. `c`, `n` and a fragment
+jump open what they land on. **A card's fragment arrives after that script has run**, so
+`CitePreview` opens the disclosures it injects — without it a preview of a repealed section (often
+nothing but apparatus) was a shut box whose first focusable sat inside `content-visibility: hidden`,
+where `.focus()` silently does nothing and ADR-0041's Tab-into-the-card stopped dead.
+
+`make test` = **545** Python tests; `make test-web` = **307** frontend tests; `make test-e2e` = **459**
 Playwright tests, 269 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -266,7 +281,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(57 ADRs, numbered to 0058 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(59 ADRs, numbered to 0060 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -323,9 +338,7 @@ to tell those cases apart. **`j` is previous and `k` is next**, which is the rev
 convention every reader who knows those keys has; it is what the guide documents and
 `guide.spec.ts` asserts, and ADR-0055 left it rather than flipping a documented binding unasked.
 **`[` and `]` are silent on a section with no contents list** — a one-paragraph repeal has no
-top-level provisions, so the keys do nothing and nothing says why. **A jump to `#section-notes`
-below 40em lands on a closed `<details>`**; above 40em `site.scss` forces the panel visible without
-opening the element, the same mismatch ADR-0043 recorded against `ChapterRail`. **Nothing tells a
+top-level provisions, so the keys do nothing and nothing says why. **Nothing tells a
 reader the shortcuts exist** unless they press `?` or read the footer. **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **`/app/diff` is two hops from the text it compares**
