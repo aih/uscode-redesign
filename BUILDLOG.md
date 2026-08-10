@@ -1914,3 +1914,96 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `preview.spec.ts › Tab moves into the card` failed, and was right to: a card's fragment arrives after the script has run, so a preview of a repealed section — often nothing but apparatus — showed a shut box, and `focusables()[0]` was a link inside `content-visibility: hidden`, which cannot be focused. `CitePreview` now opens the disclosures it injects. Confirmed as a real regression by rebuilding the image from a stashed tree, where the test passes.
   - `make test` — **545 passed**. `make test-web` — **307 passed**, guide ratchet green with ADR-0060 claimed by chapter 02.
   - `make shots` — 6 changed, all the demo pages, which list the guide's scenes. The summary chips are at the foot of a section and no screenshot reaches below the fold.
+
+## 062 — 2026-08-10 — Session 40: ⌘K, and the two commands a section page could not offer
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Task B10 of `docs/menu-refinement-spec.md` — add the ⌘K command palette: progressive
+  enhancement of the one search box, citation parse client-side via `lib/cite.ts`, action rows
+  including "Compare with previous release point…" as the B5 entry point and a `ShortcutsDialog`
+  opener; register ⌘K in `lib/shortcuts.ts`; native `<dialog>`, focus trap and restore; stay inside
+  `docs/js-budgets.json`; guide chapter 05 gets the scenario.
+- **Decided:** [ADR-0062](docs/adr/0062-a-command-palette-over-the-one-search-box.md).
+  - **The client-side citation parse in the spec is not implementable and was not built.**
+    `lib/cite.ts` is the *inverse* function — an identifier written out as a citation — and
+    `citeparse.py` is the only thing that decides what a citation is (ADR-0023). An island is
+    `<script is:inline>` and imports nothing, so a parse in the browser would have been a third copy
+    of the parser, in the one place where disagreeing with the server means landing somewhere else.
+    The palette's input submits to `/app/goto` instead: it gives the same answer the header box
+    gives because it is the same request. A debounced `/api/v1/citation` fetch would keep one parser
+    and was declined — a round trip per typing pause, a browser-to-`/api/v1` fan-out this site does
+    not have, and four failure states, to preview a destination Enter reaches anyway.
+  - **`mod` is a field on the printed shortcut list, not a special case in the island.** `keyMap()`
+    writes those bindings `Mod+k`, which is what keeps ⌘K and the plain `k` beside it — "next
+    section" — two bindings rather than one collision. `KeyboardNav` reads a held ⌘ or Ctrl only for
+    a binding the list declares, and *before* the text-field guard, because firing while the reader
+    is typing is the point of having one. The dialog prints `⌘K` and `Ctrl K` both: one cached
+    document is served to every reader (ADR-0018).
+  - **The rows are server-built data** (`lib/palette.ts`), the arrangement `KeyboardNav` uses for
+    its three neighbour hrefs. `sectionCommands` takes the previous release point out of the title's
+    release list the section page already holds for the switcher, so the B5 entry point costs no
+    further API call. That list is release points at which the *title* was published, not ones at
+    which this section changed, so the row names the release point it will compare against and the
+    redline can legitimately say `No changes`.
+  - **No "add to My Provisions" row.** Accounts are off in the reader (ADR-0034); it would be a
+    command with nothing behind it.
+  - **Rows are focused, not selected.** `↑`/`↓` move real DOM focus rather than an
+    `aria-activedescendant` around a `role="listbox"`, so `Enter` is the platform's and a row
+    reached by Tab behaves like one reached by `↓`.
+  - **`/app/settings` gains its first link from a rendered page**, closing one line of
+    `docs/ia-map.md`'s Unreachable routes section — behind ⌘K, so a keyboard route rather than a
+    visible one. `/app/diff` moves from three hops to one keystroke; B5 still owns the visible
+    "Compare with…" control and the arbitrary pair.
+  - **Ceilings raised in `docs/js-budgets.json`** (ADR-0046). The palette costs **3,494 bytes per
+    route** — `CommandPalette` 2,568 and `KeyboardNav` 926 — on every route, because it is in
+    `Base`. The first draft was 3,813 for the component alone; the rationale moved to the
+    frontmatter, where it ships with nothing, which is where ADR-0055 put `KeyboardNav`'s and
+    ADR-0060 put `ApparatusDisclosure`'s. Re-check with:
+    `node -e 'const fs=require("fs");const RE=/<script\b[^>]*\bis:inline\b[^>]*>([\s\S]*?)<\/script>/g;let n=0;for(const m of fs.readFileSync(process.argv[1],"utf8").matchAll(RE))n+=Buffer.byteLength(m[1],"utf8");console.log(n)' frontend/src/components/CommandPalette.astro`
+  - **`/app/design` renders it as a panel** (ADR-0053), which forced the island's script to be
+    conditional on `panel`: a second copy on that page binds twice to the one real dialog, and `↓`
+    then skips a row.
+- **Produced:** `docs/adr/0062-*.md`; `frontend/src/components/CommandPalette.astro`,
+  `frontend/src/lib/palette.ts`, `frontend/tests/palette.test.ts`,
+  `frontend/tests/e2e/palette.spec.ts` (new); `frontend/src/lib/shortcuts.ts`,
+  `frontend/src/components/KeyboardNav.astro`, `frontend/src/layouts/Base.astro`,
+  `frontend/src/pages/us/usc/[...identifier].astro`, `frontend/src/pages/design.astro`,
+  `frontend/src/styles/site.scss`; guide chapter 05 and its two scenarios;
+  `frontend/tests/shortcuts.test.ts`, `frontend/tests/e2e/keyboard.spec.ts`,
+  `frontend/tests/e2e/a11y.spec.ts`; `docs/js-budgets.json`, `docs/a11y/routes.json`,
+  `docs/ia-map.md`.
+- **Verified:**
+  - `make test-web` — **320 passed** (307 before): 12 new in `palette.test.ts`, one in
+    `shortcuts.test.ts` asserting `Mod+k` and a plain `k` are two bindings.
+  - `npx playwright test tests/e2e/palette.spec.ts` — **13 passed**, covering open-with-keyboard,
+    ⌘K firing from inside a filled search box while a bare `k` stays a character in it,
+    Escape-restores-focus, the citation jump through `/app/goto`, the compare row's destination,
+    a page with no section offering neither section row, filtering and its empty state, `↑`/`↓`
+    over filtered rows, one modal replacing the other rather than stacking, and the section keys
+    staying quiet behind it.
+  - `npx playwright test guide.spec.ts -g palette` — the two guide scenarios run as tests.
+  - **320px:** the dialog fits the viewport, the page does not scroll sideways behind it, and the
+    box scrolls inside itself rather than clipping its last rows — asserted in `palette.spec.ts`,
+    because `make shots` carries that ratchet and photographs the dialog closed on every page.
+  - The `palette-open` a11y state scans clean against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`.
+  - `make test` — **545 passed, 13 deselected**, unchanged by this work.
+- **Not done, and why:**
+  - **`docs/verification/a11y.json` and `docs/verification/js-bytes.json` were not committed, and
+    `make shots` was not run.** Tasks B7 and B8 were being implemented in the same working tree
+    during this session (`SiteHeader`, `SiteFooter`, `SiteSearch`, ADR-0061), and all three are
+    whole-tree snapshots — they would have recorded that work as this session's. The a11y matrix's
+    `theme-toggled` and
+    `density-compact` setups fail in the shared tree because B7 moved those two toggles into the
+    "More" menu, so the setups can no longer click them; that is B7's fix, not touched here.
+  - The byte ceilings raised here sit above what the shared tree measures, which includes B7's
+    1,073-byte header script. The 3,494 figure above is this change alone, measured with the
+    command given.
+- **Candidate tasks found and not fixed:**
+  - `docs/verification/js-bytes.json` is regenerated by `make test-web` from whatever is on disk, so
+    two concurrent sessions cannot both hold it correct. Nothing records which change owns which
+    bytes.
+  - The palette's commands are not searched by their hint text, so "theme" does not find
+    "Reading settings". A hint is a sentence and matching sentences makes every row match almost any
+    word, but the hints are where several of these rows are actually described.
+  - Nothing on screen says ⌘K exists. It is in the shortcut list behind `?` and in guide chapter 05,
+    which is the same gap CLAUDE.md already records for the rest of the key map.
