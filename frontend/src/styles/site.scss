@@ -432,21 +432,28 @@
      * 1023, on `/us/usc/t16/s470a`. 640 is the worst case here because it is
      * the narrowest width in the band and the breadcrumb wraps furthest. 23rem
      * is 368px, so 71px of headroom at 640 and 127 at 700 — and 32px of every
-     * anchor jump in this band given back to the text. */
-    --sticky-h: 23rem;
+     * anchor jump in this band given back to the text.
+     *
+     * ADR-0061 took the two display toggles, the account control and the search
+     * box's own label line off the chrome's row: **225px measured** at 640, 700,
+     * 800 and 1023, across five sections including a subsection deep link, so
+     * the band is flat rather than worst at its narrow end. 18rem is 288px, 63px
+     * of headroom — the 60px `sticky.spec.ts` requires a new addition to argue
+     * its way past. */
+    --sticky-h: 18rem;
   }
 }
 
 /* At the desktop breakpoint USWDS's nav becomes a single horizontal row and the
- * stack shrinks — but the search box takes a second row of its own from here up
- * (see the `.navtools` rules further down), which is what that layout costs.
- *
- * **287px measured** at 1024 and 1280 on `/us/usc/t16/s470a`; 19rem is 304px,
- * so 17px of headroom. It was 13rem/208px while the box shared the nav's row,
- * and leaving it there would have put every anchor jump 39px behind the bar. */
+ * stack shrinks. It shrank twice: **287px measured** at 1024 and 1280 on
+ * `/us/usc/t16/s470a` while the search box took a second row of its own, and
+ * **168px** once the box came back onto the nav's row beside three menus
+ * (ADR-0061) — measured at 1024, 1280 and 1440 across five sections. 15rem is
+ * 240px, so 72px of headroom, and 64px of every anchor jump on a desktop given
+ * back to the text. */
 @media (min-width: 64em) {
   :root {
-    --sticky-h: 19rem;
+    --sticky-h: 15rem;
     /* The reading measure, plus what a second column costs: 16rem of rail and
      * a 2rem gap. The page padding is inside `--measure` already, so the prose
      * track here comes out at exactly the width it has on a page with no rail.
@@ -705,7 +712,8 @@
  * of 1rem of padding. That is chrome `--sticky-h` pays for on the widths that
  * never see the hamburger at all. */
 .navmenu::details-content,
-.footmenu::details-content {
+.footmenu::details-content,
+.navdrop::details-content {
   box-sizing: border-box;
 }
 
@@ -777,6 +785,13 @@
      * absolutely positioned panel is exactly the thing that does it. */
     min-width: 13rem;
     max-width: calc(100vw - 2rem);
+    /* The sheet holds two open disclosures now (ADR-0061), so it can be taller
+     * than the window — and a row below the fold of a panel that does not
+     * scroll is a row nobody can reach. Every row in it is focusable, so this
+     * is not one of the scrollable regions with no keyboard route in. */
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--page);
     border: 1px solid var(--edge);
     border-radius: 0.25rem;
@@ -827,6 +842,253 @@
     .footmenu__summary {
       display: inline-flex;
     }
+  }
+}
+
+/* --------------------------------------------------- the navbar's dropdowns
+ *
+ * `Titles` and `More` (ADR-0061). The same `<details>` the release switcher and
+ * the two menus are (ADR-0056, ADR-0058), so the expanded state is the
+ * element's own and no attribute is kept in sync by hand; what `SiteHeader`'s
+ * script adds is closing — Escape, an outside pointer, and one at a time.
+ *
+ * The panel is `position: absolute` from 64em up, which is the property the
+ * sticky chrome needs: opening a menu must not make `--sticky-h` grow while it
+ * happens to be open. Below 64em both of these sit inside `.navmenu`'s own
+ * panel, which is already absolute, so the panel is in flow there and the sheet
+ * grows instead. */
+
+.navdrop {
+  position: relative;
+  flex: none;
+}
+
+.navdrop__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  white-space: nowrap;
+  /* Both halves of removing the disclosure triangle, as `.navmenu__summary`
+   * does: `list-style` is what Firefox and current Chrome read, the
+   * pseudo-element is what WebKit reads. A `<summary>` draws its marker on a
+   * `display: list-item` box and this one is a flex row for the touch target,
+   * so the caret is drawn in the markup instead (ADR-0060). */
+  list-style: none;
+}
+
+.navdrop__summary::-webkit-details-marker {
+  display: none;
+}
+
+.navdrop__summary:hover {
+  color: var(--link);
+}
+
+.navdrop__caret {
+  display: inline-block;
+  font-size: 0.7rem;
+}
+
+[open] > .navdrop__summary .navdrop__caret {
+  transform: rotate(180deg);
+}
+
+.navdrop__panel {
+  min-width: 15rem;
+  /* Never wider than the viewport it hangs in — `make shots` fails a page that
+   * scrolls sideways at 320px, and an absolutely positioned panel is exactly
+   * the thing that does it. */
+  max-width: calc(100vw - 2rem);
+  padding: 0.35rem 0;
+  background: var(--page);
+}
+
+/* 270px, the proposal's figure: wide enough for a group label to read as one
+ * and for "Release points" to keep its line. */
+.navdrop__panel--more {
+  min-width: 17rem;
+}
+
+/* Wider, because the rows here carry two things — a number the reader scans and
+ * a name that can be "Government Organization and Employees". 23rem holds that
+ * one whole; anything longer ellipsises rather than wrapping a menu row to two
+ * lines. */
+.navdrop--titles .navdrop__panel {
+  min-width: 23rem;
+}
+
+.navdrop__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* A row of the panel rather than a word in a line: the whole width is the
+ * target, which is what a menu has to be on a phone. */
+.navdrop__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.navdrop__item:hover,
+.navdrop__item:focus-visible {
+  background: var(--rule);
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.navdrop__num {
+  flex: none;
+  font-weight: 600;
+}
+
+/* The title's name is the part that can be long; the number is what the reader
+ * scans, so the number keeps its width and the name gives way. */
+.navdrop__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navdrop__item--all {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--rule);
+  font-weight: 600;
+}
+
+.navdrop__group {
+  margin: 0;
+  padding: 0.6rem 0.75rem 0.2rem;
+  font-family: var(--ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.navdrop__group + .navdrop__list {
+  margin-bottom: 0.25rem;
+}
+
+.navdrop__list + .navdrop__group {
+  border-top: 1px solid var(--rule);
+}
+
+.navdrop__account {
+  padding-top: 0.15rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* The account control is a row of this menu now rather than an item on the
+ * chrome's row, so the two properties that kept it from wrapping that row —
+ * `inline-flex` and `nowrap` — are the wrong ones here. */
+.navdrop__account .authnav {
+  display: flex;
+  font-size: inherit;
+  white-space: normal;
+}
+
+/* The two display switches are the same islands they have always been
+ * (ADR-0027, ADR-0054), rendered once, in a menu. `.usa-button--unstyled` gives
+ * them a link's colour and underline; a menu row is neither. */
+.navdrop__list .density-toggle,
+.navdrop__list .theme-toggle,
+.navdrop .soon--nav .soon__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+}
+
+.navdrop__list .density-toggle,
+.navdrop__list .theme-toggle {
+  color: var(--ink);
+}
+
+.navdrop__list .density-toggle:hover,
+.navdrop__list .theme-toggle:hover,
+.navdrop .soon--nav .soon__trigger:hover {
+  background: var(--rule);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.navdrop .soon--nav .soon__trigger:hover .soon__label,
+.navdrop .soon--nav .soon__trigger:focus-visible .soon__label {
+  text-decoration: underline;
+}
+
+@media (max-width: 63.99em) {
+  /* Inside `.navmenu`'s panel, which is itself absolute: a second absolute box
+   * hanging off a row of it would be positioned against the viewport at the
+   * widths where `.topbar` is `display: contents` (ADR-0056's second trap), and
+   * a panel that opens *over* the menu it was opened from hides the menu. */
+  .navdrop__panel {
+    min-width: 0;
+    padding-left: 0.75rem;
+    background: transparent;
+  }
+
+  /* No vertical padding, because a `<summary>` here is `content-box` and would
+   * add it to `min-height` rather than spend it inside: measured, every
+   * `<summary>` in this site computes `content-box` while the `<details>` above
+   * it computes `border-box`, and a `<summary>` appended to `<body>` computes
+   * `border-box`. USWDS's `*, ::before, ::after { box-sizing: inherit }` says
+   * otherwise and does not win here. The 44px row is `min-height` alone. */
+  .navdrop__summary {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0 1rem;
+  }
+}
+
+@media (min-width: 64em) {
+  .navdrop__panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 600;
+    /* A menu taller than the window is a menu with rows nobody can reach. It
+     * scrolls on its own, and every row in it is focusable, so it is not one of
+     * the scrollable regions with no keyboard route in. */
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--edge);
+    border-radius: 0.25rem;
+    box-shadow: 0 6px 16px rgb(0 0 0 / 22%);
+  }
+
+  /* It is the last item in the row, so it opens leftwards or it opens off the
+   * side of the container. */
+  .navdrop--more .navdrop__panel {
+    left: auto;
+    right: 0;
   }
 }
 
@@ -1468,32 +1730,19 @@ main[id] {
   min-width: 0;
 }
 
-/* The label and the "i" share the label's line, so the explainer costs the
- * sticky chrome nothing. `baseline` rather than `center` because the glyph is a
- * letter: aligned by box it sat a pixel high against the words beside it. */
-.sitesearch__labelrow {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  min-width: 0;
-}
-
-.sitesearch__label {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
 /* ------------------------------------------------- the "i", and its hit area
  *
- * A circled letter at the label's own size, because anything bigger is a row
- * this box cannot afford — it is in the sticky header, and `--sticky-h` is what
- * `scroll-margin-top` spends.
+ * A circled letter, small, because anything bigger is a row this box cannot
+ * afford — it is in the sticky header, and `--sticky-h` is what
+ * `scroll-margin-top` spends. It sat on the label's line until the label became
+ * the placeholder (ADR-0061); it is now a flex item of the box's own row,
+ * between the input and its button, where it costs no height at all because the
+ * input beside it is 44px tall.
  *
  * That leaves a ~18px target, well under the 44px a finger needs. The fix is
  * `::after`: an absolutely positioned overlay that extends the *pointer* target
  * past the visible circle without extending the box, so the touch target is
- * honest and the layout is unchanged. Growing the button itself would have put
- * the whole chrome back into the measurement it just passed. */
+ * honest and the layout is unchanged. */
 .sitesearch__info {
   position: relative;
   flex: none;
@@ -1503,14 +1752,6 @@ main[id] {
   width: 1.15rem;
   height: 1.15rem;
   padding: 0;
-  /* The circle is 18px and the label's line box is 13px, so on its own the
-   * button made the row — and therefore the sticky stack — 5px taller at every
-   * width from 640px up. Measured, because "it is only an icon" is exactly the
-   * assumption that has moved this token twice before. A negative block margin
-   * takes the difference back out of the *outer* height, so the row is as tall
-   * as its text and the circle overflows it by ~2.5px into the 0.25rem gap
-   * above the input. Re-measured after: 0px at all eight widths. */
-  margin-block: -0.25rem;
   border: 1px solid currentcolor;
   border-radius: 50%;
   background: none;
@@ -1923,36 +2164,13 @@ main[id] {
   text-align: left;
 }
 
-/* Below the desktop breakpoint the two toggles keep their icons and give up
- * their words, which is what the nav beside them already does (ADR-0058).
- * Written here rather than beside the other small-width nav rules because the
- * `display: inline-block` above would otherwise win on source order — a media
- * query adds no specificity.
- *
- * The row did not fit. At 640px `.navtools` is 530px and holds the search box,
- * the account control (149), `≡ Compact` (119) and `☾ Dark` (60) with 36px of
- * gaps between them — which left the search box 166px against the 164px its own
- * label needs to stay on one line. Two pixels. In CI it lost them, "Search or go
- * to a citation" wrapped to a second line, and the header grew 11.5px — so the
- * density control cost `--sticky-h` after all, which `typography.spec.ts`
- * measures. The box was also unusable at that width: a ~120px input.
- *
- * Dropping the labels returns ~130px, so the box is ~296px at 640 and the slack
- * is a control's width rather than a rounding error. Both buttons already carry
- * an `aria-label` and a `title` written by their own islands — the words are the
- * visible half of a name that is stated twice, so removing them costs no
- * accessible name. `display: none` rather than a visually-hidden class for the
- * same reason: the name is not coming from this element.
- *
- * The `min-width: 6.6em` above goes with the label. It exists so the theme
- * toggle does not jump when the word alternates between "Compact" and
- * "Comfortable"; with no label rendered there is nothing to alternate. */
-@media (max-width: 63.99em) {
-  .density-toggle__label,
-  .theme-toggle__label {
-    display: none;
-  }
-}
+/* ADR-0059 hid both labels below 64em, because the chrome's row did not fit:
+ * at 640px `.navtools` held the search box, the account control, `≡ Compact`
+ * and `☾ Dark`, and the box was left 166px against the 164px its own label
+ * needed. Neither toggle is on that row any more — both are rows of the More
+ * menu at every width (ADR-0061) — so the rule is gone and the words are back.
+ * A menu row that reads `≡` and nothing else is a menu row nobody can use, and
+ * a menu is where there is space for the word. */
 
 .sitesearch__hint {
   margin: 0.25rem 0 0;
@@ -1964,69 +2182,56 @@ main[id] {
   font-size: 0.95rem;
 }
 
-/* At the desktop breakpoint the nav is a horizontal row and the box can sit
- * beside it rather than under it. */
+/* At the desktop breakpoint the nav is a horizontal row and the box sits on it.
+ *
+ * The box had a row of its own from 64em up, and the reason was arithmetic:
+ * `.usa-nav-container` is USWDS's 1024px grid container, the logo took 238px
+ * and *seven* nav links ~380px, and the box got the 172px left over — not
+ * enough to read `11 U.S.C. § 523(a)(1)(B)(ii)` in. There are three items now
+ * (ADR-0061) and the label above the input is the placeholder inside it, so the
+ * arithmetic comes out the other way: ~430px of box on one row rather than
+ * ~1000px on two. A band of chrome is the most expensive thing this header can
+ * buy — the navbar is sticky here, so it is viewport permanently spent and
+ * `scroll-margin-top` above every anchor jump — and this gives one back. */
 @media (min-width: 64em) {
-  /* The search box gets its own row from here up.
-   *
-   * It shared the nav's row first, and the whole exercise showed why that was
-   * never going to work: `.usa-nav-container` is USWDS's 1024px grid container,
-   * so the header is 1024px wide however wide the window is. Of that, the logo
-   * takes 238px and the four nav links ~380px, and the box got whatever was
-   * left — 116px, then 172px after making `.usa-nav` fill its container and
-   * trimming the links' padding. Both numbers are a leftover rather than a
-   * decision, and neither is enough to read `11 U.S.C. § 523(a)(1)(B)(ii)` in.
-   *
-   * A second row costs one band of chrome and buys the box the container's full
-   * width. That trade is only available *here*: below 64em the nav is the
-   * forced-open wrapping version and the box is already on its own line, so
-   * this changes nothing there.
-   *
-   * The cost is real and is paid in `--sticky-h` at the top of this file — the
-   * navbar is sticky in this band, so a taller header is more of the viewport
-   * permanently spent and a larger `scroll-margin-top` above every anchor jump.
-   * Measured after this change rather than estimated, and the e2e anchor-jump
-   * assertion is what keeps that number honest. */
   .usa-nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
     flex: 1 1 auto;
     min-width: 0;
-    flex-wrap: wrap;
   }
 
   .usa-nav__primary {
     flex: 0 0 auto;
   }
 
-  /* A flex row will happily break "Release points" across two lines to make
+  /* A flex row will happily break "My Provisions" across two lines to make
      room; the links are short, so let them keep their own width. */
   .usa-nav__primary > li > a {
     white-space: nowrap;
   }
 
   .navtools {
-    /* Its own line, full width, and no longer competing with anything. */
-    flex: 0 0 100%;
+    /* Whatever the three menus do not need, up to the cap below. */
+    flex: 1 1 auto;
+    min-width: 0;
     padding: 0;
-    margin-left: 0;
-    margin-top: 0.5rem;
+    margin: 0 0 0 auto;
     flex-wrap: nowrap;
     justify-content: flex-end;
   }
 
-  /* Right-aligned under the nav it belongs to, and capped rather than stretched:
-     a text input spanning 1024px is harder to read than one that ends where the
-     eye expects. 34rem matches the page-level copies on `/app/goto` and
-     `/app/search`, so the control is one width across the whole site. */
+  /* Capped rather than stretched: a text input spanning the container is harder
+     to read than one that ends where the eye expects. 620px is the proposal's
+     figure (`docs/menu-refinement-spec.md`); it is a maximum the 1024px
+     container does not reach with three menus and a wordmark beside it, so what
+     the box gets in practice is the leftover, and the cap is what stops it
+     stretching on a window wider than the container. */
   .navtools .sitesearch {
     flex: 1 1 auto;
-    max-width: 34rem;
-  }
-
-  /* The label fits now that the box has a row of its own, and a visible label is
-     better than a placeholder that vanishes the moment someone types. */
-  .navtools .sitesearch__label {
-    position: static;
-    left: auto;
+    max-width: 38.75rem;
   }
 
   /* The box and its "Go" stay on one line. Left to wrap, the button drops under
@@ -4552,7 +4757,7 @@ dialog.palette {
    *
    * `--sticky-h` is NOT the offset, and that is what made an earlier attempt at
    * this look wrong enough to be recorded as "deliberately not sticky". That
-   * token is a scroll-margin budget: 19rem here, rounded up over the tallest
+   * token is a scroll-margin budget: 15rem here, rounded up over the tallest
    * chrome any reader page carries, so an anchor jump lands under the bar
    * rather than behind it. A guide page carries none of what makes that stack
    * tall — no context bar, no section bar — and its sticky chrome measures
@@ -4565,6 +4770,10 @@ dialog.palette {
    * drifts every time the navbar changes — the same trap `--sticky-h` has its
    * own paragraph about.
    *
+   * It drifted, exactly as advertised: ADR-0061 put the search box back on the
+   * navbar's row, and a guide page's sticky chrome is **74px** at 1024, 1280 and
+   * 1440. 5rem is 80px, so 6px of clearance.
+   *
    * The height is bounded and the list scrolls inside it. That is the half
    * ADR-0050's first attempt was missing: pinning alone lets a list longer than
    * the viewport push its own tail off the bottom of the screen, reachable only
@@ -4576,8 +4785,8 @@ dialog.palette {
     border-top: 0;
     padding-top: 0;
     position: sticky;
-    top: calc(8rem + 0.5rem);
-    max-height: calc(100vh - 8rem - 1.5rem);
+    top: calc(5rem + 0.5rem);
+    max-height: calc(100vh - 5rem - 1.5rem);
     overflow-y: auto;
     overscroll-behavior: contain;
   }
