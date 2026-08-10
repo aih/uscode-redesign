@@ -2007,3 +2007,88 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     word, but the hints are where several of these rows are actually described.
   - Nothing on screen says ⌘K exists. It is in the shortcut list behind `?` and in guide chapter 05,
     which is the same gap CLAUDE.md already records for the rest of the key map.
+
+## 063 — 2026-08-10 — Session 41: the header goes from eleven items to four
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Task B7 of `docs/menu-refinement-spec.md` — consolidate `SiteHeader`: wordmark, a
+  Titles dropdown (frequent titles + "All 54 titles →"), My Provisions, the one search box widened
+  to max 620px sharing the row, and a More menu absorbing Release points, Downloads (SOON), User
+  guide, API docs, About, plus Compact and Dark as labelled switches under a DISPLAY group and an
+  Accounts (SOON) row that becomes the `AuthNav` slot when `ACCOUNTS_ENABLED` is true. No route
+  changes; every href still through `lib/url.ts`. Do not touch the contextbar or `ReleasePicker`
+  (ADR-0056). One disclosure open at a time, Esc/outside-click close, `aria-expanded`; keep the
+  ADR-0058 `<details>` pattern if it fits. Update the a11y route matrix if header landmarks changed,
+  write the ADR noting the discoverability cost of moving five links behind More, update guide
+  chapter 01/02 scenarios, all three suites green.
+- **Decided:** [ADR-0061](docs/adr/0061-the-header-consolidates-behind-titles-and-more.md).
+  - Four top-level items, `<details>` for both menus — the disclosure ADR-0056 and ADR-0058 chose,
+    so the expanded state is the `<summary>`'s own and no `aria-expanded` is kept in sync by hand.
+  - **The chrome ships JavaScript for the first time**, 1,073 bytes in `SiteHeader`: Escape, outside
+    pointer, and one open at a time. Deliberately not `<details name>`, the platform's exclusive
+    grouping, which closes any same-named sibling *including an ancestor* — and below 64em both
+    dropdowns sit inside `.navmenu`. The script closes what does not contain what is being opened.
+    Escape steps aside for an open popover, so Escape over the Downloads explanation shuts the
+    explanation rather than the menu it came from.
+  - **Three deviations from the spec, each measured rather than argued.** The 620px search cap is in
+    the stylesheet and `.usa-nav-container` never reaches it: the input is **328px** at 1024, 1280
+    and 1440, against 172px when the shared row was last tried and 544px on a row of its own. The
+    spec's placeholder ("Search, or go to a citation — 11 usc 523(a)(1)") truncates at "…11 usc 52"
+    in 328px, so the box keeps "11 usc 523(a)(1), or any words", which names both halves and fits.
+    "All 54 titles →" is "All titles →": the header reaches no data, so a count there would be a
+    number nothing re-derives.
+  - **More is in the nav list, not at the far right.** The spec's spacer needs either `order` on a
+    flex item or the search box in front of the menus in the markup, and both make the tab order
+    differ from the reading order at one width or the other.
+  - The Titles shortlist is seven titles in `frontend/src/data/nav-titles.ts`, editorial and saying
+    so in its own docstring — this site records no per-title traffic and `/app/design` requires the
+    header to make no API call (ADR-0053).
+  - ADR-0059 is retired: neither toggle is on the chrome's row, so both have their words back.
+- **Produced:**
+  - `frontend/src/components/SiteHeader.astro` rewritten; `frontend/src/data/nav-titles.ts` new.
+  - `frontend/src/components/SiteSearch.astro` — label to `usa-sr-only`, the "i" into the box's own
+    row between the input and its button.
+  - `frontend/src/styles/site.scss` — the `.navdrop` block, the desktop row, `--sticky-h` twice, the
+    guide list's own offset, ADR-0059's rule removed.
+  - `docs/adr/0061-…md`, `docs/a11y/routes.json` (two new states), `docs/ia-map.md`, guide chapters
+    01, 02 and 06, `frontend/tests/e2e/{chrome,theme,typography,a11y}.spec.ts`.
+- **Verified:**
+  - `make test` — **545 passed** (6m05s).
+  - `make test-web` — **320 passed**.
+  - `make test-e2e` — **488 passed, 2 skipped** (2.7m), 272 of them the accessibility scan.
+  - `make test-a11y` — **273 passed, 272 scans → 8 violation/route pairs over 1,955 nodes**, the
+    same baseline as before this change. The two new states (`more-menu-open`, `titles-menu-open`)
+    scan clean.
+  - Header height, measured on `/app/us/usc/t16/s45f`: **74px** at 1280 (was ~120), **104px** at 700
+    and 375 (was 120 and 176), **148px** at 320. No horizontal overflow at 320.
+  - Sticky stack, measured on five sections after scrolling, at every width in each band:
+    **225px** at 640/700/800/1023 (was 297/241) and **168px** at 1024/1280/1440 (was 287). Tokens
+    23rem → 18rem and 19rem → 15rem, each keeping the 60px of headroom `sticky.spec.ts` requires.
+    A guide page's sticky chrome is **74px** (was 124), so `.guide__nav`'s own offset goes 8rem →
+    5rem. Re-check: `npx playwright test sticky.spec.ts typography.spec.ts`.
+- **Not done, and why:**
+  - **`docs/js-budgets.json` was not raised by this commit, and should have been.** The header's
+    1,073 bytes of script fit inside ceilings raised in the ADR-0062 series (`c6cb12e` and before),
+    which was landing in this same working tree while this task ran — `/app/` measures 17,770
+    against 18,000. The convention is that growth and its ceiling land together; here they did not,
+    and `docs/verification/js-bytes.json` in this commit is the artifact for both.
+  - **CLAUDE.md's test counts are stale** (`make test-web` = 307, `make test-e2e` = 459, 269 a11y
+    scans). Two sessions were changing those numbers at once; they are left for whichever lands last
+    rather than half-corrected here.
+  - `make shots` was not regenerated. The 48 committed PNGs show the old header on every page.
+- **Candidate tasks found and not fixed:**
+  - **Nothing on screen says what is behind More.** Five destinations moved behind one word; the
+    footer is the only place the full map is visible.
+  - **The search box is 328px at every desktop width** because `.usa-nav-container` caps the header
+    at 1024px while the reading column is 960px. A header that tracked the window rather than the
+    grid container would give the box the spec's 620px, and would misalign the wordmark with the
+    text below it.
+  - **Every `<summary>` in this site computes `content-box`** while its `<details>` computes
+    `border-box` — measured on `.navmenu__summary`, `.rpswitch__summary` and
+    `.uslm-details > summary`, against a bare `<summary>` appended to `<body>`, which computes
+    `border-box`. USWDS's `*, ::before, ::after { box-sizing: inherit }` says otherwise and does not
+    win. Vertical padding on any summary therefore adds to `min-height` rather than spending inside
+    it. Worked around here by giving the menu summaries no vertical padding; the cause is unfound.
+  - **`.navdrop--titles`'s links are unverified against the corpus.** Seven title numbers are
+    hard-coded; nothing checks that `/us/usc/t26` is a title this deployment holds, and the CI
+    fixture corpus holds only Title 16, so a broken one would not turn a suite red.
