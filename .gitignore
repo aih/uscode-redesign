@@ -247,3 +247,6 @@ frontend/playwright-report/
 # S3 instead (deploy/publish-demo.sh). `docs/demo/scenes.json` IS committed, so
 # every scene and caption stays reviewable in a diff.
 static/demo/
+
+# Playwright run output
+test-results/

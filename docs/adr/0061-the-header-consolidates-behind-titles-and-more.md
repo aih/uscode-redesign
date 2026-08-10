@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-10
-- **Context:** Session 35, workstream B task B7 — the Header spec of
+- **Context:** Session 41, workstream B task B7 — the Header spec of
   [`docs/menu-refinement-spec.md`](../menu-refinement-spec.md)
 - **Amends:** [ADR-0011](0011-astro-uswds-frontend-at-app.md) (the nav is no longer a flat list of
   every destination), [ADR-0023](0023-one-box-search-and-citation.md) (the box loses its visible

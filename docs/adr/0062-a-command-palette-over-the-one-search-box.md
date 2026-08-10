@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-10
-- **Context:** Session 34, task B10 of `docs/menu-refinement-spec.md`
+- **Context:** Session 40, task B10 of `docs/menu-refinement-spec.md`
 - **Amends:** [ADR-0055](0055-navigation-inside-a-section-and-a-keyboard-map.md) (the key map gains
   its first binding that holds a modifier)
 - **Depends on:** [ADR-0023](0023-citations-parse-server-side-to-an-identifier.md) (unchanged — the form still
