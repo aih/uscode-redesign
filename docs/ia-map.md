@@ -42,7 +42,7 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 | `/app/about` | `about.astro` | What this site is, and what it is not | `SiteHeader:116`, `SiteFooter:90,108` | `/app/releases`, `/app/docs`, `/app/search/syntax`, OLRC, the repository | header, footer |
 | `/app/docs` | `docs.astro` | The OpenAPI schema in this site's chrome, rather than the bare Swagger page | `SiteHeader:108`, `SiteFooter:88`, `about.astro:77`, `AccountsOff:47` | `/docs`, `/redoc`, `/openapi.json` | header, footer |
 | `/app/provisions` | `provisions.astro` | The watchlist. Switched off in the UI (ADR-0034) | `SiteHeader:95`, `AuthNav:48` | a watched provision, `/app/login` | header, footer |
-| `/app/settings` | `settings.astro` | How links open, and the theme. Switched off in the UI | `AuthNav:49` only — **see Unreachable routes** | `/app/login` | header, footer |
+| `/app/settings` | `settings.astro` | How links open, and the theme. Switched off in the UI | `palette.ts:82` (the command palette, ADR-0062), `AuthNav:49` | `/app/login` | header, footer |
 | `/app/login` | `login.astro` | Sign in. Switched off in the UI | `provisions.astro:46`, `settings.astro:52`, `signup.astro:53`, `AuthNav:35` | `/app/signup`, the `?next=` destination | header, footer |
 | `/app/signup` | `signup.astro` | Create an account. Switched off in the UI | `login.astro:58`, `AuthNav:37` | `/app/login`, the `?next=` destination | header, footer |
 | `/app/404` | `404.astro` | Anything under `/app` that is not a citation | any wrong URL | `/app/` | header, footer |
@@ -52,11 +52,10 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 
 ## Unreachable routes
 
-**`/app/settings` has no inbound link from any rendered page.** Its only linker is
-`AuthNav.astro:49`, and `SiteHeader` does not render `AuthNav` while `ACCOUNTS_ENABLED` is false
-(ADR-0034). The single reachable link to it is prose in guide chapter 06. The page itself is not
-dead — it renders `AccountsOff` and explains the link-target default — but a reader who has not read
-the guide cannot get there.
+`/app/settings` was here until ADR-0062. Its only linker was `AuthNav.astro:49`, which
+`SiteHeader` does not render while `ACCOUNTS_ENABLED` is false (ADR-0034), leaving prose in guide
+chapter 06 as the one way in. The command palette's `Reading settings` row (`lib/palette.ts:82`)
+now links it from every page — behind ⌘K, so it is a keyboard route rather than a visible one.
 
 `/app/login` and `/app/signup` are in the same position one hop further out: reachable only from
 `/app/provisions`, `/app/settings` and each other. That is consistent with accounts being off, and
@@ -64,11 +63,14 @@ they are listed here so the state is recorded rather than assumed.
 
 ## Thinly reachable
 
-**`/app/diff` is two hops from the text it compares.** The only link into it from outside itself is
-on `/app/versions`, and the only link to `/app/versions` is one line under the section heading. A
-reader on `§ 45f` who wants to know what changed goes: section → version history → pick two
-releases → diff. Task B5 owns the "Compare with…" affordance that shortens this; B5 is defined in
-`claude-code/WORKSTREAM-B-STATE.md`, not in `docs/backlog.md`.
+**`/app/diff` is two hops from the text it compares, unless the reader knows ⌘K.** The only visible
+link into it from outside itself is on `/app/versions`, and the only link to `/app/versions` is one
+line under the section heading. A reader on `§ 45f` who wants to know what changed goes: section →
+version history → pick two releases → diff. The command palette's `Compare with the previous
+release point` row (ADR-0062, `lib/palette.ts:121`) makes it one keystroke, against the release
+point before the one on screen. Task B5 still owns the "Compare with…" affordance on the section
+header, and the arbitrary pair; B5 is defined in `claude-code/WORKSTREAM-B-STATE.md`, not in
+`docs/backlog.md`.
 
 **`/app/demo` has one inbound link**, on the front page, and only for a reader who has not scrolled
 past the first paragraph.
