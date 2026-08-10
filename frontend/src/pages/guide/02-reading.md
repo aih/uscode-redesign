@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63]
 ---
 
 ## The address of a provision
@@ -105,6 +105,28 @@ steps:
   - press: Escape
   - expect: { selector: ".navdrop--more .navdrop__panel", visible: false }
     caption: Esc closes the open menu.
+```
+
+**The foot of the page** carries nine links under four headings:
+
+- **Browse** — Titles, Release points
+- **Learn** — User guide, Search guide, Keyboard shortcuts
+- **Developers** — API documentation, Source XML (OLRC), Design system
+- **Site** — About
+
+They are four columns on a window 640 pixels or wider, two from 400 pixels, and one below that.
+Each heading names the list beneath it, so a screen reader can move between the four groups.
+
+```scenario
+id: footer-groups
+title: The site's own links are grouped at the foot of the page
+steps:
+  - goto: /app/us/usc/t16/s45f
+    caption: Every page carries the same nine links at its foot.
+  - expect: { selector: ".footnav__label", count: 4 }
+    caption: Browse, Learn, Developers, Site.
+  - expect: { selector: '.footnav ul[aria-labelledby="footnav-developers"]', contains: "API documentation" }
+    caption: The API reference is under Developers.
 ```
 
 The header menu opens over the page rather than pushing it down, so the text stays where it was.

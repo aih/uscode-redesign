@@ -202,7 +202,7 @@ test("at desktop the menus are rows of links with no hamburger", async ({ page }
   await expect(page.locator(".footmenu__summary")).toBeHidden();
 });
 
-test("the footer's nine links are in four named groups (ADR-0061)", async ({ page }) => {
+test("the footer's nine links are in four named groups (ADR-0063)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/app/");
 
