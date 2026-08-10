@@ -30,6 +30,7 @@ import {
 } from "../../../lib/api";
 import { REVALIDATE, setPublicCache } from "../../../lib/cache";
 import { ACCOUNTS_ENABLED } from "../../../lib/features";
+import { sectionCommands } from "../../../lib/palette";
 import { cachedReleases } from "../../../lib/releasecache";
 import { citedIdentifiers } from "../../../lib/refs";
 import type {
@@ -239,6 +240,13 @@ const rail =
     ? { parent: parentToc.node, entries: parentToc.sections }
     : null;
 
+/** The command palette's per-page rows (ADR-0062): the redline against the
+ *  previous release point, and this section's version history. Built from
+ *  `releases`, which is already in hand for the release switcher, so neither
+ *  costs a further call. A table of contents gets none — there is no section to
+ *  compare and no timeline to show. */
+const commands = section ? sectionCommands(section.identifier, releases, selected) : [];
+
 /** The four facts about the text on screen (ADR-0044). `served_from` is the
  *  release point that actually answered, which is not always the one asked for
  *  (gotcha 10); `note` is the API's own sentence saying so. */
@@ -261,6 +269,7 @@ const releaseContext = served
   releaseContext={releaseContext}
   picker={picker}
   bar={bar}
+  commands={commands}
   rail={rail !== null}
 >
   {
