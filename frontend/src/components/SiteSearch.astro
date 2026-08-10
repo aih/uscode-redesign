@@ -26,8 +26,9 @@
  *
  * It has to be free, vertically: this box sits in the sticky chrome, the hint
  * paragraph below it is already hidden there for exactly that reason, and
- * `--sticky-h` is the token `scroll-margin-top` spends. So the button sits on
- * the label's line and the explanation lives in a popover.
+ * `--sticky-h` is the token `scroll-margin-top` spends. So the button sits
+ * inside the box's own row — it had the label's line until the label became the
+ * placeholder (ADR-0061) — and the explanation lives in a popover.
  */
 import { gotoHref, syntaxHref } from "../lib/url";
 import { CITES_KEYWORD } from "../lib/query";
@@ -55,31 +56,12 @@ const infoLead =
 ---
 
 <form class="sitesearch" method="get" action={gotoHref()} role="search">
-  {/* The label and its explainer share a line.
-      A row rather than two blocks, because this box lives in the sticky header
-      and every block here is `--sticky-h` growing — the token
-      `scroll-margin-top` spends, re-measured at eight widths in Session 15.
-      The button is sized to sit inside the label's own line box, so the chrome
-      is exactly as tall as it was. */}
-  <div class="sitesearch__labelrow">
-    <label class="sitesearch__label" for={id}>Search or go to a citation</label>
-    {/* Outside the `<label>`, deliberately: a control nested in a label steals
-        the label's click, so pressing the "i" would focus the input and never
-        open the panel. And a `popover`, for the same reasons as `ComingSoon`
-        and the citation preview (ADR-0024) — top layer, Escape and light
-        dismiss from the platform, with no script at all. This box is a plain
-        GET form that works with scripting off (ADR-0023); explaining it should
-        not be the thing that needs JavaScript. */}
-    <button
-      class="sitesearch__info"
-      type="button"
-      popovertarget={infoId}
-      title={infoLead}
-      aria-label="About the keyword search"
-    >
-      <span class="sitesearch__info-glyph" aria-hidden="true">i</span>
-    </button>
-  </div>
+  {/* The label is the accessible name and the placeholder is the visible one
+      (ADR-0061). It had a line of its own above the box, which is a band of
+      chrome — and `--sticky-h` is what `scroll-margin-top` spends — for words
+      the placeholder now carries. Hidden rather than removed: a placeholder is
+      not a label, and it disappears the moment someone types. */}
+  <label class="sitesearch__label usa-sr-only" for={id}>Search, or go to a citation</label>
 
   <div class="sitesearch__infopanel" id={infoId} popover role="dialog" aria-labelledby={`${infoId}-h`}>
     <h2 class="sitesearch__info-heading" id={`${infoId}-h`}>How this box searches</h2>
@@ -121,6 +103,23 @@ const infoLead =
       enterkeyhint="search"
       aria-describedby={`${id}-hint`}
     />
+    {/* Inside the box's right edge, between the input and its button. Outside
+        any `<label>`, deliberately: a control nested in a label steals the
+        label's click, so pressing the "i" would focus the input and never open
+        the panel. And a `popover`, for the same reasons as `ComingSoon` and the
+        citation preview (ADR-0024) — top layer, Escape and light dismiss from
+        the platform, with no script at all. This box is a plain GET form that
+        works with scripting off (ADR-0023); explaining it should not be the
+        thing that needs JavaScript. */}
+    <button
+      class="sitesearch__info"
+      type="button"
+      popovertarget={infoId}
+      title={infoLead}
+      aria-label="About the keyword search"
+    >
+      <span class="sitesearch__info-glyph" aria-hidden="true">i</span>
+    </button>
     <button class="usa-button sitesearch__go" type="submit">Go</button>
   </div>
   <p class="sitesearch__hint" id={`${id}-hint`}>
