@@ -1,6 +1,6 @@
 .PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
         verify verify-deep load-all shots loadtest navprofile spine-explain \
-        test-e2e test-a11y demo-video measure
+        test-e2e test-a11y demo-video measure footnav
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -99,6 +99,12 @@ shots:
 # site running (`make dev-all`).
 measure:
 	cd frontend && node scripts/measure.mjs
+
+# How tall the footer's own links are once opened, at six widths, and how many
+# columns they are in (ADR-0062) -> docs/verification/footnav.json. Needs the
+# site running (`make dev-all`).
+footnav:
+	cd frontend && node scripts/footnav.mjs
 
 # The demo video (ADR-0038): replays every scenario in the user guide flagged
 # `demo: true`, in `demoOrder`, with that scenario's own captions burned on

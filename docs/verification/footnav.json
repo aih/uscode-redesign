@@ -1,0 +1,42 @@
+{
+  "_comment": "Height of the footer's link block, disclosure open, per viewport width. Regenerate with `make footnav` against a running site (ADR-0062).",
+  "page": "/app/us/usc/t16/s45f",
+  "results": [
+    {
+      "viewport": 320,
+      "collapsedBehindDisclosure": true,
+      "navHeightPx": 675,
+      "columns": 1
+    },
+    {
+      "viewport": 375,
+      "collapsedBehindDisclosure": true,
+      "navHeightPx": 675,
+      "columns": 1
+    },
+    {
+      "viewport": 420,
+      "collapsedBehindDisclosure": true,
+      "navHeightPx": 442,
+      "columns": 2
+    },
+    {
+      "viewport": 640,
+      "collapsedBehindDisclosure": true,
+      "navHeightPx": 290,
+      "columns": 4
+    },
+    {
+      "viewport": 700,
+      "collapsedBehindDisclosure": true,
+      "navHeightPx": 290,
+      "columns": 4
+    },
+    {
+      "viewport": 1280,
+      "collapsedBehindDisclosure": false,
+      "navHeightPx": 195,
+      "columns": 4
+    }
+  ]
+}
