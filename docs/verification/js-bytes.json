@@ -4,17 +4,19 @@
   "excluded": "CopyColumn's <script type=\"application/json\" data-copy-targets> — its size is the section's provision list rather than code, so it varies per URL and is measured nowhere.",
   "client_bundles": "None. `astro build` emits no client JavaScript for this site; dist/client/_astro holds only CSS, because every island is is:inline and Astro never bundles those.",
   "validated_against": "The rendered page — see docs/adr/0046 for the comparison against a live /app/us/usc/… response.",
-  "total_bytes": 287612,
+  "total_bytes": 369818,
   "routes": [
     {
       "route": "/app/",
       "page": "pages/index.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -22,12 +24,14 @@
     {
       "route": "/app/404",
       "page": "pages/404.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -35,12 +39,14 @@
     {
       "route": "/app/about",
       "page": "pages/about.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -48,12 +54,14 @@
     {
       "route": "/app/demo",
       "page": "pages/demo.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -61,14 +69,16 @@
     {
       "route": "/app/design",
       "page": "pages/design.astro",
-      "bytes": 28813,
-      "scripts": 9,
+      "bytes": 33380,
+      "scripts": 11,
       "components": [
         "ApparatusDisclosure.astro",
         "AuthNav.astro",
+        "CommandPalette.astro",
         "CopyColumn.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "design.astro"
@@ -77,12 +87,14 @@
     {
       "route": "/app/diff",
       "page": "pages/diff/[...identifier].astro",
-      "bytes": 14624,
-      "scripts": 7,
+      "bytes": 19191,
+      "scripts": 9,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "[...identifier].astro"
@@ -91,12 +103,14 @@
     {
       "route": "/app/docs",
       "page": "pages/docs.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -104,12 +118,14 @@
     {
       "route": "/app/goto",
       "page": "pages/goto.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -117,12 +133,14 @@
     {
       "route": "/app/guide",
       "page": "pages/guide/index.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -130,12 +148,14 @@
     {
       "route": "/app/login",
       "page": "pages/login.astro",
-      "bytes": 14605,
-      "scripts": 7,
+      "bytes": 19172,
+      "scripts": 9,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "login.astro"
@@ -144,13 +164,15 @@
     {
       "route": "/app/provisions",
       "page": "pages/provisions.astro",
-      "bytes": 13888,
-      "scripts": 7,
+      "bytes": 18455,
+      "scripts": 9,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
         "RemoveWatchItem.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -158,12 +180,14 @@
     {
       "route": "/app/releases",
       "page": "pages/releases.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -171,12 +195,14 @@
     {
       "route": "/app/search",
       "page": "pages/search.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -184,12 +210,14 @@
     {
       "route": "/app/search/syntax",
       "page": "pages/search/syntax.astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]
@@ -197,12 +225,14 @@
     {
       "route": "/app/settings",
       "page": "pages/settings.astro",
-      "bytes": 17547,
-      "scripts": 7,
+      "bytes": 22114,
+      "scripts": 9,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "settings.astro"
@@ -211,12 +241,14 @@
     {
       "route": "/app/signup",
       "page": "pages/signup.astro",
-      "bytes": 14293,
-      "scripts": 7,
+      "bytes": 18860,
+      "scripts": 9,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro",
         "signup.astro"
@@ -225,15 +257,17 @@
     {
       "route": "/app/us/usc",
       "page": "pages/us/usc/[...identifier].astro",
-      "bytes": 38609,
-      "scripts": 11,
+      "bytes": 43176,
+      "scripts": 13,
       "components": [
         "ApparatusDisclosure.astro",
         "AuthNav.astro",
         "CitePreview.astro",
+        "CommandPalette.astro",
         "CopyColumn.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "WatchButton.astro",
         "Base.astro",
@@ -243,12 +277,14 @@
     {
       "route": "/app/versions",
       "page": "pages/versions/[...identifier].astro",
-      "bytes": 13203,
-      "scripts": 6,
+      "bytes": 17770,
+      "scripts": 8,
       "components": [
         "AuthNav.astro",
+        "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
+        "SiteHeader.astro",
         "ThemeToggle.astro",
         "Base.astro"
       ]

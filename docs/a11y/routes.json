@@ -221,6 +221,14 @@
       "name": "the header and footer menus open at a phone width (ADR-0058)"
     },
     {
+      "id": "more-menu-open",
+      "name": "the navbar's More menu open, with its group labels, display switches and account row (ADR-0061)"
+    },
+    {
+      "id": "titles-menu-open",
+      "name": "the navbar's Titles menu open over the page (ADR-0061)"
+    },
+    {
       "id": "diff-source-expanded",
       "name": "redline with the source-XML details open (ADR-0026)"
     },

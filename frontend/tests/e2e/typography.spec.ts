@@ -200,8 +200,16 @@ test.describe("the five kinds of text", () => {
 });
 
 test.describe("reading density", () => {
+  /** The control is a row of the navbar's More menu (ADR-0061), so reaching it
+   * is one click further than it was. */
+  const density = (page: import("@playwright/test").Page) =>
+    page.locator(".navdrop__list .density-toggle");
+  const openMore = (page: import("@playwright/test").Page) =>
+    page.locator(".navdrop--more > summary").click();
+
   test("defaults to comfortable, switches, and is remembered", async ({ page }) => {
     await page.goto(SECTION);
+    await openMore(page);
 
     const read = () =>
       page.evaluate(() => {
@@ -223,7 +231,7 @@ test.describe("reading density", () => {
     const comfortable = await read();
     expect(comfortable.density).toBeNull();
 
-    await page.locator(".density-toggle").click();
+    await density(page).click();
     const compact = await read();
 
     expect(compact.density).toBe("compact");
@@ -237,13 +245,15 @@ test.describe("reading density", () => {
     await page.reload();
     expect((await read()).density).toBe("compact");
 
-    await page.locator(".density-toggle").click();
+    await openMore(page);
+    await density(page).click();
     expect((await read()).density).toBe("comfortable");
   });
 
   test("arrives before first paint rather than reflowing the column", async ({ page }) => {
     await page.goto(SECTION);
-    await page.locator(".density-toggle").click();
+    await openMore(page);
+    await density(page).click();
 
     // The attribute has to be on <html> by the time the first stylesheet-driven
     // layout happens. Read it before the page has finished loading: the
@@ -256,36 +266,37 @@ test.describe("reading density", () => {
 
   test("does not move the theme toggle when it changes", async ({ page }) => {
     await page.goto(SECTION);
-    const before = await page.locator(".theme-toggle").boundingBox();
-    await page.locator(".density-toggle").click();
-    const after = await page.locator(".theme-toggle").boundingBox();
+    await openMore(page);
+    const before = await page.locator(".navdrop__list .theme-toggle").boundingBox();
+    await density(page).click();
+    const after = await page.locator(".navdrop__list .theme-toggle").boundingBox();
 
     // The label names the destination, so it alternates between two words of
-    // different length. Without a reserved width the control beside it jumps.
+    // different length. Without a reserved width the row below it jumps.
+    expect(Math.round(after!.y)).toBe(Math.round(before!.y));
     expect(Math.round(after!.x)).toBe(Math.round(before!.x));
   });
 
-  test("costs the sticky stack nothing", async ({ page }) => {
-    // Adding a control to `.navtools` is a change to `--sticky-h` if it wraps
+  test("costs the sticky stack nothing, open or closed", async ({ page }) => {
+    // Adding a control to the chrome is a change to `--sticky-h` if it wraps
     // the row, and that token is what `scroll-margin-top` spends (CLAUDE.md
-    // says so by name). It does not wrap at the widths where the stack sticks.
+    // says so by name). The control is in a menu now (ADR-0061), so what has to
+    // be free is the menu: closed it is not rendered, and open it is an
+    // absolutely positioned panel over the page.
     //
-    // 640 is the tightest of them — the first width at which the nav sticks —
+    // 640 is the tightest of these — the first width at which the nav sticks —
     // and it is in this list because 700 alone passed here with 1px of slack
     // and failed in CI, where the scrollbar is 15px of the viewport.
     for (const width of [640, 700, 1024, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(SECTION);
-      const cost = await page.evaluate(() => {
-        const header = document.querySelector(".usa-header") as HTMLElement;
-        const control = document.querySelector(".density-toggle") as HTMLElement;
-        const withIt = header.getBoundingClientRect().height;
-        control.style.display = "none";
-        const without = header.getBoundingClientRect().height;
-        control.style.display = "";
-        return withIt - without;
-      });
-      expect(cost, `the control costs no header height at ${width}px`).toBe(0);
+      const header = page.locator(".usa-header");
+      const closed = (await header.boundingBox())!.height;
+      if (width < 1024) await page.locator(".navmenu__summary").click();
+      await openMore(page);
+      await expect(density(page)).toBeVisible();
+      const open = (await header.boundingBox())!.height;
+      expect(open, `the open menu costs no header height at ${width}px`).toBe(closed);
     }
   });
 

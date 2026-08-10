@@ -55,7 +55,10 @@ test("accounts are offered as coming, not as a broken door", async ({ page }) =>
   // greyed-out control with nothing saying why.
   await page.goto("/app/us/usc/t16/s45f");
 
-  const trigger = page.locator('.navtools .soon__trigger');
+  // Last row of the More menu (ADR-0061), which is the slot `AuthNav` takes
+  // when the flag flips.
+  await page.locator(".navdrop--more > summary").click();
+  const trigger = page.locator(".navdrop__account .soon__trigger");
   await expect(trigger).toBeVisible();
   // Enabled, deliberately. `aria-disabled` was the first attempt and Playwright
   // refused to click it — correctly: the button is not disabled, it has an
@@ -78,10 +81,14 @@ test("the coming-soon panel closes on Escape", async ({ page }) => {
   // asserted because it is the whole reason the control needs no JavaScript.
   await page.goto("/app/");
 
-  await page.locator(".navtools .soon__trigger").click();
+  await page.locator(".navdrop--more > summary").click();
+  await page.locator(".navdrop__account .soon__trigger").click();
   await expect(page.locator("#accounts-panel")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("#accounts-panel")).toBeHidden();
+  // And the menu it was opened from is still open: a popover owns Escape
+  // first, so the key must not close both (ADR-0061).
+  await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
 });
 
 test("a section page asks nothing of the reader", async ({ page }) => {
@@ -111,7 +118,8 @@ test("My Provisions explains itself rather than showing a login prompt", async (
 test("the disabled Downloads control says what it will do", async ({ page }) => {
   await page.goto("/app/");
 
-  const trigger = page.locator('.usa-nav__primary .soon__trigger');
+  await page.locator(".navdrop--more > summary").click();
+  const trigger = page.locator('.navdrop__list .soon__trigger');
   await expect(trigger).toContainText("Downloads");
   // USWDS underlines and blue-links every button inside `.usa-nav__primary`,
   // which shipped this one underlined beside five links that are not.
@@ -123,7 +131,8 @@ test("the disabled Downloads control says what it will do", async ({ page }) => 
 
 test("About is in the nav and carries the disclaimer", async ({ page }) => {
   await page.goto("/app/");
-  await page.locator('.usa-nav__primary a[href="/app/about"]').click();
+  await page.locator(".navdrop--more > summary").click();
+  await page.locator('.navdrop a[href="/app/about"]').click();
 
   await expect(page).toHaveURL(/\/app\/about/);
   // The sentence that used to be eight-point grey type below the fold.
@@ -145,7 +154,10 @@ test.describe("the menus collapse below the desktop breakpoint (ADR-0058)", () =
 
     await page.locator(".navmenu__summary").click();
     await expect(list).toBeVisible();
-    await expect(page.locator('.usa-nav__primary a[href="/app/about"]')).toBeVisible();
+    await expect(page.locator('.usa-nav__primary a[href="/app/provisions"]')).toBeVisible();
+    // About is a rung further in — it is behind More at every width (ADR-0061).
+    await page.locator(".navdrop--more > summary").click();
+    await expect(page.locator('.navdrop a[href="/app/about"]')).toBeVisible();
   });
 
   test("opening it paints over the page rather than pushing it down", async ({ page }) => {
@@ -164,7 +176,7 @@ test.describe("the menus collapse below the desktop breakpoint (ADR-0058)", () =
   test("the footer's links are behind the same disclosure", async ({ page }) => {
     await page.goto("/app/");
 
-    const list = page.locator(".usa-footer__nav ul");
+    const list = page.locator(".usa-footer__nav .footnav");
     await expect(list).toBeHidden();
     // The disclaimer is not part of it: whoever arrived from a search engine
     // needs that sentence without opening anything.
@@ -185,9 +197,167 @@ test("at desktop the menus are rows of links with no hamburger", async ({ page }
   await page.goto("/app/");
 
   await expect(page.locator(".usa-nav__primary")).toBeVisible();
-  await expect(page.locator(".usa-footer__nav ul")).toBeVisible();
+  await expect(page.locator(".usa-footer__nav .footnav")).toBeVisible();
   await expect(page.locator(".navmenu__summary")).toBeHidden();
   await expect(page.locator(".footmenu__summary")).toBeHidden();
+});
+
+test("the footer's nine links are in four named groups (ADR-0061)", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/app/");
+
+  await expect(page.locator(".footnav__label")).toHaveText([
+    "Browse",
+    "Learn",
+    "Developers",
+    "Site",
+  ]);
+
+  // The set, not the count: the regrouping is only safe if no destination was
+  // dropped on the way, and `docs/ia-map.md` records the footer as the only
+  // inbound link some of these have.
+  const hrefs = await page.locator(".footnav a").evaluateAll((links) =>
+    links.map((a) => a.getAttribute("href")),
+  );
+  expect(hrefs).toEqual([
+    "/app/",
+    "/app/releases",
+    "/app/guide",
+    "/app/search/syntax",
+    "/app/guide/02-reading#keyboard-shortcuts",
+    "/app/docs",
+    "https://uscode.house.gov/download/download.shtml",
+    "/app/design",
+    "/app/about",
+  ]);
+
+  // Each label names the list under it, so the groups are navigable structure
+  // rather than type set to look like it.
+  await expect(page.locator('.footnav ul[aria-labelledby="footnav-browse"] a')).toHaveCount(2);
+});
+
+test("the columns stack as the window narrows", async ({ page }) => {
+  // Four from 40em, two from 25em, one below it. The disclosure is closed below
+  // 64em, so the columns have to be opened before they can be measured.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/app/");
+  await page.locator(".footmenu__summary").click();
+
+  const columns = () =>
+    page
+      .locator(".footnav")
+      .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
+
+  expect(await columns()).toBe(1);
+
+  await page.setViewportSize({ width: 420, height: 812 });
+  expect(await columns()).toBe(2);
+
+  await page.setViewportSize({ width: 700, height: 812 });
+  expect(await columns()).toBe(4);
+});
+
+/* ---------------------------------------------- the navbar's two dropdowns
+ *
+ * ADR-0061. The header went from eleven interactive items to four, and the two
+ * that absorbed the rest are `<details>`: what they owe is an expanded state
+ * assistive technology can read, and closing — Escape, an outside pointer, and
+ * one at a time.
+ */
+
+test("Titles offers a shortlist and a way to all of them", async ({ page }) => {
+  await page.goto("/app/us/usc/t16/s45f");
+
+  const menu = page.locator(".navdrop--titles");
+  await expect(menu.locator(".navdrop__panel")).toBeHidden();
+
+  await menu.locator("summary").click();
+  await expect(menu.locator(".navdrop__item")).not.toHaveCount(0);
+  await menu.locator('a[href="/app/"]').click();
+  await expect(page).toHaveURL(/\/app\/$/);
+});
+
+test("a summary carries its own expanded state", async ({ page }) => {
+  // `<summary>` is exposed as a button whose expanded state is the element's
+  // `open`, so nothing here keeps an `aria-expanded` attribute in sync — the
+  // assertion is on what a screen reader is told, not on the markup.
+  await page.goto("/app/");
+
+  const summary = page.locator(".navdrop--more > summary");
+  expect(await summary.evaluate((el) => el.ariaExpanded ?? String(el.parentElement.open))).toBe(
+    "false",
+  );
+  await summary.click();
+  expect(await summary.evaluate((el) => el.ariaExpanded ?? String(el.parentElement.open))).toBe(
+    "true",
+  );
+});
+
+test("only one of them is open at a time", async ({ page }) => {
+  await page.goto("/app/");
+
+  await page.locator(".navdrop--titles > summary").click();
+  await expect(page.locator(".navdrop--titles")).toHaveAttribute("open", "");
+
+  await page.locator(".navdrop--more > summary").click();
+  await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
+  await expect(page.locator(".navdrop--titles")).not.toHaveAttribute("open", "");
+});
+
+test("Escape closes the open menu and gives focus back to its summary", async ({ page }) => {
+  await page.goto("/app/");
+
+  const summary = page.locator(".navdrop--more > summary");
+  await summary.click();
+  await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".navdrop--more")).not.toHaveAttribute("open", "");
+  await expect(summary).toBeFocused();
+});
+
+test("a pointer outside closes it", async ({ page }) => {
+  // A menu left open behind the reader halfway down a section is the state a
+  // bare `<details>` has no way out of.
+  await page.goto("/app/us/usc/t16/s45f");
+
+  await page.locator(".navdrop--more > summary").click();
+  await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
+
+  await page.locator("main").click({ position: { x: 5, y: 5 } });
+  await expect(page.locator(".navdrop--more")).not.toHaveAttribute("open", "");
+});
+
+test("opening a menu does not push the page down", async ({ page }) => {
+  // The property `ReleasePicker` and the hamburger both have to hold
+  // (ADR-0056, ADR-0058): the navbar is sticky from 40em up, so a panel in flow
+  // would be `--sticky-h` growing while it happens to be open.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/app/us/usc/t16/s45f");
+  const top = () => page.locator("main").evaluate((el) => el.getBoundingClientRect().top);
+
+  const closed = await top();
+  await page.locator(".navdrop--more > summary").click();
+  await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
+  expect(await top()).toBe(closed);
+});
+
+test("both display switches are in the menu, and still switch", async ({ page }) => {
+  await page.goto("/app/us/usc/t16/s45f");
+  await page.locator(".navdrop--more > summary").click();
+
+  const density = page.locator(".navdrop__list .density-toggle");
+  const theme = page.locator(".navdrop__list .theme-toggle");
+  await expect(density).toBeVisible();
+  await expect(theme).toBeVisible();
+  // The words are back: they were dropped below 64em to fit the chrome's row
+  // (ADR-0059), and neither is on that row now.
+  await expect(density).toContainText("Compact");
+
+  await density.click();
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+  await theme.click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
 
 test("the footer and the navbar style their links the same way", async ({ page }) => {
@@ -243,7 +413,8 @@ test("the API reference renders inside the site, not as a bare Swagger page", as
 
 test("the header's API docs link stays inside the site", async ({ page }) => {
   await page.goto("/app/");
-  await page.locator('.usa-nav__primary a[href="/app/docs"]').click();
+  await page.locator(".navdrop--more > summary").click();
+  await page.locator('.navdrop a[href="/app/docs"]').click();
 
   await expect(page).toHaveURL(/\/app\/docs/);
 });
