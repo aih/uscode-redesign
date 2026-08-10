@@ -282,6 +282,18 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await expect(page.locator("#shortcuts")).toBeVisible({ timeout: 5000 });
     },
   },
+  "palette-open": {
+    routeId: "section",
+    setup: async (page) => {
+      // The second modal `<dialog>` on the site (ADR-0062), and the only state
+      // in this matrix carrying a list of commands: eight rows, each a control
+      // filling its own line, over a search form that is a second `role="search"`
+      // on a page that already has one.
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.keyboard.press("ControlOrMeta+k");
+      await expect(page.locator("#palette")).toBeVisible({ timeout: 5000 });
+    },
+  },
   "release-switcher-open": {
     routeId: "section",
     setup: async (page) => {
