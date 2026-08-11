@@ -46,7 +46,20 @@ const ADR_DIR = fileURLToPath(new URL("../../docs/adr/", import.meta.url));
  *  a rewrite in `middleware.ts` — so what they do is documented where the
  *  thing that fails is documented, and neither owns a route a chapter could
  *  sensibly claim. */
-const UNDOCUMENTED_ROUTES = new Set(["/app/404", "/app/429", "/app/healthz", "/app/preview"]);
+const UNDOCUMENTED_ROUTES = new Set([
+  "/app/404",
+  "/app/429",
+  "/app/healthz",
+  "/app/preview",
+  // The three classification-table routes (ADR-0067). These *are* features and
+  // they do need a chapter; the chapter is phase C5's, which also removes 67
+  // from INFRASTRUCTURE_ADRS below. Wave 3 ships the pages and Wave 4 ships the
+  // documentation, so for one wave these three lines are the deferral —
+  // `docs/classification-spec.md` § Waves. C5 deletes them.
+  "/app/classification",
+  "/app/classification/[congress]",
+  "/app/classification/ecct",
+]);
 
 /** The guide does not document itself, chapter by chapter. */
 function isGuidesOwnRoute(route: string): boolean {
