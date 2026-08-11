@@ -44,10 +44,27 @@
  * ## Where the toggles went
  *
  * The reading density (ADR-0054) and the theme (ADR-0027) are in More under
- * DISPLAY. They are the same two islands, rendered once — each queries
- * `document` for a single button, so a second copy for a second width is not
- * available and was not attempted. Below 64em that is a tap further away than
- * the loose controls they replace; the mobile bar is B9's.
+ * DISPLAY. The theme is *also* on the mobile bar below 64em (ADR-0064), which
+ * is the one control this header renders twice: `ThemeToggle`'s script binds
+ * every `[data-theme-toggle]` on the page, so the two buttons stay in step, and
+ * only the instance that ships that script may be the last one in the document
+ * — an inline script cannot bind a button the parser has not reached yet.
+ *
+ * ## Two rows below 64em, one above (ADR-0064)
+ *
+ * `.navbar` is the 52px bar — Menu, the wordmark, the theme — and `.navtools`
+ * is the search row under it, always on screen. Above 64em `.navbar` is
+ * `display: contents`, its wordmark and its theme button are `display: none`,
+ * and what is left is the row ADR-0061 built: the list, then the box.
+ *
+ * The wordmark is written twice because the two bands want it in a different
+ * place in the *document*, not only on screen: `.usa-navbar`'s copy is USWDS's
+ * and leads the desktop row, and `.navbar__brand`'s sits between the menu and
+ * the theme on the bar. Exactly one of them is displayed at any width, so
+ * there is one home link in the accessibility tree and one in the tab order.
+ * The alternative is `order` on a flex item, which is what ADR-0061 decision 4
+ * refused: it would leave the reader tabbing the bar in an order they cannot
+ * see.
  *
  * The Accounts row is last, and is the slot `AuthNav` takes when
  * `ACCOUNTS_ENABLED` flips (ADR-0034). With accounts off, the island is not
@@ -75,18 +92,27 @@ interface Props {
 }
 
 const { searchValue = null } = Astro.props;
+
+/** One href and one string for both copies of the wordmark. */
+const home = `${APP}/`;
+const wordmark = "United States Code";
 ---
 
 <header class="usa-header usa-header--basic" role="banner">
   <div class="usa-nav-container">
+    {/* USWDS's own bar, and the desktop row's first item. Hidden below 64em,
+        where `.navbar` below is the bar instead. */}
     <div class="usa-navbar">
       <div class="usa-logo">
         <em class="usa-logo__text">
-          <a href={`${APP}/`} title="United States Code">United States Code</a>
+          <a href={home} title={wordmark}>{wordmark}</a>
         </em>
       </div>
     </div>
     <nav aria-label="Primary" class="usa-nav">
+      {/* The 52px bar below 64em; `display: contents` above it, where these
+          three are items of the nav's own row (ADR-0064). */}
+      <div class="navbar">
       {/* The two icons are inline rather than `<img>`: they have to take their
           colour from `--ink` in both themes, and an external SVG cannot. */}
       <details class="navmenu" data-navmenu>
@@ -210,7 +236,11 @@ const { searchValue = null } = Astro.props;
                 <p class="navdrop__group" id="navmore-display">Display</p>
                 <ul class="navdrop__list" aria-labelledby="navmore-display">
                   <li><DensityToggle /></li>
-                  <li><ThemeToggle /></li>
+                  {/* The theme's second button. The bar's copy carries the
+                      island's script, because it is the later of the two in the
+                      document and an inline script binds what has already been
+                      parsed. */}
+                  <li><ThemeToggle script={false} /></li>
                 </ul>
 
                 <div class="navdrop__account">
@@ -234,9 +264,21 @@ const { searchValue = null } = Astro.props;
         </ul>
       </details>
 
-      {/* The search box keeps a row it shares rather than a row of its own:
-          `--sticky-h` is what `scroll-margin-top` spends, and a band of chrome
-          is the most expensive thing this header can buy. */}
+        {/* The bar's wordmark. Displayed below 64em, where `.usa-navbar`'s copy
+            is not, so exactly one of the two is ever a link on the page. */}
+        <span class="navbar__brand">
+          <a href={home} title={wordmark}>{wordmark}</a>
+        </span>
+
+        {/* One tap from any page below 64em, which is where ADR-0061 left it
+            two. It keeps its icon and drops its word here, the arrangement
+            ADR-0059 measured for this band. */}
+        <ThemeToggle />
+      </div>
+
+      {/* A row of its own below 64em and a share of the nav's row above it. The
+          box is on screen at every width without opening anything: it is the
+          control the site is built around (ADR-0023). */}
       <div class="navtools">
         <SiteSearch value={searchValue} />
       </div>

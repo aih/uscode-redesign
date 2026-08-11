@@ -684,6 +684,112 @@
  *     rather than leaving the nav unreachable.
  */
 
+/* --------------------------------------------------- the bar, below 64em
+ *
+ * Menu, the wordmark, the theme — one 52px row, with the search box on a full
+ * width row under it (ADR-0064). Above 64em this element has no box at all and
+ * its three children are items of the nav's own row, which is the arrangement
+ * ADR-0061 built: `.navbar__brand` and the theme button are `display: none`
+ * there, and `.navmenu` is `display: contents`, so what is left is the list.
+ *
+ * The two bands want the wordmark in a different place in the *document*, not
+ * only on screen, so it is written twice and exactly one copy is displayed —
+ * `.usa-navbar`'s above 64em, `.navbar__brand`'s below. `order` on a flex item
+ * would be one declaration instead of six lines of markup and is what ADR-0061
+ * decision 4 refused: it leaves the reader tabbing a row in an order they
+ * cannot see. */
+
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* 52px. The bar is a 44px control with 4px of air above and below it, and
+   * this is the one declaration that says so — `mobilebar.json` reads it back
+   * off the rendered page. */
+  min-height: 3.25rem;
+  padding: 0 1rem;
+  /* The sheet hangs off the bar rather than off the hamburger, so it starts at
+   * the bar's bottom edge and not 4px inside it. `.navmenu` gives up
+   * `position: relative` below 64em for this. */
+  position: relative;
+}
+
+.navbar__brand {
+  /* Takes the middle: the menu and the theme are `flex: none` at either end. */
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--ui);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.navbar__brand a {
+  /* A 44px target rather than the height of one line of type. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+
+/* Three classes, and the count is the point — the trap `.contents__link` and
+ * `.sectionbar__top` are both written against. `:root[data-theme="dark"] a` is
+ * 0-2-1, so the wordmark stated at any lower specificity came out ink on a
+ * light bar and link-blue on a dark one. It is the site's name here, not a
+ * destination among others. */
+.usa-header .navbar .navbar__brand a {
+  color: var(--ink);
+}
+
+.usa-header .navbar .navbar__brand a:hover {
+  color: var(--link);
+  text-decoration: underline;
+}
+
+/* The bar's copy of the theme island. Icon only, which is ADR-0059's
+ * arrangement for this band returning: the accessible name is written by the
+ * island itself, so dropping the word costs nothing but the word. */
+.navbar > .theme-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.navbar > .theme-toggle:hover {
+  color: var(--link);
+}
+
+.navbar > .theme-toggle .theme-toggle__icon {
+  font-size: 1.15rem;
+}
+
+/* Removed rather than visually hidden: the island writes this button's
+ * accessible name into `aria-label`, which is what a screen reader reads
+ * either way, and without script the button is `hidden` entirely. */
+.navbar > .theme-toggle .theme-toggle__label {
+  display: none;
+}
+
+@media (min-width: 64em) {
+  /* No box, so the three children below are items of the nav's row. A plain
+   * `<div>` — deliberately not the `<nav>`, whose landmark is the one thing on
+   * this row that a boxless element could cost. */
+  .navbar {
+    display: contents;
+  }
+
+  .navbar__brand,
+  .navbar > .theme-toggle {
+    display: none;
+  }
+}
+
 .navmenu__summary,
 .footmenu__summary {
   display: inline-flex;
@@ -736,12 +842,23 @@
 }
 
 @media (max-width: 63.99em) {
+  /* USWDS's own bar carries the wordmark and nothing else, and below 64em the
+   * wordmark is on `.navbar` between the menu and the theme (ADR-0064). Hidden
+   * rather than emptied: its copy of the home link must leave the tab order
+   * along with its box, or the reader tabs a link they cannot see. */
+  .usa-navbar {
+    display: none;
+  }
+
   /* `width: 100%` and a full-basis `flex` because `.usa-nav-container` is a
    * flex row: with the nav's content down to a hamburger it stopped being wide
    * enough to force a wrap and became a shrink-to-fit column beside the logo,
    * which stacked the search box and both toggles — 308px of header at 700px,
-   * where the whole point of the exercise was to spend less. One line under the
-   * brand, as before; what changed is what is on it. */
+   * where the whole point of the exercise was to spend less.
+   *
+   * Two rows now, both full width: the bar, then the search (ADR-0064). The
+   * horizontal padding moved onto each of them, so the bar's rule reaches the
+   * edges of the screen rather than stopping 1rem short. */
   .usa-nav {
     display: flex;
     /* Both written out: USWDS's small-width nav is a centred *column* — it is
@@ -759,42 +876,58 @@
     height: auto;
     overflow: visible;
     background: transparent;
-    padding: 0 1rem 0.5rem;
+    /* 0.25rem and not 0.5: the search row costs `--sticky-h` in this band, and
+     * this padding plus `.navtools`' own was 8px of it — enough to take the
+     * headroom `sticky.spec.ts` requires below 60px at 700. Measured, not
+     * trimmed by eye: `mobilebar.json` reads the stack back at 225px either
+     * way it is written, and 233 with the 0.5rem pair. */
+    padding: 0 0 0.25rem;
   }
 
-  /* The panel hangs off this, so it is the containing block. `flex: none` keeps
-   * the hamburger at its own width and lets `.navtools` take the rest of the
-   * row — at 40em and up the search box sits beside it rather than under it. */
+  /* Each of the two rows takes the whole line. */
+  .navbar {
+    flex: 1 1 100%;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* `flex: none` keeps the hamburger at its own width. `position: static`
+   * hands the sheet's containing block to `.navbar`, so it opens from the
+   * bar's bottom edge across the bar's width rather than from the 44px
+   * summary sitting inside a 52px row. */
   .navmenu {
     flex: none;
-    position: relative;
+    position: static;
   }
 
   .navmenu > .usa-nav__primary {
     position: absolute;
     top: 100%;
+    /* Both edges rather than a width: the sheet spans the bar it hangs from,
+     * which is also why it cannot scroll the page sideways at 320px — `make
+     * shots` fails a page that does, and an absolutely positioned panel is
+     * exactly the thing that does it. */
     left: 0;
+    right: 0;
     z-index: 600;
     display: flex;
     flex-direction: column;
     gap: 0;
     margin: 0;
     padding: 0.25rem 0;
-    /* Wide enough to read a label, and never wider than the viewport it hangs
-     * in — `make shots` fails a page that scrolls sideways at 320px, and an
-     * absolutely positioned panel is exactly the thing that does it. */
-    min-width: 13rem;
-    max-width: calc(100vw - 2rem);
-    /* The sheet holds two open disclosures now (ADR-0061), so it can be taller
-     * than the window — and a row below the fold of a panel that does not
-     * scroll is a row nobody can reach. Every row in it is focusable, so this
-     * is not one of the scrollable regions with no keyboard route in. */
+    /* The sheet carries More's rows in the open now (ADR-0064) as well as the
+     * Titles disclosure, so it can be taller than the window — and a row below
+     * the fold of a panel that does not scroll is a row nobody can reach. Every
+     * row in it is focusable, so this is not one of the scrollable regions with
+     * no keyboard route in. */
     max-height: calc(100vh - 8rem);
     overflow-y: auto;
     overscroll-behavior: contain;
     background: var(--page);
-    border: 1px solid var(--edge);
-    border-radius: 0.25rem;
+    /* Edge to edge, so the side borders and the radius would be drawn against
+     * nothing. The bottom edge is the one that separates the sheet from the
+     * page under it. */
+    border: 0;
+    border-bottom: 1px solid var(--edge);
     box-shadow: 0 6px 16px rgb(0 0 0 / 22%);
   }
 
@@ -1054,13 +1187,58 @@
     background: transparent;
   }
 
-  /* No vertical padding, because a `<summary>` here is `content-box` and would
-   * add it to `min-height` rather than spend it inside: measured, every
-   * `<summary>` in this site computes `content-box` while the `<details>` above
-   * it computes `border-box`, and a `<summary>` appended to `<body>` computes
-   * `border-box`. USWDS's `*, ::before, ::after { box-sizing: inherit }` says
-   * otherwise and does not win here. The 44px row is `min-height` alone. */
+  /* More is not a menu inside the menu here: the sheet *is* the menu, so its
+   * rows are the sheet's own rows (ADR-0064). The summary goes and its content
+   * is forced visible, which is `.navmenu`'s desktop arrangement run the other
+   * way round — a closed `<details>` hides its content through
+   * `::details-content` and nothing else can reach it. */
+  .navdrop--more > .navdrop__summary {
+    display: none;
+  }
+
+  .navdrop--more::details-content {
+    content-visibility: visible;
+  }
+
+  /* The first of the sheet's two dividers: the second is the rule
+   * `.navdrop__list + .navdrop__group` already draws above DISPLAY. */
+  .navdrop--more {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* Nothing to indent under, now that the summary is gone — these rows sit at
+   * the same left edge as Titles and My Provisions above them. */
+  .navdrop--more > .navdrop__panel {
+    padding-left: 0;
+  }
+
+  @supports not selector(::details-content) {
+    /* No way to force it open, so leave the control that opens it. A rung
+     * further in is a worse menu; a menu with no way in is not one. */
+    .navdrop--more > .navdrop__summary {
+      display: inline-flex;
+    }
+
+    .navdrop--more > .navdrop__panel {
+      padding-left: 0.75rem;
+    }
+  }
+
+  /* `box-sizing` written out, because a `<summary>` here is `content-box`:
+   * measured, every `<summary>` in this site computes `content-box` while the
+   * `<details>` above it computes `border-box`, and a `<summary>` appended to
+   * `<body>` computes `border-box`. USWDS's
+   * `*, ::before, ::after { box-sizing: inherit }` says otherwise and does not
+   * win here.
+   *
+   * ADR-0061 met that as a vertical problem and answered it by spending no
+   * vertical padding. Horizontally it is the same trap and was live: `width:
+   * 100%` plus 2rem of side padding made the Titles summary 32px wider than
+   * the sheet holding it, which put its caret past the right edge of a panel
+   * whose `overflow-y: auto` clips the other axis too. The caret was drawn and
+   * could not be seen. */
   .navdrop__summary {
+    box-sizing: border-box;
     width: 100%;
     justify-content: space-between;
     padding: 0 1rem;
@@ -1944,17 +2122,21 @@ main[id] {
   padding: 0 1rem 0.75rem;
 }
 
-/* Below the desktop breakpoint `.usa-nav` is the flex row and owns the side
- * padding, so this is a flex item in it rather than a block under it: the
- * hamburger and the search box share a line wherever there is room for both.
+/* Below the desktop breakpoint this is a row of its own under the bar
+ * (ADR-0064), and the box has all of it. It shared the line with the hamburger
+ * until the bar took the hamburger; what that sharing cost is ADR-0058's and
+ * ADR-0059's business — the wrap calculation, the 8rem basis, the label that
+ * broke to a second line at 640 — and none of it applies to an item that is
+ * the only thing on its line.
+ *
  * Written here rather than beside the rest of the small-width nav rules because
  * the base rule above would otherwise win on source order — a media query adds
  * no specificity. */
 @media (max-width: 63.99em) {
   .navtools {
-    flex: 1 1 16rem;
+    flex: 1 1 100%;
     min-width: 0;
-    padding: 0 0 0.25rem;
+    padding: 0.25rem 1rem 0;
   }
 }
 
@@ -1968,31 +2150,19 @@ main[id] {
   padding: 0;
 }
 
-/* Below the tablet breakpoint the header is not sticky at all — `.topbar`
- * becomes `display: contents` and only `.sectionbar` pins — so a second row
- * here is free, and the box takes the whole width. Above it, a wrapped row
- * would be `--sticky-h` growing, which is why this is scoped rather than the
- * default. */
-@media (max-width: 39.99em) {
-  /* The block keeps sharing its line with the hamburger, and only the box
-   * inside it takes the full width. Measured both ways at 375px: giving
-   * `.navtools` the whole line puts the hamburger on a line of its own and the
-   * account control and the two toggles still need two lines between them —
-   * 276px of header against 230px for this. */
+/* Below the desktop breakpoint the box is the only thing on its line, so it
+ * takes all of it.
+ *
+ * This replaces the two band-scoped bases that stood here — 100% below 40em
+ * and `flex-basis: 0` between 40em and 64em, the latter being ADR-0058's
+ * addendum. Both were about a row the box *shared*: a flex line breaks on the
+ * sum of its items' hypothetical sizes before any of them shrinks, so the
+ * basis and not the rendered width decided whether the hamburger and the two
+ * toggles pushed the box onto a second line. Nothing shares this line now
+ * (ADR-0064), and a wrap calculation over one item has one answer. */
+@media (max-width: 63.99em) {
   .navtools .sitesearch {
     flex-basis: 100%;
-  }
-}
-
-/* The band where the whole nav is sticky, so a wrapped row here is `--sticky-h`
- * growing. What decides the wrap is the basis and not the rendered width: a
- * flex line breaks when the items' hypothetical sizes overflow it, before any
- * of them shrinks. `flex-basis: 0` removes the search box from that calculation
- * entirely: only the `flex: none` controls count, and `flex-grow` still hands
- * the box everything the rest of the row does not need. */
-@media (min-width: 40em) and (max-width: 63.99em) {
-  .navtools .sitesearch {
-    flex-basis: 0;
   }
 }
 

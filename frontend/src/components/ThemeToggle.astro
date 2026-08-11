@@ -24,7 +24,27 @@
  * The accessible name says what the click will *do* ("Switch to dark mode"),
  * which is unambiguous in a way that a name plus `aria-pressed` on a changing
  * label is not.
+ *
+ * ## Two buttons, one script
+ *
+ * `SiteHeader` renders this twice (ADR-0064): once on the mobile bar and once
+ * in the More menu's DISPLAY group, with one of the two `display: none` at any
+ * width. The script binds every `[data-theme-toggle]` in the document and
+ * paints all of them, so the hidden copy is already correct when a resize
+ * reveals it.
+ *
+ * It must ship exactly once, and from the *last* instance on the page: an
+ * inline script runs where the parser reaches it, so a copy emitted before the
+ * second button cannot bind it. `script={false}` is how the earlier instance
+ * says so.
  */
+interface Props {
+  /** Whether this instance emits the island's script. Exactly one instance on
+   *  a page may, and it has to be the last one in document order. */
+  script?: boolean;
+}
+
+const { script = true } = Astro.props;
 ---
 
 <button
@@ -37,37 +57,42 @@
   <span class="theme-toggle__label">Dark</span>
 </button>
 
-<script is:inline>
-  {
-    const KEY = "usc-theme";
-    const root = document.documentElement;
-    const button = document.querySelector("[data-theme-toggle]");
-    const icon = button.querySelector(".theme-toggle__icon");
-    const label = button.querySelector(".theme-toggle__label");
+{script && (
+  <script is:inline>
+    {
+      const KEY = "usc-theme";
+      const root = document.documentElement;
+      // Every copy — see this file's frontmatter for why there are two.
+      const buttons = [...document.querySelectorAll("[data-theme-toggle]")];
 
-    function paint() {
-      const dark = root.dataset.theme === "dark";
-      // The label names the destination, not the current state: the button is
-      // the way *to* the other mode.
-      icon.textContent = dark ? "☀" : "☾";
-      label.textContent = dark ? "Light" : "Dark";
-      button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
-      button.title = dark ? "Switch to light mode" : "Switch to dark mode";
-    }
-
-    button.addEventListener("click", () => {
-      const next = root.dataset.theme === "dark" ? "light" : "dark";
-      root.dataset.theme = next;
-      try {
-        localStorage.setItem(KEY, next);
-      } catch {
-        // Private mode, or storage full. The theme still applies to this page;
-        // it just will not be remembered, which is better than throwing.
+      function paint() {
+        const dark = root.dataset.theme === "dark";
+        // The label names the destination, not the current state.
+        const name = dark ? "Switch to light mode" : "Switch to dark mode";
+        for (const b of buttons) {
+          b.querySelector(".theme-toggle__icon").textContent = dark ? "☀" : "☾";
+          b.querySelector(".theme-toggle__label").textContent = dark ? "Light" : "Dark";
+          b.setAttribute("aria-label", name);
+          b.title = name;
+          b.hidden = false;
+        }
       }
-      paint();
-    });
 
-    paint();
-    button.hidden = false;
-  }
-</script>
+      for (const b of buttons) {
+        b.addEventListener("click", () => {
+          const next = root.dataset.theme === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try {
+            localStorage.setItem(KEY, next);
+          } catch {
+            // Private mode, or storage full. It applies here and is not
+            // remembered, which is better than throwing.
+          }
+          paint();
+        });
+      }
+
+      paint();
+    }
+  </script>
+)}
