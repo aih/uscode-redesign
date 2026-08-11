@@ -109,6 +109,24 @@
       }
     },
     {
+      "usage": "a menu row under the pointer or the focus ring \u2014 the navbar's dropdowns, both display switches, the account rows",
+      "foreground": "--ink",
+      "background": "--rule",
+      "requires": 4.5,
+      "light": {
+        "fg": "#171716",
+        "bg": "#dcdbd4",
+        "ratio": 12.92,
+        "passes": true
+      },
+      "dark": {
+        "fg": "#eae8e3",
+        "bg": "#4a4743",
+        "ratio": 7.54,
+        "passes": true
+      }
+    },
+    {
       "usage": "secondary text: notes, source credit, captions",
       "foreground": "--muted",
       "background": "--page",
@@ -418,8 +436,8 @@
     }
   ],
   "summary": {
-    "pairs": 20,
-    "checks": 40,
+    "pairs": 21,
+    "checks": 42,
     "failures": 0
   }
 }

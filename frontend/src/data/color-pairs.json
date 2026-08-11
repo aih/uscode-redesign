@@ -16,6 +16,7 @@
     { "foreground": "--ink", "background": "--page", "usage": "body text on the page", "requires": 4.5 },
     { "foreground": "--ink", "background": "--panel", "usage": "body text on a panel or summary box", "requires": 4.5 },
     { "foreground": "--ink", "background": "--field", "usage": "text typed into a form control", "requires": 4.5 },
+    { "foreground": "--ink", "background": "--rule", "usage": "a menu row under the pointer or the focus ring — the navbar's dropdowns, both display switches, the account rows", "requires": 4.5 },
     { "foreground": "--muted", "background": "--page", "usage": "secondary text: notes, source credit, captions", "requires": 4.5 },
     { "foreground": "--muted", "background": "--panel", "usage": "secondary text inside a panel", "requires": 4.5 },
     { "foreground": "--link", "background": "--page", "usage": "a link in running text", "requires": 4.5 },
