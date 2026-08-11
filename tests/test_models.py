@@ -131,6 +131,7 @@ def test_classification_entries_has_the_specified_columns() -> None:
         "new_section_quote",
         "stat_volume",
         "stat_pages",
+        "stat_page_labels",
     }
 
 
@@ -191,6 +192,15 @@ def test_classification_entries_stat_pages_is_an_integer_array() -> None:
     stat_pages = Base.metadata.tables["classification_entries"].columns["stat_pages"]
     assert isinstance(stat_pages.type, ARRAY)
     assert isinstance(stat_pages.type.item_type, Integer)
+
+
+def test_classification_entries_keep_the_stat_cells_tokens_as_written() -> None:
+    """110 Stat. 1321-9 is one page and not a number, and 1,658 of the 104th's
+    11,737 rows cite one — so `stat_pages` alone loses their citation."""
+    labels = Base.metadata.tables["classification_entries"].columns["stat_page_labels"]
+    assert isinstance(labels.type, ARRAY)
+    assert isinstance(labels.type.item_type, String)
+    assert labels.nullable is False
 
 
 def test_ecct_entries_has_the_specified_columns() -> None:
