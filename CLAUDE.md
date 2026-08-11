@@ -43,7 +43,11 @@ interactive states — among them the compact reading density (ADR-0054), the op
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
-`waiveSeverity`. Every entry carries the task that owns the fix; the measured baseline is
+`waiveSeverity`. A route may declare **`readyWhen`**, a selector the scan waits for before running
+axe: the two vendored bundles draw themselves, `load` fires on a shell, and a scan that lost that
+race reported **one** node (`html-has-lang`, off the server's own `<html>`) where a rendered one
+reports 174 — which is the whole of why this artifact's node count used to differ between runs of
+identical code. Every entry carries the task that owns the fix; the measured baseline is
 `docs/verification/a11y.json`. `make shots` carries the same ratchet for horizontal overflow at 320
 CSS px and at 1280 zoomed to 200% (WCAG 1.4.10 and 1.4.4). Playwright's `globalSetup`/`globalTeardown`
 for this live in `frontend/scripts/`, not `tests/e2e/` — **a global hook inside `testDir` is loaded as
@@ -297,7 +301,41 @@ paddings measured 233 and `sticky.spec.ts`'s 60px of headroom refused it. Two tr
 panel that clips, invisible on every narrow window; and `:root[data-theme="dark"] a` at 0-2-1 took
 the bar's wordmark blue, the third component to need the three-class count.
 
-`make test` = **545** Python tests; `make test-web` = **320** frontend tests; `make test-e2e` = **497**
+**A dead end says where else to go** (ADR-0065). A 404 offered the front page and nothing else; it
+now offers the nearest identifier above the failed one that resolves, with the trail to it —
+`ancestorIdentifiers()` walks up and stops at the title, and nothing is offered when nothing above
+resolves either. An identifier absent at a release point without being repealed (gotcha 3) reads
+like a typo, so when `/versions` knows it the page says at how many release points it *is* in the
+Code and from which to which. The appendix explanation moved from one surface to both: `5 U.S.C.
+App. 3` parses to `/us/usc/t5a/s3` and OLRC publishes nothing there, and `_appendix_hint()` is now
+named from the identifier so `/api/v1/citation` and the identifier lookup give one answer, naming
+**both** real forms. And a shed `/app/diff/` was `text/plain` with no chrome — a navigation is now
+rewritten to `/app/429` **at the URL it asked for**, while a fetch still gets the text body
+`CitePreview` reads by status. **No search box on the error page**: there is one on this site and it
+is in the chrome at every width, and a second would duplicate the `site-q` id `/` reaches by. The
+**redirects table gotcha 3 suggests is declined** — OLRC publishes no machine-readable map from a
+vanished identifier to where its subject matter went, and one populated by guessing would send a
+reader silently to the wrong provision.
+
+**Comparing is one click, and the API stopped diffing the guids** (ADR-0066). `CompareWith` is a
+`<details>` on every section header: one named comparison plus a `<select>` of every older release
+point, as a link and a GET form. The default is **not** the previous release point — the Code
+republishes every title at every one, so that redline is usually empty — but the last release point
+that held *different* text, read off the section's version timeline. **Not `content_first_seen`**,
+which does not mean what it is called: § 45f's newest group reports `first_seen: 119-99` while its
+own `releases` run from `117-80`, because the field follows the stored fragment's `first_release_id`
+and an incremental load can attach an earlier release without lowering it. `?at=/c/5` rides through
+both routes, `ReadingBlock` carries the `@identifier` of the nearest enclosing element, and the
+redline **marks that run inside the whole section** with a line above saying how much of the change
+is in it — including when the answer is none. The API diff drops `@id` by default (`?guids=keep`
+restores ADR-0016's verbatim contract, tested by reassembling both sides byte for byte) and memoises
+on the resolved pair when both are pinned: `make diffcost` → **§ 1536 4,063.9 ms → 1.8 ms, § 668dd
+3,216.1 → 7.2, 399 ops → 3**, not a constant factor because diff-match-patch short-circuits on a
+common prefix. Two consequences of making comparisons ordinary: the reader's diff limiter goes
+**8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
+that runs last, because the bucket is global and every worker shares one address.
+
+`make test` = **558** Python tests; `make test-web` = **346** frontend tests; `make test-e2e` = **536**
 Playwright tests, 272 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -305,7 +343,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(63 ADRs, numbered to 0064 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(65 ADRs, numbered to 0066 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -352,10 +390,13 @@ search box is also a ⌘K command palette (ADR-0062); the footer's nine links ar
 above it, each measured against a stack of 225px and 168px. **B9 — the mobile chrome — landed as
 ADR-0064**, described above, which completes the spec.
 
-**Next: (1) workstream B task B5 — "Compare with…" on the section header;
-`/app/diff` is still two hops from the text it compares and the API diff is 5.1 s per request. State
-and standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`; (2) rebuild the deployed search
-index and finish the deployment's open items (`docs/deploy-status.md`); (3) Day 7 hardening.**
+**Workstream B is complete.** B5, B6 and B11 landed together (ADR-0065, ADR-0066); state and
+standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`.
+
+**Next: (1) Day 7 hardening; (2) `docs/verification/loadtest.json` has never been regenerated
+against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
+reader off the endpoint, ADR-0066 made the endpoint 150-2,000x cheaper, and the reader's own limiter
+changed; (3) the remaining accessibility tasks A4, A9 and A10.**
 
 Open debts: **the source's `indentUp0/1/2/3`, `indentDown1/2`, `indentTo54pts`,
 `indentTo65ptsHang`, `indent0And43pts` and `rightIndent1` classes are styled by nothing** — 8,733
@@ -368,16 +409,13 @@ where the printed Code runs the two together: USLM 1.x writes no separator and 2
 to tell those cases apart. **`j` is previous and `k` is next**, which is the reverse of the
 convention every reader who knows those keys has; it is what the guide documents and
 `guide.spec.ts` asserts, and ADR-0055 left it rather than flipping a documented binding unasked.
-**`[` and `]` are silent on a section with no contents list** — a one-paragraph repeal has no
-top-level provisions, so the keys do nothing and nothing says why. **Nothing tells a
-reader the shortcuts exist** unless they press `?` or read the footer. **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
+**`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
-link is the only way in (`docs/ia-map.md`); **`/app/diff` is two hops from the text it compares**
-(section → version history → pick two → diff), which task B5 owns; **`previewHref` in `lib/url.ts`
+link is the only way in (`docs/ia-map.md`); **`previewHref` in `lib/url.ts`
 has no caller** — `CitePreview.astro:199` builds `` `/app/preview${identifier}` `` inline in browser
 JavaScript, a reader href built outside `url.ts` against architecture rule 5, and the exact inlining
 that function's docstring says it replaced; **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 1,955 nodes**, down from 41 over 2,251, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 1,990 nodes**, down from 41 over 2,251, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by
@@ -570,10 +608,17 @@ uv run --with "fonttools[woff]" python scripts/fonts.py
                 # rebuild the two self-hosted faces from pinned google/fonts commits →
                 # frontend/public/fonts/ + docs/verification/fonts.json (ADR-0052). Byte
                 # reproducible; fontTools is deliberately not a project dependency.
+make diffcost   # what the API's redline costs with and without the @id guid churn, per
+                # section -> docs/verification/diffcost.json (ADR-0066). Times the diff in
+                # process, so the endpoint's own rate limiter is not in the way. Needs
+                # `make dev-all` running.
 make measure    # characters per rendered line of statutory text at 375/768/1280 in both
                 # reading densities, and the scroll length of three sections in each
                 # → docs/verification/measure.json (ADR-0052, ADR-0054). Exits non-zero
-                # when a median leaves 62–70. Needs `make dev-all` running.
+                # when a median leaves 62–70 — the same check `make test-e2e` now runs on
+                # every push, over scripts/measure-lines.mjs; what only this target
+                # produces is the scroll lengths, which gate nothing and so carry the
+                # commit they were measured at. Needs `make dev-all` running.
 uv run python scripts/search_eval.py score
                 # score every scoring profile in storage/searchquery.py against
                 # docs/verification/search-judgements.json → search-relevance.json
