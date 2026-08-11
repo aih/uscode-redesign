@@ -11,8 +11,7 @@ covers:
 ## Tracking change in the Code
 
 Every section page links to its **version history**: one entry per distinct text, oldest first,
-each showing the release point where that text first appeared and the release points it stood
-unchanged through.
+each showing the release point where that text first appeared and the release points where it didn't change.
 
 The Code republishes every title at every release point whether or not anything changed. The
 timeline lists only the release points at which the text of this section changed.
@@ -32,7 +31,7 @@ steps:
 ## Compare with…
 
 Every section page carries a **Compare with…** control under its heading. Opening it offers one
-comparison by name — the last release point at which this section held different text — and a list
+comparison — the last release point at which this section held different text — and a list
 of every older release point.
 
 The Code republishes every title at every release point whether or not anything changed, so the
@@ -54,7 +53,7 @@ steps:
 
 If you are reading a subsection rather than a whole section, the comparison keeps it: the redline
 covers the whole section, and the subsection you came from is marked inside it with a line above
-saying how much of the change is in it — including when the answer is none.
+saying what changed, if anything.
 
 ```scenario
 id: compare-keeps-the-provision
@@ -74,7 +73,7 @@ steps:
 From the timeline, or from the From/To picker at the foot of it, you get a **redline** between any
 two release points: removed words struck through, added words underlined, in the reading text.
 
-The redline compares the **reading text**. A second view compares the source XML, and shows
+The redline uses Google's Diff-Match-Patch algorithm to compare the **reading text**. A second view compares the source XML, and shows
 changes to `@id` and the rest of the markup.
 
 ```scenario
@@ -96,11 +95,11 @@ The line under the two release points is the result: `No changes`, or a count �
 `2 lines added`, `3 lines changed, 1 line removed`.
 
 When the words are the same and the stored XML is not, the line under the result links to the
-source redline, which shows the metadata that changed — guids, whitespace, an attribute that
+source redline, which shows the metadata that changed — `guid`s, whitespace, an attribute that
 carries no words.
 
 When both release points serve the same stored fragment, the note under the result names the
-release point whose `@id` guids that fragment carries.
+release point whose `@id` `guid`s that fragment carries.
 
 ```scenario
 id: diff-nothing-changed
@@ -122,9 +121,9 @@ behind `?source=1` and closed by default. The API returns the same comparison as
 **Cross-reference links are dropped inside the redline.** The comparison is over text, and a
 citation that is a link in the section view is plain text here.
 
-**A change in whitespace alone is not shown in the reading redline.** The source view shows it.
+**A change in whitespace alone is not shown in the reading redline.** The source view does show it.
 
-**Comparisons are rate limited.** Building one is the most expensive thing this site does, so a
+**Comparisons are rate limited.** Building one is the most compute-intensive process on the site, so a
 burst of eight is allowed and the allowance refills at one every two seconds. Past that the page
 answers `429` with a `Retry-After` header saying how many seconds to wait, and offers a link back to
-the section you were comparing.
+the section you were comparing. Future versions of the site may offload diff functionality to the browser.

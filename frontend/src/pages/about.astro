@@ -18,7 +18,7 @@ setPublicCache(Astro.response.headers, null, false);
       class="usa-link usa-link--external"
       rel="noopener"
       href="https://uscode.house.gov/">Office of the Law Revision Counsel</a
-    >'s United States Code website, built entirely from the official USLM downloads.
+    >'s United States Code website, built from the official USLM downloads.
     <strong>It is not an official publication of the United States government.</strong>
   </p>
 
@@ -29,15 +29,14 @@ setPublicCache(Astro.response.headers, null, false);
       </h2>
       <div class="usa-summary-box__text">
         <p>
-          The Office of the Law Revision Counsel publishes the Code and is the authority
+          The Office of the Law Revision Counsel (OLRC) publishes the Code and is the authority
           on it. If you need the official text, or the currency of a title, go to{" "}
           <a
             class="usa-link usa-link--external"
             rel="noopener"
             href="https://uscode.house.gov/">uscode.house.gov</a
-          >. Nothing here amends, replaces or interprets what they publish. Every page on
-          this site names the release point its text came from and links to the source
-          file it was parsed from.
+          >. Nothing here amends, replaces or interprets what the LRC publishes. Each U.S. Code section on 
+          this site links to the source and identifies the release point it came from. Future versions of this site may use an official hash to verify that the text is identical to the LRC's. (See, e.g. <a href="https://github.com/WICG/cross-origin-storage/issues/71">Expression of Interest in cross-origin storage proposal</a>.)
         </p>
       </div>
     </div>
@@ -49,7 +48,7 @@ setPublicCache(Astro.response.headers, null, false);
     This site provides an updated, navigable version of the United States Code, representing the codification of federal statutes as of a given date. 
     When new laws are passed by Congress, the OLRC <i>classifies</i> each provision to determine where it will go in the U.S. Code; then the office executes the
     changes into the code along with editorial notes. The Code, with these updates, is republished in full at every "release point", and each release point is named
-    for the last public law it includes. This site indexes each section of the Code at each release point, and allows you to search by keyword or by citation.
+    for the last public law it includes. This site indexes each section of the Code at each release point, and allows you to search by keyword, phrase or by citation.
   </p>
 
   <p>
@@ -76,7 +75,7 @@ setPublicCache(Astro.response.headers, null, false);
     <li>
       <a href={`${APP}/docs`}>
         <span class="toc__heading">
-          The API — the same data as JSON, or as the source XML
+          The API — the same data, in JSON format or in the source XML format
         </span>
       </a>
     </li>
@@ -106,9 +105,9 @@ setPublicCache(Astro.response.headers, null, false);
 
   <p>
     The corpus is the official USLM XML — 3,153 title-releases across 58 titles and 381
-    loaded release points — parsed and stored section by section. The Code republishes every
+    loaded release points (as of July 2026) — parsed and stored section by section. The Code republishes every
     title at every release point whether or not anything in it changed, and about 91% of the
-    stored text is such a republication. Each is stored once.
+    stored text is unchanged from the previous release point. The site uses a diff algorithm to identify what changed, and to store differences. 
   </p>
 
   <p class="doc-meta">
@@ -117,11 +116,14 @@ setPublicCache(Astro.response.headers, null, false);
       class="usa-link usa-link--external"
       rel="noopener"
       href="https://github.com/aih/uscode-redesign">github.com/aih/uscode-redesign</a
-    >.
+    >. The initial build was designed by Ari Hershowitz (see profile at <a
+      class="usa-link usa-link--external"
+      rel="noopener"
+      href="https://aih.github.io">aih.github.io</a>), and implemented with Claude Code (primarily) and Gemini.)
   </p>
 
   <p class="doc-meta">
-    Two things described here are not switched on yet: accounts and bulk downloads. These features will allow users to customize their
+    Two significant features are not switched on yet: accounts and bulk downloads. These features will allow users to customize their
     navigation and alerts for the U.S. Code, and to retrieve bulk downloads of the Code and its updates in a variety of formats. For now, consult the official OLRC site at <a 
     class="usa-link usa-link--external"
     rel="noopener"
