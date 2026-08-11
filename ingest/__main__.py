@@ -9,6 +9,7 @@ from pathlib import Path
 
 from db.base import SessionLocal
 from ingest import backfill as backfill_mod
+from ingest import classification as classification_mod
 from ingest import inventory as inventory_mod
 from ingest import load_all as load_all_mod
 from ingest import mirror as mirror_mod
@@ -199,6 +200,61 @@ def main(argv: list[str] | None = None) -> int:
     )
     verify_parser2.add_argument("--no-write", action="store_true")
 
+    classification_parser = subparsers.add_parser(
+        "classification",
+        help="Scrape and load OLRC's Classification Tables, hash-gated and resumable",
+    )
+    classification_parser.add_argument(
+        "--congress", type=int, default=None, help="Restrict to one congress, e.g. 118"
+    )
+    classification_parser.add_argument(
+        "--session",
+        type=int,
+        default=None,
+        help="Restrict to one session: 1, 2, or 0 for the 104th's whole-congress file",
+    )
+    classification_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-fetch and re-load every selected file, ignoring both gates",
+    )
+    classification_parser.add_argument(
+        "--from-file",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Read the index pages and the tables from DIR instead of the network "
+        "(what `make ci-data` uses); a linked file DIR does not hold is skipped",
+    )
+    classification_parser.add_argument(
+        "--cache-dir", type=Path, default=classification_mod.CACHE_DIR
+    )
+    classification_parser.add_argument(
+        "--out",
+        type=Path,
+        default=classification_mod.VERIFICATION_DIR,
+        help="Directory for the committed per-file verification JSON",
+    )
+    classification_parser.add_argument(
+        "--manifest", type=Path, default=classification_mod.MANIFEST_PATH
+    )
+    classification_parser.add_argument(
+        "--no-load", action="store_true", help="Parse and write the artifacts only"
+    )
+    classification_parser.add_argument("--quiet", action="store_true")
+
+    classification_check_parser = subparsers.add_parser(
+        "classification-check",
+        help="Poll the Classification Tables index page, record the check, and exit "
+        "10 if any table has changed",
+    )
+    classification_check_parser.add_argument(
+        "--url", default=classification_mod.CLASSIFICATION_SOURCE_URL, help="Source page"
+    )
+    classification_check_parser.add_argument(
+        "--cache-dir", type=Path, default=classification_mod.CACHE_DIR
+    )
+
     load_parser = subparsers.add_parser("load", help="Load one USLM title file")
     load_parser.add_argument("xmlfile", type=Path)
     load_parser.add_argument(
@@ -233,6 +289,8 @@ def main(argv: list[str] | None = None) -> int:
         "mirror": _cmd_mirror,
         "load-all": _cmd_load_all,
         "verify": _cmd_verify,
+        "classification": _cmd_classification,
+        "classification-check": _cmd_classification_check,
         "load": _cmd_load,
     }[args.command](args)
 
@@ -550,6 +608,85 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         path = verify_mod.write_report(report, directory=args.out)
         print(f"report: {path}")
     return 0 if report.sound else 1
+
+
+def _cmd_classification(args: argparse.Namespace) -> int:
+    """Scrape the Classification Tables and load what changed.
+
+    Resumable without a ledger, because the registry table *is* the ledger: a
+    file whose covered-law sentence still matches is skipped without a request,
+    and one that is fetched is skipped anyway if its `<PRE>` text hashes the
+    same. A re-run over an up-to-date database is two requests and no writes.
+    """
+    report = classification_mod.run_classification_load(
+        SessionLocal,
+        congress=args.congress,
+        session_num=args.session,
+        force=args.force,
+        from_dir=args.from_file,
+        cache_dir=args.cache_dir,
+        load=not args.no_load,
+        verification_dir=args.out,
+        manifest_path=args.manifest,
+        on_event=None if args.quiet else print,
+    )
+
+    print(
+        f"\n{report.links_seen} documents linked: {report.loaded} loaded, "
+        f"{len(report.skipped)} skipped, {len(report.failures)} failed"
+    )
+    print(
+        f"{report.rows_written:,} rows written in {report.elapsed_seconds:.1f}s; "
+        f"artifacts: {args.out}/classification-*.json, {args.manifest}"
+    )
+    if report.failures:
+        print("\nfailures (re-run to retry):", file=sys.stderr)
+        for filename, detail in report.failures:
+            print(f"  {filename}: {detail}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_classification_check(args: argparse.Namespace) -> int:
+    """Poll the Classification Tables index, record the check, say so in the exit code.
+
+    The exit codes are `check`'s, for the same reason — the caller is a shell
+    script on a box with no jq guarantee (deploy/update-corpus.sh):
+
+        0   checked; no table has changed
+        10  checked; a table has changed — run `python -m ingest classification`
+        1   the check itself failed
+
+    The `classification_source_checks` row is written in all three cases.
+    """
+    session = SessionLocal()
+    try:
+        result = classification_mod.poll_classification(
+            session, url=args.url, cache_dir=args.cache_dir
+        )
+        session.commit()
+    except Exception as exc:
+        # A failure to *record* the check — the database being down, say. The
+        # poll's own failures are already inside the result.
+        session.rollback()
+        result = classification_mod.ClassificationCheckResult(
+            ok=False, links=(), changed_files=(), error=f"{type(exc).__name__}: {exc}"
+        )
+    finally:
+        session.close()
+
+    if not result.ok:
+        print(f"classification check failed: {result.error}", file=sys.stderr)
+        return 1
+
+    print(f"checked {args.url}: {len(result.links)} documents linked")
+    if result.latest_covered_text:
+        print(f"newest table covers: {result.latest_covered_text}")
+    if not result.has_changes:
+        print("nothing changed since the last load")
+        return 0
+    print(f"CHANGED ({len(result.changed_files)}): {', '.join(result.changed_files)}")
+    return 10
 
 
 def _cmd_load(args: argparse.Namespace) -> int:
