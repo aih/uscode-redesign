@@ -135,3 +135,54 @@ point and the cost profile.
   never publishes). The API explains rather than 404s; the **reader** should too, with the two real
   forms shown as examples.
 - 404 and 429 pages get the search box and the breadcrumb of the nearest valid ancestor.
+
+---
+
+## B11 — The chrome's loose ends, after B7–B10
+
+Six things the menu-refinement sessions (B7–B10, ADR-0061 to ADR-0064) left behind. They are
+independent of each other: do any subset, one commit each, and skip any whose answer on inspection
+is "leave it". Items 1 and 2 are user-visible and need the guide; 3–6 are verification hygiene and
+need no guide change.
+
+**1. The theme is reachable twice below 64em.** ADR-0064 put the light/dark switch on the mobile bar
+*and* left it in the sheet's DISPLAY group, because the Mobile section of
+`docs/menu-refinement-spec.md` lists both. They are one setting, share one script and cannot
+disagree, so this is redundancy rather than a defect. Decide it in use rather than on paper: at 375
+and 320, is the DISPLAY row worth its 44px, or does the bar's moon make it noise? Dropping it is
+`display: none` on `.navdrop__list .theme-toggle` below 64em plus the guide sentence that promises
+it; keeping it is an addendum to ADR-0064 saying why. Either way the decision gets written down —
+what must not survive is the current state, where the ADR records the redundancy as unresolved.
+
+**2. `[` and `]` are silent on a section with no contents list**, and **nothing tells a reader the
+shortcuts exist** unless they press `?` or read the footer (both standing debts in `CLAUDE.md`, both
+now sharper because ADR-0055's map is printed on every page). The bar has room the old chrome did
+not. Consider whether the shortcut hint belongs there below 64em, where there is no footer in view.
+
+**3. `docs/verification/a11y.json` is not reproducible run to run** — session 42 recorded 1,955 →
+1,787 nodes with no code change, session 43 got 1,955 twice and put it back. Every observed
+difference is `/redoc`, the vendored ReDoc bundle (ADR-0032), which `main.py` serves and no reader
+change can reach. Find out what varies — a lazy-rendered panel, a viewport-dependent code block, a
+race between the scan and ReDoc's own layout — and either pin it or stop counting nodes on that
+route. The gate is on (route, rule) pairs and is sound; it is the **node count** that is currently a
+number nobody can rely on, in a file whose whole purpose is to be relied on.
+
+**4. `make measure` is not run by anything that runs on a change.** Its scroll heights were three
+sessions stale when session 43 regenerated them, so most of a 5% drop belonged to ADR-0061 and had
+to be disclaimed rather than reported. It is page geometry, like `make shots`, and only one of the
+two is a gate. Either run it wherever `make shots` runs, or split it: the characters-per-line half
+is a real gate and exits non-zero already; the scroll-height half is a record, and a record that is
+regenerated three sessions late is a record of nothing.
+
+**5. `--ink` on `--rule` is painted and not declared.** Menu rows use it for their hover fill
+(`.navdrop__item:hover`), and `frontend/src/data/color-pairs.json` does not list the pair, so
+neither `scripts/contrast.py` nor `/app/design` measures it. It passes comfortably — 12.92:1 light,
+7.54:1 dark, computed in session 43 — which is exactly why it should be a declared pair rather than
+a number in a build log. Check the same question for every other `background: var(--rule)` in
+`site.scss` while you are there; ADR-0042's whole point is that a token audit sees only what it is
+told about.
+
+**6. `.navdrop--more` carries an `open` attribute nothing reads below 64em.** `SiteHeader`'s script
+treats it as one of the `[data-navmenu]` set and closes it; the CSS forcing its content visible
+outranks that, so the attribute is inert rather than wrong. Tidier is to exclude it from the set at
+that width. Small, and worth doing only alongside another change to that script.
