@@ -116,7 +116,56 @@ can actually name a provision, and it is spelled the way the corpus spells it:
   `action`. A note to § 3551 belongs on § 3551's page; OLRC's own notes are where a provision's
   classification history is written, which is what makes this join worth having.
 
+## Addendum (2026-08-11, phase C2b — the loader, CLI and poll)
+
+Four decisions the loader forced, and one thing it cannot do.
+
+### 8. `ecct_entries` gets the two constraints `classification_entries` has
+
+The spec specified `ondelete="CASCADE"` and `UniqueConstraint(file_id, row_seq)` for one entry table
+and said nothing about the other, so C2a built it that way and left the choice here. Both tables now
+carry both (migration `0044883c483c`): decision 3 replaces a file's rows wholesale, so a re-load that
+could double them and a registry delete that could orphan them are the two failures the constraints
+exist to make impossible.
+
+### 9. The gate is two-stage, and only the second stage costs a request
+
+A file is skipped without being fetched when the index page's covered-law sentence still matches the
+registry's. A file that is fetched is skipped anyway when its extracted `<PRE>` text hashes the same,
+which happens because OLRC rewords that sentence without the table changing. The first stage is what
+keeps a re-run at two requests rather than 33; the second is what keeps 150,000 rows from being
+deleted and re-inserted to arrive at what was already there.
+
+### 10. One transaction per file, not per run
+
+`load_file` commits nothing and `run_classification_load` commits after each file, so an interrupted
+backfill resumes from the registry — which is the state, and needs no ledger of its own. A single
+transaction over 33 files would make the 104th's 11,737 rows contingent on the 118th's.
+
+### 11. `--from-file` loads what the directory holds
+
+Offline, both the index pages and the tables are read from a directory. A file the index pages link
+and the directory lacks is skipped and reported; a table the directory holds that neither index page
+links is loaded anyway, with its covered range read from its own header. `make ci-data` is both cases
+at once — the slices link a dozen files, hold three, and one of the three (`tbl110pl_1st.htm`, which
+carries the `openPLaw` anchors and the appendix rows) is linked by neither slice. Over the network the
+same absence is a failure instead: there the index page is evidence the document exists.
+
 ## Consequences
+
+**A change to the ECCT alone is invisible to the poll.** The poll is one request to `tables.shtml`,
+and the covered-law sentence that detects a republished table is written about `pl` files only — an
+ECCT link carries nothing that could differ. So an ECCT gaining a row is noticed when the next load
+runs (which fetches and hash-gates it every time) or by the weekly `--force` sweep, not by the daily
+poll. The event that changes the ECCT is OLRC classifying new laws, which changes a `pl` file's
+covered range in the same publication, so in practice the daily poll does fire — but nothing here
+guarantees it.
+
+**A slice loaded into a database is indistinguishable from the real file to the first gate.** The
+covered-law sentence of `tests/fixtures/tbl118pl_2nd_slice.htm` is the real file's, so a database that
+has run `make ci-data` will skip the real 118th table until something forces it. This is why the
+first live backfill of a box runs `--force`, and why the fixture load writes its artifacts under
+`.ci-data` rather than over the committed ones.
 
 **A `stat_pages ARRAY(Integer)` cannot hold every page these tables cite.** Statutes at Large pages
 are not always numbers: the Omnibus Consolidated Appropriations Act, 1997 begins at 110 Stat. 3009-1,
