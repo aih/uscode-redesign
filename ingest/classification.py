@@ -86,13 +86,13 @@ from storage.classification import CLASSIFICATION_SOURCE_URL, law_in_ranges
 
 CLASSIFICATION_BASE_URL = "https://uscode.house.gov/classification/"
 
-#: `CLASSIFICATION_SOURCE_URL` — the current congress's entry page, and the home
-#: of the change-detection key — and `law_in_ranges` are defined in
-#: `storage/classification.py` and imported back, so `/api/v1` can name the
-#: source and decide whether a public law is covered without importing the
-#: ingest layer. That is the `SOURCE_URL` precedent in
-#: `storage/repository.py`; both names are still addressed as
-#: `ingest.classification.<name>` by the CLI, the poll and their tests.
+# `CLASSIFICATION_SOURCE_URL` — the current congress's entry page, and the home
+# of the change-detection key — and `law_in_ranges` are defined in
+# `storage/classification.py` and imported back, so `/api/v1` can name the
+# source and decide whether a public law is covered without importing the ingest
+# layer. That is the `SOURCE_URL` precedent in `storage/repository.py`; both
+# names are still addressed as `ingest.classification.<name>` by the CLI, the
+# poll and their tests.
 
 PRIOR_CLASSIFICATION_SOURCE_URL = CLASSIFICATION_BASE_URL + "priortables.shtml"
 """The 104th–118th entry page. Read by the backfill; the daily poll reads only

@@ -7,10 +7,10 @@ development box holds. That is why the assertions name rows the slices carry and
 never a total: `42 U.S.C. 254c-2` has rows in both, and a different number of
 them in each.
 
-Four behaviours get more than one test, because each has already been got wrong
+These behaviours get more than one test, because each has already been got wrong
 somewhere in this project:
 
-  * **The two dash spellings.** `section_norm` holds a plain hyphen and
+  * **The dash spellings.** `section_norm` holds a plain hyphen and
     `usc_identifier` holds OLRC's EN DASH (gotcha 17), so a route taking typed
     input and a route taking an identifier match different columns and both have
     to accept both spellings.
@@ -22,6 +22,9 @@ somewhere in this project:
   * **Rows with holes in them.** 1,533 rows derive no identifier and 6,053 cite a
     Statutes at Large page with no integer form; both are returned rather than
     filtered out, and `stat_page_labels` is what carries the second.
+  * **The by-identifier route's page.** 14 identifiers carry more than its
+    default 200 rows and the order is newest law first, so an unreachable second
+    page loses the oldest classifications silently.
 """
 
 from __future__ import annotations

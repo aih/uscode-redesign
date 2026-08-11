@@ -7,10 +7,11 @@ answers "which public law landed where in the Code", and the two share no query,
 no table and no resolution step. Both live under `storage/` so `api/` still holds
 no session and no SQL (CLAUDE.md architecture rule 1, docs/adr/0017).
 
-Two orderings here are done in Python rather than in SQL, for the same reason:
-`title_num` is a *string* and `ORDER BY` on it gives `1, 10, 11, 11a, 12, … 2,
-20` (gotcha 16). `title_sort_key` is the contract, so `sort=code` sorts the
-matching rows' keys in this process and pages the sorted list — see
+`sort=code` orders in Python rather than in SQL. `title_num` is a *string* and
+`ORDER BY` on it gives `1, 10, 11, 11a, 12, … 2, 20` (gotcha 16);
+`title_sort_key` is the contract for ordering it, and `_section_sort_key` is the
+same rule one level down for the section number. So that sort reads the matching
+rows' keys into this process, orders them, and pages the sorted list — see
 `entries_for_file`.
 """
 
@@ -113,6 +114,12 @@ class PostgresClassification:
 
     def __init__(self, session: Session):
         self._session = session
+        # `file_covering_law` is asked twice per public-law request — once by
+        # `entries_for_law`, which owes `UnknownPublicLawError` to any caller,
+        # and once by the route, which needs the document to name it in the
+        # answer. The instance is request-scoped (`storage.get_classification`),
+        # so remembering it here is a query saved and nothing kept.
+        self._covering: dict[tuple[int, int], ClassificationFileInfo | None] = {}
 
     # ------------------------------------------------------------- freshness
 
@@ -158,6 +165,15 @@ class PostgresClassification:
         return _file_info(row) if row else None
 
     def file_covering_law(
+        self, *, congress: int, law_num: int
+    ) -> ClassificationFileInfo | None:
+        if (congress, law_num) in self._covering:
+            return self._covering[(congress, law_num)]
+        found = self._covering_law(congress=congress, law_num=law_num)
+        self._covering[(congress, law_num)] = found
+        return found
+
+    def _covering_law(
         self, *, congress: int, law_num: int
     ) -> ClassificationFileInfo | None:
         rows = self._session.scalars(
@@ -251,8 +267,7 @@ class PostgresClassification:
         would be a second copy of it in a second language. So the ordering runs
         here — over the *keys* alone, one small tuple per matching row (11,737
         for the largest file, the 104th) — and the page is fetched by the ids
-        that survive the slice. Two queries instead of one, and no ordering
-        logic anywhere but `title_sort_key`.
+        that survive the slice, at the cost of a second query.
         """
         keys = self._session.execute(
             select(

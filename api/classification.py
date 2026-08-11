@@ -6,13 +6,13 @@ of published documents rather than a view of the corpus, so nothing here
 resolves a release point and nothing here touches `Repository`, except the one
 place the lookup asks whether a section a reader typed actually exists.
 
-Three things about the data decide the shape of these routes, and each of them
+What the data does decides the shape of these routes, and each of the following
 was measured rather than assumed:
 
-  * **Two spellings of a section number.** `section_norm` holds the table's own
-    hyphen and is what typed input matches; `usc_identifier` holds the corpus's
-    EN DASH (gotcha 17). A route taking typed input normalizes; a route taking an
-    `@identifier` tries both.
+  * **A section number is spelled two ways.** `section_norm` holds the table's
+    own hyphen and is what typed input matches; `usc_identifier` holds the
+    corpus's EN DASH (gotcha 17). A route taking typed input normalizes; a route
+    taking an `@identifier` tries both.
   * **Covered but empty is not the same as uncovered.** `covered_ranges` is
     gap-aware, so "no table covers Public Law 119-150" is a 404 and "a table
     covers 119-2 and it classified nothing" is a 200 with no rows.
@@ -72,8 +72,7 @@ ClassificationDep = Annotated[ClassificationRepository, Depends(get_classificati
 
 MAX_LIMIT = 500
 """The page bound on every listing route. The largest document is the 104th's
-11,737 rows and the largest section history is a few dozen, so this is well past
-what a page shows and well short of what a table dump would cost."""
+11,737 rows and the longest section history is `/us/usc/t10/s113`'s 412."""
 
 IDENTIFIER_LIMIT = 200
 """The default page on the by-identifier route, which is spec §4's number.
@@ -88,10 +87,14 @@ _limit_classification = rate_limit("classification", capacity=120, per_second=10
 """ADR-0029, sized for a server rather than for a person. `/app/classification`
 and its session pages render on the frontend server and call these routes over
 HTTP, so the whole readership's table browsing arrives from one address — the
-same reasoning that sizes `/api/v1/search` and `/api/v1/labels`. What it bounds
-is a caller hitting `/api/v1` directly: each answer is one indexed query and a
-count, bounded at 500 rows, so 120 in a burst and 10 a second is generous for a
-program and still refuses a scrape of 144,837 rows at full speed."""
+same reasoning that sizes `/api/v1/search` and `/api/v1/labels`.
+
+What it bounds is a caller hitting `/api/v1` directly, and what it bounds it to
+is the threadpool rather than the corpus: each answer is one indexed query and a
+count over at most 500 rows. It is not a scraping defence. The whole 144,837
+rows are 290 requests at `limit=500`, which this budget serves in about 29
+seconds — copying the tables is what `Disallow: /` and ADR-0037 are for, and
+OLRC publishes them itself."""
 
 _limit_classification_suggest = rate_limit(
     "classification_suggest", capacity=30, per_second=5.0
@@ -119,6 +122,9 @@ _PL_SHORTHAND = re.compile(
     re.IGNORECASE,
 )
 
+SESSION_ALL = 0
+"""What the registry holds for a whole-congress table, spelled `all` in a URL."""
+
 READER_NOTES_ANCHOR = "#section-notes"
 """The anchor ADR-0055 gives a section's notes. OLRC prints a provision's
 classification history there, which is why the lookup's first suggestion for a
@@ -130,12 +136,11 @@ def _session_number(value: str) -> int:
 
     Both spellings are accepted on the way in: `0` is what the registry stores
     for the 104th's single whole-congress file, and `all` is what spec §5's URL
-    vocabulary writes it as. One of them had to be the canonical answer and the
-    friendlier contract is to take either.
+    vocabulary writes it as.
     """
     text = value.strip().lower()
     if text == "all":
-        return 0
+        return SESSION_ALL
     try:
         return int(text)
     except ValueError:
@@ -434,7 +439,7 @@ def classification_suggest(
         ),
     ],
 ) -> ClassificationSuggestOut:
-    """Two families of answer, decided by what the string parses as.
+    """What comes back is decided by what the string parses as.
 
     A **public law** — `118-33`, `118-33 101`, `pl 118-33` — leads to the session
     table covering it, filtered to that law. Filtering rather than scrolling,

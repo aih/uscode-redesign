@@ -8,17 +8,22 @@ reason — `Repository`'s whole shape is "how do we answer for a provision at a
 release point", and none of these questions have a release point in them — and
 the same rule holds across all three: no SQL and no database session in `api/`.
 
-Two spellings of a section number run through this interface and they are not
+A section number is spelled two ways here and the spellings are not
 interchangeable (gotcha 17):
 
   * **`section_norm`** is the table's own hyphen, lowercased — `254c-15`. It is
     what typed input is matched against, so a route taking a `?section=` or a
     path segment normalizes to it with `normalize_section_input`.
   * **`usc_identifier`** is the corpus's spelling, with an EN DASH —
-    `/us/usc/t42/s254c–15`. 9,163 of the loaded rows carry one. A route matching
-    an incoming `@identifier` has to try both, because no keyboard has that key
-    and every link the reader builds may arrive either way
+    `/us/usc/t42/s254c–15`. A route matching an incoming `@identifier` has to
+    try both, because no keyboard has that key and a link may arrive either way
     (`identifier_variants`).
+
+Measured over the loaded corpus: 143,304 of the 144,837 rows derive a
+`usc_identifier`, naming 40,967 distinct identifiers. 9,163 of those rows
+contain an EN DASH, across 3,398 distinct identifiers, and **none contains a
+plain hyphen** — so an identifier typed with one matches nothing unless
+something tries the variant.
 """
 
 from __future__ import annotations
@@ -98,6 +103,16 @@ def identifier_variants(identifier: str) -> tuple[str, ...]:
     return tuple(variants)
 
 
+def session_label(session: int) -> str:
+    """`1` | `2` | `all` — the spelling the reader's URLs use for a session.
+
+    `0` is the 104th's single whole-congress file, which the database holds as a
+    sentinel because the unique key that makes a re-fetch update a row in place
+    could not use a NULL.
+    """
+    return "all" if session == 0 else str(session)
+
+
 def law_in_ranges(law_num: int, ranges: Iterable[str]) -> bool:
     """Whether a law number falls inside any `'70-70'`-style covered segment.
 
@@ -150,14 +165,14 @@ class ClassificationFileInfo:
     @property
     def session_label(self) -> str:
         """`1` | `2` | `all` — the spelling the reader's URLs use for `session`."""
-        return "all" if self.session == 0 else str(self.session)
+        return session_label(self.session)
 
 
 @dataclass(frozen=True, slots=True)
 class ClassificationEntryRef:
     """One row of a Classification Table, plus which document it came from.
 
-    Three fields are nullable for reasons that are not failures, and a caller
+    Some fields are nullable for reasons that are not failures, and a caller
     that filters them out is dropping real rows:
 
       * `usc_identifier` is null for 1,533 of the loaded rows, 1,531 of them
@@ -208,6 +223,10 @@ class ClassificationEntryRef:
             return None
         return f"{self.pl_congress}-{self.pl_num}"
 
+    @property
+    def session_label(self) -> str:
+        return session_label(self.session)
+
 
 @dataclass(frozen=True, slots=True)
 class EcctEntryRef:
@@ -231,6 +250,10 @@ class EcctEntryRef:
     affected_pl_num: int | None
     prompting_pl_congress: int | None
     prompting_pl_num: int | None
+
+    @property
+    def session_label(self) -> str:
+        return session_label(self.session)
 
 
 @dataclass(frozen=True, slots=True)

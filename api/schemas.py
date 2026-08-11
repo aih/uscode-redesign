@@ -753,7 +753,7 @@ class ClassificationEntryOut(BaseModel):
         return cls(
             congress=entry.congress,
             session=entry.session,
-            session_label="all" if entry.session == 0 else str(entry.session),
+            session_label=entry.session_label,
             row_seq=entry.row_seq,
             raw_line=entry.raw_line,
             title_raw=entry.title_raw,
@@ -848,7 +848,7 @@ class EcctEntryOut(BaseModel):
         return cls(
             congress=entry.congress,
             session=entry.session,
-            session_label="all" if entry.session == 0 else str(entry.session),
+            session_label=entry.session_label,
             row_seq=entry.row_seq,
             former_raw=entry.former_raw,
             former_title_num=entry.former_title_num,
@@ -868,8 +868,15 @@ class EcctEntryOut(BaseModel):
 
 
 class EcctOut(BaseModel):
-    items: list[EcctEntryOut]
-    total: int
+    """The Editorial Classification Change Table, whole."""
+
+    items: list[EcctEntryOut] = Field(
+        description="Newest session first, then source order within a document."
+    )
+    total: int = Field(
+        description="Equal to the length of `items`. This table is not paged — it "
+        "is 21 rows across two documents."
+    )
 
 
 class ClassificationSuggestionOut(BaseModel):
@@ -926,8 +933,14 @@ class ClassificationSuggestionOut(BaseModel):
 
 
 class ClassificationSuggestOut(BaseModel):
-    query: str
-    suggestions: list[ClassificationSuggestionOut]
+    """What the lookup box can offer for what was typed."""
+
+    query: str = Field(description="The string that was looked up, as given.")
+    suggestions: list[ClassificationSuggestionOut] = Field(
+        description="Empty when the string is neither a public law this mirror "
+        "covers nor a citation anything is known about, which is an answer rather "
+        "than an error."
+    )
 
 
 class WatchlistItemOut(BaseModel):
