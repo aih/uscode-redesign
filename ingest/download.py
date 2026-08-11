@@ -125,7 +125,7 @@ def fetch_zip(
     last_http_status: int | None = None
 
     for attempt in range(1, attempts + 1):
-        _throttle()
+        throttle()
         try:
             digest, size, http_status = _stream_to(url, partial, timeout, opener)
         except urllib.error.HTTPError as exc:
@@ -282,7 +282,13 @@ def _unlink(path: Path) -> None:
     path.unlink(missing_ok=True)
 
 
-def _throttle() -> None:
+def throttle() -> None:
+    """Hold every caller to ~1 request/second at uscode.house.gov.
+
+    Public because the budget is per *host*, not per module: `_last_request_at`
+    is process-global, so the classification scraper calling this is what keeps
+    a run that fetches zips and tables together inside one rate.
+    """
     global _last_request_at
     elapsed = time.monotonic() - _last_request_at
     if elapsed < MIN_REQUEST_INTERVAL:
