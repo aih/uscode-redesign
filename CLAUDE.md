@@ -393,6 +393,15 @@ ADR-0064**, described above, which completes the spec.
 **Workstream B is complete.** B5, B6 and B11 landed together (ADR-0065, ADR-0066); state and
 standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`.
 
+**The classification tables are a workstream in flight** (`docs/classification-spec.md`, ADR-0067).
+OLRC's tables record which provision of which Public Law was classified to which Code section;
+the site holds none of it today. Wave 1 — the parser (`ingest/classification.py`, parse side
+only) and the four tables (`classification_files`, `classification_entries`, `ecct_entries`,
+`classification_source_checks`, migration `3c8d9ab6d527`) — is on branch `classification-wave1`
+and **not merged** (PR #44). Nothing is loaded and nothing is reachable from the reader. Wave 2
+(C2b, the loader, CLI and poll) is next; the spec's § What Wave 1 measured carries what that agent
+needs and § Waves carries the dispatch order.
+
 **Next: (1) Day 7 hardening; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
 reader off the endpoint, ADR-0066 made the endpoint 150-2,000x cheaper, and the reader's own limiter

@@ -1,6 +1,7 @@
 # Classification tables — implementation spec for aih/uscode-redesign
 
-**Status:** spec written 2026-08-11. **Wave 1 landed 2026-08-11** — C1 (parser, fixtures, ADR-0067)
+**Status:** spec written 2026-08-11. **Wave 1 landed 2026-08-11** on branch `classification-wave1`
+([PR #44](https://github.com/aih/uscode-redesign/pull/44), open) — C1 (parser, fixtures, ADR-0067)
 and C2a (schema, migration `3c8d9ab6d527`) merged, reviewed, and amended by that review; see
 [§ What Wave 1 measured](#what-wave-1-measured) for the six places this spec was wrong. Wave 2
 (C2b, the loader) is next; C3–C5 unstarted. An orchestrating session starts at
