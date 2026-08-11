@@ -60,7 +60,7 @@ From a script, the same address answers with JSON — `curl -L` follows the redi
 
 ## Site navigation
 
-**The site menus.** The top of every page carries four things: **Titles**, **My Provisions**, the
+**The site menus.** The top of every page shows four items: **Titles**, **My Provisions**, the
 search box, and **More**.
 
 Titles opens a short list of titles and a link to all of them. More holds the rest of the site under
@@ -222,8 +222,10 @@ The other ways to move:
   screen, where the row has space for the arrows alone.
 - **Previous / next cards** at the foot of the section show what is either side, with headings.
 - The **keyboard**: <kbd>←</kbd> or <kbd>j</kbd> for the previous section, <kbd>→</kbd> or
+
   <kbd>k</kbd> for the next, <kbd>u</kbd> to go up a level. The full list is under
   [Keyboard shortcuts](#keyboard-shortcuts) below.
+
 
 ```scenario
 id: neighbors-next
@@ -302,30 +304,30 @@ steps:
 
 **Moving between sections**, on a section page:
 
-| Key | |
-|---|---|
-| <kbd>←</kbd> or <kbd>j</kbd> | Previous section in reading order |
-| <kbd>→</kbd> or <kbd>k</kbd> | Next section in reading order |
-| <kbd>u</kbd> | Up to the chapter or subchapter that contains it |
+| Key                          |                                                  |
+| ---------------------------- | ------------------------------------------------ |
+| <kbd>←</kbd> or <kbd>j</kbd> | Previous section in reading order                |
+| <kbd>→</kbd> or <kbd>k</kbd> | Next section in reading order                    |
+| <kbd>u</kbd>                 | Up to the chapter or subchapter that contains it |
 
 **Moving inside a section**, on a section page:
 
-| Key | |
-|---|---|
-| <kbd>c</kbd> | The contents list |
+| Key          |                     |
+| ------------ | ------------------- |
+| <kbd>c</kbd> | The contents list   |
 | <kbd>[</kbd> | Previous subsection |
-| <kbd>]</kbd> | Next subsection |
-| <kbd>s</kbd> | Source credit |
-| <kbd>n</kbd> | Notes |
+| <kbd>]</kbd> | Next subsection     |
+| <kbd>s</kbd> | Source credit       |
+| <kbd>n</kbd> | Notes               |
 
 **Anywhere on the site:**
 
-| Key | |
-|---|---|
-| <kbd>t</kbd> | Top of the page |
-| <kbd>b</kbd> | Bottom of the page |
-| <kbd>/</kbd> | Search or go to a citation |
-| <kbd>?</kbd> | The shortcut list |
+| Key            |                                                |
+| -------------- | ---------------------------------------------- |
+| <kbd>t</kbd>   | Top of the page                                |
+| <kbd>b</kbd>   | Bottom of the page                             |
+| <kbd>/</kbd>   | Search or go to a citation                     |
+| <kbd>?</kbd>   | The shortcut list                              |
 | <kbd>Esc</kbd> | Close the shortcut list, or a citation preview |
 
 A key typed into any input, textarea, select or editable element is left alone, and so is any
@@ -405,6 +407,7 @@ opens and closes on a click or on <kbd>Enter</kbd>. They start open on a window 
 pixels and closed below that. They come from the source XML unchanged.
 
 Following a link to `#section-source` or `#section-notes` opens the block it names, as do the
+
 <kbd>c</kbd> and <kbd>n</kbd> shortcuts.
 
 ```scenario
@@ -490,13 +493,13 @@ The deepest provision in the Code is seven levels down. 91.8% of sections stop a
 
 ### The kinds of text in one column
 
-| | How it is set |
-|---|---|
-| Operative text | Spectral, the reading face |
-| Quoted amending text | Spectral, on a tinted panel labelled **Quoted** |
-| Editorial notes | Archivo, behind a pale left rule |
-| Source credit | Archivo, under a rule at the foot of the section |
-| Tables | Archivo, with figures aligned in columns |
+|                      | How it is set                                    |
+| -------------------- | ------------------------------------------------ |
+| Operative text       | Spectral, the reading face                       |
+| Quoted amending text | Spectral, on a tinted panel labelled **Quoted**  |
+| Editorial notes      | Archivo, behind a pale left rule                 |
+| Source credit        | Archivo, under a rule at the foot of the section |
+| Tables               | Archivo, with figures aligned in columns         |
 
 Quoted amending text is words an act is moving around rather than words in force. Most of it sits
 inside an editorial note describing the amendment that made it. It keeps the reading face, on a
@@ -507,10 +510,10 @@ The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll 
 
 ## Printing
 
-Printing a section gives you the document. The navigation, the search box, the copy column, the
+Printing a section gives you just the text of the document. Application features are left off the printed page: navigation, the search box, the copy column, the
 chapter rail, the release picker, the **In this section** panel, the previous/next cards and the
-footer are all left off the page. The notes and the source credit are printed open whatever state
-they were in on screen. The page is black on white whether
+footer. The notes and the source credit are printed n whatever state
+(open/closed) they were in on screen. The page is black on white whether
 or not you were reading in night mode.
 
 Every printed sheet carries a running header with the citation, the release point, and the address
