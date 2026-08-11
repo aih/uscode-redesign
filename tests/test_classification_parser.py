@@ -269,6 +269,42 @@ def test_a_row_whose_pub_l_cell_will_not_parse_is_kept_and_warned_about():
     assert len(parsed.warnings) == 1
 
 
+def test_a_description_overrunning_past_the_sec_column_will_not_invent_a_law():
+    """The re-split reads the region between Description and Sec., so a description
+    long enough to push the Pub. L. number past that boundary leaves only the head of
+    the number there — `118-274` as `118-2`, which parses. The row keeps a null law
+    and a warning instead of another law's number."""
+    page = (
+        "<html><body><pre>\n U. S. Code\n"
+        "Title Section      Description      Pub. L.  Sec.                  138 Stat.\n"
+        "-------------      -----------      -------------                  ---------\n"
+        "18    3551         tr to 42/290eeee-101a118-274 101(3)                3\n"
+        "</pre></body></html>"
+    )
+    with pytest.warns(UserWarning, match="Pub. L. number is cut off"):
+        parsed = parse_classification_file(page, filename="tbl118pl_2nd.htm")
+    assert parsed.row_count == 1
+    assert (parsed.entries[0].pl_congress, parsed.entries[0].pl_num) == (None, None)
+
+
+def test_a_sec_cell_overrunning_with_digits_is_re_split():
+    """`101, 102, 103, 104, 105` overruns a 22-character column and leaves `5 3` in
+    the Stat. cell, which is digits and spaces and so passes the cell's own shape
+    test. The column boundary having cut a number in half is the signal, and 29 of
+    the 31 files carry no statviewer link to catch it any other way."""
+    page = (
+        "<html><body><pre>\n U. S. Code\n"
+        "Title Section      Description      Pub. L.  Sec.                  138 Stat.\n"
+        "-------------      -----------      -------------                  ---------\n"
+        "18    3551         nt               118-35   101, 102, 103, 104, 105 3\n"
+        "</pre></body></html>"
+    )
+    parsed = parse_classification_file(page, filename="tbl118pl_2nd.htm")
+    row = parsed.entries[0]
+    assert row.pl_section_raw == "101, 102, 103, 104, 105"
+    assert row.stat_pages == (3,)
+
+
 def test_a_line_that_is_not_a_row_is_counted_and_reported():
     page = (
         "<html><body><pre>\n U. S. Code\n"
@@ -362,7 +398,7 @@ def test_a_quoted_new_section_is_peeled_off_the_sec_cell(modern):
     row = _row(modern, '202 "1948"')
     assert row.pl_section_raw == "202"
     assert row.new_section_quote == "1948"
-    assert row.usc_identifier == "/us/usc/t42/s1396w-8"
+    assert row.usc_identifier == "/us/usc/t42/s1396w–8"
 
 
 # --- hazard 5 and the identifier-derivation rules ---------------------------------
@@ -385,8 +421,8 @@ def test_a_range_or_a_list_derives_no_identifier():
     assert derive_usc_identifier("42", "1231 to 1234", is_appendix=False) is None
     assert derive_usc_identifier("42", "1231, 1232", is_appendix=False) is None
     assert derive_usc_identifier("42", "subchapter ii", is_appendix=False) is None
-    assert derive_usc_identifier("42", "254c-15", is_appendix=False) == "/us/usc/t42/s254c-15"
-    assert derive_usc_identifier("22", "2680-3", is_appendix=False) == "/us/usc/t22/s2680-3"
+    assert derive_usc_identifier("42", "254c-15", is_appendix=False) == "/us/usc/t42/s254c–15"
+    assert derive_usc_identifier("22", "2680-3", is_appendix=False) == "/us/usc/t22/s2680–3"
 
 
 def test_a_note_row_derives_the_parent_sections_identifier(modern):
@@ -405,13 +441,20 @@ def test_a_prec_row_derives_the_parent_sections_identifier(modern):
 
 
 def test_section_numbers_normalize_the_en_dash():
-    """OLRC writes these tables with hyphens and USLM with EN DASHes; a row joins a
-    section only if both spellings land on one (CLAUDE.md gotcha 17)."""
+    """`section_norm` folds every dash to the hyphen, which is the spelling typed
+    input arrives in (CLAUDE.md gotcha 17)."""
     assert normalize_section("45A–1") == "45a-1"
     assert normalize_section("45a‑1") == "45a-1"
-    assert derive_usc_identifier("16", normalize_section("45A–1"), is_appendix=False) == (
-        "/us/usc/t16/s45a-1"
-    )
+
+
+def test_the_derived_identifier_is_spelled_with_an_en_dash():
+    """The corpus writes `/us/usc/t16/s45a–1` with U+2013 — all 5,697 of its
+    hyphenated section identifiers do — so an identifier built with the table's own
+    hyphen joins nothing."""
+    identifier = derive_usc_identifier("16", normalize_section("45A–1"), is_appendix=False)
+    assert identifier == "/us/usc/t16/s45a–1"
+    assert "-" not in identifier
+    assert derive_usc_identifier("16", "45a-1", is_appendix=False) == identifier
 
 
 # --- the description column is an open set ----------------------------------------
@@ -567,6 +610,22 @@ def test_an_ecct_with_no_data_rows_is_valid():
     parsed = parse_ecct(page)
     assert parsed.row_count == 0
     assert parsed.entries == ()
+
+
+def test_an_ecct_row_whose_cells_do_not_close_is_warned_about():
+    """The cells are matched by regex on a document the source writes malformed, so a
+    row whose `<td>`s never close yields nothing. It carries text, so it is a row
+    being lost rather than an empty `<tr>`."""
+    page = (
+        "<html><body><table>"
+        "<tr><th>Former Classification</th><th>New Classification</th>"
+        "<th>Provision Affected</th><th>Provision Prompting Change</th></tr>"
+        "<tr><td>42:294t nt<td>42:294u new<td>Pub. L. 119-1<td>Pub. L. 119-1</tr>"
+        "</table></body></html>"
+    )
+    with pytest.warns(UserWarning, match="text but no parseable cells"):
+        parsed = parse_ecct(page)
+    assert parsed.row_count == 0
 
 
 def test_an_ecct_with_no_header_cells_is_a_parse_error():

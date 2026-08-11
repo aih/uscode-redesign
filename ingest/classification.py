@@ -138,7 +138,6 @@ _DATA_LINE_RE = re.compile(r"^(?P<title>\d+[A-Za-z]?)(?=\s|$)")
 _PL_CELL_RE = re.compile(r"^(?P<congress>\d{2,3})-(?P<num>\d{1,4})$")
 _PL_OVERFLOW_RE = re.compile(r"^(?P<description>.*?)(?P<pl>\d{2,3}-\d{1,4})\s*$")
 _STAT_CELL_RE = re.compile(r"^[\d,\s\-]*$")
-_STAT_OVERFLOW_RE = re.compile(r"^(?P<section>.*?)\s+(?P<stat>\d[\d,\s\-]*)$")
 _QUOTED_SECTION_RE = re.compile(r'^(?P<section>.*?)\s*"(?P<quote>[^"]*)"\s*$')
 _TRANSFER_RE = re.compile(
     r"(?:\btr\s+)?\b(?P<direction>to|fr)\s+(?P<target>(?:\d+[A-Za-z]?/)?\d[\w.\-–]*)"
@@ -782,6 +781,37 @@ def column_offsets(header_line: str, *, filename: str = "") -> list[int]:
     return offsets
 
 
+def _boundary_splits_a_token(visible: str, at: int) -> bool:
+    """True when a column boundary falls between two non-space characters.
+
+    The columns are fixed-width and the values are not, so a boundary with no space
+    on either side of it has cut one value in half rather than separated two. Both
+    overflow recoveries below turn on this: the source writes no separator when a
+    cell overruns, and the halves it leaves are each shaped like a valid cell.
+    """
+    if at <= 0 or at >= len(visible):
+        return False
+    return not visible[at - 1].isspace() and not visible[at].isspace()
+
+
+def _split_near(region: str, nominal: int) -> tuple[str, str] | None:
+    """Split an overrun Sec./Stat. region at the gap nearest the declared boundary.
+
+    A cell that overruns pushes the one after it to the right, so the true gap is the
+    first whitespace run ending at or after where the header puts the boundary.
+    Splitting at the first gap of any kind cuts `101, 102, 103, 104, 105` after
+    `101,`; splitting at the last cuts `1544, 1545` after the comma. Returns None when
+    no gap leaves something Stat.-shaped on the right, which the caller warns about.
+    """
+    for match in re.finditer(r"\s+", region):
+        if match.end() < nominal:
+            continue
+        section, stat = region[: match.start()].strip(), region[match.end() :].strip()
+        if section and stat and _STAT_CELL_RE.match(stat):
+            return section, stat
+    return None
+
+
 def normalize_section(section: str) -> str:
     """Lowercase, and fold U+2013/U+2011 to a plain hyphen.
 
@@ -807,12 +837,20 @@ def derive_usc_identifier(title_num: str, section_norm: str, *, is_appendix: boo
       * **Note and `prec` rows derive the parent section's identifier.** `18 / 3551 /
         nt` is a note *to* § 3551 and belongs on that section's page; `is_note` and
         `action` say which it is, so nothing downstream has to read a note as text.
+
+    The number is spelled back with an EN DASH, which is how the corpus writes it and
+    therefore the only spelling that joins: all 5,697 hyphenated section identifiers
+    in the corpus use U+2013 and none uses U+002D, so `/us/usc/t42/s254c-15` matches
+    no row while `/us/usc/t42/s254c–15` matches one (CLAUDE.md gotcha 17). The plain
+    hyphen stays on `section_norm`, which is what typed input is matched against;
+    the 342 corpus identifiers that do contain a hyphen are appendix date paths
+    (`/us/usc/t50a/act/1917-10-06/ch106/s1`), which rule 1 derives nothing for.
     """
     if is_appendix:
         return None
     if not _SECTION_IDENTIFIER_RE.match(section_norm):
         return None
-    return f"/us/usc/t{title_num}/s{section_norm}"
+    return f"/us/usc/t{title_num}/s{section_norm.replace('-', '–')}"
 
 
 def parse_stat_pages(cell: str) -> tuple[tuple[str, ...], tuple[int, ...]]:
@@ -908,25 +946,36 @@ def _parse_row(
         # The description overran its column with no separating space
         # (`tr to 42/290ee-10118-84`). Re-split on what the right-hand cell must be.
         combined = visible[offsets[2] : offsets[4]].strip()
-        overflow = _PL_OVERFLOW_RE.match(combined)
-        if overflow is not None:
-            description_raw = overflow.group("description").strip()
-            pl_raw = overflow.group("pl")
-            pl_match = _PL_CELL_RE.match(pl_raw)
+        if _boundary_splits_a_token(visible, offsets[4]):
+            # The overrun reached past the Sec. column too, so `combined` ends in
+            # the middle of the law number and `_PL_OVERFLOW_RE` would anchor on
+            # what is left of it — `118-274` read as `118-2`. Leave the law null,
+            # which spec §2 provides for, rather than store a different law's.
+            collector.warn(
+                f"{filename}: row {row_seq} overruns the Sec. column, so its "
+                f"Pub. L. number is cut off at {combined!r}: {visible!r}"
+            )
+        else:
+            overflow = _PL_OVERFLOW_RE.match(combined)
+            if overflow is not None:
+                description_raw = overflow.group("description").strip()
+                pl_raw = overflow.group("pl")
+                pl_match = _PL_CELL_RE.match(pl_raw)
     if pl_match is None:
         collector.warn(
             f"{filename}: row {row_seq} has no parseable Pub. L. cell "
             f"({pl_raw!r}) — keeping the row: {visible!r}"
         )
 
-    if not _STAT_CELL_RE.match(stat_raw):
+    if not _STAT_CELL_RE.match(stat_raw) or _boundary_splits_a_token(visible, offsets[5]):
         # The Sec. cell overran instead: `1649(a) "Subchapter III"` is 24 characters
-        # in a 22-character column.
-        combined = visible[offsets[4] :].strip()
-        overflow = _STAT_OVERFLOW_RE.match(combined)
+        # in a 22-character column. The boundary test is there because a Sec. cell
+        # that overruns with digits — `101, 102, 103, 104, 105` — leaves a Stat. cell
+        # of `5 3` that `_STAT_CELL_RE` accepts, and 29 of the 31 files carry no
+        # statviewer links for the cross-check below to catch it with.
+        overflow = _split_near(visible[offsets[4] :], offsets[5] - offsets[4])
         if overflow is not None:
-            section_of_law = overflow.group("section").strip()
-            stat_raw = overflow.group("stat").strip()
+            section_of_law, stat_raw = overflow
         else:
             collector.warn(
                 f"{filename}: row {row_seq} has no parseable Stat. cell "
@@ -1165,7 +1214,7 @@ def parse_ecct(
     The document is a real `<table>` and a malformed one — a `<div id="boxheads">`
     opens inside it and its `</div>` closes before `</table>` — so the rows are read
     by regex. An HTML parser is entitled to reparent the whole table when it meets
-    that, and a table that quietly loses its rows is worse than no table.
+    that.
 
     Zero data rows is valid: the current table has one. Zero *header* cells is not —
     that means the four columns this reads by position are no longer there.
@@ -1175,16 +1224,24 @@ def parse_ecct(
     entries: list[EcctEntry] = []
     collector = _Collector()
 
-    for row in rows:
+    for row_seq, row in enumerate(rows):
         cells = list(_ECCT_CELL_RE.finditer(row.group("cells")))
         if not cells:
+            # `_ECCT_CELL_RE` needs a closing tag, which a document this malformed
+            # may not write. A row carrying text and yielding no cells is a row
+            # being lost, so it is warned about; an empty `<tr></tr>` is not.
+            if _clean_text(row.group("cells")):
+                collector.warn(
+                    f"{filename}: row {row_seq} has text but no parseable cells: "
+                    f"{_clean_text(row.group('cells'))!r}"
+                )
             continue
         if all(cell.group("tag").lower() == "th" for cell in cells):
             headers += len(cells)
             continue
         values = [_clean_text(cell.group("body")) for cell in cells]
         if len(values) < 4:
-            collector.warn(f"{filename}: row {len(entries)} has {len(values)} cells, not 4")
+            collector.warn(f"{filename}: row {row_seq} has {len(values)} cells, not 4")
             continue
         former_title, former_section, former_is_note = _split_classification(values[0])
         new_title, new_section, new_is_note = _split_classification(values[1])
