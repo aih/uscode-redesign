@@ -1,0 +1,657 @@
+{
+  "files": {
+    "ecct.html": {
+      "congress": 119,
+      "content_hash": "e2fd30a4ec3e0b57af929c0bad95a42b66ede55e3e8b95207bc2e5e4c2033055",
+      "fetched_at": "2026-08-11T20:49:26.122499+00:00",
+      "kind": "ecct",
+      "row_count": 1,
+      "session": 2,
+      "source_url": "https://uscode.house.gov/classification/ecct.html",
+      "warnings": 0
+    },
+    "ecct_119-1.html": {
+      "congress": 119,
+      "content_hash": "a98f37fd5a1a93aea2941184a2c71bc22728b41b25bba7ff5252063ea29203ee",
+      "fetched_at": "2026-08-11T20:49:29.714808+00:00",
+      "kind": "ecct",
+      "row_count": 20,
+      "session": 1,
+      "source_url": "https://uscode.house.gov/classification/ecct_119-1.html",
+      "warnings": 0
+    },
+    "tbl104pl.htm": {
+      "congress": 104,
+      "content_hash": "1d65bd22638fe7382001a516c3d208d7d669acb230cc415004685319c4477635",
+      "covered_laws_text": "Public Laws 104-1 to 104-333",
+      "covered_ranges": [
+        "1-333"
+      ],
+      "distinct_titles": 52,
+      "fetched_at": "2026-08-11T20:51:05.709400+00:00",
+      "kind": "pl",
+      "prepared_date": "1996-11-12",
+      "row_count": 11737,
+      "rows_without_identifier": 149,
+      "rows_without_pl": 0,
+      "session": 0,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl104pl.htm",
+      "stat_volume": null,
+      "warnings": 0
+    },
+    "tbl105pl_1st.htm": {
+      "congress": 105,
+      "content_hash": "2fbf563d089c5044991a24614e8cf1aa2b7ed07576be302599d8a27a1d5f9b43",
+      "covered_laws_text": "Public Laws 105-1 to 105-153",
+      "covered_ranges": [
+        "1-153"
+      ],
+      "distinct_titles": 48,
+      "fetched_at": "2026-08-11T20:51:01.468279+00:00",
+      "kind": "pl",
+      "prepared_date": null,
+      "row_count": 4261,
+      "rows_without_identifier": 21,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl105pl_1st.htm",
+      "stat_volume": 111,
+      "warnings": 0
+    },
+    "tbl105pl_2nd.htm": {
+      "congress": 105,
+      "content_hash": "bd071e655146d4d57319ed1ea9194e7e8b8f509c0177c81d856888cdfdc51fc6",
+      "covered_laws_text": "Public Laws 105-154 to 105-394",
+      "covered_ranges": [
+        "154-394"
+      ],
+      "distinct_titles": 51,
+      "fetched_at": "2026-08-11T20:50:59.140702+00:00",
+      "kind": "pl",
+      "prepared_date": "1998-11-13",
+      "row_count": 9687,
+      "rows_without_identifier": 147,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl105pl_2nd.htm",
+      "stat_volume": 112,
+      "warnings": 2
+    },
+    "tbl106pl_1st.htm": {
+      "congress": 106,
+      "content_hash": "6fb3b020cb977363846498ca4892ae9a089d803e492cf7d6eb79b1e459fa690b",
+      "covered_laws_text": "Public Laws 106-1 to 106-170",
+      "covered_ranges": [
+        "1-170"
+      ],
+      "distinct_titles": 50,
+      "fetched_at": "2026-08-11T20:50:55.337585+00:00",
+      "kind": "pl",
+      "prepared_date": "1999-12-17",
+      "row_count": 3558,
+      "rows_without_identifier": 19,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl106pl_1st.htm",
+      "stat_volume": 113,
+      "warnings": 107
+    },
+    "tbl106pl_2nd.htm": {
+      "congress": 106,
+      "content_hash": "c9ea46b069f7e118a18de4e8e01330274ba32dcded8d34aa63d93d0b37f9bbf3",
+      "covered_laws_text": "Public Laws 106-171 to 106-580",
+      "covered_ranges": [
+        "171-580"
+      ],
+      "distinct_titles": 51,
+      "fetched_at": "2026-08-11T20:50:52.618881+00:00",
+      "kind": "pl",
+      "prepared_date": "2000-12-29",
+      "row_count": 6050,
+      "rows_without_identifier": 25,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl106pl_2nd.htm",
+      "stat_volume": 114,
+      "warnings": 10
+    },
+    "tbl107pl_1st.htm": {
+      "congress": 107,
+      "content_hash": "7a5a5cf230511e97e7def40edece60190624f78e1f04c6bfc5e65813ba779adc",
+      "covered_laws_text": "Public Laws 107-1 to 107-136",
+      "covered_ranges": [
+        "1-136"
+      ],
+      "distinct_titles": 46,
+      "fetched_at": "2026-08-11T20:50:49.750723+00:00",
+      "kind": "pl",
+      "prepared_date": "2002-01-24",
+      "row_count": 3856,
+      "rows_without_identifier": 22,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl107pl_1st.htm",
+      "stat_volume": 115,
+      "warnings": 0
+    },
+    "tbl107pl_2nd.htm": {
+      "congress": 107,
+      "content_hash": "8a80f565b7d5219684d050e0894cc6ad273f8a99ea15c06cbbfb5acbb020eb8d",
+      "covered_laws_text": "Public Laws 107-137 to 107-377",
+      "covered_ranges": [
+        "137-377"
+      ],
+      "distinct_titles": 53,
+      "fetched_at": "2026-08-11T20:50:46.592783+00:00",
+      "kind": "pl",
+      "prepared_date": "2002-12-19",
+      "row_count": 6206,
+      "rows_without_identifier": 103,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl107pl_2nd.htm",
+      "stat_volume": 116,
+      "warnings": 0
+    },
+    "tbl108pl_1st.htm": {
+      "congress": 108,
+      "content_hash": "30786cdda988f1d0bd80d8317e53894981df99c4590ae20446821447d739f113",
+      "covered_laws_text": "Public Laws 108-1 to 108-198",
+      "covered_ranges": [
+        "1-198"
+      ],
+      "distinct_titles": 50,
+      "fetched_at": "2026-08-11T20:50:44.018592+00:00",
+      "kind": "pl",
+      "prepared_date": "2005-10-06",
+      "row_count": 3832,
+      "rows_without_identifier": 127,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl108pl_1st.htm",
+      "stat_volume": 117,
+      "warnings": 3
+    },
+    "tbl108pl_2nd.htm": {
+      "congress": 108,
+      "content_hash": "129eb36b5a90cb7dcc91406906c2ee17d4870293f93a8e6384cc68ec5454077a",
+      "covered_laws_text": "Public Laws 108-199 to 108-498",
+      "covered_ranges": [
+        "199-498"
+      ],
+      "distinct_titles": 49,
+      "fetched_at": "2026-08-11T20:50:39.942688+00:00",
+      "kind": "pl",
+      "prepared_date": "2004-12-23",
+      "row_count": 4861,
+      "rows_without_identifier": 30,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl108pl_2nd.htm",
+      "stat_volume": 118,
+      "warnings": 0
+    },
+    "tbl109pl_1st.htm": {
+      "congress": 109,
+      "content_hash": "1a7536eb42dfe7e855559d9e0a6fa2a1a4fef81bd5c71fae1740a6d0129d3974",
+      "covered_laws_text": "Public Laws 109-1 to 109-169 and 109-173",
+      "covered_ranges": [
+        "1-169",
+        "173-173"
+      ],
+      "distinct_titles": 48,
+      "fetched_at": "2026-08-11T20:50:37.543554+00:00",
+      "kind": "pl",
+      "prepared_date": "2006-02-15",
+      "row_count": 4575,
+      "rows_without_identifier": 43,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl109pl_1st.htm",
+      "stat_volume": 119,
+      "warnings": 2
+    },
+    "tbl109pl_2nd.htm": {
+      "congress": 109,
+      "content_hash": "358933d2823e56239f509088b0fa56c55768fe13d034315d80f147c194fed48b",
+      "covered_laws_text": "Public Laws 109-170 to 109-172 and 109-174 to 109-482*",
+      "covered_ranges": [
+        "170-172",
+        "174-482"
+      ],
+      "distinct_titles": 49,
+      "fetched_at": "2026-08-11T20:50:35.048937+00:00",
+      "kind": "pl",
+      "prepared_date": "2007-01-15",
+      "row_count": 6131,
+      "rows_without_identifier": 386,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl109pl_2nd.htm",
+      "stat_volume": 120,
+      "warnings": 0
+    },
+    "tbl110pl_1st.htm": {
+      "congress": 110,
+      "content_hash": "fd67b4f61139a73ef426f34f133c0365ab925340abf2ec876e7a5c879e45a5f8",
+      "covered_laws_text": "Public Laws 110-1 to 110-180",
+      "covered_ranges": [
+        "1-180"
+      ],
+      "distinct_titles": 44,
+      "fetched_at": "2026-08-11T20:50:32.288435+00:00",
+      "kind": "pl",
+      "prepared_date": "2009-01-08",
+      "row_count": 2122,
+      "rows_without_identifier": 22,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl110pl_1st.htm",
+      "stat_volume": 121,
+      "warnings": 0
+    },
+    "tbl110pl_2nd.htm": {
+      "congress": 110,
+      "content_hash": "5414f67468e527c41cf49f26baa4f708456151ec4e0a633ba2553339210b8bba",
+      "covered_laws_text": "Public Laws 110-181 to 110-460",
+      "covered_ranges": [
+        "181-460"
+      ],
+      "distinct_titles": 51,
+      "fetched_at": "2026-08-11T20:50:30.245428+00:00",
+      "kind": "pl",
+      "prepared_date": "2008-12-23",
+      "row_count": 8568,
+      "rows_without_identifier": 58,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl110pl_2nd.htm",
+      "stat_volume": 122,
+      "warnings": 0
+    },
+    "tbl111pl_1st.htm": {
+      "congress": 111,
+      "content_hash": "10f64aa4a268ce2d3cacaaf27b5d82297dd7a885ca1cd113abb800e606bee64d",
+      "covered_laws_text": "Public Laws 111-1 to 111-125, 111-128 to 111-135 and 111-137",
+      "covered_ranges": [
+        "1-125",
+        "128-135",
+        "137-137"
+      ],
+      "distinct_titles": 49,
+      "fetched_at": "2026-08-11T20:50:26.726230+00:00",
+      "kind": "pl",
+      "prepared_date": "2010-02-01",
+      "row_count": 3113,
+      "rows_without_identifier": 67,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl111pl_1st.htm",
+      "stat_volume": 123,
+      "warnings": 0
+    },
+    "tbl111pl_2nd.htm": {
+      "congress": 111,
+      "content_hash": "355578af872aa47eb64154d229cf1ff3cf15e7004762d9e0f755e54502d02912",
+      "covered_laws_text": "Public Laws 111-126, 111-127, 111-136, 111-138 to 111-383",
+      "covered_ranges": [
+        "126-126",
+        "127-127",
+        "136-136",
+        "138-383"
+      ],
+      "distinct_titles": 47,
+      "fetched_at": "2026-08-11T20:50:24.567351+00:00",
+      "kind": "pl",
+      "prepared_date": "2011-01-07",
+      "row_count": 7635,
+      "rows_without_identifier": 34,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl111pl_2nd.htm",
+      "stat_volume": 124,
+      "warnings": 0
+    },
+    "tbl112pl_1st.htm": {
+      "congress": 112,
+      "content_hash": "4456c1330634054662929f8f68942919d0a7e8fb2d45a983f2bc9b49ce82ae26",
+      "covered_laws_text": "Public Laws 112-1 to 112-90",
+      "covered_ranges": [
+        "1-90"
+      ],
+      "distinct_titles": 45,
+      "fetched_at": "2026-08-11T20:50:21.143555+00:00",
+      "kind": "pl",
+      "prepared_date": "2012-01-03",
+      "row_count": 2142,
+      "rows_without_identifier": 6,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl112pl_1st.htm",
+      "stat_volume": 125,
+      "warnings": 0
+    },
+    "tbl112pl_2nd.htm": {
+      "congress": 112,
+      "content_hash": "237894f716b65d5bdcf277511afd84edf4daf21dd2846096bd2f8bcdad6392ba",
+      "covered_laws_text": "Public Laws 112-91 to 112-283",
+      "covered_ranges": [
+        "91-283"
+      ],
+      "distinct_titles": 45,
+      "fetched_at": "2026-08-11T20:50:19.519724+00:00",
+      "kind": "pl",
+      "prepared_date": "2013-01-15",
+      "row_count": 3533,
+      "rows_without_identifier": 43,
+      "rows_without_pl": 2,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl112pl_2nd.htm",
+      "stat_volume": 126,
+      "warnings": 4
+    },
+    "tbl113pl_1st.htm": {
+      "congress": 113,
+      "content_hash": "1242f38a53daf9b4c572525fb92d19daaaf3eb93295283dd3e1331a133787f4b",
+      "covered_laws_text": "Public Laws 113-1 to 113-72 and 113-74",
+      "covered_ranges": [
+        "1-72",
+        "74-74"
+      ],
+      "distinct_titles": 40,
+      "fetched_at": "2026-08-11T20:50:16.977031+00:00",
+      "kind": "pl",
+      "prepared_date": "2014-01-16",
+      "row_count": 1133,
+      "rows_without_identifier": 8,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl113pl_1st.htm",
+      "stat_volume": 127,
+      "warnings": 1
+    },
+    "tbl113pl_2nd.htm": {
+      "congress": 113,
+      "content_hash": "bb0a7cd41318d9f31bde58f1ee031dc649dcaceffe6709157994b5f010c50eba",
+      "covered_laws_text": "Public Laws 113-73 and 113-75 to 113-296",
+      "covered_ranges": [
+        "73-73",
+        "75-296"
+      ],
+      "distinct_titles": 50,
+      "fetched_at": "2026-08-11T20:50:15.602915+00:00",
+      "kind": "pl",
+      "prepared_date": "2014-12-19",
+      "row_count": 5168,
+      "rows_without_identifier": 26,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl113pl_2nd.htm",
+      "stat_volume": 128,
+      "warnings": 2
+    },
+    "tbl114pl_1st.htm": {
+      "congress": 114,
+      "content_hash": "bb5b5844f0b9e7ba92d93e500808a4a71d6e7ec5257ed03b055fbbc61288c1a3",
+      "covered_laws_text": "Public Laws 114-1 to 114-115",
+      "covered_ranges": [
+        "1-115"
+      ],
+      "distinct_titles": 46,
+      "fetched_at": "2026-08-11T20:50:13.058523+00:00",
+      "kind": "pl",
+      "prepared_date": "2015-12-28",
+      "row_count": 4065,
+      "rows_without_identifier": 7,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl114pl_1st.htm",
+      "stat_volume": 129,
+      "warnings": 0
+    },
+    "tbl114pl_2nd.htm": {
+      "congress": 114,
+      "content_hash": "96eaa7f9cdeeb12e72f55fb49e28678bbf42ccd0ecfb9581466e1a1252716c0c",
+      "covered_laws_text": "Public Laws 114-116 to 114-329",
+      "covered_ranges": [
+        "116-329"
+      ],
+      "distinct_titles": 44,
+      "fetched_at": "2026-08-11T20:50:09.964342+00:00",
+      "kind": "pl",
+      "prepared_date": "2017-01-06",
+      "row_count": 3668,
+      "rows_without_identifier": 32,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl114pl_2nd.htm",
+      "stat_volume": 130,
+      "warnings": 0
+    },
+    "tbl115pl_1st.htm": {
+      "congress": 115,
+      "content_hash": "50704b5d16d1d8401beafd7a1fc0e2230e89519a45fa4f4c6090934ad6c25bef",
+      "covered_laws_text": "Public Laws 115-1 to 115-117",
+      "covered_ranges": [
+        "1-117"
+      ],
+      "distinct_titles": 44,
+      "fetched_at": "2026-08-11T20:50:07.399254+00:00",
+      "kind": "pl",
+      "prepared_date": "2018-01-12",
+      "row_count": 2723,
+      "rows_without_identifier": 2,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl115pl_1st.htm",
+      "stat_volume": 131,
+      "warnings": 0
+    },
+    "tbl115pl_2nd.htm": {
+      "congress": 115,
+      "content_hash": "905eebac6b30a308b570746cc36b2afe106e2fd9932c863e3c4674072fc55c43",
+      "covered_laws_text": "Public Laws 115-118 to 115-442",
+      "covered_ranges": [
+        "118-442"
+      ],
+      "distinct_titles": 50,
+      "fetched_at": "2026-08-11T20:50:05.106430+00:00",
+      "kind": "pl",
+      "prepared_date": "2019-01-14",
+      "row_count": 9623,
+      "rows_without_identifier": 13,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl115pl_2nd.htm",
+      "stat_volume": 132,
+      "warnings": 0
+    },
+    "tbl116pl_1st.htm": {
+      "congress": 116,
+      "content_hash": "5f6d9242662aad86311f90e0b338039f12113b28b54e149a6407bd2b88776579",
+      "covered_laws_text": "Public Laws 116-1 to 116-108",
+      "covered_ranges": [
+        "1-108"
+      ],
+      "distinct_titles": 46,
+      "fetched_at": "2026-08-11T20:50:01.502063+00:00",
+      "kind": "pl",
+      "prepared_date": "2020-01-24",
+      "row_count": 2911,
+      "rows_without_identifier": 5,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl116pl_1st.htm",
+      "stat_volume": 133,
+      "warnings": 0
+    },
+    "tbl116pl_2nd.htm": {
+      "congress": 116,
+      "content_hash": "a2e7c803b8357085e8dff99d34206edca8b861ed22561a84fa182fcefe94dd2c",
+      "covered_laws_text": "Public Laws 116-109 to 116-344",
+      "covered_ranges": [
+        "109-344"
+      ],
+      "distinct_titles": 51,
+      "fetched_at": "2026-08-11T20:49:59.711695+00:00",
+      "kind": "pl",
+      "prepared_date": "2021-01-13",
+      "row_count": 6755,
+      "rows_without_identifier": 7,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl116pl_2nd.htm",
+      "stat_volume": 134,
+      "warnings": 0
+    },
+    "tbl117pl_1st.htm": {
+      "congress": 117,
+      "content_hash": "9376de7c4a3899ded9d1ea20011170cf589605ed1819580a6ac8765faf16e032",
+      "covered_laws_text": "Public Laws 117-1 to 117-81",
+      "covered_ranges": [
+        "1-81"
+      ],
+      "distinct_titles": 43,
+      "fetched_at": "2026-08-11T20:49:55.328725+00:00",
+      "kind": "pl",
+      "prepared_date": "2021-12-27",
+      "row_count": 2892,
+      "rows_without_identifier": 1,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl117pl_1st.htm",
+      "stat_volume": 135,
+      "warnings": 0
+    },
+    "tbl117pl_2nd.htm": {
+      "congress": 117,
+      "content_hash": "24a16cce0c71b495c32b8a71bc126a1ab83431fa007016f7b1b91f9e40888c5d",
+      "covered_laws_text": "Public Laws 117-82 to 117-362",
+      "covered_ranges": [
+        "82-362"
+      ],
+      "distinct_titles": 52,
+      "fetched_at": "2026-08-11T20:49:37.234207+00:00",
+      "kind": "pl",
+      "prepared_date": "2023-01-05",
+      "row_count": 5988,
+      "rows_without_identifier": 130,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl117pl_2nd.htm",
+      "stat_volume": 136,
+      "warnings": 0
+    },
+    "tbl118pl_1st.htm": {
+      "congress": 118,
+      "content_hash": "ba495a5bd86d0270a7ec69ec4415ebb65107852e1d0811ee759f97722d48600b",
+      "covered_laws_text": "Public Laws 118-1 to 118-34",
+      "covered_ranges": [
+        "1-34"
+      ],
+      "distinct_titles": 37,
+      "fetched_at": "2026-08-11T20:49:33.658024+00:00",
+      "kind": "pl",
+      "prepared_date": "2023-12-26",
+      "row_count": 1491,
+      "rows_without_identifier": 0,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl118pl_1st.htm",
+      "stat_volume": 137,
+      "warnings": 0
+    },
+    "tbl118pl_2nd.htm": {
+      "congress": 118,
+      "content_hash": "73b341a3935dc46fd246fc960ac233efc4921a863a523611779c9f83c40e6bb7",
+      "covered_laws_text": "Public Laws 118-35 to 118-274",
+      "covered_ranges": [
+        "35-274"
+      ],
+      "distinct_titles": 47,
+      "fetched_at": "2026-08-11T20:49:31.784809+00:00",
+      "kind": "pl",
+      "prepared_date": "2025-01-06",
+      "row_count": 2987,
+      "rows_without_identifier": 0,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl118pl_2nd.htm",
+      "stat_volume": 138,
+      "warnings": 0
+    },
+    "tbl119pl_1st.htm": {
+      "congress": 119,
+      "content_hash": "1dbeb709e5491f163f3c2b9e10df0fa3c906221838a6fb39f6319e4038db61d5",
+      "covered_laws_text": "Public Laws 119-1 through 119-69 and 119-71 through 119-73",
+      "covered_ranges": [
+        "1-69",
+        "71-73"
+      ],
+      "distinct_titles": 42,
+      "fetched_at": "2026-08-11T20:49:25.726522+00:00",
+      "kind": "pl",
+      "prepared_date": "2026-01-23",
+      "row_count": 3049,
+      "rows_without_identifier": 0,
+      "rows_without_pl": 0,
+      "session": 1,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl119pl_1st.htm",
+      "stat_volume": 139,
+      "warnings": 0
+    },
+    "tbl119pl_2nd.htm": {
+      "congress": 119,
+      "content_hash": "19d8b638f361fb2ca26eef89f1c1eb4c96b1c4d0d8f5d8b3ab30c66f8c7f48b6",
+      "covered_laws_text": "Public Law 119-70 and Public Laws 119-74 through 119-102",
+      "covered_ranges": [
+        "70-70",
+        "74-102"
+      ],
+      "distinct_titles": 36,
+      "fetched_at": "2026-08-11T20:49:23.647303+00:00",
+      "kind": "pl",
+      "prepared_date": "2026-07-12",
+      "row_count": 517,
+      "rows_without_identifier": 0,
+      "rows_without_pl": 0,
+      "session": 2,
+      "skipped_lines": 0,
+      "source_url": "https://uscode.house.gov/classification/tbl119pl_2nd.htm",
+      "stat_volume": 140,
+      "warnings": 0
+    }
+  },
+  "prior_source_url": "https://uscode.house.gov/classification/priortables.shtml",
+  "source_url": "https://uscode.house.gov/classification/tables.shtml"
+}
