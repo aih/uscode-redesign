@@ -43,7 +43,7 @@ The named comparison skips to the one that does not.
 id: compare-from-the-section
 title: Compare a section with the last release point that changed it
 steps:
-  - goto: /app/us/usc/t16/s45f
+  - goto: /app/us/usc/t16/s2201
   - click: .compare__summary
     caption: Compare with… opens under the section heading.
   - click: .compare__go
@@ -60,10 +60,10 @@ saying how much of the change is in it — including when the answer is none.
 id: compare-keeps-the-provision
 title: Compare a subsection and see it marked in the section's redline
 steps:
-  - goto: /app/us/usc/t16/s45f/c/5
+  - goto: /app/us/usc/t16/s2201/b/1
   - click: .compare__summary
   - click: .compare__go
-  - expect: { selector: ".diff-focusnote", contains: "(c)(5)" }
+  - expect: { selector: ".diff-focusnote", contains: "(b)(1)" }
     caption: The redline says which subsection it was asked about.
   - expect: { selector: "#diff-focus", visible: true }
     caption: And marks it inside the whole section.
