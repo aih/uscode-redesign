@@ -1,0 +1,159 @@
+---
+/**
+ * A page of classification rows as one table (ADR-0067).
+ *
+ * Five columns, in the source's own order: the US Code citation the provision
+ * was classified to, what was done to it, the public law, the law's own section
+ * designator, and the Statutes at Large page.
+ *
+ * Every cell has a rendering for the case where the source supplies nothing,
+ * because across the corpus each of them does: 1,533 rows carry no
+ * `usc_identifier` (1,531 of them appendix rows, which derive none by rule), 2
+ * carry no public law, and 6,053 cite a Stat. page with no integer form. A cell
+ * with nothing behind it is an em dash, and a citation with no identifier is
+ * text — never a link into the reader that would 404.
+ *
+ * The table sits in the `uslm-tablewrap` scroll region: five columns do not fit
+ * 320 CSS px, and a table that pushes the page sideways is a WCAG 1.4.10 Reflow
+ * failure `make shots` refuses (ADR-0039). The wrapper takes `tabindex="0"` and
+ * a region role so a keyboard can reach the scroll.
+ */
+import { appHref, govinfoPlawHref, statViewerHref } from "../lib/url";
+import { resultCitation } from "../lib/cite";
+import type { ClassificationEntry } from "../lib/types";
+
+interface Props {
+  entries: ClassificationEntry[];
+  /** Names the scroll region and titles the table. */
+  caption: string;
+  /** The Statutes at Large volume the whole file is in, where it has one. The
+   *  104th spans two volumes and has none, so its rows carry their own. */
+  statVolume?: number | null;
+}
+
+const { entries, caption, statVolume = null } = Astro.props;
+
+/** `18 U.S.C. § 3551`, or `Title 42` for a row naming no section.
+ *
+ * `resultCitation` writes the title phrase, so an appendix row reads
+ * `5 U.S.C. App. § 101`. The section symbol is supplied here because the tables
+ * write a bare number where a search result's `num` already carries one. */
+function citation(entry: ClassificationEntry): string | null {
+  const num = entry.section_raw?.trim();
+  return resultCitation(entry.title_num, num ? `§ ${num}` : null, "section");
+}
+
+/** The source's own token, with its one meaningful blank spelled out: OLRC's
+ *  legend reads "No entry or 'nt' by itself means the section or note is
+ *  amended", and an empty cell in a table reads as missing data instead. */
+function description(entry: ClassificationEntry): string {
+  const raw = entry.description_raw?.trim() ?? "";
+  return raw === "" ? "Amended" : raw;
+}
+
+/** `118-42`. Derived rather than stored (spec §2), and null when the row's
+ *  Pub. L. cell would not parse — 2 rows in the corpus. */
+function plLabel(entry: ClassificationEntry): string | null {
+  if (entry.pl_label) return entry.pl_label;
+  if (entry.pl_congress == null || entry.pl_num == null) return null;
+  return `${entry.pl_congress}-${entry.pl_num}`;
+}
+
+/** The law's section, with the new section it adds where the source names one:
+ *  `202 "1948"`. */
+function plSection(entry: ClassificationEntry): string {
+  const parts = [entry.pl_section_raw?.trim(), entry.new_section_quote?.trim()].filter(Boolean);
+  return parts.join(" ");
+}
+
+/** The volume this row's page is in: the file's, or the row's own where the
+ *  file has none. */
+function volumeOf(entry: ClassificationEntry): number | null {
+  return entry.stat_volume ?? statVolume;
+}
+
+/** statviewer takes a page *number*. `110 Stat. 3009-587` and
+ *  `113 Stat. 1501A-594` are single pages whose labels it cannot take, so those
+ *  rows print their label and link nothing. */
+function statPageHref(entry: ClassificationEntry, label: string): string | null {
+  const volume = volumeOf(entry);
+  if (volume == null) return null;
+  return /^\d+$/u.test(label) ? statViewerHref(volume, label) : null;
+}
+---
+
+<div class="uslm-tablewrap classtable__wrap" role="region" tabindex="0" aria-label={caption}>
+  <table class="usa-table usa-table--striped classtable">
+    <caption>{caption}</caption>
+    <thead>
+      <tr>
+        <th scope="col">U.S. Code</th>
+        <th scope="col">Description</th>
+        <th scope="col">Pub. L.</th>
+        <th scope="col">Sec.</th>
+        <th scope="col">Stat. page</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        entries.map((entry) => {
+          const cite = citation(entry);
+          const law = plLabel(entry);
+          const section = plSection(entry);
+          return (
+            <tr>
+              <th scope="row" class="classtable__cite">
+                {cite == null ? (
+                  <span class="classtable__none" aria-label="No U.S. Code citation">
+                    —
+                  </span>
+                ) : entry.usc_identifier ? (
+                  <a href={appHref(entry.usc_identifier)}>{cite}</a>
+                ) : (
+                  cite
+                )}
+              </th>
+              <td>{description(entry)}</td>
+              <td class="classtable__pl">
+                {law == null ? (
+                  <span class="classtable__none" aria-label="No public law recorded">
+                    —
+                  </span>
+                ) : entry.pl_congress != null && entry.pl_num != null ? (
+                  <a href={govinfoPlawHref(entry.pl_congress, entry.pl_num)}>{law}</a>
+                ) : (
+                  law
+                )}
+              </td>
+              <td class="classtable__sec">
+                {section === "" ? <span class="classtable__none">—</span> : section}
+              </td>
+              <td class="classtable__stat">
+                {entry.stat_page_labels.length === 0 ? (
+                  <span class="classtable__none">—</span>
+                ) : (
+                  entry.stat_page_labels.map((label, index) => {
+                    const href = statPageHref(entry, label);
+                    const volume = volumeOf(entry);
+                    return (
+                      <>
+                        {index > 0 && ", "}
+                        {href ? (
+                          <a href={href} title={`${volume} Stat. ${label}`}>
+                            {label}
+                          </a>
+                        ) : (
+                          label
+                        )}
+                      </>
+                    );
+                  })
+                )}
+              </td>
+            </tr>
+          );
+        })
+      }
+    </tbody>
+  </table>
+</div>

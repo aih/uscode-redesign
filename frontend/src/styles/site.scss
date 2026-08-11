@@ -4816,6 +4816,262 @@ dialog.palette {
   color: inherit;
 }
 
+/* ------------------------------------------------- classification tables
+ *
+ * ADR-0067's three routes. Every colour here is an existing token, so
+ * `scripts/contrast.py` already measures every pair these rules paint.
+ *
+ * The tables are five and four columns wide, which does not fit 320 CSS px in
+ * any typography — so they sit in `.uslm-tablewrap`, the focusable scroll region
+ * `uslm.ts` puts statutory tables in, and the page itself never scrolls
+ * sideways (WCAG 1.4.10, asserted by `make shots`).
+ */
+
+.classlookup {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--panel);
+  /* The listbox is absolutely positioned against this. */
+  position: relative;
+}
+
+.classlookup__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.35rem;
+}
+
+.classlookup__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.classlookup__input {
+  flex: 1 1 12rem;
+  /* USWDS gives `.usa-input` a `max-width` in `em` of its own; the row is what
+   * bounds this box. */
+  max-width: none;
+  margin-top: 0;
+}
+
+/* USWDS gives `.usa-button` `width: 100%` below 480px, which at 320 takes the
+ * whole row and leaves the field beside it nothing (ADR-0056's trap). The row
+ * wraps, so the button may have its own line — it may not have the field's. */
+.classlookup__go {
+  flex: 0 0 auto;
+  width: auto;
+  margin-right: 0;
+}
+
+.classlookup__hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Over the page rather than in flow: a list that pushed the content down would
+ * move the thing the reader is aiming at every time a request answered. */
+.classlookup__list {
+  position: absolute;
+  z-index: 20;
+  left: 1rem;
+  right: 1rem;
+  top: calc(100% - 0.5rem);
+  max-height: 18rem;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--field);
+  border: 1px solid var(--edge);
+}
+
+.classlookup__option {
+  display: block;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+}
+
+.classlookup__option:last-child {
+  border-bottom: 0;
+}
+
+/* `aria-selected` is the state, so the paint follows the attribute rather than a
+ * class the script would have to keep in step with it. */
+.classlookup__option[aria-selected="true"] {
+  background: var(--panel);
+  outline: 2px solid var(--edge);
+  outline-offset: -2px;
+}
+
+.classlookup__option-label {
+  display: block;
+}
+
+.classlookup__option-hint {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* The no-script answer to the same query: links rather than a listbox. */
+.classfind {
+  margin: 1.5rem 0;
+}
+
+.classfind__list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.classfind__list li {
+  margin-bottom: 0.5rem;
+}
+
+.classfind__hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.classcurrent {
+  margin: 1.5rem 0;
+}
+
+.classindex__count,
+.classtable__stat,
+.classtable__sec {
+  font-variant-numeric: tabular-nums;
+}
+
+.classtable {
+  font-size: 0.9rem;
+}
+
+/* The citation column is the one worth keeping on one line; the rest may wrap. */
+.classtable__cite {
+  white-space: nowrap;
+}
+
+.classtable__pl {
+  white-space: nowrap;
+}
+
+/* An em dash standing for a cell the source leaves empty — 1,533 rows have no
+ * identifier and 6,053 no integer Stat. page. Muted, because it is the absence
+ * of a fact rather than one. */
+.classtable__none {
+  color: var(--muted);
+}
+
+.classtable__note {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* --------------------------------------------------------- filter pills
+ *
+ * The filters in force, each with the same view minus itself. `.sortbar` beside
+ * it is a list of orders and only one is ever on; these are a list of things
+ * that can be taken off one at a time, so the dismiss control is part of the
+ * pill rather than the pill being a toggle. */
+.filterpills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+}
+
+.filterpills__label {
+  color: var(--muted);
+}
+
+.filterpills__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.filterpills__pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0.5rem 0.15rem 0.6rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.filterpills__name {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.filterpills__value {
+  font-weight: 700;
+}
+
+/* A 24px target inside a pill that is shorter than that: the padding is what
+ * makes it tappable, and `line-height: 1` keeps it from stretching the pill. */
+.filterpills__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  line-height: 1;
+  text-decoration: none;
+  border-radius: 999px;
+}
+
+.filterpills__clear:hover {
+  background: var(--rule);
+}
+
+.classkey {
+  margin: 2rem 0 0;
+  font-size: 0.9rem;
+}
+
+.classkey__summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.classkey__list {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+}
+
+.classkey__list dt {
+  font-weight: 700;
+  margin-top: 0.5rem;
+}
+
+.classkey__list dt:first-child {
+  margin-top: 0;
+}
+
+.classkey__list dd {
+  margin: 0 0 0 1rem;
+  color: var(--muted);
+}
+
 /* ------------------------------------------------- the source XML redline
  *
  * ADR-0026 moved the reader's diff onto the reading text and left the verbatim
