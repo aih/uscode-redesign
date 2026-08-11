@@ -1,0 +1,97 @@
+<!-- Verbatim slice of https://uscode.house.gov/classification/tables.shtml
+     (fetched 2026-08-11): the whole table of session cells and its tfoot, with the
+     site chrome around it removed. Both covered-range forms the page uses are here
+     - the 119th 2nd session's gap written inline ("Public Law 119-70 and Public
+     Laws 119-74 through 119-102") and the 1st session's written across <br/> lines
+     - as are the `cd` links that must be dropped, and both ECCT links, one of which
+     names its session only in the sentence around it. -->
+<html><body>
+<table border="2" cellpadding="10">
+
+ <tr valign="top">
+
+
+
+
+   <td align="center" width="50%">
+   <p>2026
+    <br />119th Congress, 2nd Session
+    <br />Public Law 119-70 and Public Laws 119-74 through 119-102
+   </p>
+   <p>&#160;&#160;Sorted in Public Law order
+    <br /><a href="tbl119pl_2nd.htm">(HTML format)</a>
+    <br />&#160;
+  </p>
+   <p>&#160;&#160;Sorted in U.S. Code order
+    <br /><a href="tbl119cd_2nd.htm">(HTML format)</a>
+    <br />&#160;
+   </p>
+  </td>
+
+
+
+ 
+   <td align="center" width="50%">
+   <p>2025
+    <br />119th Congress, 1st Session
+    <br />Public Laws 119-1 through 119-69
+	<br /> and
+	<br /> 119-71 through 119-73
+   </p>
+   <p>&#160;&#160;Sorted in Public Law order
+    <br /><a href="tbl119pl_1st.htm">(HTML format)</a>
+    <br />&#160;
+  </p>
+   <p>&#160;&#160;Sorted in U.S. Code order
+    <br /><a href="tbl119cd_1st.htm">(HTML format)</a>
+    <br />&#160;
+   </p>
+  </td>
+
+
+
+
+
+
+
+
+
+ 
+</tr>
+  <tfoot>
+   <tr>
+     <td colspan="2" style="border:none; text-align:center;"><em>Prior tables can be found <a href="priortables.shtml">here</a>.</em></td>
+   </tr>
+
+   <tr>
+   
+     <td colspan="2" style="border:none; text-align:center;">
+	 
+	 For editorial changes in Code classifications of earlier laws made in the process of classifying laws enacted during the 119th Congress, 2nd Session, see the table <a href="ecct.html">here</a>.
+	 
+	 <br/>
+	 For editorial changes in Code classifications of earlier laws made in the process of classifying laws enacted during the 119th Congress, 1st Session, see the table <a href="ecct_119-1.html">here</a>.
+	 
+	 </td>
+   </tr>
+
+<!-- 
+   <tr>
+     <td colspan="2" style="border:none; text-align:center;">For tables showing the dispositions of statutory notes that were editorially transferred related to the new part V of subtitle A of Title 10, Armed Forces, 
+see the disposition table <a href="t10NoteDispoPostPartVReorg.pdf">here</a>, and the reverse table organized by new location in the Code <a href="t10NoteDispoPostPartVReorgReverse.pdf">here</a>. </td>
+   </tr>
+-->
+
+  </tfoot>  
+ 
+
+
+ 
+ 
+ 
+ 
+
+ 
+</tr> 
+</table>
+</body></html>
