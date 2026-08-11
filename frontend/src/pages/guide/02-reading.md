@@ -157,7 +157,9 @@ steps:
     caption: The display switches are the last group.
 ```
 
-The light/dark switch is on the bar itself, one tap from any page.
+The light/dark switch is on the bar itself, one tap from any page. The moon on the bar and the
+**Dark** row under Display are the same setting: either one moves both, and both name the theme they
+will switch to rather than the one you are in.
 
 ```scenario
 id: theme-on-the-bar
@@ -170,6 +172,10 @@ steps:
     caption: The moon on the bar switches the page to dark.
   - expect: { selector: ".navbar > .theme-toggle", contains: "Light" }
     caption: The switch now names the way back.
+  - click: .navmenu__summary
+    caption: The Display group holds the same switch.
+  - expect: { selector: ".navdrop__list .theme-toggle__label", contains: "Light" }
+    caption: It reads Light too — one setting, named the same way in both places.
 ```
 
 **The breadcrumb** at the top of every page runs from the title down to the provision on screen:
