@@ -10,7 +10,7 @@
   "routesWithViolations": 4,
   "totals": {
     "violations": 8,
-    "nodes": 1787,
+    "nodes": 1955,
     "critical": 1,
     "serious": 7,
     "moderate": 0,
@@ -23,7 +23,7 @@
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 996,
+          "nodes": 1162,
           "firstTarget": "div[data-role=\"redoc-description\"] > p:nth-child(1) > code",
           "help": "Elements must meet minimum color contrast ratio thresholds",
           "seenAt": [
@@ -32,13 +32,14 @@
             "/redoc at 320px in dark",
             "/redoc at 320px in light",
             "/redoc at 375px in dark",
+            "/redoc at 375px in light",
             "/redoc with forced-colors: active"
           ]
         },
         {
           "id": "select-name",
           "impact": "critical",
-          "nodes": 12,
+          "nodes": 14,
           "firstTarget": "#panel\\:r9\\:0 > div > .sc-bbSZdi.fIhWJA > .sc-dtInlm.sc-fBWQRz.kLounG > select",
           "help": "Select element must have an accessible name",
           "seenAt": [
@@ -47,6 +48,7 @@
             "/redoc at 320px in dark",
             "/redoc at 320px in light",
             "/redoc at 375px in dark",
+            "/redoc at 375px in light",
             "/redoc with forced-colors: active"
           ]
         },
