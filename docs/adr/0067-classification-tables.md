@@ -41,9 +41,11 @@ are the same row. The PDF variants some vintages link are the same file again; H
 ### 2. Column offsets come from the header line, and a missing token is a parse error
 
 The ruler under the header merges Title and Section into one dash group, so it can supply five
-offsets where six are needed. The header supplies six, and they move between vintages: the 110th
-through 119th are `0/6/19/36/45/67`, the 104th `0/6/20/42/51/68`. They are derived per file from the
-positions of `Title`, `Section`, `Description`, `Pub. L.`, `Sec.` and the Stat. token.
+offsets where six are needed. The header supplies six, and they move between vintages: the 110th and
+118th files measure `0/6/19/36/45/67`, the 104th `0/6/20/42/51/68`. They are derived per file from
+the positions of `Title`, `Section`, `Description`, `Pub. L.`, `Sec.` and the Stat. token. Three of
+the 31 `pl` files have been through this parser; the other 28 are unmeasured, and the rule below is
+what makes an unmeasured vintage a failed backfill rather than a corrupted one.
 
 A header token this parser cannot find raises `ClassificationParseError` rather than falling back to
 a guess. Guessed offsets do not fail — they slice plausible garbage out of every row of the file and
@@ -94,7 +96,15 @@ the global search box is untouched.
 ### 7. Identifier derivation is three rules, and null is a valid answer
 
 `usc_identifier` is what joins a classification row to the reader. It is derived only where the table
-can actually name a provision:
+can actually name a provision, and it is spelled the way the corpus spells it:
+
+* **A hyphen in a section number becomes an EN DASH.** The tables write `254c-15` with U+002D and
+  the corpus writes `/us/usc/t42/s254c–15` with U+2013 — all 5,697 hyphenated section identifiers
+  use the en dash and none uses the hyphen (CLAUDE.md gotcha 17). Derived without the fold, 697 of
+  the 9,299 distinct identifiers the three measured files produce match no section, which is ~5% of
+  all rows. `section_norm` keeps the plain hyphen, because that is the column typed input is matched
+  against; the 342 corpus identifiers that do contain a hyphen are appendix date paths
+  (`/us/usc/t50a/act/1917-10-06/ch106/s1`), which rule 1 derives nothing for.
 
 * **Appendix rows derive nothing.** The table writes `5A / 101`; an appendix provision's real
   identifier is `/us/usc/t5a/pl/92/463/s1` or `/us/usc/t50a/act/1917-05-18/ch15/s212`, and not one of
@@ -135,5 +145,4 @@ page head, column header and selected data rows, with only the site chrome remov
 comment added. `tests/fixtures/ecct.html` is the whole page, because the ECCT is one small malformed
 table — a `<div>` opens inside the `<table>` and closes before `</table>` — and walking past the
 chrome is part of what the parser has to do. That malformation is also why the ECCT is read by regex:
-an HTML parser is entitled to reparent a table it meets that in, and a table that quietly loses its
-rows is worse than no table.
+an HTML parser is entitled to reparent a table it meets that in.
