@@ -11,8 +11,10 @@ from collections.abc import Iterator
 
 from db.base import SessionLocal
 from storage.accounts import AccountsRepository
+from storage.classification import ClassificationRepository
 from storage.postgres import PostgresRepository
 from storage.postgres_accounts import PostgresAccounts
+from storage.postgres_classification import PostgresClassification
 from storage.repository import Repository
 
 
@@ -26,3 +28,9 @@ def get_accounts() -> Iterator[AccountsRepository]:
     """Request-scoped accounts store — users, sessions, watchlists (PLAN §4)."""
     with SessionLocal() as session:
         yield PostgresAccounts(session)
+
+
+def get_classification() -> Iterator[ClassificationRepository]:
+    """Request-scoped classification store — OLRC's Classification Tables (ADR-0067)."""
+    with SessionLocal() as session:
+        yield PostgresClassification(session)

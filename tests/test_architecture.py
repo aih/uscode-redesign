@@ -129,6 +129,28 @@ def test_the_accounts_protocol_and_the_postgres_implementation_agree():
     assert required <= set(dir(PostgresAccounts))
 
 
+def test_the_classification_protocol_and_the_postgres_implementation_agree():
+    """Same check again, for the third storage module (docs/adr/0067).
+
+    The Classification Tables are neither version resolution nor account CRUD,
+    so they get a protocol of their own rather than methods on `Repository` —
+    and a method declared there and never written here would surface as an
+    AttributeError on the first request that needed it, which is the failure
+    the other two tests exist to prevent.
+    """
+    from storage.classification import ClassificationRepository
+    from storage.postgres_classification import PostgresClassification
+
+    required = {
+        name
+        for name, value in vars(ClassificationRepository).items()
+        if callable(value) and not name.startswith("_")
+    }
+
+    assert required
+    assert required <= set(dir(PostgresClassification))
+
+
 def test_uslm_element_names_stay_out_of_extraction_code():
     """Architecture rule 2: what a section *is* is decided only by a parser.
 

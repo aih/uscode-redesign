@@ -82,15 +82,17 @@ from db.models import ClassificationSourceCheck
 from db.models import EcctEntry as EcctEntryRow
 from ingest.download import Opener, throttle
 from ingest.inventory import USER_AGENT
+from storage.classification import CLASSIFICATION_SOURCE_URL, law_in_ranges
 
 CLASSIFICATION_BASE_URL = "https://uscode.house.gov/classification/"
-CLASSIFICATION_SOURCE_URL = CLASSIFICATION_BASE_URL + "tables.shtml"
-"""The current congress's entry page, and the home of the change-detection key.
 
-Spec §4 gives this constant to `storage/classification.py`, so `/api/v1` can name
-the source without importing the ingest layer — the `SOURCE_URL` precedent in
-`storage/repository.py`. That module is phase C3 and does not exist yet, so the
-value lives here until it does, and is re-imported from storage afterwards."""
+#: `CLASSIFICATION_SOURCE_URL` — the current congress's entry page, and the home
+#: of the change-detection key — and `law_in_ranges` are defined in
+#: `storage/classification.py` and imported back, so `/api/v1` can name the
+#: source and decide whether a public law is covered without importing the
+#: ingest layer. That is the `SOURCE_URL` precedent in
+#: `storage/repository.py`; both names are still addressed as
+#: `ingest.classification.<name>` by the CLI, the poll and their tests.
 
 PRIOR_CLASSIFICATION_SOURCE_URL = CLASSIFICATION_BASE_URL + "priortables.shtml"
 """The 104th–118th entry page. Read by the backfill; the daily poll reads only
@@ -364,14 +366,6 @@ def parse_covered_laws(text: str) -> tuple[tuple[str, ...], int | None, int | No
         return (), None, None
     bounds = [tuple(int(part) for part in segment.split("-")) for segment in segments]
     return tuple(segments), min(b[0] for b in bounds), max(b[1] for b in bounds)
-
-
-def law_in_ranges(law_num: int, ranges: Iterable[str]) -> bool:
-    """Whether a law number falls inside any `'70-70'`-style covered segment."""
-    return any(
-        int(segment.split("-")[0]) <= law_num <= int(segment.split("-")[1])
-        for segment in ranges
-    )
 
 
 def _covered_text_for(html: str, href_pos: int) -> str:
