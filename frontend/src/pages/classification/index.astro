@@ -1,0 +1,242 @@
+---
+/**
+ * `/app/classification` — OLRC's classification tables (ADR-0067).
+ *
+ * The tables record which provision of which public law was classified to which
+ * US Code section. This page is the way in: the lookup box, the session OLRC is
+ * currently adding to, and every table the site holds.
+ *
+ * `?q=` is the lookup's no-script path. The query is answered by
+ * `/api/v1/classifications/suggest`, the same endpoint the island calls, so
+ * both paths get the same parse — this page renders the answers as links
+ * instead of as a listbox.
+ *
+ * The freshness line here is the classification source's, from
+ * `classification_source_checks`. It is deliberately not `/api/v1/status`,
+ * which reports how current the *corpus* is: the two sources are polled
+ * separately and a page that borrowed the other's answer would state a fact
+ * about the wrong thing (ADR-0067 decision 4).
+ */
+import Base from "../../layouts/Base.astro";
+import ClassificationLookup from "../../components/ClassificationLookup.astro";
+import ErrorPage from "../../components/ErrorPage.astro";
+import {
+  ApiError,
+  fetchClassificationSuggestions,
+  fetchClassificationTables,
+} from "../../lib/api";
+import { humanizeAge } from "../../lib/currency";
+import type { ClassificationFile, ClassificationSuggestion, ClassificationTables } from "../../lib/types";
+import { classificationEcctHref, classificationHref, sessionSegment } from "../../lib/url";
+
+const query = (Astro.url.searchParams.get("q") ?? "").trim();
+
+let data: ClassificationTables | null = null;
+let failure: { status: number; detail: string } | null = null;
+
+try {
+  data = await fetchClassificationTables();
+} catch (error) {
+  if (error instanceof ApiError) {
+    failure = { status: error.status, detail: error.detail };
+    Astro.response.status = error.status;
+  } else {
+    console.error("classification tables request failed", error);
+    failure = {
+      status: 503,
+      detail: "The classification tables are unavailable right now. Please try again shortly.",
+    };
+    Astro.response.status = 503;
+  }
+}
+
+const suggestions: ClassificationSuggestion[] = query
+  ? await fetchClassificationSuggestions(query)
+  : [];
+
+const files = (data?.files ?? []).filter((file) => file.kind === "pl");
+const ecctFiles = (data?.files ?? []).filter((file) => file.kind === "ecct");
+
+/** Newest first: congress descending, then session. The 104th's `0` is a whole
+ *  congress and sorts below its own sessions, of which it has none. */
+const ordered = [...files].sort((a, b) => b.congress - a.congress || b.session - a.session);
+const current = ordered[0] ?? null;
+
+const totalRows = files.reduce((sum, file) => sum + file.row_count, 0);
+
+/** How many hours ago the check ran, for `humanizeAge` — the same coarse
+ *  phrasing the corpus's currency note uses. */
+function ageHours(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return null;
+  return (Date.now() - then) / 3_600_000;
+}
+
+const check = data?.check ?? null;
+
+/** "Public Laws 118-3 through 118-158", or the verbatim covered text where the
+ *  source wrote one with a gap in it. */
+function coverage(file: ClassificationFile): string {
+  if (file.covered_laws_text) return file.covered_laws_text;
+  if (file.covered_ranges.length > 0) {
+    return file.covered_ranges.map((range) => `${file.congress}-${range}`).join(", ");
+  }
+  return "—";
+}
+
+function sessionName(file: ClassificationFile): string {
+  return file.session === 0 ? "Whole congress" : `Session ${file.session}`;
+}
+
+function usDate(iso: string | null): string {
+  if (!iso) return "—";
+  const [year, month, day] = iso.slice(0, 10).split("-");
+  return year && month && day ? `${month}/${day}/${year}` : iso;
+}
+
+/** `104` → `104th`, `101` → `101st`. The tables run from the 104th, all of
+ *  which take `th`, but a helper that only works on the data in hand is a
+ *  helper that breaks when the source adds a row. */
+function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+}
+---
+
+{/* `wide` because the tables below are five and four columns. At 64em and up
+    that is `--measure` plus 18rem; under it the measure is unchanged and the
+    tables scroll inside their own region. */}
+<Base title="Classification tables · U.S. Code" wide>
+  <h1 class="doc-title">Classification tables</h1>
+
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    !failure && (
+      <>
+        <p class="lede">
+          Which provision of which public law was classified to which section of the Code. OLRC
+          publishes one table per congress per session, in public law order;{" "}
+          {totalRows.toLocaleString()} rows across {files.length} tables are held here.
+        </p>
+
+        <ClassificationLookup value={query} />
+
+        {query && (
+          <section class="classfind" aria-labelledby="classfind-heading">
+            <h2 class="toc-group" id="classfind-heading">
+              {suggestions.length === 0
+                ? `Nothing matches “${query}”`
+                : `Matches for “${query}”`}
+            </h2>
+            {suggestions.length === 0 ? (
+              <p class="doc-meta">
+                A public law is written <code>118-33</code>, a provision of one{" "}
+                <code>118-33 101</code>, and a Code section <code>16 usc 3831</code>.
+              </p>
+            ) : (
+              <ul class="classfind__list">
+                {suggestions.map((suggestion) => (
+                  <li>
+                    <a class="classfind__link" href={suggestion.href}>
+                      {suggestion.label}
+                    </a>
+                    {suggestion.hint && <span class="classfind__hint"> {suggestion.hint}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {check &&
+          (check.ok ? (
+            <p class="doc-meta source-currency" role="status">
+              Checked uscode.house.gov for new classification tables{" "}
+              {humanizeAge(ageHours(check.checked_at))}.
+              {check.changed_files.length > 0 && (
+                <span class="source-currency__detail">
+                  {" "}
+                  {check.changed_files.length} table
+                  {check.changed_files.length === 1 ? "" : "s"} changed at that check.
+                </span>
+              )}
+            </p>
+          ) : (
+            <div class="usa-alert usa-alert--warning usa-alert--slim" role="status">
+              <div class="usa-alert__body">
+                <p class="usa-alert__text">
+                  The last check of uscode.house.gov's classification tables failed,{" "}
+                  {humanizeAge(ageHours(check.checked_at))}. Nothing below is known to be out of
+                  date, and nothing below is known to be current either.
+                </p>
+              </div>
+            </div>
+          ))}
+
+        {current && (
+          <section class="classcurrent" aria-labelledby="classcurrent-heading">
+            <h2 class="toc-group" id="classcurrent-heading">
+              Currently being classified
+            </h2>
+            <p>
+              <a href={classificationHref(current.congress, sessionSegment(current.session))}>
+                {ordinal(current.congress)} Congress, {sessionName(current).toLowerCase()}
+              </a>{" "}
+              — {current.row_count.toLocaleString()} rows covering {coverage(current)}.
+            </p>
+            <p class="doc-meta">
+              Prepared by the Office of the Law Revision Counsel {usDate(current.prepared_date)}.
+              The current session's table is republished as new laws are classified.
+            </p>
+          </section>
+        )}
+
+        <h2 class="toc-group" id="classindex-heading">Every table</h2>
+        <div
+          class="uslm-tablewrap"
+          role="region"
+          tabindex="0"
+          aria-labelledby="classindex-heading"
+        >
+          <table class="usa-table usa-table--striped classindex">
+            <caption>Classification tables, newest first</caption>
+            <thead>
+              <tr>
+                <th scope="col">Congress</th>
+                <th scope="col">Session</th>
+                <th scope="col">Public laws covered</th>
+                <th scope="col">Rows</th>
+                <th scope="col">Prepared</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordered.map((file) => (
+                <tr>
+                  <th scope="row">
+                    <a href={classificationHref(file.congress, sessionSegment(file.session))}>
+                      {ordinal(file.congress)}
+                    </a>
+                  </th>
+                  <td>{sessionName(file)}</td>
+                  <td>{coverage(file)}</td>
+                  <td class="classindex__count">{file.row_count.toLocaleString()}</td>
+                  <td>{usDate(file.prepared_date)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="toc-group">Editorial Classification Change Table</h2>
+        <p>
+          A row marked <code>ed chg</code> or <code>nt ed chg</code> was reclassified editorially
+          rather than by a public law. <a href={classificationEcctHref()}>The ECCT</a> records
+          those moves — {ecctFiles.reduce((sum, file) => sum + file.row_count, 0)} rows.
+        </p>
+      </>
+    )
+  }
+</Base>

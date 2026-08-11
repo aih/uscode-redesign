@@ -1,0 +1,147 @@
+---
+/**
+ * `/app/classification/ecct` — the Editorial Classification Change Table
+ * (ADR-0067).
+ *
+ * Where a classification table row reads `ed chg` or `nt ed chg`, the provision
+ * moved editorially rather than by a public law, and this is the table that says
+ * where from and where to. It is 21 rows, so it is one page with no paging.
+ *
+ * Both classification columns link into the reader when the title and section
+ * are known. The two "Provision" columns are full public law citation strings,
+ * verbatim from the source.
+ */
+import Base from "../../layouts/Base.astro";
+import ErrorPage from "../../components/ErrorPage.astro";
+import { ApiError, fetchEcct } from "../../lib/api";
+import { resultCitation } from "../../lib/cite";
+import type { ClassificationPage, EcctEntry } from "../../lib/types";
+import { appHref, classificationHref } from "../../lib/url";
+
+let page: ClassificationPage<EcctEntry> | null = null;
+let failure: { status: number; detail: string } | null = null;
+
+try {
+  page = await fetchEcct();
+} catch (error) {
+  if (error instanceof ApiError) {
+    failure = { status: error.status, detail: error.detail };
+    Astro.response.status = error.status;
+  } else {
+    console.error("ECCT request failed", error);
+    failure = {
+      status: 503,
+      detail: "The classification tables are unavailable right now. Please try again shortly.",
+    };
+    Astro.response.status = 503;
+  }
+}
+
+const items = page?.items ?? [];
+
+/**
+ * A classification cell: the source's own string, linked to the section when
+ * this reader can address it.
+ *
+ * `section_norm` carries a plain hyphen and the corpus writes an en dash
+ * (gotcha 17), so no identifier is built from it here — an identifier guessed
+ * with the wrong dash resolves to nothing. The link is only offered for a
+ * section number with no hyphen in it at all, which is 5,697 of 65,938 sections
+ * short of the whole Code and never wrong about the ones it does offer.
+ */
+function classificationHrefFor(titleNum: string | null, sectionNorm: string | null): string | null {
+  if (!titleNum || !sectionNorm) return null;
+  if (!/^\d+[a-z]*$/u.test(sectionNorm)) return null;
+  return appHref(`/us/usc/t${titleNum}/s${sectionNorm}`);
+}
+
+function label(titleNum: string | null, sectionNorm: string | null, raw: string): string {
+  const cite = resultCitation(titleNum, sectionNorm ? `§ ${sectionNorm}` : null, "section");
+  return cite ?? raw;
+}
+---
+
+<Base title="Editorial Classification Change Table · U.S. Code" wide>
+  <h1 class="doc-title">Editorial Classification Change Table</h1>
+
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    !failure && (
+      <>
+        <p class="lede">
+          Provisions reclassified editorially rather than by a public law. A classification table
+          row marked <code>ed chg</code> or <code>nt ed chg</code> points here.{" "}
+          <a href={classificationHref()}>All classification tables</a>.
+        </p>
+
+        {items.length === 0 ? (
+          <p>The Editorial Classification Change Table holds no rows.</p>
+        ) : (
+          <div
+            class="uslm-tablewrap"
+            role="region"
+            tabindex="0"
+            aria-label="Editorial classification changes"
+          >
+            <table class="usa-table usa-table--striped classtable">
+              <caption>
+                Editorial classification changes — {items.length.toLocaleString()} rows
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Former classification</th>
+                  <th scope="col">New classification</th>
+                  <th scope="col">Provision affected</th>
+                  <th scope="col">Provision prompting the change</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((entry) => {
+                  const formerHref = classificationHrefFor(
+                    entry.former_title_num,
+                    entry.former_section_norm,
+                  );
+                  const newHref = classificationHrefFor(
+                    entry.new_title_num,
+                    entry.new_section_norm,
+                  );
+                  return (
+                    <tr>
+                      <th scope="row" class="classtable__cite">
+                        {formerHref ? (
+                          <a href={formerHref}>
+                            {label(
+                              entry.former_title_num,
+                              entry.former_section_norm,
+                              entry.former_raw,
+                            )}
+                          </a>
+                        ) : (
+                          entry.former_raw
+                        )}
+                        {entry.former_is_note && <span class="classtable__note"> note</span>}
+                      </th>
+                      <td class="classtable__cite">
+                        {newHref ? (
+                          <a href={newHref}>
+                            {label(entry.new_title_num, entry.new_section_norm, entry.new_raw)}
+                          </a>
+                        ) : (
+                          entry.new_raw
+                        )}
+                        {entry.new_is_note && <span class="classtable__note"> note</span>}
+                      </td>
+                      <td>{entry.provision_affected}</td>
+                      <td>{entry.provision_prompting}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>
+    )
+  }
+</Base>
