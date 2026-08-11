@@ -169,9 +169,20 @@ _MONTHS = {
 }
 
 _DATA_LINE_RE = re.compile(r"^(?P<title>\d+[A-Za-z]?)(?=\s|$)")
+_CORRECTED_ROW_RE = re.compile(r"^(?P<marker>\*+)(?P<title>\d+[A-Za-z]?)\s+(?=\S)")
 _PL_CELL_RE = re.compile(r"^(?P<congress>\d{2,3})-(?P<num>\d{1,4})$")
 _PL_OVERFLOW_RE = re.compile(r"^(?P<description>.*?)(?P<pl>\d{2,3}-\d{1,4})\s*$")
-_STAT_CELL_RE = re.compile(r"^[\d,\s\-]*$")
+_STAT_PAGE_TOKEN = r"\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?"
+_STAT_CELL_RE = re.compile(
+    rf"^\s*(?:{_STAT_PAGE_TOKEN}(?:[,\s]+{_STAT_PAGE_TOKEN})*)?\s*$"
+)
+"""What a Stat. cell can look like: page tokens, separated by commas or spaces.
+
+A page is not always a number and not always digits. `110 Stat. 3009-587` is one
+page and so is `113 Stat. 1501A-594` — the appropriations volumes number their
+divisions with a letter, and 3,323 rows across the 105th–107th cite one. A cell
+this rejects is a cell the row's own Sec. column has overrun into, which is what
+the caller then tries to re-split."""
 _QUOTED_SECTION_RE = re.compile(r'^(?P<section>.*?)\s*"(?P<quote>[^"]*)"\s*$')
 _TRANSFER_RE = re.compile(
     r"(?:\btr\s+)?\b(?P<direction>to|fr)\s+(?P<target>(?:\d+[A-Za-z]?/)?\d[\w.\-–]*)"
@@ -718,7 +729,9 @@ def parse_classification_file(
             f"{filename}: no column ruler found inside <pre> — the table layout changed"
         )
     header_line = lines[ruler_index - 1]
-    offsets = column_offsets(header_line, filename=filename)
+    offsets = refine_offsets(
+        column_offsets(header_line, filename=filename), lines[ruler_index + 1 :]
+    )
     stat_match = _STAT_HEADER_RE.search(header_line, offsets[5])
     stat_volume = (
         int(stat_match.group("volume")) if stat_match and stat_match.group("volume") else None
@@ -740,20 +753,23 @@ def parse_classification_file(
     entries: list[ClassificationEntry] = []
     skipped: list[str] = []
     for raw_line in data_lines:
-        visible = _visible(raw_line)
-        if not visible.strip():
+        printed = _visible(raw_line)
+        if not printed.strip():
             continue
+        visible, marker = realign_corrected_row(printed, title_width=offsets[1])
         if not _DATA_LINE_RE.match(visible):
             # Not a row and not blank: a footnote, a repeated header on a page
             # break, or a format this parser has not seen. Counted and shown in the
             # verification artifact rather than discarded silently.
-            skipped.append(visible)
-            collector.warn(f"{filename}: line does not start with a title number: {visible!r}")
+            skipped.append(printed)
+            collector.warn(f"{filename}: line does not start with a title number: {printed!r}")
             continue
         entries.append(
             _parse_row(
                 raw_line,
                 visible,
+                printed=printed,
+                marker=marker,
                 row_seq=len(entries),
                 offsets=offsets,
                 file_stat_volume=stat_volume,
@@ -815,6 +831,68 @@ def column_offsets(header_line: str, *, filename: str = "") -> list[int]:
     return offsets
 
 
+_OFFSET_SPLIT_TOLERANCE = 0.2
+"""Above this share of rows, a boundary that splits a token is the boundary being
+wrong rather than the rows overrunning it. The two are far apart in the real
+files: the worst legitimate overrun is 3% of a file's rows, and the two files
+whose Sec. column sits one character left of where their header puts it split
+99.9% and 74% of theirs."""
+
+_OFFSET_SEARCH = (-1, 1, -2, 2)
+
+_OFFSET_MINIMUM_ROWS = 20
+"""Below this many rows a file cannot say anything about its own columns: one row
+that overruns is 100% of a one-row file. The smallest published table is 517 rows,
+so this bound only ever applies to a fragment."""
+
+
+def refine_offsets(offsets: list[int], data_lines: Iterable[str], *, sample: int = 500) -> list[int]:
+    """Move a column boundary the file's own rows disagree with.
+
+    The header is where the offsets come from, and in 29 of the 31 published
+    tables it is right. In `tbl112pl_2nd.htm` and `tbl113pl_1st.htm` the Sec.
+    column starts one character to the left of where their header puts it, and
+    the header is not wrong about anything else — every other column lines up.
+    Read from the header alone, the Pub. L. cell of every row in those files ends
+    in the first digit of the Sec. cell, `_PL_CELL_RE` rejects it, and the guard
+    against inventing a truncated law number leaves 3,717 rows with no public law
+    at all. That is the largest defect the first full-corpus run found.
+
+    A boundary that lands between two non-space characters has cut one value in
+    half. Rows do that legitimately when a cell overruns (spec §1 hazard 2), so
+    the signal is not any single row but the share of them: a boundary that splits
+    a token in more than a fifth of the file's rows is moved to whichever nearby
+    column splits fewest, and one that does not is left exactly where the header
+    said. A boundary is never moved onto or past its neighbour, and a file with
+    too few rows to measure keeps the header's answer whatever its rows do.
+    """
+    lines = [line for line in data_lines if line.strip()][:sample]
+    if len(lines) < _OFFSET_MINIMUM_ROWS:
+        return offsets
+    refined = list(offsets)
+    for index in range(1, len(refined)):
+        rate = _split_rate(lines, refined[index])
+        if rate <= _OFFSET_SPLIT_TOLERANCE:
+            continue
+        best = refined[index]
+        for delta in _OFFSET_SEARCH:
+            candidate = refined[index] + delta
+            if candidate <= refined[index - 1] or (
+                index + 1 < len(refined) and candidate >= refined[index + 1]
+            ):
+                continue
+            candidate_rate = _split_rate(lines, candidate)
+            if candidate_rate < rate:
+                best, rate = candidate, candidate_rate
+        refined[index] = best
+    return refined
+
+
+def _split_rate(lines: Sequence[str], at: int) -> float:
+    """The share of rows in which this boundary falls inside a value."""
+    return sum(_boundary_splits_a_token(line, at) for line in lines) / len(lines)
+
+
 def _boundary_splits_a_token(visible: str, at: int) -> bool:
     """True when a column boundary falls between two non-space characters.
 
@@ -826,6 +904,32 @@ def _boundary_splits_a_token(visible: str, at: int) -> bool:
     if at <= 0 or at >= len(visible):
         return False
     return not visible[at - 1].isspace() and not visible[at].isspace()
+
+
+def realign_corrected_row(visible: str, *, title_width: int) -> tuple[str, str]:
+    """Put a corrected row's columns back where the header says they are.
+
+    OLRC marks a row it has since corrected with an asterisk in front of the title
+    number, and a second round of corrections with two — "`*` denotes an item that
+    was corrected as of October 6, 2005" says the footnote of `tbl108pl_1st.htm`.
+    The marker is written into the Title column, which is six characters wide and
+    holds at most four, and it does not always fit in the padding: `*16   3503`
+    leaves every later column where it was, `*42    7619` moves them one to the
+    right and `**15    683` two. Twenty-nine rows across three files are marked,
+    and unmarked ones start with a digit, so before this they were not recognised
+    as rows at all and were dropped.
+
+    The Title cell is rewritten without the marker and padded back to its declared
+    width, which restores the alignment of every column after it. Returns the
+    realigned line and the marker, which goes back onto `title_raw` — column 1 as
+    printed — and into no parsed field. There is no column of its own for it, and
+    inventing one would be a schema for an annotation the source explains in a
+    footnote.
+    """
+    match = _CORRECTED_ROW_RE.match(visible)
+    if match is None:
+        return visible, ""
+    return match.group("title").ljust(title_width) + visible[match.end() :], match.group("marker")
 
 
 def _split_near(region: str, nominal: int) -> tuple[str, str] | None:
@@ -952,10 +1056,33 @@ def parse_description(description: str) -> tuple[bool, str | None, str | None, s
     return is_note, action, counterpart, " ".join(other) or None
 
 
+def _split_at_linked_page(region: str, links: Sequence[tuple[int, int]]) -> tuple[str, str] | None:
+    """Split an overrun Sec./Stat. region where the row's own statviewer link says
+    the page number starts.
+
+    `4001(b)(2)(A), (B), (D)(iii)1967` has no whitespace for `_split_near` to cut
+    at, and the page is butted straight against the designator. The anchor around
+    it names page 1967, which is evidence from the document rather than a guess, so
+    the last occurrence of those digits is the split — provided what follows is
+    Stat.-shaped, which is what stops a designator that happens to contain the page
+    number from being cut in half.
+    """
+    for _volume, page in links:
+        index = region.rfind(str(page))
+        if index <= 0:
+            continue
+        section, stat = region[:index].strip(), region[index:].strip()
+        if section and _STAT_CELL_RE.match(stat):
+            return section, stat
+    return None
+
+
 def _parse_row(
     raw_line: str,
     visible: str,
     *,
+    printed: str | None = None,
+    marker: str = "",
     row_seq: int,
     offsets: list[int],
     file_stat_volume: int | None,
@@ -1007,7 +1134,10 @@ def _parse_row(
         # that overruns with digits — `101, 102, 103, 104, 105` — leaves a Stat. cell
         # of `5 3` that `_STAT_CELL_RE` accepts, and 29 of the 31 files carry no
         # statviewer links for the cross-check below to catch it with.
-        overflow = _split_near(visible[offsets[4] :], offsets[5] - offsets[4])
+        region = visible[offsets[4] :]
+        overflow = _split_near(region, offsets[5] - offsets[4]) or _split_at_linked_page(
+            region, links
+        )
         if overflow is not None:
             section_of_law, stat_raw = overflow
         else:
@@ -1037,12 +1167,15 @@ def _parse_row(
 
     is_appendix = bool(title_raw) and title_raw[-1].isalpha()
     title_num = title_raw.lower()
+    # A corrected row's asterisks are part of column 1 as printed and of no
+    # parsed field; `title_num` is what anything downstream joins on.
+    title_raw = marker + title_raw
     section_norm = normalize_section(section_raw)
     is_note, action, counterpart, act_name = parse_description(description_raw)
 
     return ClassificationEntry(
         row_seq=row_seq,
-        raw_line=visible,
+        raw_line=printed if printed is not None else visible,
         title_raw=title_raw,
         title_num=title_num,
         is_appendix=is_appendix,
