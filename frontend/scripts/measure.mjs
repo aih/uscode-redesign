@@ -1,5 +1,6 @@
 /**
- * How many characters a line of statutory text actually holds.
+ * How many characters a line of statutory text holds, and what that costs in
+ * scroll length.
  *
  * The reading measure is a brand decision (ADR-0052) and it is stated as a
  * width — `--measure` — while the thing it is meant to control is a character
@@ -18,106 +19,32 @@
  * `--reading-size`, so the *claim* is that the character count does not move
  * when the density does — and a claim measured in one setting only is not
  * measured). Exits non-zero if a median falls outside 62-70 at a width where
- * the column is at its maximum, so this is a check as well as a generator.
+ * the column is at its maximum.
+ *
+ * The band check also runs in `make test-e2e`, which CI runs on every push
+ * (`tests/e2e/typography.spec.ts`); the measuring itself is shared with it
+ * rather than written twice. What only lives here is `documentHeights`, which
+ * is a record rather than a check — and one that had gone three sessions stale
+ * without saying so, which is why the artifact now names the commit it was
+ * measured at.
  */
+import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
+import {
+  BAND,
+  DENSITIES,
+  FULL_WIDTH,
+  PAGE,
+  WIDTHS,
+  lineLengths,
+  summarise,
+  withDensity,
+} from "./measure-lines.mjs";
+
 const SITE = process.env.SITE ?? "http://localhost:8000";
 const OUT = new URL("../../docs/verification/", import.meta.url);
-
-/** Widths that put the reading column at, below and well above its maximum. */
-const WIDTHS = [375, 768, 1280];
-
-/** The two settings of the reading-density control (ADR-0054). `null` is the
- * default — no attribute on `<html>` at all, which is what a reader who has
- * never touched the control gets. */
-const DENSITIES = [null, "compact"];
-
-/** The band ADR-0052 holds the median in. Only checked where the column is at
- * its maximum: below that the viewport is the measure and 38 characters is the
- * screen's fault, not the token's. */
-const BAND = { low: 62, high: 70 };
-const FULL_WIDTH = 768;
-
-/** Stamp the density on `<html>` before the page's own scripts run, the way the
- * pre-paint bootstrap in `Base.astro` does — so the page is laid out at this
- * density from the first paint and nothing here is measuring a reflow. */
-async function withDensity(context, density) {
-  await context.addInitScript((value) => {
-    try {
-      if (value) localStorage.setItem("usc-density", value);
-      else localStorage.removeItem("usc-density");
-    } catch {
-      // No storage in this context; the default stands and the run says so.
-    }
-  }, density);
-}
-
-/** A long, ordinary provision — prose rather than a list of short paragraphs. */
-const PAGE = "/app/us/usc/t16/s45f";
-
-/**
- * Line lengths of every paragraph of statutory text on the page.
- *
- * Each character is measured on its own — a one-character Range, its rectangle
- * bucketed by vertical midpoint — and the characters sharing a bucket are one
- * rendered line. Slower than bisecting for the line breaks, and correct where
- * bisection is not: a footnote marker or a `<sup>` inside a provision is a
- * shorter box on the same line, so "the y position increases with the offset"
- * is not true of this text.
- *
- * The last line of a paragraph is dropped. It ends where the sentence ends
- * rather than where the column does, and counting it reports a measure narrower
- * than the one on screen.
- */
-async function lineLengths(page) {
-  return page.evaluate(() => {
-    const lengths = [];
-    const nodes = document.querySelectorAll(".section-body p, .section-body .prov__text");
-    for (const node of nodes) {
-      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-      const runs = [];
-      let current;
-      while ((current = walker.nextNode())) runs.push(current);
-      if (runs.length === 0) continue;
-      if (runs.reduce((sum, r) => sum + r.length, 0) < 120) continue;
-
-      const buckets = new Map();
-      const probe = document.createRange();
-      for (const run of runs) {
-        for (let i = 0; i < run.length; i += 1) {
-          probe.setStart(run, i);
-          probe.setEnd(run, i + 1);
-          const rect = probe.getBoundingClientRect();
-          if (rect.width === 0 && rect.height === 0) continue;
-          // 4px buckets: enough to separate two lines, coarse enough that a
-          // superscript on the same line does not become a line of its own.
-          const line = Math.round((rect.top + rect.height / 2) / 4);
-          buckets.set(line, (buckets.get(line) ?? 0) + 1);
-        }
-      }
-      const lines = [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([, n]) => n);
-      if (lines.length < 2) continue;
-      lengths.push(...lines.slice(0, -1));
-    }
-    return lengths;
-  });
-}
-
-function summarise(lengths) {
-  const sorted = [...lengths].sort((a, b) => a - b);
-  const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
-  return {
-    lines: sorted.length,
-    min: sorted[0] ?? null,
-    p10: at(0.1) ?? null,
-    median: at(0.5) ?? null,
-    p90: at(0.9) ?? null,
-    max: sorted[sorted.length - 1] ?? null,
-    mean: sorted.length ? Number((sorted.reduce((a, b) => a + b, 0) / sorted.length).toFixed(1)) : null,
-  };
-}
 
 /**
  * Sections to record the scroll length of.
@@ -127,6 +54,22 @@ function summarise(lengths) {
  * Three lengths of section: short, long, and one carrying a table.
  */
 const HEIGHTS = ["/app/us/usc/t16/s45f", "/app/us/usc/t16/s470a", "/app/us/usc/t16/s1801"];
+
+/** The commit these heights describe. A scroll length is only comparable to
+ * another one taken against the same chrome, and the last three sessions of
+ * this file were read as though they were. */
+function commit() {
+  try {
+    const rev = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      encoding: "utf8",
+    }).trim();
+    const dirty =
+      execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim().length > 0;
+    return dirty ? `${rev}-dirty` : rev;
+  } catch {
+    return null;
+  }
+}
 
 const browser = await chromium.launch();
 const results = [];
@@ -195,12 +138,17 @@ await writeFile(
         "Range.getClientRects() rather than estimated from a glyph width. Final lines of a " +
         "paragraph are excluded: they end where the sentence ends, not where the column does. " +
         "ADR-0052 holds the median between 62 and 70 at the widths where the column is at its " +
-        "maximum, and this script exits non-zero when one falls outside it. Both reading " +
+        "maximum. That check also runs in frontend/tests/e2e/typography.spec.ts, which CI runs " +
+        "on every push, over the same measuring code in scripts/measure-lines.mjs. Both reading " +
         "densities are measured (ADR-0054): --measure is a multiple of --reading-size, so the " +
         "character count is supposed to be the same in either, and that is the claim these two " +
         "sets of rows check. documentHeights is the scroll length of three sections at two " +
-        "widths, which is what a narrower measure and a tighter leading cost.",
+        "widths, which is what a narrower measure and a tighter leading cost; nothing gates on " +
+        "it, so it carries the commit it was measured at — a scroll length is comparable only " +
+        "to one taken against the same chrome.",
       site: SITE,
+      measuredAt: commit(),
+      band: BAND,
       results,
       documentHeights: heights,
     },

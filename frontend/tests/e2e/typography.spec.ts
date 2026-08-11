@@ -18,6 +18,21 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test } from "@playwright/test";
 
+import {
+  BAND,
+  DENSITIES,
+  FULL_WIDTH,
+  PAGE,
+  WIDTHS,
+  lineLengths,
+  summarise,
+  withDensity,
+} from "../../scripts/measure-lines.mjs";
+
+/** `playwright.config.ts` resolves `baseURL`; these run in their own contexts,
+ *  which do not inherit it. */
+const SITE = process.env.SITE ?? "http://localhost:8000";
+
 const LADDER = JSON.parse(
   readFileSync(
     fileURLToPath(new URL("../../../docs/verification/ladder.json", import.meta.url)),
@@ -197,6 +212,50 @@ test.describe("the five kinds of text", () => {
     );
     expect(aligns).not.toContain("justify");
   });
+});
+
+/**
+ * The reading measure, in characters (ADR-0052).
+ *
+ * `--measure` is a width and the claim it exists to keep is a character count,
+ * so the two are related only through the face and the size: a face change, a
+ * size change or a density change moves the count without moving the token.
+ * `scripts/measure.mjs` has checked this since ADR-0052 and nothing ran it —
+ * its numbers were three sessions stale when they were last regenerated — so
+ * the check runs here, where CI runs it on every push, over the measuring code
+ * that script uses (`scripts/measure-lines.mjs`). What stays in `make measure`
+ * is the scroll length beside it, which is a record and gates nothing.
+ */
+test.describe("the reading measure", () => {
+  for (const density of DENSITIES) {
+    const label = density ?? "comfortable";
+    for (const width of WIDTHS.filter((w) => w >= FULL_WIDTH)) {
+      test(`holds ${BAND.low}-${BAND.high} characters a line at ${width}px, ${label}`, async ({
+        browser,
+      }) => {
+        // A fresh context rather than the fixture's page: the density has to be
+        // in storage before the first paint, or this measures a reflow.
+        const context = await browser.newContext({ viewport: { width, height: 900 } });
+        await withDensity(context, density);
+        const page = await context.newPage();
+        await page.goto(`${SITE}${PAGE}`, { waitUntil: "networkidle" });
+        await page.evaluate(() => document.fonts.ready);
+
+        const characters = summarise(await lineLengths(page));
+        await context.close();
+
+        expect(characters.lines, "no statutory text was measured").toBeGreaterThan(50);
+        expect(
+          characters.median,
+          `median characters a line at ${width}px in ${label}`,
+        ).toBeGreaterThanOrEqual(BAND.low);
+        expect(
+          characters.median,
+          `median characters a line at ${width}px in ${label}`,
+        ).toBeLessThanOrEqual(BAND.high);
+      });
+    }
+  }
 });
 
 test.describe("reading density", () => {

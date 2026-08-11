@@ -97,6 +97,11 @@ shots:
 # browser broke the lines (ADR-0052) -> docs/verification/measure.json. Also the
 # scroll length of three sections, which is what the measure costs. Needs the
 # site running (`make dev-all`).
+#
+# The band check here is a second copy of the one `make test-e2e` runs on every
+# push (tests/e2e/typography.spec.ts, over scripts/measure-lines.mjs). What only
+# this target produces is documentHeights, which gates nothing and therefore
+# names the commit it was measured at.
 measure:
 	cd frontend && node scripts/measure.mjs
 
