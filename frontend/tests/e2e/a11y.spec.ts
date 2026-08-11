@@ -387,6 +387,25 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await page.locator(".diff-view--source").waitFor({ timeout: 15000 });
     },
   },
+  "classification-lookup-open": {
+    routeId: "classification",
+    setup: async (page) => {
+      // The listbox exists only while a request's answer is on screen, and its
+      // rows are `role="option"` in an absolutely positioned box over the page
+      // — markup no other scan in this matrix reaches. One option is made
+      // active, because `aria-activedescendant` and `aria-selected` are the
+      // half of the combobox pattern a closed box cannot show.
+      await page.goto("/app/classification", { waitUntil: "load" });
+      const box = page.locator("[data-classlookup-input]");
+      await box.waitFor({ timeout: 5000 });
+      await box.click();
+      await box.fill("118-42");
+      await expect(page.locator("[data-classlookup-list] [role='option']").first()).toBeVisible({
+        timeout: 5000,
+      });
+      await page.keyboard.press("ArrowDown");
+    },
+  },
   "search-box-filled": {
     routeId: "section",
     setup: async (page) => {

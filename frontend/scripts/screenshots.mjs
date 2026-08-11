@@ -47,6 +47,10 @@ const PAGES = [
   // without knowing which route to open — and a table of colour pairs, which is
   // the other shape that pushes a phone sideways.
   ["design", "/app/design"],
+  // Session 48: a classification table (ADR-0067). Five columns of fixed-width
+  // source data — the widest table on the site, and the one most likely to push
+  // a phone sideways, which is what the overflow assertion below is for.
+  ["classification", "/app/classification/118/2"],
 ];
 
 /**
