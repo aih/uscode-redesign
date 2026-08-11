@@ -1,0 +1,242 @@
+---
+/**
+ * ⌘K: the search box and this page's commands, over whatever you were reading
+ * (ADR-0062).
+ *
+ * A modal `<dialog>`, for the reasons `ShortcutsDialog` is one — the top layer,
+ * the focus trap, the inert background and `Escape` are the element's rather
+ * than this file's. A closed `<dialog>` is `display: none` by the UA
+ * stylesheet, so with scripting off nothing here renders and nothing changes:
+ * the header's box is still a plain GET form to `/app/goto` (ADR-0023), and so
+ * is this one.
+ *
+ * ## What it adds over `/`
+ *
+ * `/` focuses the box where the box is, which below 64em is inside the
+ * hamburger (ADR-0058) — a key that opens a menu to reach a control. `⌘K` opens
+ * this over the page from wherever the keyboard already is, including from
+ * inside a text field, which is the one place the site's other shortcuts
+ * deliberately never fire.
+ *
+ * The rows under the input are the second half. They are the only place several
+ * of these destinations are named — `/app/settings` is linked from no rendered
+ * page while accounts are off — and "Compare with the previous release point"
+ * is the entry point to `/app/diff`, which is otherwise three hops from the
+ * text it compares.
+ *
+ * ## It parses nothing
+ *
+ * The input submits to `/app/goto`, the router that already decides whether a
+ * string is a citation or words. `citeparse.py` is the only thing that makes
+ * that decision (ADR-0023) and there is no TypeScript copy of it, so a palette
+ * that showed you the parse before you pressed Enter would be a second parser
+ * disagreeing with the first. See `lib/palette.ts`.
+ *
+ * ## Rows are focused, not selected
+ *
+ * `↑`/`↓` move real DOM focus between the rows rather than moving an
+ * `aria-activedescendant` around a `role="listbox"`. The rows are links and one
+ * button, so `Enter` is then the platform's — no key handler decides what
+ * activating a row means, and a row reached by Tab behaves the same as one
+ * reached by `↓`. `↓` from the input, or from the last row, lands on the first;
+ * `↑` from the first row goes back to the input, which is where the reader came
+ * from. Filtered-out rows are `hidden`, so `actions()` skips them and the keys
+ * never focus a row nobody can see.
+ *
+ * ## The rest of the island, in prose rather than in bytes
+ *
+ * It ships on every route, so its comments are on every route's budget
+ * (ADR-0046) — the reasoning that would ordinarily sit beside the code is here,
+ * as it is in `KeyboardNav`.
+ *
+ *   * **`opener` is stored rather than left to the dialog's own focus restore**,
+ *     so `Escape` puts the keyboard back exactly where it was even when the
+ *     palette was opened from inside another control.
+ *   * **The empty-state line appears only once something has been typed.** An
+ *     empty box showing every row is not a search that found nothing.
+ *   * **`KeyboardNav` owns the key map** (`lib/shortcuts.ts`) and dispatches
+ *     `usc:palette`; nothing here decides which key opens this.
+ *   * **The shortcut row closes this first.** Two modals stacked is a reader
+ *     pressing Escape twice. The listener below runs before `KeyboardNav`'s on
+ *     the same button, because that component is further down `Base.astro` and
+ *     attaches its own later.
+ *   * **A modal's backdrop fills the viewport**, so a click on it is reported
+ *     against the dialog with coordinates outside its box. `ShortcutsDialog`
+ *     measures the same way for the same reason.
+ */
+import { matchKey, siteCommands, type PaletteCommand } from "../lib/palette";
+import { gotoHref } from "../lib/url";
+
+interface Props {
+  /** The rows this page adds above the site-wide ones. A section page passes
+   *  the two that need a provision on screen; everything else passes none. */
+  commands?: PaletteCommand[];
+  /** Render as a block rather than a modal dialog, for `/app/design`
+   *  (ADR-0053). A second `<dialog id="palette">` on the page that already
+   *  carries the real one would duplicate the id, and a modal held open would
+   *  make the rest of the design page inert. */
+  panel?: boolean;
+  /** Distinguishes the specimen's ids from the live one's. */
+  idPrefix?: string;
+}
+
+const { commands = [], panel = false, idPrefix = "palette" } = Astro.props;
+const Wrapper = panel ? "div" : "dialog";
+const inputId = `${idPrefix}-q`;
+const headingId = `${idPrefix}-heading`;
+const listId = `${idPrefix}-list`;
+
+const rows: { command: PaletteCommand; key: string }[] = [...commands, ...siteCommands()].map(
+  (command) => ({ command, key: matchKey(command) }),
+);
+---
+
+<Wrapper
+  class:list={["palette", panel && "palette--panel"]}
+  id={panel ? undefined : idPrefix}
+  aria-labelledby={panel ? undefined : headingId}
+  data-palette={panel ? undefined : ""}
+>
+  <h2 class="palette__heading" id={headingId}>Search, or run a command</h2>
+
+  {/* The same action and the same field name as the header's box, so the
+      no-script path and the palette path land on the identical URL. */}
+  <form class="palette__form" method="get" action={gotoHref()} role="search" aria-labelledby={headingId}>
+    <label class="palette__label" for={inputId}>Search or go to a citation</label>
+    <div class="palette__row">
+      <input
+        class="usa-input palette__input"
+        id={inputId}
+        type="search"
+        name="q"
+        placeholder="11 usc 523(a)(1), or any words"
+        autocomplete="off"
+        spellcheck="false"
+        enterkeyhint="search"
+        aria-describedby={`${inputId}-hint`}
+        data-palette-input
+      />
+      <button class="usa-button palette__go" type="submit">Go</button>
+    </div>
+    <p class="palette__hint" id={`${inputId}-hint`}>
+      A citation goes straight there; anything else searches the text.
+    </p>
+  </form>
+
+  <h3 class="palette__group" id={`${listId}-label`}>Commands</h3>
+  <ul class="palette__list" id={listId} aria-labelledby={`${listId}-label`}>
+    {
+      rows.map(({ command, key }) => (
+        <li class="palette__item" data-palette-row data-label={key}>
+          {command.href ? (
+            <a class="palette__action" href={command.href} data-palette-id={command.id}>
+              <span class="palette__action-label">{command.label}</span>
+              {command.hint && <span class="palette__action-hint">{command.hint}</span>}
+            </a>
+          ) : (
+            /* The shortcut list is a dialog, not a page. `data-shortcuts-open`
+               is `KeyboardNav`'s own hook — the footer's link uses it too — so
+               this row opens the real dialog rather than a copy of it. */
+            <button
+              class="palette__action"
+              type="button"
+              data-palette-id={command.id}
+              data-shortcuts-open
+            >
+              <span class="palette__action-label">{command.label}</span>
+              {command.hint && <span class="palette__action-hint">{command.hint}</span>}
+            </button>
+          )}
+        </li>
+      ))
+    }
+  </ul>
+
+  {/* Not `hidden` behind a script that might not run: the row is empty only
+      once the reader has typed, and until then the script has certainly run. */}
+  <p class="palette__empty" hidden data-palette-empty>No command matches what you typed.</p>
+
+  <p class="palette__foot">
+    <kbd>↑</kbd> <kbd>↓</kbd> to move · <kbd>Enter</kbd> to open · <kbd>Esc</kbd> to close
+  </p>
+</Wrapper>
+
+{
+  !panel && (
+    <script is:inline>
+      {
+        const palette = document.querySelector("[data-palette]");
+        if (palette) {
+          const input = palette.querySelector("[data-palette-input]");
+          const rows = [...palette.querySelectorAll("[data-palette-row]")];
+          const empty = palette.querySelector("[data-palette-empty]");
+          let opener = null;
+
+          function actions() {
+            return rows
+              .filter((row) => !row.hidden)
+              .map((row) => row.querySelector(".palette__action"));
+          }
+
+          function filter() {
+            const needle = input.value.trim().toLowerCase();
+            let shown = 0;
+            for (const row of rows) {
+              const match = !needle || (row.dataset.label || "").includes(needle);
+              row.hidden = !match;
+              if (match) shown += 1;
+            }
+            empty.hidden = shown > 0 || !needle;
+          }
+
+          function open() {
+            if (palette.open) return;
+            opener = document.activeElement;
+            input.value = "";
+            filter();
+            palette.showModal();
+            input.focus();
+          }
+
+          input.addEventListener("input", filter);
+          document.addEventListener("usc:palette", open);
+
+          palette.addEventListener("close", () => {
+            opener?.focus?.({ preventScroll: true });
+            opener = null;
+          });
+
+          palette.addEventListener("keydown", (event) => {
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+            const list = actions();
+            if (list.length === 0) return;
+            event.preventDefault();
+            const at = list.indexOf(document.activeElement);
+            if (event.key === "ArrowDown") {
+              list[at === -1 || at === list.length - 1 ? 0 : at + 1].focus();
+            } else if (at <= 0) {
+              input.focus();
+            } else {
+              list[at - 1].focus();
+            }
+          });
+
+          palette
+            .querySelector("[data-shortcuts-open]")
+            ?.addEventListener("click", () => palette.close());
+
+          palette.addEventListener("click", (event) => {
+            if (event.target !== palette) return;
+            const box = palette.getBoundingClientRect();
+            const inside =
+              event.clientX >= box.left &&
+              event.clientX <= box.right &&
+              event.clientY >= box.top &&
+              event.clientY <= box.bottom;
+            if (!inside) palette.close();
+          });
+        }
+      }
+    </script>
+  )
+}

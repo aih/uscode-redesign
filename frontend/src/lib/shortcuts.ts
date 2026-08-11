@@ -21,6 +21,16 @@ export interface Shortcut {
   keys: string[];
   /** As `KeyboardEvent.key` reports them. */
   codes: string[];
+  /**
+   * Held with ⌘ on a Mac or Ctrl elsewhere.
+   *
+   * The island refuses every other modifier — those belong to the browser and
+   * the operating system — so this is the one exception, and it is an exception
+   * because a bare letter cannot be a shortcut that also works while the reader
+   * is typing in the search box. `keyMap()` prefixes these `Mod+`, which is
+   * also what keeps `⌘K` and a plain `k` from being the same binding.
+   */
+  mod?: boolean;
   /** The sentence in the help dialog. Imperative, no trailing stop. */
   what: string;
 }
@@ -124,6 +134,17 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         what: "Search or go to a citation",
       },
       {
+        action: "palette",
+        keys: ["⌘K", "Ctrl K"],
+        codes: ["k"],
+        mod: true,
+        // The same box, plus the commands for the page you are on. `/` reaches
+        // the box where it sits, which below 64em is inside the menu; this
+        // opens it over the page from wherever the keyboard already is,
+        // including from inside a text field.
+        what: "The command palette — the search box and this page's commands",
+      },
+      {
         action: "help",
         keys: ["?"],
         codes: ["?"],
@@ -133,26 +154,33 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         action: "close",
         keys: ["Esc"],
         codes: ["Escape"],
-        what: "Close this list, or a citation preview",
+        what: "Close this list, the command palette, or a citation preview",
       },
     ],
   },
 ];
 
-/** `{ "ArrowLeft": "previous-section", … }` — what the island switches on.
+/** `{ "ArrowLeft": "previous-section", "Mod+k": "palette", … }` — what the
+ * island switches on.
  *
  * Built here so the bindings are derived from the printed list rather than
  * written twice. A key claimed by two actions is a bug the dialog cannot show,
- * so it throws rather than letting the later one win silently. */
+ * so it throws rather than letting the later one win silently.
+ *
+ * A `mod` binding is keyed `Mod+<lowercase key>`, which is how `⌘K` and a plain
+ * `k` — "next section" — stay two bindings rather than one collision. The
+ * island lowercases what the event reports for the same reason: with Shift
+ * held, `KeyboardEvent.key` is `K`. */
 export function keyMap(): Record<string, string> {
   const map: Record<string, string> = {};
   for (const group of SHORTCUT_GROUPS) {
     for (const item of group.items) {
       for (const code of item.codes) {
-        if (map[code]) {
-          throw new Error(`Two actions bound to ${code}: ${map[code]} and ${item.action}`);
+        const binding = item.mod ? `Mod+${code.toLowerCase()}` : code;
+        if (map[binding]) {
+          throw new Error(`Two actions bound to ${binding}: ${map[binding]} and ${item.action}`);
         }
-        map[code] = item.action;
+        map[binding] = item.action;
       }
     }
   }

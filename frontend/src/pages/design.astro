@@ -42,6 +42,7 @@ import ApparatusDisclosure from "../components/ApparatusDisclosure.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import ChapterRail from "../components/ChapterRail.astro";
 import CitationNotFound from "../components/CitationNotFound.astro";
+import CommandPalette from "../components/CommandPalette.astro";
 import CopyColumn from "../components/CopyColumn.astro";
 import NoResults from "../components/NoResults.astro";
 import Neighbors from "../components/Neighbors.astro";
@@ -58,6 +59,7 @@ import Timeline from "../components/Timeline.astro";
 import COLOR_PAIRS from "../data/color-pairs.json";
 import { setPublicCache } from "../lib/cache";
 import { documentDiff, diffLinesHtml, diffSummary } from "../lib/diffdoc";
+import { sectionCommands } from "../lib/palette";
 import { previewFailureHtml } from "../lib/preview";
 import type { Citation, Entry, Release, SearchResultItem, VersionEntry } from "../lib/types";
 import { appHref } from "../lib/url";
@@ -272,6 +274,11 @@ const VERSIONS: VersionEntry[] = [
     status: null,
   },
 ];
+
+/** The two rows a section page adds to the command palette (ADR-0062), for the
+ *  specimen provision at the newer of the two specimen release points — so the
+ *  comparison row names the older one, as it would on a real section. */
+const PALETTE_COMMANDS = sectionCommands("/us/usc/t0/s1", [RP_NEW, RP_OLD], RP_NEW.label);
 
 /** The neighbours of § 2, and the subdivision above it — what `SectionBar` and
  *  `Neighbors` step through. */
@@ -741,6 +748,21 @@ const TYPE_ROLES = [
 
   <div class="spec">
     <ShortcutsDialog panel={true} idPrefix="shortcuts-specimen" />
+  </div>
+
+  <p class="spec__label">The command palette</p>
+
+  <p>
+    <kbd>⌘K</kbd> anywhere: the header's search box, submitting to the same <code>/app/goto</code>
+    it submits to there, over a list of the commands for the page underneath. The two rows a
+    section adds are shown here with specimen data; every other row is on every page.
+    <kbd>↑</kbd> and <kbd>↓</kbd> move focus itself between the rows rather than a selection
+    marker beside them, so <kbd>Enter</kbd> is the platform's. Rendered as a block for the same
+    reason the shortcut list above it is.
+  </p>
+
+  <div class="spec">
+    <CommandPalette panel={true} idPrefix="palette-specimen" commands={PALETTE_COMMANDS} />
   </div>
 
   {/* -------------------------------------------------------------- versions */}

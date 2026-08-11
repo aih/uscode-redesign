@@ -222,7 +222,9 @@ test.describe("the shortcut list", () => {
 
   test("the footer link opens it rather than navigating", async ({ page }) => {
     await page.goto(SECTION);
-    await page.locator("[data-shortcuts-open]").click();
+    // Named to the footer: the command palette's own row carries the same hook
+    // (ADR-0062), and its behaviour is `palette.spec.ts`'s.
+    await page.locator("footer [data-shortcuts-open]").click();
     await expect(page.locator(DIALOG)).toBeVisible();
     await expect(page).toHaveURL(/s45f/u);
   });

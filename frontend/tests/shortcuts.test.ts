@@ -52,10 +52,22 @@ describe("the shortcut list", () => {
     for (const group of SHORTCUT_GROUPS) {
       for (const item of group.items) {
         expect(item.keys.length).toBeGreaterThan(0);
-        expect(item.codes.length).toBe(item.keys.length);
         expect(item.what.trim()).not.toBe("");
+        // A `mod` shortcut is one binding printed twice — `⌘K` and `Ctrl K`
+        // are the same key held with whichever modifier this reader's
+        // keyboard has, and the page cannot know which, being one cached
+        // document served to everyone (ADR-0018). Every other row prints one
+        // spelling per code.
+        if (item.mod) expect(item.codes.length).toBe(1);
+        else expect(item.codes.length).toBe(item.keys.length);
       }
     }
+  });
+
+  it("puts a held modifier in the binding, so ⌘K is not the plain k next to it", () => {
+    const map = keyMap();
+    expect(map["Mod+k"]).toBe("palette");
+    expect(map.k).toBe("next-section");
   });
 
   it("claims no key the island refuses to act on", () => {

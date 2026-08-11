@@ -253,6 +253,7 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
     routeId: "section",
     setup: async (page) => {
       await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator(".navdrop--more > summary").click();
       await page.locator("[data-theme-toggle]").click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     },
@@ -267,6 +268,7 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       // It is one scan and not an axis because the tokens it moves are sizes,
       // and none of the rules here reads a size except through what it paints.
       await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator(".navdrop--more > summary").click();
       await page.locator("[data-density-toggle]").click();
       await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
     },
@@ -280,6 +282,18 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await page.goto(SECTION, { waitUntil: "load" });
       await page.keyboard.press("Shift+Slash");
       await expect(page.locator("#shortcuts")).toBeVisible({ timeout: 5000 });
+    },
+  },
+  "palette-open": {
+    routeId: "section",
+    setup: async (page) => {
+      // The second modal `<dialog>` on the site (ADR-0062), and the only state
+      // in this matrix carrying a list of commands: eight rows, each a control
+      // filling its own line, over a search form that is a second `role="search"`
+      // on a page that already has one.
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.keyboard.press("ControlOrMeta+k");
+      await expect(page.locator("#palette")).toBeVisible({ timeout: 5000 });
     },
   },
   "release-switcher-open": {
@@ -309,6 +323,31 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       await expect(page.locator(".navmenu")).toHaveAttribute("open", "");
       await page.locator(".footmenu__summary").click();
       await expect(page.locator(".footmenu")).toHaveAttribute("open", "");
+    },
+  },
+  "more-menu-open": {
+    // Closed, this panel is not rendered at all, so its group labels, its two
+    // display switches and the account row are markup no other scan in the
+    // matrix reaches — and it is an absolutely positioned box over the page,
+    // which is the arrangement that puts a control on top of another control's
+    // name (ADR-0061).
+    routeId: "section",
+    setup: async (page) => {
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator(".navdrop--more > summary").click();
+      await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "", {
+        timeout: 5000,
+      });
+    },
+  },
+  "titles-menu-open": {
+    routeId: "section",
+    setup: async (page) => {
+      await page.goto(SECTION, { waitUntil: "load" });
+      await page.locator(".navdrop--titles > summary").click();
+      await expect(page.locator(".navdrop--titles")).toHaveAttribute("open", "", {
+        timeout: 5000,
+      });
     },
   },
   "diff-source-expanded": {

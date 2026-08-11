@@ -13,6 +13,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 const PAGE = "/app/us/usc/t16/s45f";
 const TOGGLE = "[data-theme-toggle]";
+/** The control is a row of the navbar's More menu (ADR-0061). */
+const MORE = ".navdrop--more > summary";
 
 test.use({ colorScheme: "dark" });
 
@@ -45,6 +47,7 @@ test("the site is light even when the OS asks for dark", async ({ page }) => {
 
 test("the toggle switches to dark and back", async ({ page }) => {
   await page.goto(PAGE);
+  await page.locator(MORE).click();
   const toggle = page.locator(TOGGLE);
 
   // Hidden until the script that makes it work has run: a dead control in the
@@ -70,6 +73,7 @@ test("the toggle switches to dark and back", async ({ page }) => {
 
 test("the choice survives a navigation, and lands before the first paint", async ({ page }) => {
   await page.goto(PAGE);
+  await page.locator(MORE).click();
   await page.locator(TOGGLE).click();
 
   await page.goto("/app/releases");

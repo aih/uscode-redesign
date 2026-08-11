@@ -41,6 +41,21 @@ steps:
     caption: The front page lists the titles that are loaded.
 ```
 
+The **Titles** menu at the top of every page is the other way in. It lists a few titles and ends
+with **All titles**, which goes to this page.
+
+```scenario
+id: titles-menu-to-front-page
+title: Reach the title list from any page
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - click: .navdrop--titles > summary
+    caption: Titles opens a short list over the page.
+  - click: .navdrop__item--all
+    caption: All titles goes to the front page.
+  - expect: { selector: ".toc", contains: "Title 16" }
+```
+
 ## Inactive features and indexing
 
 Two features described in this guide are currently inactive: **accounts** and **bulk downloads**.

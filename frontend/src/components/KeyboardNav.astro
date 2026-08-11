@@ -21,14 +21,20 @@
  *
  * ## What it will not do
  *
- * No combination holding Ctrl, Alt or ⌘ is touched: those are the browser's and
- * the operating system's. Shift is allowed through for `?` alone, which needs
- * it on most layouts, so a blanket refusal would make the help key unreachable
- * on the keyboards most readers have. Nothing fires while focus is in a text
- * field, a `<select>` or anything `contenteditable`, and nothing fires while
- * the help dialog is open — otherwise `]` behind a modal scrolls a document the
- * reader cannot see. `Escape` is in the printed list and is bound to nothing
- * here: the dialog and the hover card each already handle their own.
+ * Alt is never touched, and neither is Ctrl or ⌘ except for the one binding
+ * `lib/shortcuts.ts` marks `mod` — ⌘K, the command palette (ADR-0062). Those
+ * combinations are the browser's and the operating system's, and taking one is
+ * a decision that belongs in the printed list rather than in this file. Shift
+ * is allowed through for `?` alone, which needs it on most layouts, so a
+ * blanket refusal would make the help key unreachable on the keyboards most
+ * readers have.
+ *
+ * Nothing fires while focus is in a text field, a `<select>` or anything
+ * `contenteditable` — except a `mod` binding, which is the point of having one:
+ * ⌘K has to work while the reader is typing. Nothing at all fires while a modal
+ * dialog is open, otherwise `]` behind one scrolls a document the reader cannot
+ * see. `Escape` is in the printed list and is bound to nothing here: the two
+ * dialogs and the hover card each already handle their own.
  *
  * ## In-page jumps move focus as well as the scroll position
  *
@@ -187,6 +193,12 @@ const targets = {
         case "help":
           openHelp();
           return true;
+        // The palette binds its own opening to this, so the key map stays the
+        // only place a key is attached to an action and this file does not have
+        // to know whether the palette is on the page.
+        case "palette":
+          document.dispatchEvent(new CustomEvent("usc:palette"));
+          return true;
         default:
           // A neighbour this page does not have, or `Escape`, which the dialog
           // and the hover card handle themselves.
@@ -195,7 +207,21 @@ const targets = {
     }
 
     document.addEventListener("keydown", (event) => {
-      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.altKey) return;
+      // Any modal, not just the help dialog: the palette is a second one, and a
+      // shortcut that scrolls the inert document behind either is a shortcut
+      // firing where the reader cannot see it.
+      if (document.querySelector("dialog[open]")) return;
+
+      if (event.metaKey || event.ctrlKey) {
+        // The one place a held modifier is read, and only for a binding the
+        // printed list declares `mod`. `key` is `K` with Shift held, so it is
+        // lowercased to match what `keyMap()` wrote.
+        const bound = keys[`Mod+${event.key.toLowerCase()}`];
+        if (bound && run(bound)) event.preventDefault();
+        return;
+      }
+
       if (event.shiftKey && event.key !== "?") return;
       const el = event.target;
       if (
@@ -204,7 +230,6 @@ const targets = {
       ) {
         return;
       }
-      if (dialog?.open) return;
 
       const action = keys[event.key];
       // Only once something actually happened: a key that found nothing to do

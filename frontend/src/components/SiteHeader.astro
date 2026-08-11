@@ -1,18 +1,59 @@
 ---
 /**
- * The site navbar the BUILDLOG 008 review found missing entirely: a brand, and
- * the three places a reader actually needs to reach from anywhere — the titles,
- * the release points, and the API.
+ * The site navbar: a brand, two destinations, the one search box, and a menu
+ * holding everything else (ADR-0061).
  *
- * USWDS's basic header, and no JavaScript. The nav was a plain list that wrapped
- * on a phone, on the reasoning that four links you can already read beat a menu
- * you must tap to see. There are seven items now, and at 375px they wrapped to
- * three 44px bands above the statute; between 40em and 64em they are also
- * sticky, which is 88px of `--sticky-h` spent on the menu before the reader
- * reaches a word of law. Below 64em they collapse into `.navmenu` — a native
- * `<details>`, the same script-free disclosure `ReleasePicker` uses (ADR-0056),
- * whose panel is `position: absolute` so opening it moves nothing. Above 64em
- * the summary is hidden and the list is a row again (ADR-0058).
+ * It had eleven interactive items on one row — seven links, an account control,
+ * two display toggles and the search box with its button — which is a menu that
+ * has to be read rather than scanned. It has four: **Titles**, **My
+ * Provisions**, the search box (ADR-0023) and **More**. The contextbar's
+ * release switcher (ADR-0056) is a different control on a different bar and is
+ * untouched; the "Release points" link this header used to carry was only the
+ * archive page, and it is in More.
+ *
+ * ## Three disclosures, and what closes them
+ *
+ * `Titles` and `More` are `<details>`, the script-free disclosure `ReleasePicker`
+ * chose (ADR-0056) and the menus took (ADR-0058): a `<summary>` is exposed as a
+ * button carrying its own expanded state, so neither needs an `aria-expanded`
+ * kept in sync by hand. `.navmenu` is still the hamburger below 64em.
+ *
+ * What `<details>` does not do is close. Two open menus overlapping each other
+ * is a real state of this markup, and so is a menu left open behind the reader
+ * halfway down a section. So this component ships the first script the site
+ * chrome has ever had — Escape, outside pointer, and one open at a time. It is
+ * deliberately not `<details name>`, the platform's exclusive-accordion
+ * grouping: that closes *any* same-named sibling, including an ancestor, and
+ * `Titles` sits inside `.navmenu` below 64em. The script closes what does not
+ * contain what is being opened, which is the same rule with the nesting case
+ * right.
+ *
+ * A popover open inside a menu owns Escape first, which is why the key handler
+ * steps aside for one: Escape over the Downloads explanation should shut the
+ * explanation, not the menu it was opened from.
+ *
+ * ## Why More is in the list rather than at the far right
+ *
+ * The proposal put a spacer between the search box and More. That needs either
+ * `order` on a flex item or the search box in front of the menus in the markup,
+ * and both of them make the tab order differ from the reading order at one
+ * width or the other. In the list, the reader tabs the header in the order they
+ * see it at every width, and below 64em there is one menu rather than a
+ * hamburger with a second disclosure loose beside it.
+ *
+ * ## Where the toggles went
+ *
+ * The reading density (ADR-0054) and the theme (ADR-0027) are in More under
+ * DISPLAY. They are the same two islands, rendered once — each queries
+ * `document` for a single button, so a second copy for a second width is not
+ * available and was not attempted. Below 64em that is a tap further away than
+ * the loose controls they replace; the mobile bar is B9's.
+ *
+ * The Accounts row is last, and is the slot `AuthNav` takes when
+ * `ACCOUNTS_ENABLED` flips (ADR-0034). With accounts off, the island is not
+ * rendered at all rather than rendered and hidden: a hidden island still ships
+ * its script and still asks `/api/v1/auth/me` who is reading, on every page, to
+ * be told nobody.
  */
 import AuthNav from "./AuthNav.astro";
 import ComingSoon from "./ComingSoon.astro";
@@ -25,7 +66,8 @@ import {
   DOWNLOADS_ENABLED,
   DOWNLOADS_NOTICE,
 } from "../lib/features";
-import { APP } from "../lib/url";
+import { APP, appHref } from "../lib/url";
+import { NAV_TITLES } from "../data/nav-titles";
 
 interface Props {
   /** Prefills the one search box when a page is showing a query's results. */
@@ -45,12 +87,9 @@ const { searchValue = null } = Astro.props;
       </div>
     </div>
     <nav aria-label="Primary" class="usa-nav">
-      {/* `<summary>` is exposed as a button carrying its own expanded state, so
-          the disclosure needs no `aria-expanded` of its own and no script to
-          keep one in sync. The two icons are inline rather than `<img>`: they
-          have to take their colour from `--ink` in both themes, and an external
-          SVG cannot. */}
-      <details class="navmenu">
+      {/* The two icons are inline rather than `<img>`: they have to take their
+          colour from `--ink` in both themes, and an external SVG cannot. */}
+      <details class="navmenu" data-navmenu>
         <summary class="navmenu__summary">
           <svg
             class="navmenu__icon navmenu__icon--open"
@@ -86,100 +125,155 @@ const { searchValue = null } = Astro.props;
         </summary>
         <ul class="usa-nav__primary usa-accordion">
           <li class="usa-nav__primary-item">
-            <a class="usa-nav__link" href={`${APP}/`}><span>Titles</span></a>
-          </li>
-          <li class="usa-nav__primary-item">
-            <a class="usa-nav__link" href={`${APP}/releases`}><span>Release points</span></a>
+            {/* Seven titles and a way to all of them. The shortlist is
+                editorial and says so where it is written — this header reaches
+                no data, so it could not be anything else. */}
+            <details class="navdrop navdrop--titles" data-navmenu>
+              <summary class="navdrop__summary">
+                <span>Titles</span>
+                <span class="navdrop__caret" aria-hidden="true">▾</span>
+              </summary>
+              <div class="navdrop__panel">
+                <ul class="navdrop__list">
+                  {NAV_TITLES.map((title) => (
+                    <li>
+                      <a class="navdrop__item" href={appHref(`/us/usc/t${title.num}`)}>
+                        <span class="navdrop__num">Title {title.num}</span>
+                        <span class="navdrop__name">{title.name}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                <a class="navdrop__item navdrop__item--all" href={`${APP}/`}>
+                  All titles <span aria-hidden="true">→</span>
+                </a>
+              </div>
+            </details>
           </li>
           <li class="usa-nav__primary-item">
             <a class="usa-nav__link" href={`${APP}/provisions`}><span>My Provisions</span></a>
           </li>
-          {/* The guide (ADR-0038). Ahead of the API reference because it is the
-              one thing here written for a reader who does not already know what
-              the site does. */}
           <li class="usa-nav__primary-item">
-            <a class="usa-nav__link" href={`${APP}/guide`}><span>User guide</span></a>
+            <details class="navdrop navdrop--more" data-navmenu>
+              <summary class="navdrop__summary">
+                <span>More</span>
+                <span class="navdrop__caret" aria-hidden="true">▾</span>
+              </summary>
+              <div class="navdrop__panel navdrop__panel--more">
+                <p class="navdrop__group" id="navmore-reference">Reference</p>
+                <ul class="navdrop__list" aria-labelledby="navmore-reference">
+                  <li>
+                    <a class="navdrop__item" href={`${APP}/releases`}>Release points</a>
+                  </li>
+                  {/* Not a link, because there is nothing to link to yet — it
+                      explains itself instead of 404ing. See `ComingSoon` for
+                      why it is not `<button disabled>`. */}
+                  {!DOWNLOADS_ENABLED && (
+                    <li>
+                      <ComingSoon
+                        id="downloads"
+                        label="Downloads"
+                        heading={DOWNLOADS_NOTICE.heading}
+                        lead={DOWNLOADS_NOTICE.lead}
+                        detail={DOWNLOADS_NOTICE.detail}
+                      >
+                        <p class="soon__detail">
+                          <a
+                            class="usa-link usa-link--external"
+                            rel="noopener"
+                            href="https://uscode.house.gov/download/download.shtml">
+                            Release-point downloads at the OLRC
+                          </a>
+                        </p>
+                      </ComingSoon>
+                    </li>
+                  )}
+                </ul>
+
+                <p class="navdrop__group" id="navmore-help">Help</p>
+                <ul class="navdrop__list" aria-labelledby="navmore-help">
+                  {/* The guide (ADR-0038), ahead of the API reference because
+                      it is the one thing here written for a reader who does not
+                      already know what the site does. */}
+                  <li><a class="navdrop__item" href={`${APP}/guide`}>User guide</a></li>
+                  {/* `/app/docs`, not FastAPI's `/docs`. The bare Swagger page
+                      is a different site — no navbar, no footer, no way back. */}
+                  <li><a class="navdrop__item" href={`${APP}/docs`}>API docs</a></li>
+                  {/* The disclaimer this site carries in the footer — "a
+                      conceptual redesign … not an official publication" — is the
+                      single most important sentence on the page for anyone who
+                      lands on a provision from a search engine. It has a page,
+                      and this is the way in. */}
+                  <li><a class="navdrop__item" href={`${APP}/about`}>About</a></li>
+                </ul>
+
+                <p class="navdrop__group" id="navmore-display">Display</p>
+                <ul class="navdrop__list" aria-labelledby="navmore-display">
+                  <li><DensityToggle /></li>
+                  <li><ThemeToggle /></li>
+                </ul>
+
+                <div class="navdrop__account">
+                  {ACCOUNTS_ENABLED ? (
+                    <AuthNav />
+                  ) : (
+                    <span class="authnav authnav--off">
+                      <ComingSoon
+                        id="accounts"
+                        label="Accounts"
+                        heading={ACCOUNTS_NOTICE.heading}
+                        lead={ACCOUNTS_NOTICE.lead}
+                        detail={ACCOUNTS_NOTICE.detail}
+                      />
+                    </span>
+                  )}
+                </div>
+              </div>
+            </details>
           </li>
-          {/* `/app/docs`, not FastAPI's `/docs`. The bare Swagger page is a
-              different site — no navbar, no footer, no way back — so the reader
-              who clicks "API docs" from here has left. The reader page wraps the
-              same OpenAPI schema in this chrome. */}
-          <li class="usa-nav__primary-item">
-            <a class="usa-nav__link" href={`${APP}/docs`}><span>API docs</span></a>
-          </li>
-          {/* The disclaimer this site has always carried in the footer — "a
-              conceptual redesign … not an official publication" — is the single
-              most important sentence on the page for anyone who lands on a
-              provision from a search engine, and it was in eight-point grey type
-              below the fold. It has a page now, and this is the way in. */}
-          <li class="usa-nav__primary-item">
-            <a class="usa-nav__link" href={`${APP}/about`}><span>About</span></a>
-          </li>
-          {/* Not a link, because there is nothing to link to yet — it explains
-              itself instead of 404ing. See `ComingSoon` for why it is not
-              `<button disabled>`. */}
-          {!DOWNLOADS_ENABLED && (
-            <li class="usa-nav__primary-item">
-              <ComingSoon
-                id="downloads"
-                label="Downloads"
-                heading={DOWNLOADS_NOTICE.heading}
-                lead={DOWNLOADS_NOTICE.lead}
-                detail={DOWNLOADS_NOTICE.detail}
-              >
-                <p class="soon__detail">
-                  <a
-                    class="usa-link usa-link--external"
-                    rel="noopener"
-                    href="https://uscode.house.gov/download/download.shtml">
-                    Release-point downloads at the OLRC
-                  </a>
-                </p>
-              </ComingSoon>
-            </li>
-          )}
         </ul>
       </details>
-      {/* The chrome's controls share one row at every width — which is also
-          what keeps them out of `--sticky-h`: a second block in the nav would
-          add a whole 44px band to the sticky stack between 40em and 64em, and
-          that token is what `scroll-margin-top` spends.
 
-          There used to be two boxes here, a keyword search and a citation jump,
-          on the reasoning that they answer different questions: one goes to a
-          provision you can already name, the other is for when you cannot. True,
-          and still not worth two controls — the reader knows what they typed,
-          the server can tell which it is, and two boxes sharing this row meant
-          both were slivers below ~50em. `SiteSearch` is the merged one; the
-          two toggles at the end are the reading-comfort controls rather than
-          navigation — the theme (ADR-0027) and the reading density
-          (ADR-0054), which is why they sit together. */}
+      {/* The search box keeps a row it shares rather than a row of its own:
+          `--sticky-h` is what `scroll-margin-top` spends, and a band of chrome
+          is the most expensive thing this header can buy. */}
       <div class="navtools">
         <SiteSearch value={searchValue} />
-        {/* `AuthNav` is the island that asks `/api/v1/auth/me` who the reader
-            is. With accounts switched off there is nobody to be, so it is not
-            rendered at all rather than rendered and hidden — a hidden island
-            still ships its script and still makes the request, on every page,
-            to be told 401. The control that takes its place explains what an
-            account will be for, and is plain server-rendered markup.
-            `AuthNav` itself is untouched: `ACCOUNTS_ENABLED = true` puts it
-            back. */}
-        {ACCOUNTS_ENABLED ? (
-          <AuthNav />
-        ) : (
-          <span class="authnav authnav--off">
-            <ComingSoon
-              id="accounts"
-              label="Accounts"
-              heading={ACCOUNTS_NOTICE.heading}
-              lead={ACCOUNTS_NOTICE.lead}
-              detail={ACCOUNTS_NOTICE.detail}
-            />
-          </span>
-        )}
-        <DensityToggle />
-        <ThemeToggle />
       </div>
     </nav>
   </div>
 </header>
+
+<script is:inline>
+  {
+    // Escape, outside pointer, and one open at a time. Why this is a script at
+    // all, and why not `<details name>`, is in this file's frontmatter.
+    const menus = [...document.querySelectorAll("[data-navmenu]")];
+    const shut = (keep) => {
+      for (const menu of menus) {
+        if (menu.open && menu !== keep && !menu.contains(keep)) menu.open = false;
+      }
+    };
+
+    for (const menu of menus) {
+      menu.addEventListener("toggle", () => {
+        if (menu.open) shut(menu);
+      });
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      // A popover opened from inside a menu owns Escape first.
+      if (document.querySelector("[popover]:popover-open")) return;
+      const open = menus.filter((menu) => menu.open).pop();
+      if (!open) return;
+      open.open = false;
+      open.firstElementChild.focus();
+    });
+
+    document.addEventListener("pointerdown", (event) => {
+      if (menus.some((menu) => menu.open && menu.contains(event.target))) return;
+      shut(null);
+    });
+  }
+</script>

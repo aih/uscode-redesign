@@ -5,7 +5,7 @@ order: 5
 summary: One box that takes a citation or a phrase, works out which you meant, searches strictly unless you ask it not to, and lets you scope, filter and order what comes back.
 covers:
   routes: ["/app/goto", "/app/search", "/app/search/syntax"]
-  adrs: [23, 28, 31, 49]
+  adrs: [23, 28, 31, 49, 62]
 ---
 
 There is one box in the header and it answers two kinds of question. Type a citation and it goes
@@ -26,6 +26,47 @@ steps:
   - expect: { selector: ".doc-title", contains: "45f" }
     caption: 16 U.S.C. § 45f.
 ```
+
+## The command palette
+
+<kbd>⌘K</kbd> — <kbd>Ctrl</kbd> <kbd>K</kbd> on a keyboard with no ⌘ — opens the same box over
+whatever you are reading, with a list of commands under it. It works while you are typing in
+another field, which no other shortcut on this site does. <kbd>Esc</kbd> closes it and puts the
+keyboard back where it was.
+
+```scenario
+id: palette-opens
+title: ⌘K opens the search box over the page
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - expect: { selector: "#palette", visible: false }
+  - press: ControlOrMeta+k
+  - expect: { selector: "#palette", visible: true }
+  - fill: { selector: "#palette-q", value: "16 usc 45f(c)(5)" }
+  - press: Enter
+  - expect: { url: "/app/us/usc/t16/s45f/c/5" }
+```
+
+The commands are the same on every page except two, which a section adds: a redline of that
+section against the release point before the one on screen, and its version history. Typing
+narrows the list. <kbd>↓</kbd> and <kbd>↑</kbd> move between the rows, and <kbd>Enter</kbd> opens
+the one you are on.
+
+```scenario
+id: palette-compare
+title: A section offers a redline against the previous release point
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - press: ControlOrMeta+k
+  - fill: { selector: "#palette-q", value: "compare" }
+  - expect: { selector: "[data-palette-row]:not([hidden])", count: 1 }
+  - click: '[data-palette-id="compare-previous"]'
+  - expect: { url: "/app/diff/us/usc/t16/s45f" }
+```
+
+The palette needs JavaScript. Without it the header's box is unchanged and every command in the
+list is a page reachable from the header or the footer, except the shortcut list, which is
+[chapter 2](/app/guide/02-reading#keyboard).
 
 ## Going to a citation
 

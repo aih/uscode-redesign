@@ -17,8 +17,10 @@ import ReleaseContext from "../components/ReleaseContext.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
 import SectionBar from "../components/SectionBar.astro";
 import PrintHeader from "../components/PrintHeader.astro";
+import CommandPalette from "../components/CommandPalette.astro";
 import ShortcutsDialog from "../components/ShortcutsDialog.astro";
 import KeyboardNav from "../components/KeyboardNav.astro";
+import type { PaletteCommand } from "../lib/palette";
 import type { Entry, Release } from "../lib/types";
 import "../styles/site.scss";
 
@@ -60,6 +62,13 @@ interface Props {
    * first was the wrong one. Prefilling the single box the site already has is
    * the same affordance without the double. */
   searchValue?: string | null;
+  /** Rows the command palette offers on top of the site-wide ones (ADR-0062).
+   *
+   * Only a page with a provision on screen has any: "compare with the previous
+   * release point" and "version history" both need a section identifier, and
+   * the first also needs the title's release list, which the section page has
+   * already fetched for the release switcher. */
+  commands?: PaletteCommand[];
   /** Set by a page that fills the `rail` slot. See `hasRail` below. */
   rail?: boolean;
   /** Widens the page beyond the 46rem reading measure.
@@ -81,6 +90,7 @@ const {
   picker = null,
   bar = null,
   searchValue = null,
+  commands = [],
   rail = false,
   wide = false,
 } = Astro.props;
@@ -315,7 +325,12 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
         page with no section — `KeyboardNav` is handed no destinations and the
         in-page targets are not in the document.
 
-        The dialog first, because the island looks it up by id on the way in. */}
+        The dialog first, because the island looks it up by id on the way in.
+
+        The palette is ahead of both: its own script closes it when the shortcut
+        row is clicked, and that listener has to be attached before
+        `KeyboardNav`'s opens the help dialog on the same click. */}
+    <CommandPalette commands={commands} />
     <ShortcutsDialog />
     <KeyboardNav
       previous={bar?.previous}

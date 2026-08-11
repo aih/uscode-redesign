@@ -185,7 +185,7 @@
   "_statesComment": [
     "Interactive states. The id is the contract: a.11y.spec.ts maps each id to a setup function and",
     "fails if one declared here has no setup, so a state cannot be listed and quietly not scanned.",
-    "Scanned at 1280x900, light theme \u2014 the state, not the palette, is what these add."
+    "Scanned at 1280x900, light theme \u2014 the state, not the theme, is what these add."
   ],
   "states": [
     {
@@ -221,12 +221,24 @@
       "name": "the header and footer menus open at a phone width (ADR-0058)"
     },
     {
+      "id": "more-menu-open",
+      "name": "the navbar's More menu open, with its group labels, display switches and account row (ADR-0061)"
+    },
+    {
+      "id": "titles-menu-open",
+      "name": "the navbar's Titles menu open over the page (ADR-0061)"
+    },
+    {
       "id": "diff-source-expanded",
       "name": "redline with the source-XML details open (ADR-0026)"
     },
     {
       "id": "search-box-filled",
       "name": "search-and-citation box focused with a query (ADR-0023)"
+    },
+    {
+      "id": "palette-open",
+      "name": "the command palette open as a modal dialog, with this page's commands (ADR-0062)"
     }
   ],
   "_excludedComment": "Reachable addresses deliberately not in the matrix, and why.",

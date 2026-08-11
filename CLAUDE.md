@@ -39,7 +39,7 @@ runs axe-core over the route matrix in `docs/a11y/routes.json` — 29 route entr
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and ten
 interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
 (ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
-(ADR-0058) — **269 scans in ~1m45s**,
+(ADR-0058), both navbar dropdowns (ADR-0061) and the command palette (ADR-0062) — **272 scans**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -273,15 +273,15 @@ jump open what they land on. **A card's fragment arrives after that script has r
 nothing but apparatus) was a shut box whose first focusable sat inside `content-visibility: hidden`,
 where `.focus()` silently does nothing and ADR-0041's Tab-into-the-card stopped dead.
 
-`make test` = **545** Python tests; `make test-web` = **307** frontend tests; `make test-e2e` = **459**
-Playwright tests, 269 of which are the accessibility scan (**all three are required** — reader
+`make test` = **545** Python tests; `make test-web` = **320** frontend tests; `make test-e2e` = **488**
+Playwright tests, 272 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(59 ADRs, numbered to 0060 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(62 ADRs, numbered to 0063 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -321,10 +321,19 @@ like a title with nothing in it.
 **The chapter rail is pinned and scrolls on its own** (ADR-0050, reversing ADR-0043's standing
 decision): bounding the height is the half the first attempt was missing.
 
-**Next: (1) workstream B task B5 — "Compare with…" on the section header; `/app/diff` is still two
-hops from the text it compares and the API diff is 5.1 s per request. State and standing decisions
-are in `claude-code/WORKSTREAM-B-STATE.md`; (2) rebuild the deployed search index and finish the
-deployment's open items (`docs/deploy-status.md`); (3) Day 7 hardening.**
+**The menu refinement is three quarters done** (`docs/menu-refinement-spec.md`). The header is four
+items with two `<details>` dropdowns and the first script the chrome has carried (ADR-0061); the one
+search box is also a ⌘K command palette (ADR-0062); the footer's nine links are four labelled groups
+(ADR-0063). `--sticky-h` drops with the header — 23rem → 18rem in the 40–64em band, 19rem → 15rem
+above it, each measured against a stack of 225px and 168px. **Task B9 — the mobile chrome — is the
+part not written**: a 52px bar (Menu, wordmark, theme toggle) with the search row always visible
+beneath it, and the menu sheet flattened.
+
+**Next: (1) workstream B task B9 — the mobile chrome, the last section of
+`docs/menu-refinement-spec.md`; (2) workstream B task B5 — "Compare with…" on the section header;
+`/app/diff` is still two hops from the text it compares and the API diff is 5.1 s per request. State
+and standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`; (3) rebuild the deployed search
+index and finish the deployment's open items (`docs/deploy-status.md`); (4) Day 7 hardening.**
 
 Open debts: **the source's `indentUp0/1/2/3`, `indentDown1/2`, `indentTo54pts`,
 `indentTo65ptsHang`, `indent0And43pts` and `rightIndent1` classes are styled by nothing** — 8,733
