@@ -4,11 +4,15 @@
 ([PR #44](https://github.com/aih/uscode-redesign/pull/44)) — C1 (parser, fixtures, ADR-0067)
 and C2a (schema, migration `3c8d9ab6d527`); see
 [§ What Wave 1 measured](#what-wave-1-measured) for the six places this spec was wrong.
-**Wave 2 landed 2026-08-11** on branch `c2b-classification-loader`
-([PR #45](https://github.com/aih/uscode-redesign/pull/45), open) — C2b (fetch, loader, CLI, poll,
+**Wave 2 landed 2026-08-11** and is merged into `main`
+([PR #45](https://github.com/aih/uscode-redesign/pull/45)) — C2b (fetch, loader, CLI, poll,
 migration `0044883c483c`), with the whole corpus loaded once from the live source; see
-[§ What Wave 2 measured](#what-wave-2-measured). Nothing is reachable from the reader yet. Wave 3
-(C3 storage + API, C4 reader pages) is next; C5 unstarted. An orchestrating session starts at
+[§ What Wave 2 measured](#what-wave-2-measured). **Wave 3 landed 2026-08-11** on branch
+`c4-classification-reader` (unmerged) — C3 (storage protocol, seven API routes) and C4 (three reader
+routes, the lookup, the table); see [§ What Wave 3 measured](#what-wave-3-measured). The API and the
+pages are live; the three routes are reachable only by typed URL, because C5 owns the chrome. **C5
+is next** — menus, the guide chapter, `docs/ia-map.md`, `/app/design` specimens, the
+`update-corpus.sh` wiring and the backfill on the box. An orchestrating session starts at
 [§ Waves](#waves-parallel-agent-dispatch) and dispatches the phase prompts at the end of this file.
 Update this status line as waves land.
 
@@ -366,6 +370,48 @@ measurement.
 One ratchet is deferred rather than met: ADR-0067 is listed in `INFRASTRUCTURE_ADRS` in
 `frontend/tests/guide.test.ts`, because Wave 1 ships no reader surface for a chapter to describe.
 **C5 removes that line when it writes the chapter** — it is named in the C5 prompt.
+
+## What Wave 3 measured
+
+Where this section and an earlier one disagree, this one is the later measurement.
+
+1. **§4's own 404 example is false against the loaded corpus.** `tbl119pl_1st.htm` covers
+   `['1-69', '71-73']`, so Public Law 119-72 *is* covered and route 3 returns 200 with empty items.
+   The 119th is covered through 102; **119-103 and up is the genuinely uncovered case**, and no law
+   in the corpus actually falls in a gap — each congress's two files are complementary. The
+   distinction is still real and still tested; the example was wrong.
+2. **§4 asks for "a fourth `..._agree` test" and there were two** (`Repository`,
+   `AccountsRepository`), so `ClassificationRepository`'s is the third.
+3. **§4 names four refs and needs five.** `last_classification_check()` had no return type;
+   `ClassificationCheckInfo` is a sibling of `SourceCheckInfo` and reuses `SOURCE_CHECK_STALE_AFTER`.
+4. **A default `limit` with no `offset` truncates silently, and this wave shipped it twice.** Route
+   5 (`/classifications/us/usc/{identifier:path}`) was fixed at 200 rows unpaged: **14 identifiers
+   exceed it and `/us/usc/t10/s113` carries 412**, and because the order is newest-law-first the
+   dropped rows were the oldest. The reader's by-section view then repeated it against route 4's
+   default of 100 — `?title=42&section=1396a` reported 353 rows in its heading and rendered 100.
+   Both now page. **9,163** rows carry an EN DASH in `usc_identifier` across 3,398 distinct ones;
+   143,304 of the 144,837 rows derive an identifier at all, naming 40,967 distinct ones.
+5. **§4's suggest route names a "code-filtered view" that §5 never defines.** It is
+   `/app/classification?title=…&section=…` — the index page, which is where the lookup box already
+   is; a code-filtered view spans every congress and session, so it has no home on a per-session
+   page.
+6. **A reader href may never be composed from a title and a section number.** `ecct.astro` built
+   `/us/usc/t{title}/s{section_norm}` by concatenation and **7 of its 30 links 404'd** — every one a
+   *Former classification* cell, the column whose meaning is that the provision moved away. The rule
+   is the loader's: link where `usc_identifier` is present, render text where it is not.
+7. **`/app/docs` overflows because of unbreakable `<code>` endpoint paths, not its parameter
+   tables.** C3's seven routes pushed 320 px overflow from a recorded 3 px to 146 px and started a
+   91 px overflow at 375 px, where there had been none. The widest span is
+   `/api/v1/classifications/tables/119/2/entries` — 422 px, right edge 466, which is exactly
+   `466−320` and `466−375`. `.table-scroll` and `.uslm-tablewrap` are already the same two
+   declarations and the parameter table already scrolls inside its wrapper. `overflow-wrap: anywhere`
+   on `.apidocs__intro code, .endpoint__prose code` takes both widths to **0**, so both `reflow`
+   entries were deleted rather than a third added — and `main`'s recorded 3 px was already stale, the
+   page having overflowed 50 px at 320 with no classification route present.
+8. **The reflow ratchet has no magnitude bound.** `screenshots.mjs` matches a known violation on
+   `(page, view)` alone, so 3 px growing to 146 px would have passed unrecorded. Remeasuring is
+   voluntary. Unlike ADR-0039's `waiveSeverity`, which weakened the gate's rule, widening this
+   ledger is the documented process — but the ledger cannot tell a fixed page from a worsening one.
 
 ## Waves — parallel agent dispatch
 
