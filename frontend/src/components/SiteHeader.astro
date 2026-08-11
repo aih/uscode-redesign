@@ -32,6 +32,16 @@
  * steps aside for one: Escape over the Downloads explanation should shut the
  * explanation, not the menu it was opened from.
  *
+ * The script counts a `[data-navmenu]` as a menu only while its `<summary>` is
+ * displayed. Below 64em `More` is not one: its summary is `display: none` and
+ * its panel is forced visible (ADR-0064), so it is a group of the sheet and its
+ * `open` is an attribute nothing reads there. Closing it anyway is invisible at
+ * that width and waiting for the reader at 1280, where the menu they left open
+ * has been shut behind their back. The question is put to the summary's own
+ * visibility rather than to a media query, so the breakpoint stays written once
+ * — in the stylesheet — and it is asked at each event rather than once at
+ * parse, because a window can be resized across it.
+ *
  * ## Why More is in the list rather than at the far right
  *
  * The proposal put a spacer between the search box and More. That needs either
@@ -291,15 +301,18 @@ const wordmark = "United States Code";
     // Escape, outside pointer, and one open at a time. Why this is a script at
     // all, and why not `<details name>`, is in this file's frontmatter.
     const menus = [...document.querySelectorAll("[data-navmenu]")];
+    // A menu only while its summary shows; see the frontmatter.
+    const on = (m) => m.open && m.firstElementChild.checkVisibility();
+
     const shut = (keep) => {
       for (const menu of menus) {
-        if (menu.open && menu !== keep && !menu.contains(keep)) menu.open = false;
+        if (on(menu) && menu !== keep && !menu.contains(keep)) menu.open = false;
       }
     };
 
     for (const menu of menus) {
       menu.addEventListener("toggle", () => {
-        if (menu.open) shut(menu);
+        if (on(menu)) shut(menu);
       });
     }
 
@@ -307,14 +320,14 @@ const wordmark = "United States Code";
       if (event.key !== "Escape") return;
       // A popover opened from inside a menu owns Escape first.
       if (document.querySelector("[popover]:popover-open")) return;
-      const open = menus.filter((menu) => menu.open).pop();
+      const open = menus.filter(on).pop();
       if (!open) return;
       open.open = false;
       open.firstElementChild.focus();
     });
 
     document.addEventListener("pointerdown", (event) => {
-      if (menus.some((menu) => menu.open && menu.contains(event.target))) return;
+      if (menus.some((menu) => on(menu) && menu.contains(event.target))) return;
       shut(null);
     });
   }

@@ -314,6 +314,41 @@ test.describe("the menus collapse below the desktop breakpoint (ADR-0058)", () =
     await page.locator(".footmenu__summary").click();
     await expect(list).toBeVisible();
   });
+
+  test("a More opened at desktop survives a trip through a narrow window", async ({ page }) => {
+    // More is a disclosure above 64em and a group of the sheet below it
+    // (ADR-0064), so a reader who opens it at desktop and then narrows the
+    // window carries an `open` attribute into a band where nothing reads it.
+    // The chrome's script counted it as a menu there and closed it, which is
+    // invisible at 375 — its panel is forced open — and waiting for them at
+    // 1280, where the menu they left open is shut.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/app/us/usc/t16/s45f");
+    await page.locator(".navdrop--more > summary").click();
+    await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.locator(".navmenu__summary").click();
+    await expect(page.locator(".navmenu")).toHaveAttribute("open", "");
+    // The sheet's own rows, not a menu of its own: opening the sheet leaves it
+    // alone rather than reaching into it.
+    await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(page.locator(".navdrop--more")).toHaveAttribute("open", "");
+    await expect(page.locator(".navdrop__panel--more")).toBeVisible();
+  });
+
+  test("the sheet still closes on Escape with More open inside it", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/app/us/usc/t16/s45f");
+    await page.locator(".navmenu__summary").click();
+    await expect(page.locator(".navmenu")).toHaveAttribute("open", "");
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".navmenu")).not.toHaveAttribute("open", "");
+    await expect(page.locator(".navmenu__summary")).toBeFocused();
+  });
 });
 
 test("at desktop the menus are rows of links with no hamburger", async ({ page }) => {
