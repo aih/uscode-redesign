@@ -86,6 +86,79 @@ test.describe("the classification lookup", () => {
   });
 });
 
+test.describe("the by-section view", () => {
+  // `/classifications/code/…` defaults to 100 rows. The busiest sections are
+  // past that — 42 U.S.C. § 1396a has 353 — so an unpaged view showed a total
+  // it was not rendering, with nothing on screen saying which hundred.
+  const BUSY = "/app/classification?title=18&section=3551";
+
+  test("renders a page, says which page, and offers the next one", async ({ page }) => {
+    await page.goto(BUSY, { waitUntil: "load" });
+    const rows = page.locator(".classsection tbody tr");
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThanOrEqual(50);
+
+    const meta = await page.locator(".classsection .doc-meta").first().innerText();
+    expect(meta).toMatch(/Showing 1–\d+ of \d+/);
+
+    // `textContent`, not `innerText`: `.toc-group` is uppercased by CSS, and
+    // `innerText` reports what is painted.
+    const heading = (await page.locator("#classsection-heading").textContent()) ?? "";
+    const total = Number(/([\d,]+) rows?/.exec(heading)![1].replace(/,/g, ""));
+    if (total > count) {
+      await page.getByRole("link", { name: /Next/ }).click();
+      await page.waitForURL(/offset=/, { timeout: 5000 });
+      expect(page.url()).toContain("title=18");
+      expect(page.url()).toContain("section=3551");
+    }
+  });
+
+  test("says so when the offset is past the end", async ({ page }) => {
+    await page.goto(`${BUSY}&offset=999999`, { waitUntil: "load" });
+    await expect(page.getByText(/past the last of/)).toBeVisible();
+    expect(await page.locator(".classsection tbody tr").count()).toBe(0);
+    expect(await page.locator(".searchpager").count()).toBe(0);
+  });
+});
+
+test.describe("a mistyped URL still shows the table", () => {
+  test("a fractional offset does not become a 422", async ({ page }) => {
+    const response = await page.goto("/app/classification/118/2?offset=1.5", {
+      waitUntil: "load",
+    });
+    expect(response?.status()).toBe(200);
+    await expect(page.locator(".classtable")).toBeVisible();
+  });
+
+  test("an offset past the end says so instead of counting past the total", async ({ page }) => {
+    await page.goto("/app/classification/118/2?offset=999999", { waitUntil: "load" });
+    await expect(page.getByText(/past the last of/)).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("Showing 1,000,000");
+    expect(await page.locator(".searchpager").count()).toBe(0);
+  });
+
+  test("a session with no table is one heading, not two", async ({ page }) => {
+    const response = await page.goto("/app/classification/104/1", { waitUntil: "load" });
+    expect(response?.status()).toBe(404);
+    const headings = page.locator("main h1");
+    expect(await headings.count()).toBe(1);
+    await expect(headings.first()).toContainText("404");
+  });
+});
+
+test.describe("the ECCT", () => {
+  test("links no classification cell, because none carries an identifier", async ({ page }) => {
+    // Composing `/us/usc/t{title}/s{section_norm}` 404ed on 7 of 30 links, every
+    // one in the Former classification column — the column whose whole meaning
+    // is that the provision moved away.
+    await page.goto("/app/classification/ecct", { waitUntil: "load" });
+    const cells = page.locator(".classtable__cite");
+    expect(await cells.count()).toBeGreaterThan(0);
+    expect(await cells.locator("a").count()).toBe(0);
+  });
+});
+
 test.describe("a classification table", () => {
   test("does not push the page sideways at 320 CSS px", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 768 });

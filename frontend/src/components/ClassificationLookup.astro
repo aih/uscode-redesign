@@ -20,16 +20,17 @@
  * listbox path reach the same answers by the same parse; the difference is a
  * round trip.
  *
- * That is also why the combobox roles are stamped by the script rather than
- * written into the markup. An `aria-expanded` input wired to a listbox that
- * nothing can ever populate is a control announcing behaviour it does not have.
+ * The combobox roles are stamped by the script rather than written into the
+ * markup, so with scripting off the box announces no listbox behaviour.
  *
- * ## Rows are an active descendant, not focus
+ * ## Keyboard
  *
  * `↑`/`↓` move `aria-activedescendant` while real focus stays in the input —
- * the ARIA 1.2 combobox pattern, and the one that keeps typing working between
- * two arrow presses. `Enter` follows the active row, `Escape` closes the list
- * and leaves the keyboard where it already was.
+ * the ARIA 1.2 combobox pattern, which keeps typing working between two arrow
+ * presses. `Enter` follows the active row, `Escape` closes the list and leaves
+ * the keyboard where it already was. A row navigates on `click`, so a pointer
+ * and an assistive-technology activation take the same path; `mousedown` only
+ * cancels its own default, which is the blur that would close the list first.
  *
  * `CommandPalette` moves real DOM focus instead, and for its own reason: its
  * rows are links and a button, so activating one is the platform's job. These
@@ -45,7 +46,7 @@
  * and the endpoint is rate-limited for a person rather than a crawler (spec
  * §4).
  *
- * ## Where a row goes, in prose rather than in bytes
+ * ## Where a row goes
  *
  * A suggestion carries a ready-made `href` — a path relative to the reader's
  * base, percent-encoded by the API — and the same answer in structured pieces.
@@ -55,6 +56,13 @@
  * architecture rule 5 asks for and what an `is:inline` script cannot import.
  * `url.test.ts` asserts the two agree, shape by shape, against the paths
  * `api/classification.py`'s `_app_path` emits.
+ *
+ * ## More than one on a page
+ *
+ * The script binds every `[data-classlookup]` and marks each one it has set up,
+ * so a second copy of the island — `/app/design` is the case `idPrefix` exists
+ * for — gets its own handlers and the first does not get them twice. Ids are all
+ * derived from `idPrefix` for the same reason.
  */
 import { APP, classificationHref, classificationSuggestHref } from "../lib/url";
 
@@ -116,8 +124,9 @@ const statusId = `${idPrefix}-status`;
 
 <script is:inline>
   {
-    const box = document.querySelector("[data-classlookup]");
-    if (box) {
+    for (const box of document.querySelectorAll("[data-classlookup]")) {
+      if (box.dataset.classlookupReady) continue;
+      box.dataset.classlookupReady = "1";
       const input = box.querySelector("[data-classlookup-input]");
       const list = box.querySelector("[data-classlookup-list]");
       const status = box.querySelector("[data-classlookup-status]");
@@ -178,10 +187,8 @@ const statusId = `${idPrefix}-status`;
             detail.textContent = suggestion.detail;
             option.append(detail);
           }
-          option.addEventListener("mousedown", (event) => {
-            event.preventDefault();
-            location.assign(href);
-          });
+          option.addEventListener("mousedown", (event) => event.preventDefault());
+          option.addEventListener("click", () => location.assign(href));
           list.append(option);
           return option;
         });
@@ -238,9 +245,7 @@ const statusId = `${idPrefix}-status`;
         }
       });
 
-      // A blur that is not a click on a row: the row's own `mousedown` has
-      // already navigated by the time this runs.
-      input.addEventListener("blur", () => setTimeout(close, 120));
+      input.addEventListener("blur", () => setTimeout(close, 200));
     }
   }
 </script>

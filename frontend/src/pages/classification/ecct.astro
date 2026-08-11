@@ -7,16 +7,16 @@
  * moved editorially rather than by a public law, and this is the table that says
  * where from and where to. It is 21 rows, so it is one page with no paging.
  *
- * Both classification columns link into the reader when the title and section
- * are known. The two "Provision" columns are full public law citation strings,
- * verbatim from the source.
+ * All four columns are text. The two "Provision" columns are full public law
+ * citation strings, verbatim from the source; the two classification columns
+ * carry no `usc_identifier`, and this reader does not compose one — see `cell`.
  */
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import { ApiError, fetchEcct } from "../../lib/api";
 import { resultCitation } from "../../lib/cite";
 import type { EcctPage } from "../../lib/types";
-import { appHref, classificationHref } from "../../lib/url";
+import { classificationHref } from "../../lib/url";
 
 let page: EcctPage | null = null;
 let failure: { status: number; detail: string } | null = null;
@@ -40,42 +40,29 @@ try {
 const items = page?.items ?? [];
 
 /**
- * A classification cell: the source's own string, linked to the section when
- * this reader can address it.
+ * One classification cell: the citation, and whether the source left it empty.
  *
- * `section_norm` carries a plain hyphen and the corpus writes an en dash
- * (gotcha 17), so no identifier is built from it here — an identifier guessed
- * with the wrong dash resolves to nothing. The link is only offered for a
- * section number with no hyphen in it at all, which is 5,697 of 65,938 sections
- * short of the whole Code and never wrong about the ones it does offer.
- */
-function readerHref(titleNum: string | null, sectionNorm: string | null): string | null {
-  if (!titleNum || !sectionNorm) return null;
-  if (!/^\d+[a-z]*$/u.test(sectionNorm)) return null;
-  return appHref(`/us/usc/t${titleNum}/s${sectionNorm}`);
-}
-
-/**
- * One classification cell, as a label, an optional href, and whether the source
- * left it empty.
+ * Nothing here links into the reader. `ClassificationTable` links a row only
+ * where the loader supplied a `usc_identifier`, and the ECCT carries none — so
+ * a link here could only be composed from `title_num` and `section_norm`, which
+ * is a guess about a provision this table exists to say has moved. Composing it
+ * was measured against the running site: 7 of the 30 section links 404ed, every
+ * one of them in the Former classification column.
  *
  * Four of the 21 rows have no former classification at all — a note that was
- * newly classified rather than moved — so the cell has to have a rendering for
- * nothing, the same as every cell in `ClassificationTable`.
+ * newly classified rather than moved — so the cell needs a rendering for
+ * nothing, as every cell in `ClassificationTable` does.
  */
 function cell(
   titleNum: string | null,
   sectionNorm: string | null,
   raw: string,
   isNote: boolean,
-): { label: string; href: string | null } | null {
+): string | null {
   const cite = resultCitation(titleNum, sectionNorm ? `§ ${sectionNorm}` : null, "section");
   const text = cite ?? raw.trim();
   if (!text) return null;
-  return {
-    label: isNote ? `${text} note` : text,
-    href: readerHref(titleNum, sectionNorm),
-  };
+  return isNote ? `${text} note` : text;
 }
 ---
 
@@ -132,21 +119,18 @@ function cell(
                     <tr>
                       <th scope="row" class="classtable__cite">
                         {former == null ? (
-                          <span class="classtable__none" aria-label="Newly classified, moved from nothing">—</span>
-                        ) : former.href ? (
-                          <a href={former.href}>{former.label}</a>
+                          <span
+                            class="classtable__none"
+                            aria-label="Newly classified, moved from nothing"
+                          >
+                            —
+                          </span>
                         ) : (
-                          former.label
+                          former
                         )}
                       </th>
                       <td class="classtable__cite">
-                        {next == null ? (
-                          <span class="classtable__none">—</span>
-                        ) : next.href ? (
-                          <a href={next.href}>{next.label}</a>
-                        ) : (
-                          next.label
-                        )}
+                        {next == null ? <span class="classtable__none">—</span> : next}
                       </td>
                       <td>{entry.provision_affected}</td>
                       <td>{entry.provision_prompting}</td>

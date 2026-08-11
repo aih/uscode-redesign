@@ -264,17 +264,25 @@ export async function fetchClassificationEntries(
   );
 }
 
-/** Everything ever classified to one Code section, newest public law first —
- *  the order a section's classification history reads in. A section nothing was
- *  ever classified to is an empty page: the tables cover 1996 onward, so
- *  silence here is ordinary rather than an error. */
+/**
+ * Everything ever classified to one Code section, newest public law first — the
+ * order a section's classification history reads in. A section nothing was ever
+ * classified to is an empty page: the tables cover 1996 onward, so silence here
+ * is ordinary rather than an error.
+ *
+ * `limit` is always sent. The route's own default is 100 and the busiest
+ * sections are well past it — 42 U.S.C. § 1396a has 353 rows, § 1395l 282,
+ * 26 U.S.C. § 1 243 — so a caller that omits it gets a hundred rows beside a
+ * total that says there are more, with nothing on screen saying which hundred.
+ */
 export async function fetchClassificationsForSection(
   titleNum: string,
   section: string,
   opts: { limit?: number; offset?: number } = {},
 ): Promise<ClassificationEntryPage> {
+  const { limit = CLASSIFICATION_PAGE_SIZE, offset = 0 } = opts;
   return getJson<ClassificationEntryPage>(
-    `${API}/classifications/code/${encodeURIComponent(titleNum)}/${encodeURIComponent(section)}${qs({ ...opts })}`,
+    `${API}/classifications/code/${encodeURIComponent(titleNum)}/${encodeURIComponent(section)}${qs({ limit, offset })}`,
   );
 }
 

@@ -317,6 +317,22 @@ export function normalizeSectionKey(value: string): string {
   return value.trim().toLowerCase().replace(/[‑–—]/gu, "-");
 }
 
+/**
+ * `?offset=` as the API will accept it, from whatever a URL carried.
+ *
+ * The counterpart of the `offset` `classificationHref` writes. The route
+ * declares it `int` and `ge=0`, so a float is a 422 and an error page where the
+ * table should be — `Number("1.5")` is `1.5`, which reaches the API intact and
+ * fails there rather than here. Anything unreadable, negative or fractional
+ * becomes the first page, which is the same rule `?sort=` follows: a mistyped
+ * URL still shows the table.
+ */
+export function readOffset(raw: string | null | undefined): number {
+  const parsed = Number(raw ?? "");
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.floor(parsed);
+}
+
 export interface ClassificationFilters {
   /** `118-33` — one public law. */
   pl?: string | null;

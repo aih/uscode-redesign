@@ -5313,6 +5313,25 @@ dialog.palette {
   white-space: nowrap;
 }
 
+/* An endpoint path in running prose may break anywhere.
+ *
+ * A route is one unbroken token with no space in it, so a long one is a single
+ * word wider than a phone — and unlike the parameter tables, the prose lists are
+ * in no scroll region, so that width lands on the document. Measured at
+ * `/app/docs`: `/api/v1/classifications/tables/119/2/entries` is 422px, right
+ * edge 466, which is the 146px this page scrolled sideways at 320 CSS px and the
+ * 91px at 375 (WCAG 1.4.10, asserted by `make shots`).
+ *
+ * Scoped to the prose rather than to every `code` on the page, so the rule above
+ * keeps its nowrap: that column sits inside `.table-scroll` and contributes
+ * nothing to document width. The page overflowed 50px at 320 before ADR-0067's
+ * routes joined the schema — `GET /api/v1/sections/{identifier}/diff` is 370px —
+ * so this is not a classification fix, it is the fix that page always needed. */
+.apidocs__intro code,
+.endpoint__prose code {
+  overflow-wrap: anywhere;
+}
+
 
 
 .endpoint__required {

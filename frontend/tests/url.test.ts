@@ -11,6 +11,7 @@ import {
   classificationHref,
   classificationSuggestHref,
   compareTitles,
+  readOffset,
   citationHref,
   diffHref,
   govinfoPlawHref,
@@ -397,6 +398,30 @@ describe("normalizeSectionKey", () => {
     expect(normalizeSectionKey(" 254C\u201315 ")).toBe("254c-15");
     expect(normalizeSectionKey("45A\u20111")).toBe("45a-1");
     expect(normalizeSectionKey("45a-1")).toBe("45a-1");
+  });
+});
+
+describe("readOffset", () => {
+  it("reads a page offset", () => {
+    expect(readOffset("50")).toBe(50);
+    expect(readOffset("0")).toBe(0);
+  });
+
+  it("floors a fraction rather than passing a 422 to the API", () => {
+    // The route declares `offset` an int; `Number("1.5")` is 1.5, which reaches
+    // FastAPI intact and renders an error page where the table should be.
+    expect(readOffset("1.5")).toBe(1);
+    expect(readOffset("99.99")).toBe(99);
+  });
+
+  it("treats anything unreadable or negative as the first page", () => {
+    expect(readOffset("abc")).toBe(0);
+    expect(readOffset("-5")).toBe(0);
+    expect(readOffset("")).toBe(0);
+    expect(readOffset(null)).toBe(0);
+    expect(readOffset(undefined)).toBe(0);
+    expect(readOffset("Infinity")).toBe(0);
+    expect(readOffset("NaN")).toBe(0);
   });
 });
 

@@ -31,6 +31,7 @@ import {
   classificationEcctHref,
   classificationHref,
   normalizeSectionKey,
+  readOffset,
   sessionNumber,
 } from "../../../lib/url";
 
@@ -62,7 +63,7 @@ const sort = (CLASSIFICATION_SORTS as readonly string[]).includes(requestedSort 
   ? (requestedSort as string)
   : "pl";
 
-const offset = Math.max(0, Number(params.get("offset") ?? "0") || 0);
+const offset = readOffset(params.get("offset"));
 
 const SORT_LABELS: Record<string, string> = {
   pl: "Public law order",
@@ -155,12 +156,20 @@ if (section) {
 const file = page?.file ?? null;
 const total = page?.total ?? 0;
 const items = page?.items ?? [];
-const shownFrom = total === 0 ? 0 : offset + 1;
-const shownTo = Math.min(offset + CLASSIFICATION_PAGE_SIZE, total);
+/** An offset past the last row. The request succeeded and named a page that is
+ *  not there, which is not the same as a table that matched nothing — and the
+ *  range has to be counted off what came back, or `?offset=999999` reads
+ *  "Showing 1,000,000–2,987 of 2,987". */
+const pastEnd = total > 0 && offset >= total;
+const shownFrom = items.length > 0 ? offset + 1 : 0;
+const shownTo = offset + items.length;
 ---
 
 <Base title={`Classification table: ${heading} · U.S. Code`} wide>
-  <h1 class="doc-title">{heading}</h1>
+  {/* `ErrorPage` carries its own `<h1>`. `/app/classification/104/1` is a real
+      congress and a session it has no table for, so titling the failure with
+      the table's own name would name a table that does not exist. */}
+  {!failure && <h1 class="doc-title">{heading}</h1>}
 
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
@@ -215,6 +224,13 @@ const shownTo = Math.min(offset + CLASSIFICATION_PAGE_SIZE, total);
             : `${total.toLocaleString()} row${total === 1 ? "" : "s"}`}
         </h2>
 
+        {pastEnd && (
+          <p>
+            That is past the last of {total.toLocaleString()} rows.{" "}
+            <a href={href({ offset: 0 })}>Back to the first page</a>.
+          </p>
+        )}
+
         {total > 0 && (
           <>
             <nav class="sortbar" aria-label="Sort rows">
@@ -238,16 +254,20 @@ const shownTo = Math.min(offset + CLASSIFICATION_PAGE_SIZE, total);
               </ul>
             </nav>
 
-            <p class="doc-meta">
-              Showing {shownFrom.toLocaleString()}–{shownTo.toLocaleString()} of{" "}
-              {total.toLocaleString()}.
-            </p>
+            {items.length > 0 && (
+              <>
+                <p class="doc-meta">
+                  Showing {shownFrom.toLocaleString()}–{shownTo.toLocaleString()} of{" "}
+                  {total.toLocaleString()}.
+                </p>
 
-            <ClassificationTable
-              entries={items}
-              caption={`${heading}, rows ${shownFrom.toLocaleString()}–${shownTo.toLocaleString()}`}
-              statVolume={file?.stat_volume ?? null}
-            />
+                <ClassificationTable
+                  entries={items}
+                  caption={`${heading}, rows ${shownFrom.toLocaleString()}–${shownTo.toLocaleString()}`}
+                  statVolume={file?.stat_volume ?? null}
+                />
+              </>
+            )}
           </>
         )}
 
@@ -264,7 +284,7 @@ const shownTo = Math.min(offset + CLASSIFICATION_PAGE_SIZE, total);
             <p>This table holds no rows.</p>
           ))}
 
-        {(offset > 0 || total > offset + CLASSIFICATION_PAGE_SIZE) && (
+        {!pastEnd && (offset > 0 || total > offset + CLASSIFICATION_PAGE_SIZE) && (
           <nav class="searchpager" aria-label="Table pages">
             {offset > 0 && (
               <a

@@ -29,6 +29,7 @@ import ClassificationTable from "../../components/ClassificationTable.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import {
   ApiError,
+  CLASSIFICATION_PAGE_SIZE,
   fetchClassificationSuggestions,
   fetchClassificationTables,
   fetchClassificationsForSection,
@@ -46,6 +47,7 @@ import {
   classificationHref,
   classificationSuggestionHref,
   normalizeSectionKey,
+  readOffset,
 } from "../../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
@@ -78,14 +80,18 @@ const suggestions: ClassificationSuggestion[] = query
   ? await fetchClassificationSuggestions(query)
   : [];
 
+/** Which page of the by-section view. Only that view is paged — the registry
+ *  under it is 33 rows and whole. */
+const sectionOffset = readOffset(Astro.url.searchParams.get("offset"));
+
 /** The by-section view never fails this page: the registry below it is the
  *  answer to a different question and is still worth showing. */
 let sectionRows: ClassificationEntryPage | null = null;
 if (bySection && !failure) {
-  sectionRows = await fetchClassificationsForSection(
-    bySection.titleFilter,
-    bySection.sectionFilter,
-  ).catch(() => null);
+  sectionRows = await fetchClassificationsForSection(bySection.titleFilter, bySection.sectionFilter, {
+    limit: CLASSIFICATION_PAGE_SIZE,
+    offset: sectionOffset,
+  }).catch(() => null);
 }
 const sectionCitation = bySection
   ? resultCitation(bySection.titleFilter, `§ ${bySection.sectionFilter}`, "section")
@@ -100,6 +106,23 @@ const sectionFilters = bySection
       { name: "Section", label: bySection.sectionFilter, href: classificationHref() },
     ]
   : [];
+
+/** The same view at another page, keeping both filters. */
+function sectionPageHref(nextOffset: number): string {
+  return classificationHref(null, null, {
+    title: bySection?.titleFilter,
+    section: bySection?.sectionFilter,
+    offset: nextOffset,
+  });
+}
+
+const sectionTotal = sectionRows?.total ?? 0;
+const sectionItems = sectionRows?.items ?? [];
+/** An offset past the last row: the request succeeded and named a page that is
+ *  not there, which is a different thing from a section with no rows. */
+const sectionPastEnd = sectionTotal > 0 && sectionOffset >= sectionTotal;
+const sectionFrom = sectionItems.length > 0 ? sectionOffset + 1 : 0;
+const sectionTo = sectionOffset + sectionItems.length;
 
 const files = (data?.files ?? []).filter((file) => file.kind === "pl");
 const ecctFiles = (data?.files ?? []).filter((file) => file.kind === "ecct");
@@ -147,7 +170,10 @@ function ordinal(n: number): string {
     that is `--measure` plus 18rem; under it the measure is unchanged and the
     tables scroll inside their own region. */}
 <Base title="Classification tables · U.S. Code" wide>
-  <h1 class="doc-title">Classification tables</h1>
+  {/* `ErrorPage` carries its own `<h1>`, so this one is rendered only when there
+      is a page to title. Both together read as a heading over a table that is
+      not there. */}
+  {!failure && <h1 class="doc-title">Classification tables</h1>}
 
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
 
@@ -220,26 +246,62 @@ function ordinal(n: number): string {
             </div>
 
             <h2 class="toc-group" id="classsection-heading">
-              {sectionRows == null || sectionRows.total === 0
+              {sectionTotal === 0
                 ? `Nothing was classified to ${sectionCitation}`
-                : `${sectionRows.total.toLocaleString()} row${
-                    sectionRows.total === 1 ? "" : "s"
+                : `${sectionTotal.toLocaleString()} row${
+                    sectionTotal === 1 ? "" : "s"
                   } classified to ${sectionCitation}`}
             </h2>
-            {sectionRows == null || sectionRows.total === 0 ? (
+
+            {sectionTotal === 0 && (
               <p class="doc-meta">
                 The tables cover 1996 onward, so a section last touched before then has no rows
                 here.
               </p>
-            ) : (
+            )}
+
+            {sectionPastEnd && (
+              <p>
+                That is past the last of {sectionTotal.toLocaleString()} rows.{" "}
+                <a href={sectionPageHref(0)}>Back to the first page</a>.
+              </p>
+            )}
+
+            {sectionItems.length > 0 && (
               <>
-                <p class="doc-meta">Newest public law first, across every table.</p>
+                <p class="doc-meta">
+                  Newest public law first, across every table. Showing{" "}
+                  {sectionFrom.toLocaleString()}–{sectionTo.toLocaleString()} of{" "}
+                  {sectionTotal.toLocaleString()}.
+                </p>
                 <ClassificationTable
-                  entries={sectionRows.items}
-                  caption={`Classified to ${sectionCitation}, newest law first`}
+                  entries={sectionItems}
+                  caption={`Classified to ${sectionCitation}, rows ${sectionFrom.toLocaleString()}–${sectionTo.toLocaleString()}`}
                 />
               </>
             )}
+
+            {!sectionPastEnd &&
+              (sectionOffset > 0 || sectionTotal > sectionOffset + CLASSIFICATION_PAGE_SIZE) && (
+                <nav class="searchpager" aria-label="Classification rows pages">
+                  {sectionOffset > 0 && (
+                    <a
+                      class="usa-button usa-button--outline"
+                      href={sectionPageHref(Math.max(0, sectionOffset - CLASSIFICATION_PAGE_SIZE))}
+                    >
+                      ← Previous
+                    </a>
+                  )}
+                  {sectionTotal > sectionOffset + CLASSIFICATION_PAGE_SIZE && (
+                    <a
+                      class="usa-button usa-button--outline"
+                      href={sectionPageHref(sectionOffset + CLASSIFICATION_PAGE_SIZE)}
+                    >
+                      Next →
+                    </a>
+                  )}
+                </nav>
+              )}
           </section>
         )}
 
