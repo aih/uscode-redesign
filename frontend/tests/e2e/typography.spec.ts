@@ -204,8 +204,12 @@ test.describe("reading density", () => {
    * is one click further than it was. */
   const density = (page: import("@playwright/test").Page) =>
     page.locator(".navdrop__list .density-toggle");
-  const openMore = (page: import("@playwright/test").Page) =>
-    page.locator(".navdrop--more > summary").click();
+  /** Below 64em there is no More to open: the sheet *is* the menu and these
+   * rows are its own (ADR-0064), so the summary is `display: none` there. */
+  const openMore = async (page: import("@playwright/test").Page) => {
+    const summary = page.locator(".navdrop--more > summary");
+    if (await summary.isVisible()) await summary.click();
+  };
 
   test("defaults to comfortable, switches, and is remembered", async ({ page }) => {
     await page.goto(SECTION);

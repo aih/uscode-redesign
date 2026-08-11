@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63, 64]
 ---
 
 ## The address of a provision
@@ -71,9 +71,14 @@ Both menus open over the page rather than pushing it down, and one is open at a 
 closes the other. **Esc** closes the open menu and puts the keyboard back on the button that opened
 it. So does clicking anywhere outside it.
 
-On a window narrower than 1024 pixels those four collapse behind a **Menu** button beside the search
-box, and the foot of the page collapses behind **Site links**. The disclaimer under the footer menu
-stays on screen either way.
+On a window narrower than 1024 pixels the page carries a bar instead: **Menu**, the site's name, and
+the light/dark switch, with the search box on its own row underneath. The search box is on screen
+without opening anything. The foot of the page collapses behind **Site links**; the disclaimer under
+the footer menu stays on screen either way.
+
+Menu opens a sheet under the bar. It lists Titles, then My Provisions, then everything More holds at
+a wider window — Reference, Help and Display — in the open, one heading after another, with the
+Accounts row last. There is no second menu to open inside it.
 
 ```scenario
 id: header-more-menu
@@ -140,13 +145,31 @@ needs:
 steps:
   - goto: /app/us/usc/t16/s45f
     caption: On a phone the site links are behind one button.
+  - expect: { selector: ".navtools .sitesearch__input", visible: true }
+    caption: The search box has its own row under the bar and is always on screen.
   - click: .navmenu__summary
-    caption: Menu opens them over the page.
+    caption: Menu opens the rest over the page.
   - expect: { selector: '.usa-nav__primary a[href="/app/provisions"]', visible: true }
-    caption: The same four the top of a wide window shows in a row.
-  - click: .navdrop--more > summary
+    caption: Titles and My Provisions lead the sheet.
   - expect: { selector: '.navdrop a[href="/app/releases"]', visible: true }
-    caption: More opens inside the menu rather than over it.
+    caption: Release points, the guide and the API reference follow, in the open.
+  - expect: { selector: ".navdrop__list .density-toggle", visible: true }
+    caption: The display switches are the last group.
+```
+
+The light/dark switch is on the bar itself, one tap from any page.
+
+```scenario
+id: theme-on-the-bar
+title: Switch to dark from the bar
+needs:
+  viewport: mobile
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - click: .navbar > .theme-toggle
+    caption: The moon on the bar switches the page to dark.
+  - expect: { selector: ".navbar > .theme-toggle", contains: "Light" }
+    caption: The switch now names the way back.
 ```
 
 **The breadcrumb** at the top of every page runs from the title down to the provision on screen:

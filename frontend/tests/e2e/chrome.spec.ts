@@ -155,9 +155,136 @@ test.describe("the menus collapse below the desktop breakpoint (ADR-0058)", () =
     await page.locator(".navmenu__summary").click();
     await expect(list).toBeVisible();
     await expect(page.locator('.usa-nav__primary a[href="/app/provisions"]')).toBeVisible();
-    // About is a rung further in — it is behind More at every width (ADR-0061).
-    await page.locator(".navdrop--more > summary").click();
+    // About is in the sheet itself here, not behind More: below 64em the sheet
+    // *is* the menu, so More's summary is gone and its rows are the sheet's
+    // own (ADR-0064).
+    await expect(page.locator(".navdrop--more > summary")).toBeHidden();
     await expect(page.locator('.navdrop a[href="/app/about"]')).toBeVisible();
+  });
+
+  test("the sheet reads Titles, My Provisions, reference, help, display", async ({
+    page,
+  }) => {
+    // The order the mobile spec asks for, asserted as an order rather than as a
+    // set: a menu is a reading sequence, and "these rows exist somewhere in
+    // here" is not the claim.
+    await page.goto("/app/us/usc/t16/s45f");
+    await page.locator(".navmenu__summary").click();
+
+    const rows = await page.evaluate(() => {
+      const sheet = document.querySelector(".usa-nav__primary")!;
+      return [
+        ...sheet.querySelectorAll(
+          "summary.navdrop__summary, a.usa-nav__link, a.navdrop__item, .soon__trigger, .density-toggle, .theme-toggle",
+        ),
+      ]
+        // The Titles shortlist is behind its own disclosure and is not a row of
+        // the sheet: what is a row is the `Titles` summary that opens it.
+        .filter((el) => !el.closest(".navdrop--titles .navdrop__panel"))
+        // More's summary is still in the markup and is `display: none` here,
+        // which is the claim — so it must not count as a row.
+        .filter((el) => el.getClientRects().length > 0)
+        .map((el) =>
+          el
+            .textContent!
+            // The `soon` controls carry a visually-hidden explanation, and the
+            // carets and glyphs are `aria-hidden` decoration. Neither is the
+            // row's name.
+            .replace(/soon —.*/s, "")
+            .replace(/[▾▴≡☾☀]/g, "")
+            .replace(/\s+/g, " ")
+            .trim(),
+        );
+    });
+
+    expect(rows).toEqual([
+      "Titles",
+      "My Provisions",
+      "Release points",
+      "Downloads",
+      "User guide",
+      "API docs",
+      "About",
+      "Compact",
+      "Dark",
+      "Accounts",
+    ]);
+
+    // The two dividers the spec asks for are the group labels, which name what
+    // is under them rather than only separating it.
+    await expect(page.locator(".navdrop--more .navdrop__group")).toHaveText([
+      "Reference",
+      "Help",
+      "Display",
+    ]);
+  });
+
+  test("every row of the bar and the sheet is a 44px target", async ({ page }) => {
+    await page.goto("/app/us/usc/t16/s45f");
+    await page.locator(".navmenu__summary").click();
+
+    const short = await page.evaluate(() => {
+      const bar = document.querySelector(".navbar")!;
+      return [...bar.querySelectorAll("summary, a, button")]
+        .filter((el) => (el as HTMLElement).offsetParent !== null)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return { name: el.className || el.tagName, px: Math.min(r.width, r.height) };
+        })
+        .filter((t) => t.px > 0 && t.px < 44);
+    });
+
+    expect(short, "every target on the bar and in the sheet is at least 44px").toEqual([]);
+  });
+
+  test("the bar is 52px and the search box has the row under it", async ({ page }) => {
+    await page.goto("/app/us/usc/t16/s45f");
+
+    const geometry = await page.evaluate(() => {
+      const round = (n: number) => Math.round(n);
+      const bar = document.querySelector(".navbar")!.getBoundingClientRect();
+      const tools = document.querySelector(".navtools")!.getBoundingClientRect();
+      const brand = document.querySelector(".navbar__brand")!.getBoundingClientRect();
+      const menu = document.querySelector(".navmenu__summary")!.getBoundingClientRect();
+      const theme = document.querySelector(".navbar > .theme-toggle")!.getBoundingClientRect();
+      return {
+        barHeight: round(bar.height),
+        searchBelowBar: round(tools.top) >= round(bar.bottom),
+        // The same width as the bar above it, which is the nav's full width.
+        searchFullWidth: round(tools.width) === round(bar.width),
+        // Menu, then the wordmark, then the theme — left to right.
+        order: [round(menu.left), round(brand.left), round(theme.left)],
+      };
+    });
+
+    expect(geometry.barHeight).toBe(52);
+    expect(geometry.searchBelowBar).toBe(true);
+    expect(geometry.searchFullWidth).toBe(true);
+    expect(geometry.order[0]).toBeLessThan(geometry.order[1]);
+    expect(geometry.order[1]).toBeLessThan(geometry.order[2]);
+
+    // And the box is on screen without opening anything, which is the whole
+    // point of giving it a row: it is the control the site is built around.
+    await expect(page.locator(".navtools .sitesearch__input")).toBeVisible();
+  });
+
+  test("USWDS's own bar leaves the tab order with its box", async ({ page }) => {
+    // The wordmark is written twice, and a copy that is merely invisible would
+    // still be a home link the keyboard reaches and the eye cannot find.
+    await page.goto("/app/us/usc/t16/s45f");
+
+    await expect(page.locator(".usa-navbar")).toBeHidden();
+    await expect(page.locator(".navbar__brand a")).toBeVisible();
+    // The two wordmarks, not every link to `/app/`: the Titles menu's "All
+    // titles →" goes to the same place and is a different thing.
+    const shown = await page
+      .locator(".usa-logo a, .navbar__brand a")
+      .evaluateAll((links) => links.filter((a) => a.getClientRects().length > 0).length);
+    expect(shown).toBe(1);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(page.locator(".usa-logo a")).toBeVisible();
+    await expect(page.locator(".navbar__brand a")).toBeHidden();
   });
 
   test("opening it paints over the page rather than pushing it down", async ({ page }) => {

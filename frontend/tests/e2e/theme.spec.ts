@@ -12,7 +12,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const PAGE = "/app/us/usc/t16/s45f";
-const TOGGLE = "[data-theme-toggle]";
+/** There are two of these buttons (ADR-0064) — one on the mobile bar and one in
+ * the More menu — and exactly one of them is displayed at any width, so a
+ * selector that names neither matches both and Playwright refuses it. These
+ * tests run at the project's desktop viewport, where the menu's is the live
+ * one. */
+const TOGGLE = ".navdrop__list .theme-toggle";
+const BAR_TOGGLE = ".navbar > .theme-toggle";
 /** The control is a row of the navbar's More menu (ADR-0061). */
 const MORE = ".navdrop--more > summary";
 
@@ -103,4 +109,73 @@ test("the toggle costs the sticky chrome no height", async ({ page }) => {
   });
 
   expect(topbar).toBeLessThanOrEqual(token);
+});
+
+/* ------------------------------------------- two buttons, one setting (ADR-0064)
+ *
+ * The theme is a row of the More menu at desktop and a control on the bar below
+ * 64em, which is two `<button>` elements for one setting. What that owes: one
+ * of them displayed at a time, both bound, and the hidden one already correct
+ * when a resize reveals it.
+ */
+
+test("the bar carries the theme below the desktop breakpoint, and the menu above it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(PAGE);
+  await expect(page.locator(BAR_TOGGLE)).toBeVisible();
+  // Present but not displayed, so there is one theme control in the tab order
+  // and one in the accessibility tree.
+  await expect(page.locator(TOGGLE)).toBeHidden();
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.locator(BAR_TOGGLE)).toBeHidden();
+  await page.locator(MORE).click();
+  await expect(page.locator(TOGGLE)).toBeVisible();
+});
+
+test("the bar's toggle switches, and is one tap from the page", async ({ page }) => {
+  // One tap, where ADR-0061 left it two: open More, then click. That is the
+  // whole of what B9 buys on a phone.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(PAGE);
+
+  const bar = page.locator(BAR_TOGGLE);
+  await expect(bar).toHaveAccessibleName("Switch to dark mode");
+  await bar.click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(bar).toHaveAccessibleName("Switch to light mode");
+});
+
+test("the copy that is not on screen is painted too", async ({ page }) => {
+  // The script binds every `[data-theme-toggle]` and paints all of them. If it
+  // painted only the visible one, a reader who switched on a phone and then
+  // widened the window would find a menu row offering to switch to the mode
+  // they are already in.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(PAGE);
+  await page.locator(BAR_TOGGLE).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator(MORE).click();
+  await expect(page.locator(TOGGLE)).toHaveAccessibleName("Switch to light mode");
+  await expect(page.locator(`${TOGGLE} .theme-toggle__label`)).toHaveText("Light");
+});
+
+test("the island's script ships once", async ({ page }) => {
+  // Two copies would bind every button twice, and a click would toggle the
+  // theme and toggle it back. The button that carries the script has to be the
+  // last of the two in the document, so `script={false}` is on the other.
+  await page.goto(PAGE);
+
+  const copies = await page.evaluate(
+    () =>
+      [...document.querySelectorAll("script")].filter((s) =>
+        s.textContent?.includes("usc-theme"),
+      ).length,
+  );
+  // One island, plus `Base`'s pre-paint bootstrap, which reads the same key.
+  expect(copies).toBe(2);
 });

@@ -254,7 +254,9 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
     setup: async (page) => {
       await page.goto(SECTION, { waitUntil: "load" });
       await page.locator(".navdrop--more > summary").click();
-      await page.locator("[data-theme-toggle]").click();
+      // Scoped: there are two of these buttons (ADR-0064) and this scan runs at
+      // the desktop viewport, where the menu's is the one displayed.
+      await page.locator(".navdrop__list .theme-toggle").click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     },
   },
@@ -317,6 +319,10 @@ const STATE_SETUP: Record<string, { routeId: string; setup: (page: Page) => Prom
       // it sees the navbar's list as a row and the footer's as a row. The
       // viewport is set here rather than by the describe block: at 1280 the
       // summary is `display: none` and there is nothing to open.
+      //
+      // It is also the only scan of the sheet in the shape B9 gave it
+      // (ADR-0064) — More flattened into it, its group labels and both display
+      // switches in the open — and of the 52px bar the sheet hangs from.
       await page.setViewportSize({ width: 375, height: 812 });
       await page.goto(SECTION, { waitUntil: "load" });
       await page.locator(".navmenu__summary").click();

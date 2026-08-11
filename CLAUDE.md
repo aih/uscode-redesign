@@ -273,7 +273,31 @@ jump open what they land on. **A card's fragment arrives after that script has r
 nothing but apparatus) was a shut box whose first focusable sat inside `content-visibility: hidden`,
 where `.focus()` silently does nothing and ADR-0041's Tab-into-the-card stopped dead.
 
-`make test` = **545** Python tests; `make test-web` = **320** frontend tests; `make test-e2e` = **488**
+**Below 64em the header is a bar and a search row** (ADR-0064). `.navbar` is 52px — Menu, the site's
+name, the light/dark switch — and `display: contents` from 64em up, where its three children are
+items of the row ADR-0061 built, so the desktop header is untouched. The one search box has a
+full-width row under the bar and is on screen without opening anything, which **retires ADR-0058's
+`flex-basis` addendum and the two band-scoped bases it left**: those were about a row the box
+*shared*. **More is not a disclosure there** — its summary is `display: none` and its
+`::details-content` forced visible, `.navmenu`'s desktop arrangement run the other way round — so the
+sheet reads Titles, My Provisions, REFERENCE, HELP, DISPLAY, Accounts, the group labels serving as
+the dividers. **The wordmark is written twice**, one copy displayed per band: it must precede the
+menu at desktop and follow it on the bar, so no single DOM gives both bands a tab order matching the
+reading order, and `order` on a flex item is what ADR-0061 decision 4 refused. `display: contents` on
+the `<nav>` would have reached the same layout and was rejected because **whether a boxless landmark
+survives in the platform accessibility tree is not checkable here** — `page.accessibility` is gone
+from Playwright and axe computes landmarks from the DOM. `ThemeToggle` renders twice and **ships its
+script once, from the later instance**, binding every `[data-theme-toggle]`; the theme is therefore
+reachable twice below 64em, which is what the spec asks and what ADR-0064 records as its cost.
+Header **148 → 104px at 320**, unchanged at 375–1023, bar 52px, sticky stack back to ADR-0061's
+**225px** (`make mobilebar` → `docs/verification/mobilebar.json`) after the first draft's half-rem
+paddings measured 233 and `sticky.spec.ts`'s 60px of headroom refused it. Two traps: **`.navdrop__summary`'s
+`width: 100%` plus 2rem of side padding was 32px wider than the sheet holding it** — ADR-0061's
+`content-box` `<summary>` in a horizontal form — which drew the Titles caret past the right edge of a
+panel that clips, invisible on every narrow window; and `:root[data-theme="dark"] a` at 0-2-1 took
+the bar's wordmark blue, the third component to need the three-class count.
+
+`make test` = **545** Python tests; `make test-web` = **320** frontend tests; `make test-e2e` = **497**
 Playwright tests, 272 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -281,7 +305,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(62 ADRs, numbered to 0063 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(63 ADRs, numbered to 0064 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -325,15 +349,13 @@ decision): bounding the height is the half the first attempt was missing.
 items with two `<details>` dropdowns and the first script the chrome has carried (ADR-0061); the one
 search box is also a ⌘K command palette (ADR-0062); the footer's nine links are four labelled groups
 (ADR-0063). `--sticky-h` drops with the header — 23rem → 18rem in the 40–64em band, 19rem → 15rem
-above it, each measured against a stack of 225px and 168px. **Task B9 — the mobile chrome — is the
-part not written**: a 52px bar (Menu, wordmark, theme toggle) with the search row always visible
-beneath it, and the menu sheet flattened.
+above it, each measured against a stack of 225px and 168px. **B9 — the mobile chrome — landed as
+ADR-0064**, described above, which completes the spec.
 
-**Next: (1) workstream B task B9 — the mobile chrome, the last section of
-`docs/menu-refinement-spec.md`; (2) workstream B task B5 — "Compare with…" on the section header;
+**Next: (1) workstream B task B5 — "Compare with…" on the section header;
 `/app/diff` is still two hops from the text it compares and the API diff is 5.1 s per request. State
-and standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`; (3) rebuild the deployed search
-index and finish the deployment's open items (`docs/deploy-status.md`); (4) Day 7 hardening.**
+and standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`; (2) rebuild the deployed search
+index and finish the deployment's open items (`docs/deploy-status.md`); (3) Day 7 hardening.**
 
 Open debts: **the source's `indentUp0/1/2/3`, `indentDown1/2`, `indentTo54pts`,
 `indentTo65ptsHang`, `indent0And43pts` and `rightIndent1` classes are styled by nothing** — 8,733

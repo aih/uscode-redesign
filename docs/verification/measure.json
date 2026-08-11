@@ -116,73 +116,73 @@
       "page": "/app/us/usc/t16/s45f",
       "density": "comfortable",
       "viewport": 375,
-      "scrollHeightPx": 14717
+      "scrollHeightPx": 13954
     },
     {
       "page": "/app/us/usc/t16/s45f",
       "density": "comfortable",
       "viewport": 1280,
-      "scrollHeightPx": 8239
+      "scrollHeightPx": 8115
     },
     {
       "page": "/app/us/usc/t16/s470a",
       "density": "comfortable",
       "viewport": 375,
-      "scrollHeightPx": 3688
+      "scrollHeightPx": 2923
     },
     {
       "page": "/app/us/usc/t16/s470a",
       "density": "comfortable",
       "viewport": 1280,
-      "scrollHeightPx": 1580
+      "scrollHeightPx": 1454
     },
     {
       "page": "/app/us/usc/t16/s1801",
       "density": "comfortable",
       "viewport": 375,
-      "scrollHeightPx": 8839
+      "scrollHeightPx": 8076
     },
     {
       "page": "/app/us/usc/t16/s1801",
       "density": "comfortable",
       "viewport": 1280,
-      "scrollHeightPx": 24189
+      "scrollHeightPx": 24065
     },
     {
       "page": "/app/us/usc/t16/s45f",
       "density": "compact",
       "viewport": 375,
-      "scrollHeightPx": 12613
+      "scrollHeightPx": 11850
     },
     {
       "page": "/app/us/usc/t16/s45f",
       "density": "compact",
       "viewport": 1280,
-      "scrollHeightPx": 7334
+      "scrollHeightPx": 7210
     },
     {
       "page": "/app/us/usc/t16/s470a",
       "density": "compact",
       "viewport": 375,
-      "scrollHeightPx": 3688
+      "scrollHeightPx": 2923
     },
     {
       "page": "/app/us/usc/t16/s470a",
       "density": "compact",
       "viewport": 1280,
-      "scrollHeightPx": 1599
+      "scrollHeightPx": 1473
     },
     {
       "page": "/app/us/usc/t16/s1801",
       "density": "compact",
       "viewport": 375,
-      "scrollHeightPx": 7465
+      "scrollHeightPx": 6702
     },
     {
       "page": "/app/us/usc/t16/s1801",
       "density": "compact",
       "viewport": 1280,
-      "scrollHeightPx": 24602
+      "scrollHeightPx": 24478
     }
   ]
 }

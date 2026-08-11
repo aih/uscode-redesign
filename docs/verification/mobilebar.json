@@ -1,0 +1,675 @@
+{
+  "_comment": "The header's cost below the desktop breakpoint, menu closed, and the sticky stack it feeds. Regenerate with `make mobilebar` against a running site (ADR-0064).",
+  "headerPage": "/app/us/usc/t16/s45f",
+  "stickyPage": "/app/us/usc/t16/s470a",
+  "header": [
+    {
+      "viewport": 320,
+      "headerPx": 104,
+      "barPx": 52,
+      "searchVisible": true,
+      "searchInputPx": 181.61,
+      "smallestTargetPx": 44,
+      "targets": [
+        {
+          "name": "navmenu__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item navdrop__item--all",
+          "px": 44
+        },
+        {
+          "name": "usa-nav__link",
+          "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled density-toggle",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "A",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        }
+      ]
+    },
+    {
+      "viewport": 375,
+      "headerPx": 104,
+      "barPx": 52,
+      "searchVisible": true,
+      "searchInputPx": 236.61,
+      "smallestTargetPx": 44,
+      "targets": [
+        {
+          "name": "navmenu__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item navdrop__item--all",
+          "px": 44
+        },
+        {
+          "name": "usa-nav__link",
+          "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled density-toggle",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "A",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        }
+      ]
+    },
+    {
+      "viewport": 420,
+      "headerPx": 104,
+      "barPx": 52,
+      "searchVisible": true,
+      "searchInputPx": 281.61,
+      "smallestTargetPx": 44,
+      "targets": [
+        {
+          "name": "navmenu__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item navdrop__item--all",
+          "px": 44
+        },
+        {
+          "name": "usa-nav__link",
+          "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled density-toggle",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "A",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        }
+      ]
+    },
+    {
+      "viewport": 640,
+      "headerPx": 104,
+      "barPx": 52,
+      "searchVisible": true,
+      "searchInputPx": 501.61,
+      "smallestTargetPx": 44,
+      "targets": [
+        {
+          "name": "navmenu__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item navdrop__item--all",
+          "px": 44
+        },
+        {
+          "name": "usa-nav__link",
+          "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled density-toggle",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "A",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        }
+      ]
+    },
+    {
+      "viewport": 700,
+      "headerPx": 104,
+      "barPx": 52,
+      "searchVisible": true,
+      "searchInputPx": 561.61,
+      "smallestTargetPx": 44,
+      "targets": [
+        {
+          "name": "navmenu__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item navdrop__item--all",
+          "px": 44
+        },
+        {
+          "name": "usa-nav__link",
+          "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled density-toggle",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "A",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        }
+      ]
+    },
+    {
+      "viewport": 1023,
+      "headerPx": 104,
+      "barPx": 52,
+      "searchVisible": true,
+      "searchInputPx": 884.61,
+      "smallestTargetPx": 44,
+      "targets": [
+        {
+          "name": "navmenu__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item navdrop__item--all",
+          "px": 44
+        },
+        {
+          "name": "usa-nav__link",
+          "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled density-toggle",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "A",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        }
+      ]
+    },
+    {
+      "viewport": 1280,
+      "headerPx": 73.52,
+      "barPx": 53.23,
+      "searchVisible": true,
+      "searchInputPx": 328.2,
+      "smallestTargetPx": 44,
+      "targets": [
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item navdrop__item--all",
+          "px": 44
+        },
+        {
+          "name": "usa-nav__link",
+          "px": 45.23
+        },
+        {
+          "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled density-toggle",
+          "px": 44
+        },
+        {
+          "name": "usa-button usa-button--unstyled theme-toggle",
+          "px": 44
+        },
+        {
+          "name": "soon__trigger",
+          "px": 44
+        }
+      ]
+    }
+  ],
+  "sticky": [
+    {
+      "viewport": 640,
+      "stackPx": 225.13
+    },
+    {
+      "viewport": 700,
+      "stackPx": 225.13
+    },
+    {
+      "viewport": 1023,
+      "stackPx": 225.13
+    },
+    {
+      "viewport": 1280,
+      "stackPx": 168.08
+    }
+  ]
+}
