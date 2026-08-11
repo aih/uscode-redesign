@@ -49,15 +49,33 @@ const items = page?.items ?? [];
  * section number with no hyphen in it at all, which is 5,697 of 65,938 sections
  * short of the whole Code and never wrong about the ones it does offer.
  */
-function classificationHrefFor(titleNum: string | null, sectionNorm: string | null): string | null {
+function readerHref(titleNum: string | null, sectionNorm: string | null): string | null {
   if (!titleNum || !sectionNorm) return null;
   if (!/^\d+[a-z]*$/u.test(sectionNorm)) return null;
   return appHref(`/us/usc/t${titleNum}/s${sectionNorm}`);
 }
 
-function label(titleNum: string | null, sectionNorm: string | null, raw: string): string {
+/**
+ * One classification cell, as a label, an optional href, and whether the source
+ * left it empty.
+ *
+ * Four of the 21 rows have no former classification at all — a note that was
+ * newly classified rather than moved — so the cell has to have a rendering for
+ * nothing, the same as every cell in `ClassificationTable`.
+ */
+function cell(
+  titleNum: string | null,
+  sectionNorm: string | null,
+  raw: string,
+  isNote: boolean,
+): { label: string; href: string | null } | null {
   const cite = resultCitation(titleNum, sectionNorm ? `§ ${sectionNorm}` : null, "section");
-  return cite ?? raw;
+  const text = cite ?? raw.trim();
+  if (!text) return null;
+  return {
+    label: isNote ? `${text} note` : text,
+    href: readerHref(titleNum, sectionNorm),
+  };
 }
 ---
 
@@ -98,39 +116,37 @@ function label(titleNum: string | null, sectionNorm: string | null, raw: string)
               </thead>
               <tbody>
                 {items.map((entry) => {
-                  const formerHref = classificationHrefFor(
+                  const former = cell(
                     entry.former_title_num,
                     entry.former_section_norm,
+                    entry.former_raw,
+                    entry.former_is_note,
                   );
-                  const newHref = classificationHrefFor(
+                  const next = cell(
                     entry.new_title_num,
                     entry.new_section_norm,
+                    entry.new_raw,
+                    entry.new_is_note,
                   );
                   return (
                     <tr>
                       <th scope="row" class="classtable__cite">
-                        {formerHref ? (
-                          <a href={formerHref}>
-                            {label(
-                              entry.former_title_num,
-                              entry.former_section_norm,
-                              entry.former_raw,
-                            )}
-                          </a>
+                        {former == null ? (
+                          <span class="classtable__none" aria-label="Newly classified, moved from nothing">—</span>
+                        ) : former.href ? (
+                          <a href={former.href}>{former.label}</a>
                         ) : (
-                          entry.former_raw
+                          former.label
                         )}
-                        {entry.former_is_note && <span class="classtable__note"> note</span>}
                       </th>
                       <td class="classtable__cite">
-                        {newHref ? (
-                          <a href={newHref}>
-                            {label(entry.new_title_num, entry.new_section_norm, entry.new_raw)}
-                          </a>
+                        {next == null ? (
+                          <span class="classtable__none">—</span>
+                        ) : next.href ? (
+                          <a href={next.href}>{next.label}</a>
                         ) : (
-                          entry.new_raw
+                          next.label
                         )}
-                        {entry.new_is_note && <span class="classtable__note"> note</span>}
                       </td>
                       <td>{entry.provision_affected}</td>
                       <td>{entry.provision_prompting}</td>

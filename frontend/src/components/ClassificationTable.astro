@@ -59,11 +59,16 @@ function plLabel(entry: ClassificationEntry): string | null {
   return `${entry.pl_congress}-${entry.pl_num}`;
 }
 
-/** The law's section, with the new section it adds where the source names one:
- *  `202 "1948"`. */
+/** The law's section, with the new section it adds where the source names one.
+ *
+ * The quotation marks are the source's own notation and they carry the meaning:
+ * OLRC's legend reads "an item in quotes following the section citation in
+ * column 5 indicates a new section that is being added". The column is stored
+ * without them (`3` and `50506`), so they are written back here — `3 "50506"`. */
 function plSection(entry: ClassificationEntry): string {
-  const parts = [entry.pl_section_raw?.trim(), entry.new_section_quote?.trim()].filter(Boolean);
-  return parts.join(" ");
+  const section = entry.pl_section_raw?.trim() ?? "";
+  const quote = entry.new_section_quote?.trim();
+  return [section, quote ? `"${quote}"` : ""].filter(Boolean).join(" ");
 }
 
 /** The volume this row's page is in: the file's, or the row's own where the
