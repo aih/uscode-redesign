@@ -355,3 +355,228 @@ class AuthSession(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ClassificationFile(Base):
+    """One source document from OLRC's Classification Tables (spec §2).
+
+    A `kind='pl'` row is one `tbl{congress}{pl}_{session}.htm` file — which
+    provision of which public law was classified where; a `kind='ecct'` row is
+    an Editorial Classification Change Table. `kind` is a string and not an enum
+    because the source has already added one document type to this family and
+    may add another.
+
+    `session` is 1 or 2, with **0 for the 104th's single whole-congress file**
+    (`tbl104pl.htm`, covering 104-1 through 104-333). A sentinel rather than
+    NULL, because `UniqueConstraint(kind, congress, session)` is what makes a
+    re-fetch update a row in place, and NULL is never equal to itself in a
+    unique index.
+
+    `covered_laws_text` is the page header's public-law range, verbatim
+    ("Public Law 119-70 and Public Laws 119-74 through 119-102"). It is the
+    change-detection key: the pages carry no usable `Last-Modified` or `ETag`
+    and embed a per-request `jsessionid`, so hashing the raw bytes detects
+    nothing. `content_hash` is sha256 of the extracted `<PRE>` text — hex, like
+    `title_versions.source_zip_sha256` — and gates the reload once a change is
+    suspected. `covered_ranges` holds that same header parsed into gap-aware
+    segments (`['70-70', '74-102']`), which is what answers whether a given
+    public law is covered by a file that classified nothing for it.
+
+    `row_count` and `skipped_lines` are the parse report kept beside the data,
+    so a load that silently started dropping lines is visible without a
+    re-parse.
+    """
+
+    __tablename__ = "classification_files"
+    __table_args__ = (
+        # One registry row per source document — a re-fetch updates in place
+        # (spec §2: wholesale replace per file, one transaction).
+        UniqueConstraint("kind", "congress", "session"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String)  # 'pl' | 'ecct' — open set
+    congress: Mapped[int] = mapped_column(Integer)
+    session: Mapped[int] = mapped_column(Integer)  # 1 | 2 | 0 = whole congress
+    source_url: Mapped[str] = mapped_column(String)
+    source_filename: Mapped[str] = mapped_column(String)  # 'tbl118pl_2nd.htm'
+    covered_laws_text: Mapped[str | None] = mapped_column(Text, nullable=True)  # null for ECCT
+    covered_ranges: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    first_law: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_law: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prepared_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    # The Stat. volume from the column header ('138 Stat.'). NULL for the 104th,
+    # whose header is the volume-less 'Stat. Page' because that congress spans two.
+    stat_volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content_hash: Mapped[str] = mapped_column(String)  # sha256 hex of the <PRE> text
+    fetched_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    row_count: Mapped[int] = mapped_column(Integer)
+    skipped_lines: Mapped[int] = mapped_column(Integer)
+
+
+class ClassificationEntry(Base):
+    """One row of a Classification Table: a public-law provision and where it
+    landed in the Code.
+
+    Every `*_raw` column is the source cell verbatim after tag-stripping, and is
+    NOT NULL with `''` for a blank cell — `description_raw = ''` means the
+    section was amended, and `pl_section_raw = ''` means the row is about the
+    whole law. Those blanks carry meaning, so they are stored as the empty
+    string the source wrote rather than as NULL.
+
+    The parsed columns beside them are best-effort. `pl_congress`/`pl_num` are
+    nullable because a row whose Pub. L. cell fails to parse is kept and warned
+    about, never dropped. `usc_identifier` is nullable by rule as well as by
+    failure: appendix rows never derive one, since `5A / 405` cannot produce the
+    `/us/usc/t5a/pl/92/463/s1` shape OLRC actually publishes, and a section cell
+    naming a range rather than one section derives nothing either. Note and
+    `prec` rows do derive the parent section's identifier, qualified by
+    `is_note`/`action`.
+
+    `title_num` is a string ('5a'), never an integer, and never an ORDER BY on
+    its own — sort through `storage.postgres.title_sort_key` (gotcha 16).
+    `section_norm` is lowercased with U+2013/U+2011 folded to '-', because OLRC
+    writes section numbers with an en dash and no keyboard has that key
+    (gotcha 17); it is the column user input is matched against.
+
+    `action` is a string and not an enum: the Description column is an open set
+    (`nt`, `new`, `nt new`, `prec`, `tr fr`, `tr to`, `omitted`, `repealed`,
+    `gen amd`, `ed chg`, …) that the source extends without warning (gotcha 13's
+    lesson applied to a second vocabulary).
+
+    Rows are deleted and re-inserted wholesale when their file changes — the
+    source has no row identity to diff against — so `id` is never a permalink
+    and nothing foreign-keys into this table.
+    """
+
+    __tablename__ = "classification_entries"
+    __table_args__ = (
+        # Re-inserting a file's rows must not be able to double them.
+        UniqueConstraint("file_id", "row_seq"),
+        # "Everything Public Law 118-33 classified", in source order — the
+        # /classifications/pl/{congress}/{law_num} route and the ?pl= filter.
+        Index(
+            "ix_classification_entries_pl_congress_pl_num_row_seq",
+            "pl_congress",
+            "pl_num",
+            "row_seq",
+        ),
+        # "Everything ever classified to 42 U.S.C. 254c-15" — the
+        # /classifications/code/{title_num}/{section} route, the ?title=/?section=
+        # filters, and the `code` sort's leading columns.
+        Index("ix_classification_entries_title_num_section_norm", "title_num", "section_norm"),
+        # The by-identifier route, which is a lookup on the derived path alone
+        # and cannot use the composite index above.
+        Index("ix_classification_entries_usc_identifier", "usc_identifier"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    file_id: Mapped[int] = mapped_column(
+        ForeignKey("classification_files.id", ondelete="CASCADE")
+    )
+    row_seq: Mapped[int] = mapped_column(Integer)  # 0-based order within the file
+    raw_line: Mapped[str] = mapped_column(Text)  # tag-stripped, verbatim
+    title_raw: Mapped[str] = mapped_column(String)  # '5A'
+    title_num: Mapped[str] = mapped_column(String)  # '5a' — string, see docstring
+    is_appendix: Mapped[bool] = mapped_column(Boolean, default=False)
+    section_raw: Mapped[str] = mapped_column(String)
+    section_norm: Mapped[str] = mapped_column(String)  # lowercased, en dash -> '-'
+    description_raw: Mapped[str] = mapped_column(String)  # '' = amended
+    is_note: Mapped[bool] = mapped_column(Boolean, default=False)
+    action: Mapped[str | None] = mapped_column(String, nullable=True)  # open set
+    transfer_counterpart: Mapped[str | None] = mapped_column(String, nullable=True)  # '42/290ee-10'
+    act_name: Mapped[str | None] = mapped_column(String, nullable=True)  # appendix rows
+    usc_identifier: Mapped[str | None] = mapped_column(String, nullable=True)  # '/us/usc/t18/s3551'
+    pl_congress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pl_num: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pl_section_raw: Mapped[str] = mapped_column(String)  # '101(3)', '2(6), (7)', '' = whole law
+    new_section_quote: Mapped[str | None] = mapped_column(String, nullable=True)  # 202 "1948"
+    stat_volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stat_pages: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
+
+
+class EcctEntry(Base):
+    """One row of the Editorial Classification Change Table: a provision OLRC
+    moved from one Code location to another without Congress amending it.
+
+    The two classifications are stored raw ('42:294t nt') and split into the
+    same `(title_num, section_norm, is_note)` triple `classification_entries`
+    uses, so a section's editorial history is reachable from either end by the
+    same normalized key. The split columns are nullable because the source
+    writes free text in these cells and a cell that does not split is kept
+    rather than dropped.
+
+    `provision_affected` and `provision_prompting` are full public-law citation
+    strings kept verbatim, with the congress and law number pulled out beside
+    them when they parse.
+    """
+
+    __tablename__ = "ecct_entries"
+    __table_args__ = (
+        # Both directions of "what happened to this section" — the ECCT is read
+        # from the old citation as often as from the new one.
+        Index(
+            "ix_ecct_entries_former_title_num_former_section_norm",
+            "former_title_num",
+            "former_section_norm",
+        ),
+        Index(
+            "ix_ecct_entries_new_title_num_new_section_norm",
+            "new_title_num",
+            "new_section_norm",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("classification_files.id"))
+    row_seq: Mapped[int] = mapped_column(Integer)
+    former_raw: Mapped[str] = mapped_column(String)  # '42:294t nt'
+    former_title_num: Mapped[str | None] = mapped_column(String, nullable=True)
+    former_section_norm: Mapped[str | None] = mapped_column(String, nullable=True)
+    former_is_note: Mapped[bool] = mapped_column(Boolean, default=False)
+    new_raw: Mapped[str] = mapped_column(String)  # '42:294u new'
+    new_title_num: Mapped[str | None] = mapped_column(String, nullable=True)
+    new_section_norm: Mapped[str | None] = mapped_column(String, nullable=True)
+    new_is_note: Mapped[bool] = mapped_column(Boolean, default=False)
+    provision_affected: Mapped[str] = mapped_column(Text)  # verbatim citation string
+    provision_prompting: Mapped[str] = mapped_column(Text)
+    affected_pl_congress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    affected_pl_num: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prompting_pl_congress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prompting_pl_num: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ClassificationSourceCheck(Base):
+    """One poll of the Classification Tables index page.
+
+    A sibling of `source_checks`, not a reuse of it. `last_source_check()` takes
+    the newest row regardless of `source_url` and feeds `/api/v1/status`, so
+    interleaving classification polls into that table would make the answer to
+    "how current is the corpus" flap between two unrelated sources.
+
+    Written on success and on failure, for the reason `SourceCheck`'s docstring
+    gives: a scraper that has stopped running looks exactly like a source with
+    nothing new. `files_seen` is NULL on a failed check rather than 0, and
+    `changed_files` names the source filenames whose covered-law text differs
+    from the registry — the answer to "was there anything new", recorded because
+    the next successful load erases the evidence. `error` is truncated to 500
+    characters by the writer.
+    """
+
+    __tablename__ = "classification_source_checks"
+    # Every read is "the most recent one" — the freshness line on
+    # /classifications/tables and the poll's own short-circuit.
+    __table_args__ = (Index("ix_classification_source_checks_checked_at", "checked_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    checked_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    source_url: Mapped[str] = mapped_column(String)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    files_seen: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    changed_files: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    latest_covered_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
