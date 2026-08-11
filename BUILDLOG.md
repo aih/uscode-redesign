@@ -2440,3 +2440,86 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   themselves, which survive only in the verification JSON; 28 of the 31 `pl` files have never been
   through this parser, and an unmeasured vintage whose header tokens move raises rather than
   storing garbage.
+
+## 069 — 2026-08-11 — Session 47: classification tables, wave 2 — the loader, CLI and poll
+
+- **Tool/model:** Claude Code, Opus 5, one session in a worktree off `classification-wave1` (Wave 2
+  is the join point between C1 and C2a, so it was not dispatched to a subagent).
+- **Asked:** Execute phase prompt C2b — `load_file`, `poll_classification` +
+  `record_classification_check`, the fetch layer, the `classification` / `classification-check`
+  subcommands with exit codes 0/10/1, the verification JSON and the manifest, `make ci-data` through
+  `--from-file`, and the full live backfill with its artifacts committed. Stop before Wave 3.
+- **Produced:** branch `c2b-classification-loader`, 12 commits `02f5152..HEAD`.
+  - `ingest/classification.py` gains its other three layers: the fetch (throttled, cached under
+    `data/classification/`, `.part`-then-rename), `load_file` + `run_classification_load`,
+    `poll_classification` + `record_classification_check`, and the artifact writers.
+  - `ingest/__main__.py`: `classification` and `classification-check`.
+  - `db/models.py` + migration `0044883c483c`: `ondelete="CASCADE"` and
+    `UniqueConstraint(file_id, row_seq)` on `ecct_entries`.
+  - `ingest/download.py`: `_throttle` → public `throttle` (the budget is per host, not per module).
+  - `tests/test_classification_loader.py` (33 tests), six new parser tests, one model test.
+  - `Makefile`: `ci-classification-data`, which `ci-data` depends on.
+  - 33 `docs/verification/classification-*.json` and `data/manifests/classification.json` from the
+    live run; ADR-0067's Wave 2 addendum; the spec's § What Wave 2 measured.
+- **Decided:**
+  - **`ecct_entries` gets the two constraints its sibling has** — the choice Wave 1 deferred here.
+    Wholesale replace per file means a re-load that could double rows and a registry delete that
+    could orphan them are the two failures worth making impossible (ADR-0067 decision 8).
+  - **The gate is two-stage, and only the second costs a request.** A file whose covered-law
+    sentence still matches the registry is skipped without being fetched; one that is fetched is
+    skipped anyway if its `<PRE>` text hashes the same, because OLRC rewords that sentence without
+    touching the table. A re-run over an up-to-date database is two requests and 3.5 seconds.
+  - **One transaction per file, not per run** — `load_file` commits nothing and the orchestrator
+    commits after each file, so an interrupted backfill resumes from the registry and needs no
+    ledger of its own.
+  - **`--from-file DIR` loads what the directory holds:** a linked file it lacks is skipped, and a
+    table it holds that neither index page links is loaded with its covered range read from its own
+    header. `make ci-data` is both at once — the slices link a dozen files and hold three, and
+    `tbl110pl_1st.htm` is linked by neither. Over the network the same absence is a failure, since
+    there the index page is evidence the document exists.
+  - **The disk cache is a record of what was fetched, not a way to avoid fetching.** The one page
+    that changes is the current session's, and serving last week's copy of it is the failure the
+    poll exists to catch.
+  - **Four parser defects fixed**, all in the 28 vintages Wave 1 never measured, and the reason a
+    column boundary is now checked against the file's own rows: `tbl112pl_2nd.htm` and
+    `tbl113pl_1st.htm` start their Sec. column one character left of where their header puts it; a
+    Stat. page is not always a number (`113 Stat. 1501A-594` — the appropriations volumes number
+    their divisions with a letter); a row OLRC has corrected carries an asterisk in front of its
+    title number, which sometimes fits in the Title column's padding and sometimes pushes every
+    later column one or two characters right; and a Sec. cell butted straight against its Stat. page
+    can be split where the row's own statviewer anchor says the page begins.
+  - **A boundary moves only on the share of rows, never on one row.** More than a fifth, and only
+    when a nearby column splits fewer — the worst legitimate overrun in the corpus is 3% of a file,
+    and the two shifted files split 99.9% and 74% of theirs. A file under 20 rows keeps the header's
+    answer whatever its rows do.
+- **Verified:**
+  - `make test` — **690 passed, 13 deselected** (648 after Wave 1: +33 loader, +8 parser, +1 model),
+    with `USC_REQUIRE_INTEGRATION=1`. `make test-web` — **346 passed**, untouched by this wave.
+  - `alembic upgrade head && alembic downgrade -1 && alembic upgrade head` clean.
+  - **The full live backfill, twice.** 33 documents, **144,837 rows across 31 `pl` files and 21 ECCT
+    rows in two**, 131 warnings, 0 skipped lines, 2 rows without a public law, 1,533 without a
+    derived identifier, 60 distinct titles, 107 s from cold. Re-check with `uv run python -m ingest
+    classification --force`. The first run, before the four fixes, was 10,584 warnings, 3,717 rows
+    with no public law and 29 lines dropped — the numbers that justify the fixes.
+  - **A re-run is a no-op:** 0 rows written, 31 of 33 skipped without a fetch, 3.5 s. The two ECCT
+    files are fetched and report `unchanged`.
+  - **The poll cycle, live:** `classification-check` twice → exit 0 both times; with one registry
+    row's `covered_laws_text` edited to `Public Laws 119-74 through 119-99` → exit 10 naming
+    `tbl119pl_2nd.htm`; `classification --congress 119 --session 2` then fetched it, found the
+    `<PRE>` hash unchanged, refreshed the registry row and wrote nothing; the next check → exit 0.
+  - Check rows on both paths, the wholesale replace, the ECCT not doubling, the cascade, and the
+    three exit codes are `tests/test_classification_loader.py`, whose integration tests bind their
+    sessions to one connection inside a transaction that is rolled back — the orchestrator commits
+    per file by design, and this database is the fixture corpus every other integration test reads.
+  - `make ci-classification-data` loads 4 documents / 192 rows offline, writing its artifacts under
+    `.ci-data` so a slice never overwrites the committed description of the real file.
+- **Open, carried into Wave 3:** nothing reads any of this — no storage protocol, no API route, no
+  page, no guide chapter (ADR-0067 is still in the guide ratchet's `INFRASTRUCTURE_ADRS`, and C5
+  removes it). 129 rows keep their Stat. citation in `raw_line` alone: 127 where a Sec. cell's
+  bracket runs into a letter-numbered page in a vintage with no anchors to key on, and 2 in
+  `tbl112pl_2nd.htm` whose description pushes the law number past the Sec. column. A change to the
+  ECCT alone is invisible to the poll — the covered-law sentence is written about `pl` files only —
+  so it is caught by the next load or the weekly `--force` sweep. A database that has run
+  `make ci-data` will skip the real tables until something forces it, because a slice carries the
+  real file's covered-law sentence. `deploy/update-corpus.sh` is **not** wired to the check yet;
+  that is C5's, along with running the backfill on the box.
