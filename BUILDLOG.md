@@ -2381,3 +2381,62 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     URLs CI builds, so the local run exercised the redline CI renders.
   - CI green on both the push and pull_request runs of `d8a419d` (runs 31486531480, 31486534828):
     `make test`, `make test-web`, `make test-e2e` all passing.
+
+## 068 — 2026-08-11 — Session 46: classification tables, wave 1 — the parser and the schema
+
+- **Tool/model:** Claude Code, Opus 5 orchestrating; C1 and C2a by two Opus 5 subagents in parallel
+  git worktrees, the merged-diff review by a third with fresh context.
+- **Asked:** Read `docs/classification-spec.md`, execute Wave 1 as two parallel agents on disjoint
+  files, merge A then B when both report green, review the merged diff from fresh context, update
+  the spec's status line, write this entry. Stop before Wave 2 (C2b, the loader).
+- **Produced:** branch `classification-wave1`, 13 commits `13423a3..5321d86`.
+  - C1 (`b2a43a0..44e1614`): `ingest/classification.py` (parse side — `parse_tables_index`,
+    `parse_classification_file`, `parse_ecct`, `ClassificationParseReport`), five committed fixture
+    slices plus `ecct.html` whole, `tests/test_classification_parser.py`, `docs/adr/0067`.
+  - C2a (`b2a7ea6..ebd5f4c`): `classification_files`, `classification_entries`, `ecct_entries` and
+    `classification_source_checks` in `db/models.py`; migration `3c8d9ab6d527`; model tests.
+  - Post-review (`bd5e772..5321d86`): the four fixes below, the spec's new
+    § What Wave 1 measured, and ADR-0067 listed in the guide ratchet's `INFRASTRUCTURE_ADRS`.
+- **Decided:**
+  - **ADR-0067**, not the 0068 the spec's C1 prompt named — `docs/adr/` topped out at 0066.
+  - **`usc_identifier` is spelled with an EN DASH.** The tables write `254c-15` and the corpus
+    writes `/us/usc/t42/s254c–15`; 697 of the 9,299 distinct identifiers the three measured files
+    produce are hyphenated and every one joined nothing. 611 join now. `section_norm` keeps the
+    plain hyphen, which is what typed input is matched against (gotcha 17, ADR-0067 decision 7).
+  - **`classification_entries` gains `stat_page_labels ARRAY(String)`**, amended into the unapplied
+    migration rather than added by a second one. 110 Stat. 1321-9 and 3009-587 are single pages and
+    not numbers, and 1,658 of the 104th's 11,737 rows cite one.
+  - **Two silent mis-parses now warn or re-split.** A description overrunning past the Sec. column
+    left the Pub. L. number cut off where the re-split region ends — `118-274` read as `118-2`,
+    which parses — so the law is left null and warned about. A Sec. cell overrunning with digits
+    left a Stat. cell of `5 3`, which the cell's own shape test accepts; a column boundary between
+    two non-space characters is the signal, and the re-split now takes the gap nearest the declared
+    boundary rather than the first gap of any kind.
+  - **ADR-0067 is listed as infrastructure in `frontend/tests/guide.test.ts`** until C4/C5 ship
+    `/app/classification`. Wave 1 has no reader surface for a chapter to describe, and the ratchet
+    would otherwise hold CI red for the rest of the workstream. C5's prompt names removing the line.
+  - **`ecct_entries` keeps spec §2's asymmetry** — no CASCADE and no `(file_id, row_seq)` unique
+    constraint, where `classification_entries` has both. C2b must delete ECCT rows explicitly;
+    recorded in the spec rather than smoothed away here.
+- **Verified:**
+  - `make test` — **648 passed, 13 deselected** (558 before; +70 parser, +20 model), with
+    `USC_REQUIRE_INTEGRATION=1`. `make test-web` — **346 passed**.
+  - `alembic downgrade -1 && alembic upgrade head` clean against the dev Postgres with the amended
+    migration, `alembic check` reporting no drift, and the corpus row counts identical across the
+    cycle (65,938 sections, 96,185,732 `guid_map`).
+  - Full-file scratch run over the six downloaded originals: **2,987 rows for `tbl118pl_2nd.htm`,
+    2,122 for `tbl110pl_1st.htm`, 11,737 for `tbl104pl.htm`, 1 ECCT row**, zero skipped lines and
+    zero warnings in all four. **The spec's 2,990 and 11,740 are each three too high, for two
+    different reasons** — in the 118th file the extra lines are the banner, the column header and
+    the ruler; in the 104th the `<pre>` is never closed, so the page's own footer (`14v4`, `About
+    the Office`, `Privacy Policy`) falls inside it. Re-check by counting non-blank lines inside
+    `<pre>` in `data/classification/`.
+  - The dash fix measured against the loaded corpus: of the 697 en-dash identifiers the parser
+    derives, **611 join a row of `sections`**; against 0 of 697 before. Re-check by loading the
+    derived identifiers into a temp table and left-joining `sections`.
+- **Open, carried into Wave 2:** `db.models.ClassificationEntry`/`EcctEntry` collide by name with
+  their `ingest.classification` counterparts, so a loader importing both must alias one side;
+  `classification_files.skipped_lines` is an `Integer` while the parser produces the lines
+  themselves, which survive only in the verification JSON; 28 of the 31 `pl` files have never been
+  through this parser, and an unmeasured vintage whose header tokens move raises rather than
+  storing garbage.
