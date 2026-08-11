@@ -5,7 +5,11 @@
     "inventory: the guide ratchet's readerRoutes() in frontend/tests/guide.test.ts, plus the two",
     "API documentation pages FastAPI serves from main.py. Every path here answered 200 on a",
     "running site except /app/404, which answers 404 and renders the error page on purpose.",
-    "Everything here is reachable from the CI fixture corpus: Title 16 at 119-99 and 119-102not101."
+    "Everything here is reachable from the CI fixture corpus: Title 16 at 119-99 and 119-102not101.",
+    "A route may carry `readyWhen`: a selector the scan waits for before running axe. It is for",
+    "pages whose content is rendered by their own script rather than sent as markup — the two",
+    "vendored bundles — where `load` fires on a shell and axe would otherwise measure whichever",
+    "part of the page had painted by then."
   ],
   "viewports": [
     {
@@ -174,12 +178,14 @@
     {
       "id": "apidocs-swagger",
       "path": "/docs",
-      "name": "Swagger UI (vendored, ADR-0032)"
+      "name": "Swagger UI (vendored, ADR-0032)",
+      "readyWhen": ".opblock"
     },
     {
       "id": "apidocs-redoc",
       "path": "/redoc",
-      "name": "ReDoc (vendored, ADR-0032)"
+      "name": "ReDoc (vendored, ADR-0032)",
+      "readyWhen": "[data-role='redoc-description']"
     }
   ],
   "_statesComment": [
