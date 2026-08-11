@@ -1717,6 +1717,12 @@ class ClassificationLoadReport:
         return sum(1 for result in self.results if result.loaded)
 
     @property
+    def unchanged(self) -> int:
+        """Fetched, and its `<PRE>` text hashed the same — the second gate. Counted
+        separately from `skipped`, which never asked for the file at all."""
+        return sum(1 for result in self.results if not result.loaded)
+
+    @property
     def sound(self) -> bool:
         return not self.failures
 

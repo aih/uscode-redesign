@@ -633,7 +633,8 @@ def _cmd_classification(args: argparse.Namespace) -> int:
 
     print(
         f"\n{report.links_seen} documents linked: {report.loaded} loaded, "
-        f"{len(report.skipped)} skipped, {len(report.failures)} failed"
+        f"{report.unchanged} unchanged, {len(report.skipped)} skipped, "
+        f"{len(report.failures)} failed"
     )
     print(
         f"{report.rows_written:,} rows written in {report.elapsed_seconds:.1f}s; "
