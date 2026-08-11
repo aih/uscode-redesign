@@ -105,6 +105,11 @@
       "name": "classification tables index — the lookup box and the registry table (ADR-0067)"
     },
     {
+      "id": "classification-by-section",
+      "path": "/app/classification?title=18&section=3551",
+      "name": "the code-filtered view — every row ever classified to one section, with the filters as pills, on the index route"
+    },
+    {
       "id": "classification-session",
       "path": "/app/classification/118/2",
       "name": "one classification table — five columns in a scroll region, the sort control and the pager"

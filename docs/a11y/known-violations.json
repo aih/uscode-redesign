@@ -26,10 +26,19 @@
     {
       "page": "docs",
       "view": "320",
-      "overflowPx": 3,
+      "overflowPx": 146,
       "owner": "A4",
       "recorded": "2026-08-03",
-      "reason": "The per-endpoint parameter tables on /app/docs push the page 3px sideways at 320 CSS px. Same tables as the scrollable-region-focusable entry below."
+      "remeasured": "2026-08-11",
+      "reason": "The per-endpoint parameter tables on /app/docs push the page sideways at 320 CSS px. Same tables as the scrollable-region-focusable entry below. Was 3px; 146px since ADR-0067's seven /api/v1/classifications routes joined the schema this page renders — `/classifications/tables/{congress}/{session}/entries` is the longest path the API publishes, and .table-scroll does not contain its own overflow the way .uslm-tablewrap does."
+    },
+    {
+      "page": "docs",
+      "view": "375",
+      "overflowPx": 91,
+      "owner": "A4",
+      "recorded": "2026-08-11",
+      "reason": "The same tables, now wide enough to overflow 375 CSS px as well. Recorded rather than fixed because /app/docs is task A4's and the fix is the one already owed at 320: give .table-scroll the scroll region .uslm-tablewrap has."
     }
   ],
   "entries": [

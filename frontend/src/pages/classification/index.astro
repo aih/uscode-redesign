@@ -91,6 +91,16 @@ const sectionCitation = bySection
   ? resultCitation(bySection.titleFilter, `§ ${bySection.sectionFilter}`, "section")
   : null;
 
+/** The two filters in force, each with the same view minus itself — the same
+ *  pills the session page renders. A section number names nothing without its
+ *  title, so dropping either one drops both and returns the plain index. */
+const sectionFilters = bySection
+  ? [
+      { name: "Title", label: bySection.titleFilter, href: classificationHref() },
+      { name: "Section", label: bySection.sectionFilter, href: classificationHref() },
+    ]
+  : [];
+
 const files = (data?.files ?? []).filter((file) => file.kind === "pl");
 const ecctFiles = (data?.files ?? []).filter((file) => file.kind === "ecct");
 
@@ -183,6 +193,32 @@ function ordinal(n: number): string {
 
         {bySection && (
           <section class="classsection" aria-labelledby="classsection-heading">
+            <div class="filterpills">
+              <span class="filterpills__label" id="classsection-pills">
+                Filtered by
+              </span>
+              <ul class="filterpills__list" aria-labelledby="classsection-pills">
+                {sectionFilters.map((filter) => (
+                  <li>
+                    <span class="filterpills__pill">
+                      <span class="filterpills__name">{filter.name}</span>
+                      <span class="filterpills__value">{filter.label}</span>
+                      <a
+                        class="filterpills__clear"
+                        href={filter.href}
+                        aria-label={`Remove the ${filter.name.toLowerCase()} filter ${filter.label}`}
+                      >
+                        <span aria-hidden="true">×</span>
+                      </a>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <a class="filterpills__all" href={classificationHref()}>
+                Clear all
+              </a>
+            </div>
+
             <h2 class="toc-group" id="classsection-heading">
               {sectionRows == null || sectionRows.total === 0
                 ? `Nothing was classified to ${sectionCitation}`
@@ -193,14 +229,11 @@ function ordinal(n: number): string {
             {sectionRows == null || sectionRows.total === 0 ? (
               <p class="doc-meta">
                 The tables cover 1996 onward, so a section last touched before then has no rows
-                here. <a href={classificationHref()}>Clear this</a>.
+                here.
               </p>
             ) : (
               <>
-                <p class="doc-meta">
-                  Newest public law first, across every table.{" "}
-                  <a href={classificationHref()}>Clear this</a>.
-                </p>
+                <p class="doc-meta">Newest public law first, across every table.</p>
                 <ClassificationTable
                   entries={sectionRows.items}
                   caption={`Classified to ${sectionCitation}, newest law first`}
