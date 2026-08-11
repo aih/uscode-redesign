@@ -80,6 +80,9 @@ const INFRASTRUCTURE_ADRS = new Set([
   46, // the per-route JavaScript byte budget — a test harness
   47, // declining a shared cache in front of the spine — a deployment decision
   51, // the search index rebuilds itself on a mapping change — a deploy step
+  67, // the classification tables: scraping and schema, with no reader surface yet.
+  //     Remove this line when C4/C5 ship /app/classification and its chapter
+  //     (docs/classification-spec.md, phase C5).
 ]);
 
 const chapters = readChapters();

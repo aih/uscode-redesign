@@ -1,8 +1,11 @@
 # Classification tables — implementation spec for aih/uscode-redesign
 
-**Status:** spec written 2026-08-11 (planning session, no feature code yet). Phases C1–C5 below,
-none started. An orchestrating session starts at [§ Waves](#waves-parallel-agent-dispatch) and
-dispatches the phase prompts at the end of this file. Update this status line as waves land.
+**Status:** spec written 2026-08-11. **Wave 1 landed 2026-08-11** — C1 (parser, fixtures, ADR-0067)
+and C2a (schema, migration `3c8d9ab6d527`) merged, reviewed, and amended by that review; see
+[§ What Wave 1 measured](#what-wave-1-measured) for the six places this spec was wrong. Wave 2
+(C2b, the loader) is next; C3–C5 unstarted. An orchestrating session starts at
+[§ Waves](#waves-parallel-agent-dispatch) and dispatches the phase prompts at the end of this file.
+Update this status line as waves land.
 
 The OLRC Classification Tables record which provision of each new Public Law was classified to
 which US Code section (118-35 §101(3) → 18 USC 3551 note). The site holds nothing of this today.
@@ -295,6 +298,43 @@ Ratchets owed by the new routes — each is a hard gate:
 - Frontend: `make test-web` (guide ratchet, js budgets, palette), `make test-e2e` (chrome lists,
   new scenarios, the lookup's keyboard path), `make test-a11y`, `make shots`.
 
+## What Wave 1 measured
+
+Where this section and an earlier one disagree, this one is the later measurement.
+
+1. **The row counts in §6 are three too high, in both files, for two different reasons.** The parser
+   emits **2,987** rows for `tbl118pl_2nd.htm` and **11,737** for `tbl104pl.htm`. In the 118th file
+   the extra three are the `U. S. Code` banner, the column header and the ruler. In the 104th the
+   `<pre>` is never closed, so the site chrome at the end of the document (`14v4`, `About the
+   Office`, `Privacy Policy`) falls inside it. The 110th file is 2,122 rows. All three parse with
+   zero skipped lines and zero warnings.
+2. **`classification_entries` gains `stat_page_labels ARRAY(String)`.** Statutes at Large pages are
+   not always numbers — 110 Stat. 1321-9 and 3009-587 are single pages — and **1,658 of the 104th's
+   11,737 rows** cite one, which `stat_pages ARRAY(Integer)` cannot hold. The column also keeps a
+   range distinguishable from its endpoints (`863-866` is one token there and two integers in
+   `stat_pages`). Amended into migration `3c8d9ab6d527` rather than added by a second migration.
+3. **`usc_identifier` is spelled with an EN DASH.** The tables write `254c-15`; the corpus writes
+   `/us/usc/t42/s254c–15`, and all 5,697 of its hyphenated section identifiers use U+2013 while none
+   uses U+002D (gotcha 17). Derived with the table's own hyphen, 697 of the 9,299 distinct
+   identifiers the measured files produce join nothing; spelled with the en dash, 611 join. The 342
+   corpus identifiers that do contain a hyphen are appendix date paths, which derive nothing anyway.
+   `section_norm` keeps the plain hyphen — it is what typed input is matched against, so §4's
+   routes still normalize their input to the hyphen and §5's links still go through `encodePath`.
+4. **The ADR is 0067**, not the 0068 the C1 prompt names; `docs/adr/` topped out at 0066.
+5. **`ecct_entries` has neither `ondelete="CASCADE"` nor `UniqueConstraint(file_id, row_seq)`**,
+   because §2 specifies both for `classification_entries` and neither here. C2b's wholesale replace
+   must therefore delete ECCT rows explicitly, and nothing in the database stops a re-load doubling
+   them. Decide it in C2b rather than smoothing it here.
+6. **Two things C2b will trip over.** `db.models.ClassificationEntry`/`EcctEntry` collide by name
+   with `ingest.classification.ClassificationEntry`/`EcctEntry`, and a loader importing both must
+   alias one side. `classification_files.skipped_lines` is an `Integer` while the parser produces a
+   tuple of the lines themselves, so the count is stored and the lines survive only in the
+   verification JSON.
+
+One ratchet is deferred rather than met: ADR-0067 is listed in `INFRASTRUCTURE_ADRS` in
+`frontend/tests/guide.test.ts`, because Wave 1 ships no reader surface for a chapter to describe.
+**C5 removes that line when it writes the chapter** — it is named in the C5 prompt.
+
 ## Waves — parallel agent dispatch
 
 The house rhythm applies: implement in a worktree → tests pass → fresh-context reviewer reads the
@@ -405,7 +445,9 @@ branch named for the phase. Small commits, imperative messages, `Co-Authored-By`
 
 ### C5 — Menus, guide, poll wiring, deploy (Wave 4)
 
-> Finish the workstream: add "Classification tables" to SiteHeader's More ▸ Reference group,
+> Finish the workstream: remove ADR-0067 from `INFRASTRUCTURE_ADRS` in
+> `frontend/tests/guide.test.ts` — the chapter you write below is what replaces it. Add
+> "Classification tables" to SiteHeader's More ▸ Reference group,
 > SiteFooter's Browse group, and `siteCommands()` in `lib/palette.ts`, updating the ordered-text
 > assertions in `tests/e2e/chrome.spec.ts` and the palette tests in the same commits. Write the
 > guide chapter (`covers.routes` = the three routes, `covers.adrs` = the classification ADR's
