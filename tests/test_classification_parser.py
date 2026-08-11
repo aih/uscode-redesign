@@ -59,6 +59,38 @@ def oldest() -> ParsedClassificationFile:
     return _parse("tbl104pl_slice.htm", "tbl104pl.htm")
 
 
+HEADER = "Title Section      Description      Pub. L.  Sec.                  138 Stat."
+RULER = "-------------      -----------      -------------                  ---------"
+MODERN_OFFSETS = (0, 6, 19, 36, 45, 67)
+
+
+def _line(
+    title: str,
+    section: str,
+    description: str,
+    pl: str,
+    section_of_law: str,
+    stat: str,
+    *,
+    offsets: tuple[int, ...] = MODERN_OFFSETS,
+) -> str:
+    """One fixed-width row, each cell laid out at the column it belongs to.
+
+    Built rather than typed: a row whose columns are a character out is the exact
+    defect several of the tests below are about, so the alignment cannot be left to
+    counting spaces by eye.
+    """
+    line = ""
+    for value, at in zip((title, section, description, pl, section_of_law, stat), offsets):
+        line = line.ljust(at) + value
+    return line
+
+
+def _page(*lines: str, header: str = HEADER) -> str:
+    body = "\n".join(lines)
+    return f"<html><body><pre>\n U. S. Code\n{header}\n{RULER}\n{body}\n</pre></body></html>"
+
+
 def _row(parsed: ParsedClassificationFile, raw_fragment: str) -> ClassificationEntry:
     matches = [e for e in parsed.entries if raw_fragment in e.raw_line]
     assert len(matches) == 1, f"{raw_fragment!r} matched {len(matches)} rows"
@@ -168,6 +200,48 @@ def test_column_offsets_differ_by_vintage(modern, older, oldest):
     assert modern.column_offsets == (0, 6, 19, 36, 45, 67)
     assert older.column_offsets == (0, 6, 19, 36, 45, 67)
     assert oldest.column_offsets == (0, 6, 20, 42, 51, 68)
+
+
+def test_a_boundary_the_files_own_rows_disagree_with_is_moved():
+    """Measured over all 31 published tables: `tbl112pl_2nd.htm` and
+    `tbl113pl_1st.htm` start their Sec. column one character to the left of where
+    their header puts it. Read from the header alone, the Pub. L. cell of every row
+    in those files ends in the first digit of the Sec. cell, and the guard against
+    inventing a truncated law number left 3,717 rows with no public law at all."""
+    shifted = [(0, 6, 19, 36, 44, 67)]
+    parsed = parse_classification_file(
+        _page(
+            *(
+                _line("42", f"50{n:02d}", "nt new", "113-2", f"1101({n})", "39", offsets=shifted[0])
+                for n in range(25)
+            )
+        ),
+        filename="tbl113pl_1st.htm",
+    )
+
+    assert parsed.column_offsets == (0, 6, 19, 36, 44, 67)
+    assert {(row.pl_congress, row.pl_num) for row in parsed.entries} == {(113, 2)}
+    assert parsed.entries[0].pl_section_raw == "1101(0)"
+    assert parsed.warnings == ()
+
+
+def test_a_file_too_small_to_measure_keeps_the_headers_answer():
+    """One row that overruns is 100% of a one-row file. The smallest published
+    table is 517 rows, so this only ever applies to a fragment."""
+    parsed = parse_classification_file(
+        _page(_line("42", "5121", "nt new", "113-2", "1101(a)", "39", offsets=(0, 6, 19, 36, 44, 67))),
+        filename="tbl113pl_1st.htm",
+    )
+    assert parsed.column_offsets[4] == 45
+
+
+def test_a_boundary_a_few_rows_overrun_is_left_where_the_header_put_it(modern, older, oldest):
+    """Cells overrun their column legitimately (hazard 2), so the signal is the
+    share of rows and not any single one — the worst legitimate overrun in the
+    corpus is 3% of a file's rows."""
+    assert modern.column_offsets[4] == 45
+    assert older.column_offsets[4] == 45
+    assert oldest.column_offsets[4] == 51
 
 
 def test_a_missing_header_token_is_a_parse_error():
@@ -369,6 +443,88 @@ def test_a_hyphenated_stat_page_is_a_page_and_not_a_range(oldest):
     assert row.stat_pages == ()
     assert parse_stat_pages("4264-4267") == (("4264-4267",), (4264, 4267))
     assert parse_stat_pages("1544, 1545") == (("1544", "1545"), (1544, 1545))
+
+
+def test_a_stat_page_numbered_with_a_letter_is_a_page(oldest):
+    """113 Stat. 1501A-594 is one page: the appropriations volumes number their
+    divisions with a letter. 3,323 rows across the 105th–107th cite one, and a
+    Stat. cell of digits and hyphens alone read every one of them as an overrun."""
+    page = (
+        "<html><body><pre>\n U. S. Code\n"
+        "Title Section      Description      Pub. L.  Sec.                  113 Stat.\n"
+        "-------------      -----------      -------------                  ---------\n"
+        "47    336          nt new           106-113  1000(a)(9)               1501A-594\n"
+        "</pre></body></html>"
+    )
+    row = parse_classification_file(page, filename="tbl106pl_1st.htm").entries[0]
+
+    assert row.stat_page_labels == ("1501A-594",)
+    assert row.stat_pages == ()
+    assert row.pl_section_raw == "1000(a)(9)"
+
+
+def test_a_corrected_row_is_a_row():
+    """OLRC marks a row it has since corrected with an asterisk in front of the
+    title number — "`*` denotes an item that was corrected as of October 6, 2005",
+    says `tbl108pl_1st.htm`'s footnote. 29 rows across three files carry one, and
+    before this they were not recognised as rows at all. The marker is column 1 as
+    printed and no parsed field."""
+    row = parse_classification_file(
+        _page(_line("*16", "3503", "nt", "108-7", "155", "246")),
+        filename="tbl108pl_1st.htm",
+    ).entries[0]
+
+    assert (row.title_raw, row.title_num) == ("*16", "16")
+    assert row.usc_identifier == "/us/usc/t16/s3503"
+    assert (row.pl_congress, row.pl_num, row.pl_section_raw) == (108, 7, "155")
+    assert row.stat_pages == (246,)
+    assert row.raw_line.startswith("*16")
+
+
+@pytest.mark.parametrize(
+    ("marker", "keeps_width"),
+    [("*", True), ("*", False), ("**", False)],
+    ids=["padding-absorbs-it", "one-right", "two-right"],
+)
+def test_a_corrected_row_realigns_however_far_the_marker_pushed_it(marker, keeps_width):
+    """The Title column is six characters wide and holds at most four, so the
+    marker sometimes fits in the padding and sometimes pushes every later column
+    right: `*16   3503` keeps them, `*42    7619` moves them one and `**15    683`
+    two. All three shapes are in the files."""
+    # Inside the Title cell the marker eats the padding and every later column
+    # stays put; in front of the line it pushes them all right.
+    line = (
+        _line(marker + "16", "3503", "nt", "108-7", "155", "246")
+        if keeps_width
+        else marker + _line("16", "3503", "nt", "108-7", "155", "246")
+    )
+
+    parsed = parse_classification_file(_page(line), filename="tbl108pl_1st.htm")
+
+    assert parsed.skipped_lines == ()
+    assert parsed.warnings == ()
+    row = parsed.entries[0]
+    assert (row.section_raw, row.pl_num, row.pl_section_raw) == ("3503", 7, "155")
+    assert row.stat_pages == (246,)
+
+
+def test_a_linked_stat_page_butted_against_the_designator_is_split_off():
+    """`4001(b)(2)(A), (B), (D)(iii)1967` has no whitespace to cut at, and the
+    anchor around the page says where the cell begins — evidence from the document
+    rather than a guess. Roughly a hundred rows are this shape."""
+    page = (
+        "<html><body><pre>\n U. S. Code\n"
+        "Title Section      Description      Pub. L.  Sec.                  129 Stat.\n"
+        "-------------      -----------      -------------                  ---------\n"
+        "20    7221                          114-95   4001(b)(2)(A), (B), (D)(iii)"
+        '<a href="/statviewer.htm?volume=129&page=1967">1967</a>\n'
+        "</pre></body></html>"
+    )
+    row = parse_classification_file(page, filename="tbl114pl_1st.htm").entries[0]
+
+    assert row.pl_section_raw == "4001(b)(2)(A), (B), (D)(iii)"
+    assert row.stat_pages == (1967,)
+    assert row.stat_volume == 129
 
 
 def test_a_multi_value_section_of_law_cell_is_kept_verbatim(older):

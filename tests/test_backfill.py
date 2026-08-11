@@ -84,7 +84,7 @@ class FakeServer:
 @pytest.fixture(autouse=True)
 def _no_throttle(monkeypatch):
     """The 1 req/sec pacing is real in production and pointless in tests."""
-    monkeypatch.setattr("ingest.download._throttle", lambda: None)
+    monkeypatch.setattr("ingest.download.throttle", lambda: None)
 
 
 @pytest.fixture

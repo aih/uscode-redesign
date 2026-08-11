@@ -1,6 +1,6 @@
 ---
 name: ingest-cli
-description: The `python -m ingest` command-line reference for this project — inventory, fetch, backfill, mirror push/pull, load-all, load, reindex_search, verify, verify-downloads — plus scripts/vendor_apidocs.py. Use when running, resuming, or debugging any corpus download, load, search-index, or verification job.
+description: The `python -m ingest` command-line reference for this project — inventory, fetch, backfill, mirror push/pull, load-all, load, reindex_search, verify, verify-downloads, classification, classification-check — plus scripts/vendor_apidocs.py. Use when running, resuming, or debugging any corpus download, load, search-index, classification-table, or verification job.
 ---
 
 # `python -m ingest` — command reference
@@ -92,6 +92,34 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   two RPs with identical bytes is reported (OLRC republished it unchanged; also the u1
   substitution signature); two *different* titles sharing a zip fails the report, because
   that means URL construction collapsed two addresses. --deep re-hashes from disk.
+
+## python -m ingest classification [--congress N] [--session S] [--force] [--from-file DIR]
+                                  [--no-load] [--cache-dir DIR] [--out DIR] [--manifest PATH]
+  OLRC's Classification Tables — which provision of which public law landed where (ADR-0067).
+  Walks tables.shtml and priortables.shtml, loads every `pl` table and the ECCT, writes
+  docs/verification/classification-{congress}-{session}.json per document and
+  data/manifests/classification.json for the run. Pages are cached under data/classification/.
+
+  Resumable with no ledger: the registry table is the state. Two gates — a file whose
+  covered-law sentence still matches `classification_files` is skipped without a request (so a
+  re-run is two requests, not 33), and one that is fetched is skipped anyway if its `<PRE>`
+  text hashes the same. `--force` ignores both, which is what the first load on a box and the
+  weekly sweep want. `--session 0` is the 104th's whole-congress file.
+
+  `--from-file DIR` reads the index pages and the tables off disk instead — the offline path
+  `make ci-data` uses. What the directory holds is what loads: a linked file it lacks is
+  skipped, and a table it holds that no index page links is loaded with its covered range read
+  from its own header. Point `--out`/`--manifest` somewhere disposable when doing that, or a
+  fixture slice overwrites the artifacts describing the real files.
+
+## python -m ingest classification-check
+  The daily poll for the tables (ADR-0067 decision 5). One request to tables.shtml; writes a
+  `classification_source_checks` row whatever happens — a sibling of `source_checks` and not a
+  reuse of it, because `/api/v1/status` reads the newest row of that table regardless of URL.
+  Exit codes are `check`'s: 0 nothing changed, 10 a table's covered-law range moved, 1 the
+  check failed. Change detection is that sentence and not a body hash — the pages embed a
+  per-request jsessionid, so no two downloads are byte-identical. A change to the ECCT alone is
+  invisible here; the next `classification` run fetches and hash-gates it.
 
 ## python -m ingest load <xmlfile> --release <label> [--currency-date YYYY-MM-DD] [--source-url URL]
                                                   [--source-zip PATH]

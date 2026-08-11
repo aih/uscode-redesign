@@ -335,7 +335,7 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **558** Python tests; `make test-web` = **346** frontend tests; `make test-e2e` = **536**
+`make test` = **690** Python tests; `make test-web` = **346** frontend tests; `make test-e2e` = **536**
 Playwright tests, 272 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -394,13 +394,22 @@ ADR-0064**, described above, which completes the spec.
 standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`.
 
 **The classification tables are a workstream in flight** (`docs/classification-spec.md`, ADR-0067).
-OLRC's tables record which provision of which Public Law was classified to which Code section;
-the site holds none of it today. Wave 1 — the parser (`ingest/classification.py`, parse side
-only) and the four tables (`classification_files`, `classification_entries`, `ecct_entries`,
-`classification_source_checks`, migration `3c8d9ab6d527`) — is on branch `classification-wave1`
-and **not merged** (PR #44). Nothing is loaded and nothing is reachable from the reader. Wave 2
-(C2b, the loader, CLI and poll) is next; the spec's § What Wave 1 measured carries what that agent
-needs and § Waves carries the dispatch order.
+OLRC's tables record which provision of which Public Law was classified to which Code section.
+Wave 1 — the parser (`ingest/classification.py`, parse side only) and the four tables
+(`classification_files`, `classification_entries`, `ecct_entries`,
+`classification_source_checks`, migration `3c8d9ab6d527`) — is **merged** (PR #44). Wave 2 — the
+fetch, `load_file`, the backfill, the poll, the `classification` / `classification-check`
+subcommands and migration `0044883c483c` — is on branch `c2b-classification-loader`, **not merged**
+(PR #45), and **the whole corpus is loaded once from the live source: 144,837 rows across 31 Public Law order tables plus 21 ECCT rows, 131 warnings, 0 skipped
+lines, 107 seconds from cold** (`docs/verification/classification-*.json`, one artifact per
+document). Nothing is reachable from the reader — no storage protocol, no API route, no page.
+Wave 3 (C3 storage + API, C4 reader pages) is next; the spec's § What Wave 2 measured carries what
+those agents need and § Waves carries the dispatch order. **The first full-corpus parse found four
+defects in the 28 vintages Wave 1 never measured** — a Sec. column one character left of its own
+header in two files, a Stat. page numbered with a letter (`113 Stat. 1501A-594`), a row OLRC has
+corrected carrying an asterisk that shifts every later column, and a page butted straight against
+its Sec. designator — all fixed, and the reason a boundary is now checked against the file's own
+rows rather than trusted from the header alone (ADR-0067's addendum).
 
 **Next: (1) Day 7 hardening; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
@@ -576,6 +585,9 @@ make dev-data   # seed release_points from the RP inventory, then load Title 16 
 make ci-data    # the same two release points with NO network: inventory from
                 # tests/fixtures/releasepoints.json, 119-99 from a committed zip. What CI
                 # uses — never fetch from uscode.house.gov on every push (ADR-0013).
+                # Runs `make ci-classification-data` first, which copies the committed
+                # classification slices to the filenames OLRC publishes them at and loads
+                # them through `python -m ingest classification --from-file` (ADR-0067).
 make loadtest   # hey against the top routes → docs/verification/loadtest.json; needs
                 # `make dev-all` running and `brew install hey`
 make test       # uv run pytest (-m 'not slow') — the specification; nothing merges without it green

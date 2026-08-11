@@ -240,9 +240,15 @@ def test_ecct_entries_are_indexed_from_both_ends() -> None:
 
 
 def test_ecct_entries_belong_to_a_classification_file() -> None:
+    """The same two constraints `classification_entries` carries, for the same
+    reason: the load policy is wholesale replace per file, so a re-load must not
+    be able to double these rows and a deleted registry row must not orphan
+    them (migration 0044883c483c)."""
     file_id = Base.metadata.tables["ecct_entries"].columns["file_id"]
     fk = next(iter(file_id.foreign_keys))
     assert fk.column.table.name == "classification_files"
+    assert fk.ondelete == "CASCADE"
+    assert ("file_id", "row_seq") in _unique_column_sets("ecct_entries")
 
 
 def test_classification_source_checks_is_a_sibling_of_source_checks() -> None:

@@ -517,10 +517,17 @@ class EcctEntry(Base):
     `provision_affected` and `provision_prompting` are full public-law citation
     strings kept verbatim, with the congress and law number pulled out beside
     them when they parse.
+
+    The file key and `row_seq` carry the same constraints as
+    `classification_entries`, for the same reason: the load policy is wholesale
+    replace per file, so a re-load must not be able to double these rows and a
+    deleted registry row must not leave them orphaned.
     """
 
     __tablename__ = "ecct_entries"
     __table_args__ = (
+        # Re-inserting a file's rows must not be able to double them.
+        UniqueConstraint("file_id", "row_seq"),
         # Both directions of "what happened to this section" — the ECCT is read
         # from the old citation as often as from the new one.
         Index(
@@ -536,7 +543,9 @@ class EcctEntry(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    file_id: Mapped[int] = mapped_column(ForeignKey("classification_files.id"))
+    file_id: Mapped[int] = mapped_column(
+        ForeignKey("classification_files.id", ondelete="CASCADE")
+    )
     row_seq: Mapped[int] = mapped_column(Integer)
     former_raw: Mapped[str] = mapped_column(String)  # '42:294t nt'
     former_title_num: Mapped[str | None] = mapped_column(String, nullable=True)

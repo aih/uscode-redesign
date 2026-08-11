@@ -1,0 +1,11 @@
+{
+  "congress": 119,
+  "content_hash": "e2fd30a4ec3e0b57af929c0bad95a42b66ede55e3e8b95207bc2e5e4c2033055",
+  "generated_at": "2026-08-11T20:49:26.118755+00:00",
+  "kind": "ecct",
+  "rows_parsed": 1,
+  "session": 2,
+  "source_filename": "ecct.html",
+  "source_url": "https://uscode.house.gov/classification/ecct.html",
+  "warnings": []
+}

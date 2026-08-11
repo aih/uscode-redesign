@@ -1,10 +1,14 @@
 # Classification tables — implementation spec for aih/uscode-redesign
 
-**Status:** spec written 2026-08-11. **Wave 1 landed 2026-08-11** on branch `classification-wave1`
-([PR #44](https://github.com/aih/uscode-redesign/pull/44), open) — C1 (parser, fixtures, ADR-0067)
-and C2a (schema, migration `3c8d9ab6d527`) merged, reviewed, and amended by that review; see
-[§ What Wave 1 measured](#what-wave-1-measured) for the six places this spec was wrong. Wave 2
-(C2b, the loader) is next; C3–C5 unstarted. An orchestrating session starts at
+**Status:** spec written 2026-08-11. **Wave 1 landed 2026-08-11** and is merged into `main`
+([PR #44](https://github.com/aih/uscode-redesign/pull/44)) — C1 (parser, fixtures, ADR-0067)
+and C2a (schema, migration `3c8d9ab6d527`); see
+[§ What Wave 1 measured](#what-wave-1-measured) for the six places this spec was wrong.
+**Wave 2 landed 2026-08-11** on branch `c2b-classification-loader`
+([PR #45](https://github.com/aih/uscode-redesign/pull/45), open) — C2b (fetch, loader, CLI, poll,
+migration `0044883c483c`), with the whole corpus loaded once from the live source; see
+[§ What Wave 2 measured](#what-wave-2-measured). Nothing is reachable from the reader yet. Wave 3
+(C3 storage + API, C4 reader pages) is next; C5 unstarted. An orchestrating session starts at
 [§ Waves](#waves-parallel-agent-dispatch) and dispatches the phase prompts at the end of this file.
 Update this status line as waves land.
 
@@ -331,6 +335,33 @@ Where this section and an earlier one disagree, this one is the later measuremen
    alias one side. `classification_files.skipped_lines` is an `Integer` while the parser produces a
    tuple of the lines themselves, so the count is stored and the lines survive only in the
    verification JSON.
+
+## What Wave 2 measured
+
+The first full-corpus run. Where this section and an earlier one disagree, this one is the later
+measurement.
+
+1. **The corpus is 144,837 rows across 31 `pl` files, plus 21 ECCT rows in two files.** The estimate
+   in §1 was 100–150k. 131 warnings, 0 skipped lines, 2 rows without a public law, 1,533 rows
+   without a `usc_identifier` (1,531 of them appendix rows, which derive none by rule), 6,053 whose
+   Stat. page has no integer form, and 107 seconds to fetch and load all 33 documents from cold.
+2. **Wave 1's three measured files were not representative, and the other 28 carried four defects.**
+   The first parse of them warned 10,584 times, left 3,717 rows with no public law at all, and
+   dropped 29 lines. Two files put their Sec. column one character left of their header; a Stat.
+   page is not always a number (`113 Stat. 1501A-594`); a row OLRC has corrected carries an asterisk
+   in front of its title number, which sometimes shifts every later column; and a Sec. cell butted
+   against its Stat. page can be split where the row's own statviewer anchor says the page begins.
+   All four are fixed, tested, and recorded in ADR-0067's addendum.
+3. **What remains is 0.09% of the rows, in two classes.** 127 rows have a Sec. cell whose bracket
+   runs straight into a letter-numbered page (`101(f) [405(d)(24), (25)]2681-423`) in a vintage with
+   no statviewer anchors to key on, and 2 rows in `tbl112pl_2nd.htm` have a description long enough
+   to push the law number past the Sec. column, where reading it would mean reading `112-239` as
+   `112-23`. All 129 keep their `raw_line` and are warned about.
+4. **`ecct_entries` got `ondelete="CASCADE"` and `UniqueConstraint(file_id, row_seq)`** — the choice
+   §What Wave 1 measured left to this wave, in migration `0044883c483c`.
+5. **The poll cannot see a change to the ECCT alone**, and a database that has loaded the fixture
+   slices will skip the real tables until something forces it. Both are ADR-0067's consequences now;
+   the second is why `make ci-data` writes its artifacts under `.ci-data`.
 
 One ratchet is deferred rather than met: ADR-0067 is listed in `INFRASTRUCTURE_ADRS` in
 `frontend/tests/guide.test.ts`, because Wave 1 ships no reader surface for a chapter to describe.

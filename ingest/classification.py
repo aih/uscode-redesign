@@ -7,9 +7,17 @@ scraped here, because Code order is a sort in our own display. Alongside them si
 the Editorial Classification Change Table (`ecct.html`), which records where OLRC
 moved *earlier* laws while classifying the new ones.
 
-This module is the parse side: HTML in, dataclasses out, no database and no network.
 `docs/classification-spec.md` is the specification and
-`docs/adr/0067-classification-tables.md` records the decisions.
+`docs/adr/0067-classification-tables.md` records the decisions. Four layers live
+here, in this order, on `ingest/inventory.py`'s model of one module per source:
+
+  * the parse side — HTML in, dataclasses out, no database and no network;
+  * the fetch — one throttled request per page, cached under
+    `data/classification/`;
+  * `load_file`, which replaces one source document's rows wholesale, and
+    `run_classification_load`, which walks the index pages doing that;
+  * `poll_classification`, which asks whether anything changed and records the
+    asking either way.
 
 The tables are fixed-width text inside `<PRE><FONT face=Courier>` — there is no
 `<table>` markup and no per-row identity of any kind. Six columns: Title, Section,
@@ -45,19 +53,35 @@ would get wrong, each covered by a test in `tests/test_classification_parser.py`
     `tr to 42/290ee-10`, bare `to 36/300113` in older vintages, and act names on
     appendix rows (`Ethics Act nt new`, `IG Act nt`, `R Plan 2, 1968`).
 
-Politeness, the disk cache, the loader and the poll are C2b's; nothing here touches
-the network, so every test in the suite runs offline.
+The only function that reaches the network is `fetch_classification_page`, and
+every test in the suite either injects an `Opener` or reads a committed slice, so
+the suite runs offline (ADR-0013).
 """
 
 from __future__ import annotations
 
 import hashlib
 import html as htmllib
+import json
 import re
+import time
+import urllib.request
 import warnings
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import delete, insert, select
+from sqlalchemy.orm import Session
+
+from db.models import ClassificationEntry as ClassificationEntryRow
+from db.models import ClassificationFile as ClassificationFileRow
+from db.models import ClassificationSourceCheck
+from db.models import EcctEntry as EcctEntryRow
+from ingest.download import Opener, throttle
+from ingest.inventory import USER_AGENT
 
 CLASSIFICATION_BASE_URL = "https://uscode.house.gov/classification/"
 CLASSIFICATION_SOURCE_URL = CLASSIFICATION_BASE_URL + "tables.shtml"
@@ -72,6 +96,13 @@ PRIOR_CLASSIFICATION_SOURCE_URL = CLASSIFICATION_BASE_URL + "priortables.shtml"
 """The 104th–118th entry page. Read by the backfill; the daily poll reads only
 `CLASSIFICATION_SOURCE_URL`, since closed congresses do not gain laws."""
 
+CACHE_DIR = Path("data/classification")
+"""Where every fetched page is kept, under its own filename. Gitignored with the
+rest of `data/`; the committed record of a run is the verification artifact."""
+
+VERIFICATION_DIR = Path("docs/verification")
+MANIFEST_PATH = Path("data/manifests/classification.json")
+
 # --- entry pages -----------------------------------------------------------------
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
@@ -81,6 +112,9 @@ _TABLE_HREF_RE = re.compile(
     r"(?P<order>pl|cd)(?:_(?P<session>1st|2nd))?"
     r'\.(?P<ext>htm|pdf)))"',
     re.IGNORECASE,
+)
+_ECCT_FILENAME_RE = re.compile(
+    r"^ecct(?:_(?P<congress>\d+)-(?P<session>\d+))?\.html$", re.IGNORECASE
 )
 _ECCT_HREF_RE = re.compile(
     r'href="(?P<href>[^"]*?(?P<filename>ecct(?:_(?P<congress>\d+)-(?P<session>\d+))?'
@@ -135,9 +169,20 @@ _MONTHS = {
 }
 
 _DATA_LINE_RE = re.compile(r"^(?P<title>\d+[A-Za-z]?)(?=\s|$)")
+_CORRECTED_ROW_RE = re.compile(r"^(?P<marker>\*+)(?P<title>\d+[A-Za-z]?)\s+(?=\S)")
 _PL_CELL_RE = re.compile(r"^(?P<congress>\d{2,3})-(?P<num>\d{1,4})$")
 _PL_OVERFLOW_RE = re.compile(r"^(?P<description>.*?)(?P<pl>\d{2,3}-\d{1,4})\s*$")
-_STAT_CELL_RE = re.compile(r"^[\d,\s\-]*$")
+_STAT_PAGE_TOKEN = r"\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?"
+_STAT_CELL_RE = re.compile(
+    rf"^\s*(?:{_STAT_PAGE_TOKEN}(?:[,\s]+{_STAT_PAGE_TOKEN})*)?\s*$"
+)
+"""What a Stat. cell can look like: page tokens, separated by commas or spaces.
+
+A page is not always a number and not always digits. `110 Stat. 3009-587` is one
+page and so is `113 Stat. 1501A-594` — the appropriations volumes number their
+divisions with a letter, and 3,323 rows across the 105th–107th cite one. A cell
+this rejects is a cell the row's own Sec. column has overrun into, which is what
+the caller then tries to re-split."""
 _QUOTED_SECTION_RE = re.compile(r'^(?P<section>.*?)\s*"(?P<quote>[^"]*)"\s*$')
 _TRANSFER_RE = re.compile(
     r"(?:\btr\s+)?\b(?P<direction>to|fr)\s+(?P<target>(?:\d+[A-Za-z]?/)?\d[\w.\-–]*)"
@@ -684,7 +729,9 @@ def parse_classification_file(
             f"{filename}: no column ruler found inside <pre> — the table layout changed"
         )
     header_line = lines[ruler_index - 1]
-    offsets = column_offsets(header_line, filename=filename)
+    offsets = refine_offsets(
+        column_offsets(header_line, filename=filename), lines[ruler_index + 1 :]
+    )
     stat_match = _STAT_HEADER_RE.search(header_line, offsets[5])
     stat_volume = (
         int(stat_match.group("volume")) if stat_match and stat_match.group("volume") else None
@@ -706,20 +753,23 @@ def parse_classification_file(
     entries: list[ClassificationEntry] = []
     skipped: list[str] = []
     for raw_line in data_lines:
-        visible = _visible(raw_line)
-        if not visible.strip():
+        printed = _visible(raw_line)
+        if not printed.strip():
             continue
+        visible, marker = realign_corrected_row(printed, title_width=offsets[1])
         if not _DATA_LINE_RE.match(visible):
             # Not a row and not blank: a footnote, a repeated header on a page
             # break, or a format this parser has not seen. Counted and shown in the
             # verification artifact rather than discarded silently.
-            skipped.append(visible)
-            collector.warn(f"{filename}: line does not start with a title number: {visible!r}")
+            skipped.append(printed)
+            collector.warn(f"{filename}: line does not start with a title number: {printed!r}")
             continue
         entries.append(
             _parse_row(
                 raw_line,
                 visible,
+                printed=printed,
+                marker=marker,
                 row_seq=len(entries),
                 offsets=offsets,
                 file_stat_volume=stat_volume,
@@ -781,6 +831,68 @@ def column_offsets(header_line: str, *, filename: str = "") -> list[int]:
     return offsets
 
 
+_OFFSET_SPLIT_TOLERANCE = 0.2
+"""Above this share of rows, a boundary that splits a token is the boundary being
+wrong rather than the rows overrunning it. The two are far apart in the real
+files: the worst legitimate overrun is 3% of a file's rows, and the two files
+whose Sec. column sits one character left of where their header puts it split
+99.9% and 74% of theirs."""
+
+_OFFSET_SEARCH = (-1, 1, -2, 2)
+
+_OFFSET_MINIMUM_ROWS = 20
+"""Below this many rows a file cannot say anything about its own columns: one row
+that overruns is 100% of a one-row file. The smallest published table is 517 rows,
+so this bound only ever applies to a fragment."""
+
+
+def refine_offsets(offsets: list[int], data_lines: Iterable[str], *, sample: int = 500) -> list[int]:
+    """Move a column boundary the file's own rows disagree with.
+
+    The header is where the offsets come from, and in 29 of the 31 published
+    tables it is right. In `tbl112pl_2nd.htm` and `tbl113pl_1st.htm` the Sec.
+    column starts one character to the left of where their header puts it, and
+    the header is not wrong about anything else — every other column lines up.
+    Read from the header alone, the Pub. L. cell of every row in those files ends
+    in the first digit of the Sec. cell, `_PL_CELL_RE` rejects it, and the guard
+    against inventing a truncated law number leaves 3,717 rows with no public law
+    at all. That is the largest defect the first full-corpus run found.
+
+    A boundary that lands between two non-space characters has cut one value in
+    half. Rows do that legitimately when a cell overruns (spec §1 hazard 2), so
+    the signal is not any single row but the share of them: a boundary that splits
+    a token in more than a fifth of the file's rows is moved to whichever nearby
+    column splits fewest, and one that does not is left exactly where the header
+    said. A boundary is never moved onto or past its neighbour, and a file with
+    too few rows to measure keeps the header's answer whatever its rows do.
+    """
+    lines = [line for line in data_lines if line.strip()][:sample]
+    if len(lines) < _OFFSET_MINIMUM_ROWS:
+        return offsets
+    refined = list(offsets)
+    for index in range(1, len(refined)):
+        rate = _split_rate(lines, refined[index])
+        if rate <= _OFFSET_SPLIT_TOLERANCE:
+            continue
+        best = refined[index]
+        for delta in _OFFSET_SEARCH:
+            candidate = refined[index] + delta
+            if candidate <= refined[index - 1] or (
+                index + 1 < len(refined) and candidate >= refined[index + 1]
+            ):
+                continue
+            candidate_rate = _split_rate(lines, candidate)
+            if candidate_rate < rate:
+                best, rate = candidate, candidate_rate
+        refined[index] = best
+    return refined
+
+
+def _split_rate(lines: Sequence[str], at: int) -> float:
+    """The share of rows in which this boundary falls inside a value."""
+    return sum(_boundary_splits_a_token(line, at) for line in lines) / len(lines)
+
+
 def _boundary_splits_a_token(visible: str, at: int) -> bool:
     """True when a column boundary falls between two non-space characters.
 
@@ -792,6 +904,32 @@ def _boundary_splits_a_token(visible: str, at: int) -> bool:
     if at <= 0 or at >= len(visible):
         return False
     return not visible[at - 1].isspace() and not visible[at].isspace()
+
+
+def realign_corrected_row(visible: str, *, title_width: int) -> tuple[str, str]:
+    """Put a corrected row's columns back where the header says they are.
+
+    OLRC marks a row it has since corrected with an asterisk in front of the title
+    number, and a second round of corrections with two — "`*` denotes an item that
+    was corrected as of October 6, 2005" says the footnote of `tbl108pl_1st.htm`.
+    The marker is written into the Title column, which is six characters wide and
+    holds at most four, and it does not always fit in the padding: `*16   3503`
+    leaves every later column where it was, `*42    7619` moves them one to the
+    right and `**15    683` two. Twenty-nine rows across three files are marked,
+    and unmarked ones start with a digit, so before this they were not recognised
+    as rows at all and were dropped.
+
+    The Title cell is rewritten without the marker and padded back to its declared
+    width, which restores the alignment of every column after it. Returns the
+    realigned line and the marker, which goes back onto `title_raw` — column 1 as
+    printed — and into no parsed field. There is no column of its own for it, and
+    inventing one would be a schema for an annotation the source explains in a
+    footnote.
+    """
+    match = _CORRECTED_ROW_RE.match(visible)
+    if match is None:
+        return visible, ""
+    return match.group("title").ljust(title_width) + visible[match.end() :], match.group("marker")
 
 
 def _split_near(region: str, nominal: int) -> tuple[str, str] | None:
@@ -918,10 +1056,33 @@ def parse_description(description: str) -> tuple[bool, str | None, str | None, s
     return is_note, action, counterpart, " ".join(other) or None
 
 
+def _split_at_linked_page(region: str, links: Sequence[tuple[int, int]]) -> tuple[str, str] | None:
+    """Split an overrun Sec./Stat. region where the row's own statviewer link says
+    the page number starts.
+
+    `4001(b)(2)(A), (B), (D)(iii)1967` has no whitespace for `_split_near` to cut
+    at, and the page is butted straight against the designator. The anchor around
+    it names page 1967, which is evidence from the document rather than a guess, so
+    the last occurrence of those digits is the split — provided what follows is
+    Stat.-shaped, which is what stops a designator that happens to contain the page
+    number from being cut in half.
+    """
+    for _volume, page in links:
+        index = region.rfind(str(page))
+        if index <= 0:
+            continue
+        section, stat = region[:index].strip(), region[index:].strip()
+        if section and _STAT_CELL_RE.match(stat):
+            return section, stat
+    return None
+
+
 def _parse_row(
     raw_line: str,
     visible: str,
     *,
+    printed: str | None = None,
+    marker: str = "",
     row_seq: int,
     offsets: list[int],
     file_stat_volume: int | None,
@@ -973,7 +1134,10 @@ def _parse_row(
         # that overruns with digits — `101, 102, 103, 104, 105` — leaves a Stat. cell
         # of `5 3` that `_STAT_CELL_RE` accepts, and 29 of the 31 files carry no
         # statviewer links for the cross-check below to catch it with.
-        overflow = _split_near(visible[offsets[4] :], offsets[5] - offsets[4])
+        region = visible[offsets[4] :]
+        overflow = _split_near(region, offsets[5] - offsets[4]) or _split_at_linked_page(
+            region, links
+        )
         if overflow is not None:
             section_of_law, stat_raw = overflow
         else:
@@ -1003,12 +1167,15 @@ def _parse_row(
 
     is_appendix = bool(title_raw) and title_raw[-1].isalpha()
     title_num = title_raw.lower()
+    # A corrected row's asterisks are part of column 1 as printed and of no
+    # parsed field; `title_num` is what anything downstream joins on.
+    title_raw = marker + title_raw
     section_norm = normalize_section(section_raw)
     is_note, action, counterpart, act_name = parse_description(description_raw)
 
     return ClassificationEntry(
         row_seq=row_seq,
-        raw_line=visible,
+        raw_line=printed if printed is not None else visible,
         title_raw=title_raw,
         title_num=title_num,
         is_appendix=is_appendix,
@@ -1307,6 +1474,755 @@ def _visible(line: str) -> str:
     NBSP a space. Every step is one-glyph-for-one-glyph, so the column offsets that
     were true on screen are still true here."""
     return htmllib.unescape(_TAG_RE.sub("", line)).replace("\xa0", " ").rstrip()
+
+
+# ---------------------------------------------------------------------------------
+# Fetching
+# ---------------------------------------------------------------------------------
+
+
+def page_filename(url: str) -> str:
+    """`'…/classification/tbl118pl_2nd.htm'` → `'tbl118pl_2nd.htm'`."""
+    return url.rsplit("/", 1)[-1].split("?", 1)[0]
+
+
+def fetch_classification_page(
+    url: str,
+    *,
+    cache_dir: Path | None = CACHE_DIR,
+    filename: str | None = None,
+    timeout: float = 60.0,
+    opener: Opener | None = None,
+) -> str:
+    """GET one classification page, throttled, and keep a copy on disk.
+
+    The throttle is `ingest.download.throttle` and the User-Agent is
+    `ingest.inventory.USER_AGENT`, so a run that fetches tables and a run that
+    fetches title zips share one ~1 req/sec budget at uscode.house.gov
+    (CLAUDE.md's source etiquette). A full backfill is ~33 requests.
+
+    **The cache is a record of what was fetched, not a way to avoid fetching.**
+    Every call here makes the request; what avoids requests is the covered-law
+    gate in `run_classification_load`, which skips a file without asking for it.
+    Reading a cached copy back is `read_cached_page`, which the `--from-file`
+    path uses. A cache consulted here would be actively wrong: the one page that
+    changes is the current session's, and serving last week's copy of it is
+    exactly the failure the poll exists to catch.
+
+    The body lands in a `.part` file and is renamed, so an interrupted fetch
+    cannot leave a truncated page that a later `--from-file` run parses as real.
+    """
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    throttle()
+    with (opener or _default_opener)(request, timeout) as response:
+        charset = getattr(response.headers, "get_content_charset", lambda: None)() or "utf-8"
+        html = response.read().decode(charset, errors="replace")
+
+    if cache_dir is not None:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        target = cache_dir / (filename or page_filename(url))
+        partial = target.with_suffix(target.suffix + ".part")
+        partial.write_text(html, encoding="utf-8")
+        partial.replace(target)
+    return html
+
+
+def read_cached_page(directory: Path, filename: str) -> str | None:
+    """A page already on disk, or None. The offline half of the fetch."""
+    path = directory / filename
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _default_opener(request: urllib.request.Request, timeout: float) -> Any:
+    return urllib.request.urlopen(request, timeout=timeout)  # noqa: S310 - fixed https host
+
+
+# ---------------------------------------------------------------------------------
+# Loading
+# ---------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FileLoadResult:
+    """What `load_file` did to one source document."""
+
+    kind: str
+    congress: int
+    session: int
+    source_filename: str
+    action: str
+    """`'inserted'`, `'replaced'`, or `'unchanged'` — the last meaning the
+    extracted `<PRE>` text hashed the same, so the registry row was refreshed
+    and no row was touched."""
+
+    rows_written: int
+    rows_deleted: int
+    file_id: int | None = None
+
+    @property
+    def loaded(self) -> bool:
+        return self.action != "unchanged"
+
+
+def load_file(
+    session: Session,
+    parsed: ParsedClassificationFile | ParsedEcctFile,
+    *,
+    force: bool = False,
+) -> FileLoadResult:
+    """Replace one source document's rows wholesale. Commits nothing.
+
+    The source has no row identity of any kind — no ids, no keys, and rows that
+    shift position when OLRC republishes the current session's file with new laws
+    in it — so there is nothing to diff against (ADR-0067 decision 3). A file
+    whose `<PRE>` text hashes differently has its entries deleted and re-inserted;
+    a file that hashes the same has its registry row refreshed and its rows left
+    alone, because the index page can reword its covered-law sentence without the
+    table changing.
+
+    The delete is explicit for both kinds rather than left to `ON DELETE CASCADE`:
+    the registry row is updated in place, not deleted, so the cascade never fires.
+
+    The caller owns the transaction. `run_classification_load` commits once per
+    file, which is what makes an interrupted backfill resumable — the registry is
+    the state.
+    """
+    row = session.scalars(
+        select(ClassificationFileRow).where(
+            ClassificationFileRow.kind == parsed.kind,
+            ClassificationFileRow.congress == parsed.congress,
+            ClassificationFileRow.session == parsed.session,
+        )
+    ).one_or_none()
+
+    unchanged = row is not None and row.content_hash == parsed.content_hash and not force
+    values = _registry_values(parsed)
+
+    if row is None:
+        row = ClassificationFileRow(**values)
+        session.add(row)
+        action = "inserted"
+    else:
+        for name, value in values.items():
+            setattr(row, name, value)
+        row.fetched_at = datetime.now(timezone.utc)
+        action = "unchanged" if unchanged else "replaced"
+    session.flush()
+
+    if unchanged:
+        return FileLoadResult(
+            kind=parsed.kind,
+            congress=parsed.congress,
+            session=parsed.session,
+            source_filename=parsed.source_filename,
+            action=action,
+            rows_written=0,
+            rows_deleted=0,
+            file_id=row.id,
+        )
+
+    table = EcctEntryRow if parsed.kind == "ecct" else ClassificationEntryRow
+    deleted = session.execute(
+        delete(table).where(table.file_id == row.id)
+    ).rowcount or 0
+
+    payload = [
+        {"file_id": row.id, **entry.as_json()} for entry in parsed.entries
+    ]
+    if payload:
+        # One statement rather than 11,737 ORM objects: the 104th's file is the
+        # size that decides whether a full backfill takes a minute or an hour.
+        session.execute(insert(table), payload)
+
+    return FileLoadResult(
+        kind=parsed.kind,
+        congress=parsed.congress,
+        session=parsed.session,
+        source_filename=parsed.source_filename,
+        action=action,
+        rows_written=len(payload),
+        rows_deleted=deleted,
+        file_id=row.id,
+    )
+
+
+def _registry_values(
+    parsed: ParsedClassificationFile | ParsedEcctFile,
+) -> dict[str, object]:
+    """The `classification_files` columns for either kind of parsed document.
+
+    An ECCT has no covered-law range, no prepared date and no Stat. volume — the
+    columns are NULL for it rather than absent, because one registry table holds
+    both kinds. `skipped_lines` is a count here and the lines themselves in the
+    verification artifact: the column is an `Integer`.
+    """
+    common: dict[str, object] = {
+        "kind": parsed.kind,
+        "congress": parsed.congress,
+        "session": parsed.session,
+        "source_url": parsed.source_url,
+        "source_filename": parsed.source_filename,
+        "content_hash": parsed.content_hash,
+        "row_count": parsed.row_count,
+    }
+    if isinstance(parsed, ParsedEcctFile):
+        return {
+            **common,
+            "covered_laws_text": None,
+            "covered_ranges": [],
+            "first_law": None,
+            "last_law": None,
+            "prepared_date": None,
+            "stat_volume": None,
+            "skipped_lines": 0,
+        }
+    return {
+        **common,
+        "covered_laws_text": parsed.covered_laws_text,
+        "covered_ranges": list(parsed.covered_ranges),
+        "first_law": parsed.first_law,
+        "last_law": parsed.last_law,
+        "prepared_date": parsed.prepared_date,
+        "stat_volume": parsed.stat_volume,
+        "skipped_lines": len(parsed.skipped_lines),
+    }
+
+
+# ---------------------------------------------------------------------------------
+# The backfill
+# ---------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationLoadReport:
+    """What one `python -m ingest classification` run did."""
+
+    links_seen: int
+    results: tuple[FileLoadResult, ...]
+    skipped: tuple[tuple[str, str], ...]
+    """`(filename, why)` for a file the covered-law gate answered without
+    fetching, and for a file `--from-file` had no copy of."""
+
+    failures: tuple[tuple[str, str], ...]
+    elapsed_seconds: float = 0.0
+
+    @property
+    def rows_written(self) -> int:
+        return sum(result.rows_written for result in self.results)
+
+    @property
+    def loaded(self) -> int:
+        return sum(1 for result in self.results if result.loaded)
+
+    @property
+    def unchanged(self) -> int:
+        """Fetched, and its `<PRE>` text hashed the same — the second gate. Counted
+        separately from `skipped`, which never asked for the file at all."""
+        return sum(1 for result in self.results if not result.loaded)
+
+    @property
+    def sound(self) -> bool:
+        return not self.failures
+
+
+def run_classification_load(
+    session_factory: Callable[[], Session],
+    *,
+    congress: int | None = None,
+    session_num: int | None = None,
+    force: bool = False,
+    from_dir: Path | None = None,
+    cache_dir: Path | None = CACHE_DIR,
+    load: bool = True,
+    verification_dir: Path | None = VERIFICATION_DIR,
+    manifest_path: Path | None = MANIFEST_PATH,
+    urls: Sequence[str] = (CLASSIFICATION_SOURCE_URL, PRIOR_CLASSIFICATION_SOURCE_URL),
+    opener: Opener | None = None,
+    on_event: Callable[[str], None] | None = None,
+) -> ClassificationLoadReport:
+    """Walk the two index pages, load every table that changed, write the artifacts.
+
+    Resumable and hash-gated, in two stages. A closed congress's file is skipped
+    without a request, because the index page's covered-law sentence already
+    matches the registry (ADR-0067 decision 5) — which is what keeps a re-run at
+    two requests rather than 33. A file that *is* fetched is still hash-gated:
+    OLRC rewords that sentence without touching the table often enough that the
+    `<PRE>` hash is the cheaper of the two answers to trust.
+
+    `from_dir` reads both the index pages and the tables off disk instead, which
+    is the offline path `make ci-data` takes. What is in that directory is what
+    gets loaded: a linked file it does not hold is skipped and reported rather
+    than failing the run, and a table it holds that neither index page links is
+    loaded anyway, with its covered-law range read from its own header. The
+    fixture directory is both at once — the slices link a dozen files and hold
+    three, one of which the slices of the index pages do not mention.
+    """
+    started = time.monotonic()
+    say = on_event or (lambda _message: None)
+
+    links: list[TableLink] = []
+    failures: list[tuple[str, str]] = []
+    for url in urls:
+        try:
+            html = _index_html(url, from_dir=from_dir, cache_dir=cache_dir, opener=opener)
+        except Exception as exc:
+            failures.append((page_filename(url), f"{type(exc).__name__}: {exc}"))
+            continue
+        if html is None:
+            say(f"skipped {page_filename(url)}: not in {from_dir}")
+            continue
+        links.extend(parse_tables_index(html))
+
+    if from_dir is not None:
+        links.extend(links_on_disk(from_dir, exclude={link.filename for link in links}))
+
+    wanted = [
+        link
+        for link in links
+        if (congress is None or link.congress == congress)
+        and (session_num is None or link.session == session_num)
+    ]
+    say(f"{len(links)} documents linked, {len(wanted)} selected")
+
+    registry = _registry_snapshot(session_factory) if load else {}
+    results: list[FileLoadResult] = []
+    skipped: list[tuple[str, str]] = []
+
+    for link in wanted:
+        known = registry.get((link.kind, link.congress, link.session))
+        if not force and _can_skip_without_fetching(link, known):
+            assert known is not None
+            skipped.append((link.filename, "covered laws unchanged"))
+            say(f"skipped {link.filename}: covered laws unchanged ({known.row_count} rows)")
+            continue
+
+        try:
+            html = _document_html(link, from_dir=from_dir, cache_dir=cache_dir, opener=opener)
+            if html is None:
+                skipped.append((link.filename, f"not in {from_dir}"))
+                say(f"skipped {link.filename}: not in {from_dir}")
+                continue
+            parsed = _parse_document(link, html)
+        except Exception as exc:
+            failures.append((link.filename, f"{type(exc).__name__}: {exc}"))
+            say(f"FAILED {link.filename}: {type(exc).__name__}: {exc}")
+            continue
+
+        if load:
+            with session_factory() as db:
+                try:
+                    result = load_file(db, parsed, force=force)
+                    db.commit()
+                except Exception as exc:
+                    db.rollback()
+                    failures.append((link.filename, f"{type(exc).__name__}: {exc}"))
+                    say(f"FAILED {link.filename}: {type(exc).__name__}: {exc}")
+                    # The artifacts are written below, and a file that did not
+                    # land in the database must not get one claiming it did.
+                    continue
+            results.append(result)
+            say(
+                f"{result.action} {link.filename}: {result.rows_written} rows written, "
+                f"{result.rows_deleted} replaced"
+            )
+            if result.action == "unchanged":
+                # The parse is the one the committed artifact already describes,
+                # so rewriting it would move a timestamp and nothing else.
+                continue
+        else:
+            say(f"parsed {link.filename}: {parsed.row_count} rows (not loaded)")
+
+        if verification_dir is not None:
+            write_verification(parsed, directory=verification_dir)
+        if manifest_path is not None:
+            write_classification_manifest(parsed, path=manifest_path)
+
+    return ClassificationLoadReport(
+        links_seen=len(links),
+        results=tuple(results),
+        skipped=tuple(skipped),
+        failures=tuple(failures),
+        elapsed_seconds=time.monotonic() - started,
+    )
+
+
+def links_on_disk(directory: Path, *, exclude: Iterable[str] = ()) -> list[TableLink]:
+    """Every classification document in a directory, as links, by filename alone.
+
+    The offline counterpart to `parse_tables_index`, and the reason `--from-file`
+    does not need the index pages: a table's congress and session are in its name
+    and its covered-law range is in its own header. An unsuffixed `ecct.html`
+    found this way has no congress to belong to — the sentence that dates it is on
+    the index page — so it gets 0/0, which is what the registry stores for "the
+    source did not say".
+    """
+    skip = set(exclude)
+    found: list[TableLink] = []
+    for path in sorted(directory.iterdir()):
+        if path.name in skip or not path.is_file():
+            continue
+        ecct = _ECCT_FILENAME_RE.match(path.name)
+        if ecct is not None:
+            found.append(
+                TableLink(
+                    kind="ecct",
+                    congress=int(ecct.group("congress") or 0),
+                    session=int(ecct.group("session") or 0),
+                    filename=path.name,
+                    url=CLASSIFICATION_BASE_URL + path.name,
+                )
+            )
+            continue
+        try:
+            congress, session_num = _split_filename(path.name)
+        except ClassificationParseError:
+            continue
+        found.append(
+            TableLink(
+                kind="pl",
+                congress=congress,
+                session=session_num,
+                filename=path.name,
+                url=CLASSIFICATION_BASE_URL + path.name,
+            )
+        )
+    return found
+
+
+def _index_html(
+    url: str, *, from_dir: Path | None, cache_dir: Path | None, opener: Opener | None
+) -> str | None:
+    if from_dir is not None:
+        return read_cached_page(from_dir, page_filename(url))
+    return fetch_classification_page(url, cache_dir=cache_dir, opener=opener)
+
+
+def _document_html(
+    link: TableLink, *, from_dir: Path | None, cache_dir: Path | None, opener: Opener | None
+) -> str | None:
+    if from_dir is not None:
+        return read_cached_page(from_dir, link.filename)
+    return fetch_classification_page(link.url, cache_dir=cache_dir, opener=opener)
+
+
+def _parse_document(
+    link: TableLink, html: str
+) -> ParsedClassificationFile | ParsedEcctFile:
+    if link.kind == "ecct":
+        return parse_ecct(
+            html,
+            filename=link.filename,
+            source_url=link.url,
+            congress=link.congress,
+            session=link.session,
+        )
+    return parse_classification_file(
+        html,
+        filename=link.filename,
+        source_url=link.url,
+        # The index page's wording, not the file's own: it is what a poll
+        # compares against, and the two are written independently.
+        covered_laws_text=link.covered_laws_text or None,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _KnownFile:
+    """One registry row as plain values — the two gates below read nothing else."""
+
+    source_filename: str
+    covered_laws_text: str | None
+    content_hash: str
+    row_count: int
+
+
+def _registry_snapshot(
+    session_factory: Callable[[], Session],
+) -> dict[tuple[str, int, int], _KnownFile]:
+    """The registry, keyed `(kind, congress, session)`.
+
+    Read once, in its own short session, and detached: the loop above holds no
+    transaction open across a network fetch.
+    """
+    with session_factory() as db:
+        return {
+            (row.kind, row.congress, row.session): _KnownFile(
+                source_filename=row.source_filename,
+                covered_laws_text=row.covered_laws_text,
+                content_hash=row.content_hash,
+                row_count=row.row_count,
+            )
+            for row in db.scalars(select(ClassificationFileRow))
+        }
+
+
+def _can_skip_without_fetching(link: TableLink, known: _KnownFile | None) -> bool:
+    """Whether the index page still says about this file exactly what the registry
+    holds — the gate that keeps a re-run at two requests rather than 33.
+
+    Never true for an ECCT link, which carries no covered-law sentence for the
+    index page to have changed. The ECCT is one small table; the backfill fetches
+    it every run and lets the `<PRE>` hash decide.
+    """
+    if known is None or link.kind != "pl" or not link.covered_laws_text:
+        return False
+    return known.covered_laws_text == link.covered_laws_text
+
+
+def _index_reports_change(link: TableLink, known: _KnownFile | None) -> bool:
+    """Whether the index page says something about this document that the registry
+    does not — the question the poll answers, in one request.
+
+    A document the registry has never seen is a change. For a `pl` file so is a
+    reworded covered-law sentence, which is what OLRC writes when it classifies a
+    new law (ADR-0067 decision 5). An ECCT already in the registry is *not*: the
+    page carries nothing about it that could have changed, so its content is only
+    ever compared during a load.
+    """
+    if known is None:
+        return True
+    return link.kind == "pl" and known.covered_laws_text != link.covered_laws_text
+
+
+# ---------------------------------------------------------------------------------
+# Artifacts
+# ---------------------------------------------------------------------------------
+
+
+def write_verification(
+    parsed: ParsedClassificationFile | ParsedEcctFile,
+    *,
+    directory: Path = VERIFICATION_DIR,
+) -> Path:
+    """One committed artifact per source document (PLAN §11.5).
+
+    What the parse found, and nothing it found *in* the table: no entry rows, so
+    the file stays a few kilobytes and a diff between two runs is a diff between
+    two parses. `skipped_lines` is the lines themselves here, which is the only
+    place they survive — the column on `classification_files` is a count.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    if isinstance(parsed, ParsedEcctFile):
+        name = f"classification-ecct-{parsed.congress}-{parsed.session}.json"
+        document: dict[str, object] = {
+            "kind": "ecct",
+            "congress": parsed.congress,
+            "session": parsed.session,
+            "source_filename": parsed.source_filename,
+            "source_url": parsed.source_url,
+            "content_hash": parsed.content_hash,
+            "rows_parsed": parsed.row_count,
+            "warnings": list(parsed.warnings),
+        }
+    else:
+        name = f"classification-{parsed.congress}-{parsed.session}.json"
+        document = {
+            "kind": "pl",
+            "source_url": parsed.source_url,
+            "content_hash": parsed.content_hash,
+            "column_offsets": list(parsed.column_offsets),
+            "prepared_date": (
+                parsed.prepared_date.isoformat() if parsed.prepared_date else None
+            ),
+            "stat_volume": parsed.stat_volume,
+            "covered_laws_text": parsed.covered_laws_text,
+            **parsed.report().as_json(),
+            "skipped_line_text": list(parsed.skipped_lines),
+        }
+    document["generated_at"] = datetime.now(timezone.utc).isoformat()
+    path = directory / name
+    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def write_classification_manifest(
+    parsed: ParsedClassificationFile | ParsedEcctFile,
+    *,
+    path: Path = MANIFEST_PATH,
+) -> Path:
+    """One provenance manifest for the whole scrape (documentation duty 4).
+
+    Keyed by source filename and merged in place, the way `write_manifest` merges
+    a title into a release's manifest: loading one congress still leaves one file
+    describing everything loaded so far.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    manifest: dict[str, Any] = {}
+    if path.exists():
+        manifest = json.loads(path.read_text())
+    manifest["source_url"] = CLASSIFICATION_SOURCE_URL
+    manifest["prior_source_url"] = PRIOR_CLASSIFICATION_SOURCE_URL
+    files = manifest.setdefault("files", {})
+
+    entry: dict[str, object] = {
+        "kind": parsed.kind,
+        "congress": parsed.congress,
+        "session": parsed.session,
+        "source_url": parsed.source_url,
+        "content_hash": parsed.content_hash,
+        "row_count": parsed.row_count,
+        "warnings": len(parsed.warnings),
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if isinstance(parsed, ParsedClassificationFile):
+        report = parsed.report()
+        entry.update(
+            covered_laws_text=parsed.covered_laws_text,
+            covered_ranges=list(parsed.covered_ranges),
+            prepared_date=(
+                parsed.prepared_date.isoformat() if parsed.prepared_date else None
+            ),
+            stat_volume=parsed.stat_volume,
+            skipped_lines=len(parsed.skipped_lines),
+            rows_without_pl=report.rows_without_pl,
+            rows_without_identifier=report.rows_without_identifier,
+            distinct_titles=len(report.distinct_titles),
+        )
+    files[parsed.source_filename] = entry
+
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return path
+
+
+# ---------------------------------------------------------------------------------
+# The poll
+# ---------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationCheckResult:
+    """What one poll of `tables.shtml` found. Mirrors the check row it writes."""
+
+    ok: bool
+    links: tuple[TableLink, ...]
+    changed_files: tuple[str, ...]
+    """Source filenames the registry does not hold, or holds with different
+    covered-law text. The answer to "is there anything to load"."""
+
+    latest_covered_text: str | None = None
+    error: str | None = None
+
+    @property
+    def has_changes(self) -> bool:
+        return bool(self.changed_files)
+
+
+def record_classification_check(
+    session: Session,
+    *,
+    source_url: str,
+    ok: bool,
+    files_seen: int | None = None,
+    changed_files: Sequence[str] = (),
+    latest_covered_text: str | None = None,
+    error: str | None = None,
+) -> ClassificationSourceCheck:
+    """Write one `classification_source_checks` row. On success *and* on failure.
+
+    The failure case is the one that matters, for ADR-0036's reason: a scraper
+    that stopped running looks exactly like a source with nothing new, and only
+    the record of the attempt tells them apart. `files_seen` stays NULL on a
+    failure rather than becoming 0 — the page never parsed, so nothing was seen.
+    """
+    row = ClassificationSourceCheck(
+        source_url=source_url,
+        ok=ok,
+        files_seen=files_seen,
+        changed_files=list(changed_files),
+        latest_covered_text=latest_covered_text,
+        # Truncated for `SourceCheck`'s reason: an error here is a one-line
+        # diagnosis, and an HTML error page would push a status response into
+        # the kilobytes.
+        error=(error[:500] if error else None),
+    )
+    session.add(row)
+    return row
+
+
+def poll_classification(
+    session: Session,
+    *,
+    url: str = CLASSIFICATION_SOURCE_URL,
+    cache_dir: Path | None = CACHE_DIR,
+    opener: Opener | None = None,
+) -> ClassificationCheckResult:
+    """Ask `tables.shtml` whether anything changed, and record the asking.
+
+    One request and one check row per call, whatever happens. Commits nothing —
+    the caller owns the transaction.
+
+    Only the current congress's page is polled: a closed congress does not gain
+    laws, so `priortables.shtml` is a backfill concern. A file this database
+    holds that the page no longer lists fails the check rather than deleting
+    anything, the same refusal `poll_source` makes for a vanished release point:
+    a document never leaves OLRC's index, so its absence means a truncated
+    response or changed markup, and neither is news. The comparison is scoped to
+    the congresses the fetched page covers, since this page is not where the
+    other thirty files are listed.
+    """
+    try:
+        html = fetch_classification_page(url, cache_dir=cache_dir, opener=opener)
+        links = parse_tables_index(html)
+    except Exception as exc:  # network, HTTP, or ClassificationParseError
+        error = f"{type(exc).__name__}: {exc}"
+        record_classification_check(session, source_url=url, ok=False, error=error)
+        return ClassificationCheckResult(ok=False, links=(), changed_files=(), error=error)
+
+    registry = {
+        (row.kind, row.congress, row.session): _KnownFile(
+            source_filename=row.source_filename,
+            covered_laws_text=row.covered_laws_text,
+            content_hash=row.content_hash,
+            row_count=row.row_count,
+        )
+        for row in session.scalars(select(ClassificationFileRow))
+    }
+    congresses = {link.congress for link in links}
+    seen = {(link.kind, link.congress, link.session) for link in links}
+    vanished = sorted(
+        known.source_filename
+        for (kind, congress, session_num), known in registry.items()
+        if congress in congresses and (kind, congress, session_num) not in seen
+    )
+    if vanished:
+        error = (
+            f"{len(vanished)} document(s) this database holds are missing from "
+            f"{page_filename(url)} ({', '.join(vanished[:5])}"
+            f"{', …' if len(vanished) > 5 else ''}) — refusing to treat a page "
+            "that looks truncated as news"
+        )
+        record_classification_check(session, source_url=url, ok=False, error=error)
+        return ClassificationCheckResult(ok=False, links=(), changed_files=(), error=error)
+
+    changed = tuple(
+        link.filename
+        for link in links
+        if _index_reports_change(link, registry.get((link.kind, link.congress, link.session)))
+    )
+    latest = _latest_covered_text(links)
+    record_classification_check(
+        session,
+        source_url=url,
+        ok=True,
+        files_seen=len(links),
+        changed_files=changed,
+        latest_covered_text=latest,
+    )
+    return ClassificationCheckResult(
+        ok=True, links=tuple(links), changed_files=changed, latest_covered_text=latest
+    )
+
+
+def _latest_covered_text(links: Sequence[TableLink]) -> str | None:
+    """The covered-law sentence of the newest `pl` file on the page — the string
+    the next poll compares against, kept on the check row so a change is visible
+    in the record even after the load that answered it."""
+    pl_links = [link for link in links if link.kind == "pl" and link.covered_laws_text]
+    if not pl_links:
+        return None
+    return max(pl_links, key=lambda link: (link.congress, link.session)).covered_laws_text
 
 
 def _clean_text(raw: str) -> str:
