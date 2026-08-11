@@ -1,0 +1,90 @@
+<!-- Verbatim slice of https://uscode.house.gov/classification/priortables.shtml
+     (fetched 2026-08-11): 3 of the page's 16 rows, chosen for the forms the parser
+     has to survive. The 118th writes its range with "to"; the 109th writes a gap
+     across <br/> lines with a footnote marker, and links PDF variants beside the
+     HTML; the 104th is one whole-congress file with no session in its name. -->
+<html><body>
+<table border="2" cellpadding="10" width="600">
+<tr>
+ 
+
+   <td align="center" width="50%">
+   <strong>2024</strong>
+    <br />118th Congress, 2nd Session
+    <br />Public Laws 118-35 to 118-274
+
+    <br />&#160;&#160;Sorted in Public Law order
+    <br /><a href="tbl118pl_2nd.htm">(HTML format)</a>
+    <br />&#160;
+
+    <br />&#160;&#160;Sorted in U.S. Code order
+    <br /><a href="tbl118cd_2nd.htm">(HTML format)</a>
+    <br />&#160;
+
+  </td>
+
+
+
+  <td align="center" colspan="2">
+   <strong>2023</strong>
+    <br />118th Congress, 1st Session
+    <br />Public Laws 118-1 to 118-34
+
+    <br />&#160;&#160;Sorted in Public Law order
+    <br /><a href="tbl118pl_1st.htm">(HTML format)</a>
+    <br />&#160;
+  
+    <br />&#160;&#160;Sorted in U.S. Code order
+    <br /><a href="tbl118cd_1st.htm">(HTML format)</a>
+    <br />&#160;
+
+  </td>
+ 
+ </tr>
+<tr>
+  
+  
+  <td align="center">
+   <strong>2006</strong>
+    <br />109th Congress, 2nd Session
+    <br />Public Laws 109-170 to 109-172 <br />and <br />109-174 to 109-482*
+   <br />&#160;&#160;Sorted in Public Law order
+    <br /><a href="tbl109pl_2nd.htm">(HTML format)</a>
+   <br />&#160;&#160;Sorted in U.S. Code order
+    <br /><a href="tbl109cd_2nd.htm">(HTML format)</a>
+    <br /><p>* Public Law 109-173 was enacted by the 109th Congress, 1st Session.</p>
+  </td>
+
+
+
+
+ <td align="center">
+   <strong>2005</strong>
+    <br />109th Congress, 1st Session
+    <br />Public Laws 109-1 to 109-169 and 109-173
+   <br />
+      <a href="tbl109pl_1st.htm">Public Law order</a>
+      &#160;&#160;
+      <a href="tbl109pl_1st.pdf">(**PDF)</a>
+    <br />
+      <a href="tbl109cd_1st.htm">U.S. Code order</a>
+      &#160;&#160;
+      <a href="tbl109us_1st.pdf">(**PDF)</a>
+  </td>
+
+   </tr>
+<tr valign="top">
+
+    <td align="center" colspan="2">
+   <strong>1995 and 1996</strong>
+    <br />104th Congress, 1st and 2nd Session
+    <br />Public Laws 104-1 to 104-333
+    <br /><a href="tbl104pl.htm">Public Law order</a>
+    <br /><a href="tbl104cd.htm">U.S. Code order</a>
+  </td>
+
+
+
+  </tr>
+</table>
+</body></html>
