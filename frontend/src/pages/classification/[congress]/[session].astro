@@ -24,13 +24,8 @@ import {
   ApiError,
   CLASSIFICATION_PAGE_SIZE,
   fetchClassificationEntries,
-  fetchClassificationTables,
 } from "../../../lib/api";
-import type {
-  ClassificationEntry,
-  ClassificationFile,
-  ClassificationPage,
-} from "../../../lib/types";
+import type { ClassificationEntryPage } from "../../../lib/types";
 import {
   CLASSIFICATION_SORTS,
   classificationEcctHref,
@@ -74,34 +69,21 @@ const SORT_LABELS: Record<string, string> = {
   code: "U.S. Code order",
 };
 
-let page: ClassificationPage<ClassificationEntry> | null = null;
-let file: ClassificationFile | null = null;
+let page: ClassificationEntryPage | null = null;
 let failure: { status: number; detail: string } | null = null;
 
 try {
-  const [entries, registry] = await Promise.all([
-    fetchClassificationEntries(congress, session, {
-      pl,
-      pl_section: plSection,
-      title,
-      section,
-      sort,
-      limit: CLASSIFICATION_PAGE_SIZE,
-      offset,
-    }),
-    // The registry, for the file's covered range and its Statutes at Large
-    // volume. It never fails this page: the table is the answer and the
-    // provenance around it is context.
-    fetchClassificationTables().catch(() => null),
-  ]);
-  page = entries;
-  file =
-    registry?.files.find(
-      (candidate) =>
-        candidate.kind === "pl" &&
-        candidate.congress === congress &&
-        candidate.session === session,
-    ) ?? null;
+  // One call. The document these rows came from — its covered range and its
+  // Statutes at Large volume — rides back on the same response.
+  page = await fetchClassificationEntries(congress, sessionParam, {
+    pl,
+    pl_section: plSection,
+    title,
+    section,
+    sort,
+    limit: CLASSIFICATION_PAGE_SIZE,
+    offset,
+  });
 } catch (error) {
   if (error instanceof ApiError) {
     failure = { status: error.status, detail: error.detail };
@@ -170,6 +152,7 @@ if (section) {
   });
 }
 
+const file = page?.file ?? null;
 const total = page?.total ?? 0;
 const items = page?.items ?? [];
 const shownFrom = total === 0 ? 0 : offset + 1;

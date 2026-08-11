@@ -8,12 +8,12 @@
 import { API, ancestorIdentifiers } from "./url";
 import type {
   Citation,
-  ClassificationEntry,
-  ClassificationPage,
+  ClassificationEntryPage,
   ClassificationSuggestion,
+  ClassificationSuggestions,
   ClassificationTables,
   Diff,
-  EcctEntry,
+  EcctPage,
   Entry,
   Labels,
   Neighbors,
@@ -242,22 +242,45 @@ export interface ClassificationEntryQuery {
   offset?: number;
 }
 
-/** One session's table, filtered, sorted and paged by the API. Nothing is
- *  sorted or sliced here: `?sort=code` orders by title through
- *  `title_sort_key`, which is server-side by gotcha 16. */
+/**
+ * One session's table, filtered, sorted and paged by the API.
+ *
+ * Nothing is sorted or sliced here: `?sort=code` orders by title through
+ * `title_sort_key`, which is server-side by gotcha 16. `sort` must already be
+ * one of the two the API accepts — it is a `Literal` there and an unrecognized
+ * value is a 422, while the *page* falls back silently, so the normalization
+ * happens before the call.
+ *
+ * `session` takes the label (`1`, `2`, `all`) rather than the number: the route
+ * accepts either and the label is what the URL already carries.
+ */
 export async function fetchClassificationEntries(
   congress: number,
-  session: number,
+  session: string,
   query: ClassificationEntryQuery = {},
-): Promise<ClassificationPage<ClassificationEntry>> {
-  return getJson<ClassificationPage<ClassificationEntry>>(
+): Promise<ClassificationEntryPage> {
+  return getJson<ClassificationEntryPage>(
     `${API}/classifications/tables/${congress}/${session}/entries${qs({ ...query })}`,
   );
 }
 
+/** Everything ever classified to one Code section, newest public law first —
+ *  the order a section's classification history reads in. A section nothing was
+ *  ever classified to is an empty page: the tables cover 1996 onward, so
+ *  silence here is ordinary rather than an error. */
+export async function fetchClassificationsForSection(
+  titleNum: string,
+  section: string,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<ClassificationEntryPage> {
+  return getJson<ClassificationEntryPage>(
+    `${API}/classifications/code/${encodeURIComponent(titleNum)}/${encodeURIComponent(section)}${qs({ ...opts })}`,
+  );
+}
+
 /** The whole Editorial Classification Change Table — 21 rows across two files. */
-export async function fetchEcct(): Promise<ClassificationPage<EcctEntry>> {
-  return getJson<ClassificationPage<EcctEntry>>(`${API}/classifications/ecct`);
+export async function fetchEcct(): Promise<EcctPage> {
+  return getJson<EcctPage>(`${API}/classifications/ecct`);
 }
 
 /**
@@ -270,18 +293,20 @@ export async function fetchEcct(): Promise<ClassificationPage<EcctEntry>> {
  * page calls it when a query arrives in `?q=`, and the island calls the same
  * URL from the browser.
  *
- * Never throws. A lookup that fails is a box that found nothing, not a page
- * that will not render.
+ * An empty list is a normal answer rather than a failure — the two citation
+ * kinds are independent and either may be absent. It never throws for the same
+ * reason: a lookup that fails is a box that found nothing, not a page that will
+ * not render.
  */
 export async function fetchClassificationSuggestions(
   query: string,
 ): Promise<ClassificationSuggestion[]> {
   if (!query.trim()) return [];
   try {
-    const body = await getJson<
-      ClassificationSuggestion[] | { suggestions: ClassificationSuggestion[] }
-    >(`${API}/classifications/suggest${qs({ q: query })}`);
-    return Array.isArray(body) ? body : (body.suggestions ?? []);
+    const body = await getJson<ClassificationSuggestions>(
+      `${API}/classifications/suggest${qs({ q: query })}`,
+    );
+    return body.suggestions ?? [];
   } catch {
     return [];
   }

@@ -44,8 +44,19 @@
  * keystroke. A failed fetch renders nothing: the form underneath still works,
  * and the endpoint is rate-limited for a person rather than a crawler (spec
  * §4).
+ *
+ * ## Where a row goes, in prose rather than in bytes
+ *
+ * A suggestion carries a ready-made `href` — a path relative to the reader's
+ * base, percent-encoded by the API — and the same answer in structured pieces.
+ * The island prefixes `data-app` onto the path, so `/app` is still spelled once,
+ * in `lib/url.ts`. The page's own no-script list builds the same URL from the
+ * structured pieces through `classificationSuggestionHref`, which is what
+ * architecture rule 5 asks for and what an `is:inline` script cannot import.
+ * `url.test.ts` asserts the two agree, shape by shape, against the paths
+ * `api/classification.py`'s `_app_path` emits.
  */
-import { classificationHref, classificationSuggestHref } from "../lib/url";
+import { APP, classificationHref, classificationSuggestHref } from "../lib/url";
 
 interface Props {
   /** What the box starts with — the `?q=` a no-script submission arrived with. */
@@ -69,6 +80,7 @@ const statusId = `${idPrefix}-status`;
   aria-labelledby={`${inputId}-label`}
   data-classlookup
   data-endpoint={classificationSuggestHref("")}
+  data-app={APP}
   data-list={listId}
 >
   <label class="classlookup__label" id={`${inputId}-label`} for={inputId}>
@@ -110,6 +122,7 @@ const statusId = `${idPrefix}-status`;
       const list = box.querySelector("[data-classlookup-list]");
       const status = box.querySelector("[data-classlookup-status]");
       const endpoint = box.dataset.endpoint;
+      const app = box.dataset.app;
       const listId = box.dataset.list;
       let items = [];
       let active = -1;
@@ -153,20 +166,21 @@ const statusId = `${idPrefix}-status`;
           option.className = "classlookup__option";
           option.setAttribute("role", "option");
           option.setAttribute("aria-selected", "false");
-          option.dataset.href = suggestion.href;
+          const href = app + suggestion.href;
+          option.dataset.href = href;
           const label = document.createElement("span");
           label.className = "classlookup__option-label";
           label.textContent = suggestion.label;
           option.append(label);
-          if (suggestion.hint) {
-            const hint = document.createElement("span");
-            hint.className = "classlookup__option-hint";
-            hint.textContent = suggestion.hint;
-            option.append(hint);
+          if (suggestion.detail) {
+            const detail = document.createElement("span");
+            detail.className = "classlookup__option-hint";
+            detail.textContent = suggestion.detail;
+            option.append(detail);
           }
           option.addEventListener("mousedown", (event) => {
             event.preventDefault();
-            location.assign(suggestion.href);
+            location.assign(href);
           });
           list.append(option);
           return option;
@@ -193,8 +207,7 @@ const statusId = `${idPrefix}-status`;
         })
           .then((response) => (response.ok ? response.json() : null))
           .then((body) => {
-            if (!body) return;
-            show(Array.isArray(body) ? body : (body.suggestions ?? []));
+            if (body) show(body.suggestions || []);
           })
           .catch(() => {});
       }

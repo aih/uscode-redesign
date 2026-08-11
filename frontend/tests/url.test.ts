@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  APP,
   ancestorIdentifiers,
   apiDiffHref,
   apiHref,
   appHref,
   classificationEcctHref,
+  classificationSuggestionHref,
   classificationHref,
   classificationSuggestHref,
   compareTitles,
@@ -395,6 +397,55 @@ describe("normalizeSectionKey", () => {
     expect(normalizeSectionKey(" 254C\u201315 ")).toBe("254c-15");
     expect(normalizeSectionKey("45A\u20111")).toBe("45a-1");
     expect(normalizeSectionKey("45a-1")).toBe("45a-1");
+  });
+});
+
+describe("where a lookup suggestion leads", () => {
+  // The API returns a ready-made path and the same answer in structured pieces.
+  // The page builds from the pieces (architecture rule 5) and the island
+  // concatenates `/app` onto the path, because an `is:inline` script imports
+  // nothing. These assertions are what keeps the two from drifting apart: each
+  // `href` below is exactly what `api/classification.py`'s `_app_path` emits.
+  it("takes a public law to its rows on the session page", () => {
+    expect(
+      classificationSuggestionHref({
+        kind: "pl",
+        href: "/classification/118/2?pl=118-42&pl_section=793",
+        congress: 118,
+        session_label: "2",
+        pl: "118-42",
+        pl_section: "793",
+      }),
+    ).toBe("/app/classification/118/2?pl=118-42&pl_section=793");
+  });
+
+  it("takes a citation to the section's notes, percent-encoding the en dash", () => {
+    const built = classificationSuggestionHref({
+      kind: "section-notes",
+      href: "/us/usc/t42/s254c%E2%80%9315#section-notes",
+      identifier: "/us/usc/t42/s254c–15",
+      fragment: "#section-notes",
+    });
+    expect(built).toBe("/app/us/usc/t42/s254c%E2%80%9315#section-notes");
+    // The island's concatenation reaches the identical URL.
+    expect(built).toBe(`${APP}/us/usc/t42/s254c%E2%80%9315#section-notes`);
+  });
+
+  it("takes the second citation suggestion to the code-filtered view", () => {
+    expect(
+      classificationSuggestionHref({
+        kind: "section-classifications",
+        href: "/classification?title=16&section=45f",
+        title_num: "16",
+        section: "45f",
+      }),
+    ).toBe("/app/classification?title=16&section=45f");
+  });
+
+  it("falls back to the path it was given for a kind it does not know", () => {
+    expect(
+      classificationSuggestionHref({ kind: "something-new", href: "/classification/119/2" }),
+    ).toBe("/app/classification/119/2");
   });
 });
 

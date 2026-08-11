@@ -15,10 +15,10 @@ import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import { ApiError, fetchEcct } from "../../lib/api";
 import { resultCitation } from "../../lib/cite";
-import type { ClassificationPage, EcctEntry } from "../../lib/types";
+import type { EcctPage } from "../../lib/types";
 import { appHref, classificationHref } from "../../lib/url";
 
-let page: ClassificationPage<EcctEntry> | null = null;
+let page: EcctPage | null = null;
 let failure: { status: number; detail: string } | null = null;
 
 try {

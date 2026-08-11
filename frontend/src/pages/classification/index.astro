@@ -16,20 +16,44 @@
  * which reports how current the *corpus* is: the two sources are polled
  * separately and a page that borrowed the other's answer would state a fact
  * about the wrong thing (ADR-0067 decision 4).
+ *
+ * `?title=` and `?section=` are the third thing this route does. A lookup that
+ * reads a US Code citation offers "Classification entries for § …", and what
+ * that leads to is every row ever classified to that section, across every
+ * table — which is this page with the two filters on. It is not a route of its
+ * own because it is one query answered in the place the query is typed.
  */
 import Base from "../../layouts/Base.astro";
 import ClassificationLookup from "../../components/ClassificationLookup.astro";
+import ClassificationTable from "../../components/ClassificationTable.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import {
   ApiError,
   fetchClassificationSuggestions,
   fetchClassificationTables,
+  fetchClassificationsForSection,
 } from "../../lib/api";
 import { humanizeAge } from "../../lib/currency";
-import type { ClassificationFile, ClassificationSuggestion, ClassificationTables } from "../../lib/types";
-import { classificationEcctHref, classificationHref, sessionSegment } from "../../lib/url";
+import { resultCitation } from "../../lib/cite";
+import type {
+  ClassificationEntryPage,
+  ClassificationFile,
+  ClassificationSuggestion,
+  ClassificationTables,
+} from "../../lib/types";
+import {
+  classificationEcctHref,
+  classificationHref,
+  classificationSuggestionHref,
+  normalizeSectionKey,
+} from "../../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
+const titleFilter = Astro.url.searchParams.get("title")?.trim().toLowerCase() || null;
+const rawSection = Astro.url.searchParams.get("section")?.trim() || null;
+const sectionFilter = rawSection ? normalizeSectionKey(rawSection) : null;
+/** Both halves or neither: a section number names nothing without its title. */
+const bySection = titleFilter && sectionFilter ? { titleFilter, sectionFilter } : null;
 
 let data: ClassificationTables | null = null;
 let failure: { status: number; detail: string } | null = null;
@@ -54,26 +78,30 @@ const suggestions: ClassificationSuggestion[] = query
   ? await fetchClassificationSuggestions(query)
   : [];
 
+/** The by-section view never fails this page: the registry below it is the
+ *  answer to a different question and is still worth showing. */
+let sectionRows: ClassificationEntryPage | null = null;
+if (bySection && !failure) {
+  sectionRows = await fetchClassificationsForSection(
+    bySection.titleFilter,
+    bySection.sectionFilter,
+  ).catch(() => null);
+}
+const sectionCitation = bySection
+  ? resultCitation(bySection.titleFilter, `§ ${bySection.sectionFilter}`, "section")
+  : null;
+
 const files = (data?.files ?? []).filter((file) => file.kind === "pl");
 const ecctFiles = (data?.files ?? []).filter((file) => file.kind === "ecct");
 
-/** Newest first: congress descending, then session. The 104th's `0` is a whole
- *  congress and sorts below its own sessions, of which it has none. */
-const ordered = [...files].sort((a, b) => b.congress - a.congress || b.session - a.session);
-const current = ordered[0] ?? null;
+/** The API returns the registry newest first already; `current` is its own
+ *  field rather than this page's guess at which row is newest. */
+const ordered = files;
+const current = data?.current ?? null;
 
-const totalRows = files.reduce((sum, file) => sum + file.row_count, 0);
+const totalRows = data?.entry_total ?? 0;
 
-/** How many hours ago the check ran, for `humanizeAge` — the same coarse
- *  phrasing the corpus's currency note uses. */
-function ageHours(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const then = Date.parse(iso);
-  if (Number.isNaN(then)) return null;
-  return (Date.now() - then) / 3_600_000;
-}
-
-const check = data?.check ?? null;
+const source = data?.source ?? null;
 
 /** "Public Laws 118-3 through 118-158", or the verbatim covered text where the
  *  source wrote one with a gap in it. */
@@ -140,10 +168,12 @@ function ordinal(n: number): string {
               <ul class="classfind__list">
                 {suggestions.map((suggestion) => (
                   <li>
-                    <a class="classfind__link" href={suggestion.href}>
+                    <a class="classfind__link" href={classificationSuggestionHref(suggestion)}>
                       {suggestion.label}
                     </a>
-                    {suggestion.hint && <span class="classfind__hint"> {suggestion.hint}</span>}
+                    {suggestion.detail && (
+                      <span class="classfind__hint"> {suggestion.detail}</span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -151,29 +181,60 @@ function ordinal(n: number): string {
           </section>
         )}
 
-        {check &&
-          (check.ok ? (
-            <p class="doc-meta source-currency" role="status">
-              Checked uscode.house.gov for new classification tables{" "}
-              {humanizeAge(ageHours(check.checked_at))}.
-              {check.changed_files.length > 0 && (
-                <span class="source-currency__detail">
-                  {" "}
-                  {check.changed_files.length} table
-                  {check.changed_files.length === 1 ? "" : "s"} changed at that check.
-                </span>
-              )}
-            </p>
-          ) : (
+        {bySection && (
+          <section class="classsection" aria-labelledby="classsection-heading">
+            <h2 class="toc-group" id="classsection-heading">
+              {sectionRows == null || sectionRows.total === 0
+                ? `Nothing was classified to ${sectionCitation}`
+                : `${sectionRows.total.toLocaleString()} row${
+                    sectionRows.total === 1 ? "" : "s"
+                  } classified to ${sectionCitation}`}
+            </h2>
+            {sectionRows == null || sectionRows.total === 0 ? (
+              <p class="doc-meta">
+                The tables cover 1996 onward, so a section last touched before then has no rows
+                here. <a href={classificationHref()}>Clear this</a>.
+              </p>
+            ) : (
+              <>
+                <p class="doc-meta">
+                  Newest public law first, across every table.{" "}
+                  <a href={classificationHref()}>Clear this</a>.
+                </p>
+                <ClassificationTable
+                  entries={sectionRows.items}
+                  caption={`Classified to ${sectionCitation}, newest law first`}
+                />
+              </>
+            )}
+          </section>
+        )}
+
+        {source &&
+          (source.stale ? (
             <div class="usa-alert usa-alert--warning usa-alert--slim" role="status">
               <div class="usa-alert__body">
                 <p class="usa-alert__text">
-                  The last check of uscode.house.gov's classification tables failed,{" "}
-                  {humanizeAge(ageHours(check.checked_at))}. Nothing below is known to be out of
-                  date, and nothing below is known to be current either.
+                  {source.last_checked_at
+                    ? `The last check of uscode.house.gov's classification tables was ${humanizeAge(source.hours_since_check)}`
+                    : "uscode.house.gov's classification tables have never been checked from here"}
+                  {source.ok ? "." : ", and it failed."} Nothing below is known to be out of date,
+                  and nothing below is known to be current either.
                 </p>
               </div>
             </div>
+          ) : (
+            <p class="doc-meta source-currency" role="status">
+              Checked uscode.house.gov for new classification tables{" "}
+              {humanizeAge(source.hours_since_check)}.
+              {source.changed_files.length > 0 && (
+                <span class="source-currency__detail">
+                  {" "}
+                  {source.changed_files.length} table
+                  {source.changed_files.length === 1 ? "" : "s"} changed at that check.
+                </span>
+              )}
+            </p>
           ))}
 
         {current && (
@@ -182,7 +243,7 @@ function ordinal(n: number): string {
               Currently being classified
             </h2>
             <p>
-              <a href={classificationHref(current.congress, sessionSegment(current.session))}>
+              <a href={classificationHref(current.congress, current.session_label)}>
                 {ordinal(current.congress)} Congress, {sessionName(current).toLowerCase()}
               </a>{" "}
               — {current.row_count.toLocaleString()} rows covering {coverage(current)}.
@@ -216,7 +277,7 @@ function ordinal(n: number): string {
               {ordered.map((file) => (
                 <tr>
                   <th scope="row">
-                    <a href={classificationHref(file.congress, sessionSegment(file.session))}>
+                    <a href={classificationHref(file.congress, file.session_label)}>
                       {ordinal(file.congress)}
                     </a>
                   </th>

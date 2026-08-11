@@ -294,9 +294,10 @@ export interface SearchResponse {
 export interface ClassificationFile {
   kind: string;
   congress: number;
-  /** `1`, `2`, or `0` for the 104th's single whole-congress file. The reader's
-   *  URL writes that `0` as `all` (`sessionSegment` in `lib/url.ts`). */
+  /** `1`, `2`, or `0` for the 104th's single whole-congress file. */
   session: number;
+  /** The same value spelled the way a URL spells it: `1`, `2` or `all`. */
+  session_label: string;
   source_url: string;
   source_filename: string;
   /** Verbatim: "Public Law 119-70 and Public Laws 119-74 through 119-102". */
@@ -308,44 +309,60 @@ export interface ClassificationFile {
   prepared_date: string | null;
   /** Null for the 104th, which spans two Statutes at Large volumes. */
   stat_volume: number | null;
-  fetched_at: string | null;
+  fetched_at: string;
   row_count: number;
   skipped_lines: number;
 }
 
-/** The last time this site asked OLRC whether the tables had changed. A sibling
- *  of `SourceCheck`, and deliberately not the same fact: `/api/v1/status`
- *  reports the *corpus*'s freshness (ADR-0036, ADR-0067 decision 4). */
-export interface ClassificationCheck {
-  checked_at: string;
-  source_url: string;
+/** The last poll of OLRC's classification index page.
+ *
+ * Its own check, and deliberately not the one `/api/v1/status` reports: that
+ * polls the release-point inventory, and the two sources are published on
+ * different schedules (ADR-0036, ADR-0067 decision 4). */
+export interface ClassificationSource {
+  url: string;
+  /** Null means no check has ever been recorded here. */
+  last_checked_at: string | null;
+  hours_since_check: number | null;
   ok: boolean;
-  files_seen: number;
+  /** The last check failed, is over a week old, or never happened. */
+  stale: boolean;
+  files_seen: number | null;
   changed_files: string[];
   latest_covered_text: string | null;
   error: string | null;
 }
 
-/** Route 1: the registry plus its freshness. */
+/** Route 1: the registry, its freshness, and the two totals the index page
+ *  would otherwise compute for itself. */
 export interface ClassificationTables {
+  source: ClassificationSource;
   files: ClassificationFile[];
-  check: ClassificationCheck | null;
+  /** The newest Public Law order table — the session being classified now. */
+  current: ClassificationFile | null;
+  /** Rows across every Public Law order table held. */
+  entry_total: number;
 }
 
 /** One row of a Public Law order table. */
 export interface ClassificationEntry {
+  /** The congress of the *document* this row came from, which is not always the
+   *  congress of the law: a table can carry a row about an earlier one. */
+  congress: number;
+  session: number;
+  session_label: string;
   row_seq: number;
   /** The tag-stripped source line, kept verbatim — the only thing 129 rows the
    *  parser could not fully split still have (ADR-0067's addendum). */
   raw_line: string;
-  title_raw: string | null;
+  title_raw: string;
   /** A string: `5a` is a title and `5` is a different one (gotcha 16). Ordering
    *  by it is the API's job, through `title_sort_key`. */
-  title_num: string | null;
+  title_num: string;
   is_appendix: boolean;
-  section_raw: string | null;
+  section_raw: string;
   /** Lowercased, with a plain hyphen — what typed input is matched against. */
-  section_norm: string | null;
+  section_norm: string;
   /** `""` means the law amended the section; the vocabulary is open. */
   description_raw: string;
   is_note: boolean;
@@ -358,10 +375,11 @@ export interface ClassificationEntry {
   usc_identifier: string | null;
   pl_congress: number | null;
   pl_num: number | null;
-  /** Derived rather than stored (spec §2); null when the Pub. L. cell would not
-   *  parse. */
+  /** `118-35`, derived rather than stored; null for the 2 rows whose Pub. L.
+   *  cell could not be read. Those rows are kept. */
   pl_label: string | null;
-  pl_section_raw: string | null;
+  /** `""` means the row is about the whole law. */
+  pl_section_raw: string;
   new_section_quote: string | null;
   stat_volume: number | null;
   /** Empty for a page with no integer form. */
@@ -372,6 +390,9 @@ export interface ClassificationEntry {
 
 /** One row of the Editorial Classification Change Table. */
 export interface EcctEntry {
+  congress: number;
+  session: number;
+  session_label: string;
   row_seq: number;
   former_raw: string;
   former_title_num: string | null;
@@ -389,21 +410,61 @@ export interface EcctEntry {
   prompting_pl_num: number | null;
 }
 
-/** The paged envelope every list route returns (spec §4 route 2). */
-export interface ClassificationPage<T> {
-  items: T[];
+/** One page of classification rows, and the size of the set it came from —
+ *  routes 2 to 5. */
+export interface ClassificationEntryPage {
+  items: ClassificationEntry[];
+  /** Rows the filters matched, not rows returned: what a pager needs. */
   total: number;
   limit: number;
   offset: number;
+  sort: string | null;
+  /** The document these rows came from, where they all came from one. Null on
+   *  the by-section and by-identifier routes, which read across every table. */
+  file: ClassificationFile | null;
 }
 
-/** One row of the lookup's listbox. `kind` is an open set — the API decides
- *  what a query means and this reader only renders the answer. */
+/** The ECCT is 21 rows, so it is returned whole. */
+export interface EcctPage {
+  items: EcctEntry[];
+  total: number;
+}
+
+/**
+ * One thing the lookup box can offer for what was typed.
+ *
+ * `kind` is an open set — `pl`, `section-notes`, `section-classifications` so
+ * far. The API decides what a query means; this reader renders the answer.
+ *
+ * `href` is a path relative to the reader's base, percent-encoded and ready to
+ * use. The structured fields beside it carry the same answer in pieces, and
+ * they are what `classificationSuggestionHref` builds from — a reader URL is
+ * `lib/url.ts`'s to write (architecture rule 5).
+ */
 export interface ClassificationSuggestion {
   kind: string;
   label: string;
+  /** A second line for the row: what the suggestion leads to. */
+  detail: string | null;
   href: string;
-  hint?: string | null;
+  congress: number | null;
+  session: number | null;
+  session_label: string | null;
+  pl: string | null;
+  pl_section: string | null;
+  title_num: string | null;
+  /** The `section_norm` spelling — a plain hyphen. */
+  section: string | null;
+  /** The USLM `@identifier`, as the corpus spells it (EN DASH). */
+  identifier: string | null;
+  fragment: string | null;
+  /** How many rows are behind this suggestion, when known. */
+  count: number | null;
+}
+
+export interface ClassificationSuggestions {
+  query: string;
+  suggestions: ClassificationSuggestion[];
 }
 
 /* --------------------------------------------------------------- OpenAPI

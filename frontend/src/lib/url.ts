@@ -375,6 +375,49 @@ export function classificationSuggestHref(query: string): string {
   return `${API}/classifications/suggest?q=${encodeURIComponent(query)}`;
 }
 
+/**
+ * Where one lookup suggestion leads.
+ *
+ * The API returns a ready-made `href` and the same answer in structured pieces.
+ * This builds from the pieces, because a reader URL is this module's to write
+ * (architecture rule 5) — and because the identifier in a `section-notes`
+ * suggestion is the corpus's EN DASH, which `appHref` percent-encodes and a
+ * pasted string would not.
+ *
+ * The three kinds the API defines today, and an unknown one falls back to the
+ * path it was given: a suggestion this reader does not recognise should still
+ * go somewhere rather than nowhere.
+ */
+export function classificationSuggestionHref(suggestion: {
+  kind: string;
+  href: string;
+  congress?: number | null;
+  session_label?: string | null;
+  pl?: string | null;
+  pl_section?: string | null;
+  title_num?: string | null;
+  section?: string | null;
+  identifier?: string | null;
+  fragment?: string | null;
+}): string {
+  if (suggestion.kind === "pl" && suggestion.congress != null && suggestion.session_label) {
+    return classificationHref(suggestion.congress, suggestion.session_label, {
+      pl: suggestion.pl,
+      plSection: suggestion.pl_section,
+    });
+  }
+  if (suggestion.kind === "section-notes" && suggestion.identifier) {
+    return `${appHref(suggestion.identifier)}${suggestion.fragment ?? ""}`;
+  }
+  if (suggestion.kind === "section-classifications" && suggestion.title_num) {
+    return classificationHref(null, null, {
+      title: suggestion.title_num,
+      section: suggestion.section,
+    });
+  }
+  return `${APP}${suggestion.href}`;
+}
+
 /** govinfo's page for a public law. Predictable from (congress, number), which
  *  congress.gov's is not — its URLs are keyed by the bill, and the tables do
  *  not carry one. */
