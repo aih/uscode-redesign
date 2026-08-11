@@ -118,8 +118,9 @@ steps:
 
 ## Night mode
 
-**Light or dark.** The **More** menu in the header holds the control, under **Display**. Light is
-the default setting. The choice is kept in the browser and applied before the page paints.
+**Light or dark.** The **More** menu in the header holds the control, under **Display**. On a window
+narrower than 1024 pixels it is on the bar at the top of the page instead, beside the site's name.
+Light is the default setting. The choice is kept in the browser and applied before the page paints.
 
 ```scenario
 id: theme-toggle
@@ -133,7 +134,7 @@ steps:
     caption: More holds the display switches.
   - click: .navdrop__list .theme-toggle
     caption: One control switches the theme.
-  - expect: { selector: ".theme-toggle__label", contains: "Light" }
+  - expect: { selector: ".navdrop__list .theme-toggle__label", contains: "Light" }
     caption: The choice is remembered, and lands before the page paints.
 ```
 
