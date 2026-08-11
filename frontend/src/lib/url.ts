@@ -276,6 +276,119 @@ export function compareTitles(a: string, b: string): number {
   return an - bn || as.localeCompare(bs);
 }
 
+/* ------------------------------------------------- classification tables
+ *
+ * OLRC's classification tables (ADR-0067) under `/app/classification`. The
+ * source publishes one file per congress per session; the reader's URL says
+ * which one, and the filters, sort and page ride in the query string.
+ */
+
+/** The session segment of a classification URL.
+ *
+ * The database stores `0` for the 104th congress, whose tables are one
+ * whole-congress file rather than one per session. `0` is not a session anyone
+ * would type, so the URL writes `all` and the two are mapped in both
+ * directions here. */
+export type ClassificationSession = "1" | "2" | "all";
+
+/** `0` → `all`. */
+export function sessionSegment(session: number): ClassificationSession {
+  return session === 1 ? "1" : session === 2 ? "2" : "all";
+}
+
+/** `all` → `0`; anything that is not a session at all → `null`, which is what
+ *  makes a mistyped URL a 404 rather than a query for session `NaN`. */
+export function sessionNumber(segment: string): number | null {
+  if (segment === "all") return 0;
+  if (segment === "1") return 1;
+  if (segment === "2") return 2;
+  return null;
+}
+
+/**
+ * A section number as the tables spell it, from whatever a person typed.
+ *
+ * `classification_entries.section_norm` is lowercased with a plain hyphen
+ * (spec §2), while the corpus's `usc_identifier` carries an EN DASH — the same
+ * two spellings gotcha 17 is about. Typed input is matched against the former,
+ * so it is normalized to the hyphen here and never to U+2013.
+ */
+export function normalizeSectionKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[‑–—]/gu, "-");
+}
+
+export interface ClassificationFilters {
+  /** `118-33` — one public law. */
+  pl?: string | null;
+  /** `101` — a prefix of the law's own section designator. */
+  plSection?: string | null;
+  title?: string | null;
+  section?: string | null;
+  sort?: string | null;
+  offset?: number | null;
+}
+
+/** The order a session table is read in. `pl` is the source's own order and is
+ *  the default, so it is left out of the URL. */
+export const CLASSIFICATION_SORTS = ["pl", "code"] as const;
+
+/**
+ * `/app/classification`, `/app/classification/118/2`, and either with filters.
+ *
+ * Defaults are omitted rather than written out, so one view has one URL: the
+ * source's order and the first page spell themselves by their absence. A
+ * congress without a session (or the other way round) names no file, so both
+ * are required together or the base page is returned.
+ */
+export function classificationHref(
+  congress?: number | string | null,
+  session?: string | null,
+  opts: ClassificationFilters = {},
+): string {
+  const base =
+    congress != null && congress !== "" && session
+      ? `${APP}/classification/${congress}/${session}`
+      : `${APP}/classification`;
+  const params = new URLSearchParams();
+  if (opts.pl) params.set("pl", opts.pl);
+  if (opts.plSection) params.set("pl_section", opts.plSection);
+  if (opts.title) params.set("title", opts.title);
+  if (opts.section) params.set("section", normalizeSectionKey(opts.section));
+  if (opts.sort && opts.sort !== "pl") params.set("sort", opts.sort);
+  if (opts.offset) params.set("offset", String(opts.offset));
+  const query = params.toString();
+  return query ? `${base}?${query}` : base;
+}
+
+/** `/app/classification/ecct` — the Editorial Classification Change Table. */
+export function classificationEcctHref(): string {
+  return `${APP}/classification/ecct`;
+}
+
+/** `/api/v1/classifications/suggest?q=…` — what the lookup's listbox fetches.
+ *
+ * Built here rather than in the island for architecture rule 5's reason and one
+ * more: an `is:inline` script imports nothing, so a URL written inside it is a
+ * second copy of this one. The page renders `classificationSuggestHref("")` into
+ * a data attribute and the island appends the encoded query to it. */
+export function classificationSuggestHref(query: string): string {
+  return `${API}/classifications/suggest?q=${encodeURIComponent(query)}`;
+}
+
+/** govinfo's page for a public law. Predictable from (congress, number), which
+ *  congress.gov's is not — its URLs are keyed by the bill, and the tables do
+ *  not carry one. */
+export function govinfoPlawHref(congress: number | string, num: number | string): string {
+  return `https://www.govinfo.gov/app/details/PLAW-${congress}publ${num}`;
+}
+
+/** OLRC's statviewer, the target the source tables link their own Stat. pages
+ *  to. Only ever built from an integer page: `110 Stat. 3009-587` is a single
+ *  page whose label this endpoint cannot take. */
+export function statViewerHref(volume: number | string, page: number | string): string {
+  return `https://uscode.house.gov/statviewer.htm?volume=${volume}&page=${page}`;
+}
+
 /** `/c/5` → `(c)(5)`. USLM's short-form vocabulary is empty below section
  * (`docs/prior-art.md` §1), so a provision path is bare designators with no
  * level name attached — "(c)(5)" is the honest reading, not "paragraph (c)(5)",

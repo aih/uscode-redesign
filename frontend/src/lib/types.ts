@@ -281,6 +281,131 @@ export interface SearchResponse {
   facets: SearchFacets;
 }
 
+/* ------------------------------------------------- classification tables
+ *
+ * Mirrors the `…Out` models in `api/schemas.py` for the routes in
+ * `docs/classification-spec.md` §4 (ADR-0067). Every field the source cannot
+ * supply is nullable here because it is nullable there: 1,533 of the corpus's
+ * 144,837 rows have no `usc_identifier`, 2 have no public law at all, and 6,053
+ * cite a Statutes at Large page with no integer form.
+ */
+
+/** One source document — a Public Law order table, or the ECCT. */
+export interface ClassificationFile {
+  kind: string;
+  congress: number;
+  /** `1`, `2`, or `0` for the 104th's single whole-congress file. The reader's
+   *  URL writes that `0` as `all` (`sessionSegment` in `lib/url.ts`). */
+  session: number;
+  source_url: string;
+  source_filename: string;
+  /** Verbatim: "Public Law 119-70 and Public Laws 119-74 through 119-102". */
+  covered_laws_text: string | null;
+  /** Gap-aware segments of the above — `["70-70", "74-102"]`. */
+  covered_ranges: string[];
+  first_law: number | null;
+  last_law: number | null;
+  prepared_date: string | null;
+  /** Null for the 104th, which spans two Statutes at Large volumes. */
+  stat_volume: number | null;
+  fetched_at: string | null;
+  row_count: number;
+  skipped_lines: number;
+}
+
+/** The last time this site asked OLRC whether the tables had changed. A sibling
+ *  of `SourceCheck`, and deliberately not the same fact: `/api/v1/status`
+ *  reports the *corpus*'s freshness (ADR-0036, ADR-0067 decision 4). */
+export interface ClassificationCheck {
+  checked_at: string;
+  source_url: string;
+  ok: boolean;
+  files_seen: number;
+  changed_files: string[];
+  latest_covered_text: string | null;
+  error: string | null;
+}
+
+/** Route 1: the registry plus its freshness. */
+export interface ClassificationTables {
+  files: ClassificationFile[];
+  check: ClassificationCheck | null;
+}
+
+/** One row of a Public Law order table. */
+export interface ClassificationEntry {
+  row_seq: number;
+  /** The tag-stripped source line, kept verbatim — the only thing 129 rows the
+   *  parser could not fully split still have (ADR-0067's addendum). */
+  raw_line: string;
+  title_raw: string | null;
+  /** A string: `5a` is a title and `5` is a different one (gotcha 16). Ordering
+   *  by it is the API's job, through `title_sort_key`. */
+  title_num: string | null;
+  is_appendix: boolean;
+  section_raw: string | null;
+  /** Lowercased, with a plain hyphen — what typed input is matched against. */
+  section_norm: string | null;
+  /** `""` means the law amended the section; the vocabulary is open. */
+  description_raw: string;
+  is_note: boolean;
+  action: string | null;
+  transfer_counterpart: string | null;
+  act_name: string | null;
+  /** Spelled with an EN DASH, as the corpus spells it — so every href built
+   *  from it goes through `appHref`, which percent-encodes. Null for the 1,531
+   *  appendix rows that derive none by rule, and for 2 others. */
+  usc_identifier: string | null;
+  pl_congress: number | null;
+  pl_num: number | null;
+  /** Derived rather than stored (spec §2); null when the Pub. L. cell would not
+   *  parse. */
+  pl_label: string | null;
+  pl_section_raw: string | null;
+  new_section_quote: string | null;
+  stat_volume: number | null;
+  /** Empty for a page with no integer form. */
+  stat_pages: number[];
+  /** The page as printed — `3009-587`, `1501A-594`, `1544, 1545`. */
+  stat_page_labels: string[];
+}
+
+/** One row of the Editorial Classification Change Table. */
+export interface EcctEntry {
+  row_seq: number;
+  former_raw: string;
+  former_title_num: string | null;
+  former_section_norm: string | null;
+  former_is_note: boolean;
+  new_raw: string;
+  new_title_num: string | null;
+  new_section_norm: string | null;
+  new_is_note: boolean;
+  provision_affected: string;
+  provision_prompting: string;
+  affected_pl_congress: number | null;
+  affected_pl_num: number | null;
+  prompting_pl_congress: number | null;
+  prompting_pl_num: number | null;
+}
+
+/** The paged envelope every list route returns (spec §4 route 2). */
+export interface ClassificationPage<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** One row of the lookup's listbox. `kind` is an open set — the API decides
+ *  what a query means and this reader only renders the answer. */
+export interface ClassificationSuggestion {
+  kind: string;
+  label: string;
+  href: string;
+  hint?: string | null;
+}
+
 /* --------------------------------------------------------------- OpenAPI
  *
  * Only the parts `/app/docs` renders. This is deliberately not a complete

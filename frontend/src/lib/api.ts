@@ -8,7 +8,12 @@
 import { API, ancestorIdentifiers } from "./url";
 import type {
   Citation,
+  ClassificationEntry,
+  ClassificationPage,
+  ClassificationSuggestion,
+  ClassificationTables,
   Diff,
+  EcctEntry,
   Entry,
   Labels,
   Neighbors,
@@ -205,6 +210,81 @@ export async function fetchSearch(
   return getJson<SearchResponse>(
     `${API}/search${qs({ q: query, offset, limit, sort, ...release })}`,
   );
+}
+
+/* ------------------------------------------------- classification tables
+ *
+ * ADR-0067's routes, under `/api/v1/classifications/…`. Everything here goes
+ * through `getJson`, so a 404 from the API arrives as an `ApiError` a page can
+ * hand to `ErrorPage` — which is the difference the spec asks these pages to
+ * keep: "no table covers Public Law 119-72" is a 404, and "a table covers it
+ * and it classified nothing" is a 200 with an empty `items`.
+ */
+
+/** The registry of source documents, and when this site last checked them. */
+export async function fetchClassificationTables(): Promise<ClassificationTables> {
+  return getJson<ClassificationTables>(`${API}/classifications/tables`);
+}
+
+/** How many rows one session page asks for. Well under the API's own bound of
+ *  500: the largest session file is ~9,700 rows and the 104th's is 11,737, so
+ *  an unbounded fetch here would be a page nobody can read and a query nobody
+ *  budgeted for. */
+export const CLASSIFICATION_PAGE_SIZE = 50;
+
+export interface ClassificationEntryQuery {
+  pl?: string | null;
+  pl_section?: string | null;
+  title?: string | null;
+  section?: string | null;
+  sort?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+/** One session's table, filtered, sorted and paged by the API. Nothing is
+ *  sorted or sliced here: `?sort=code` orders by title through
+ *  `title_sort_key`, which is server-side by gotcha 16. */
+export async function fetchClassificationEntries(
+  congress: number,
+  session: number,
+  query: ClassificationEntryQuery = {},
+): Promise<ClassificationPage<ClassificationEntry>> {
+  return getJson<ClassificationPage<ClassificationEntry>>(
+    `${API}/classifications/tables/${congress}/${session}/entries${qs({ ...query })}`,
+  );
+}
+
+/** The whole Editorial Classification Change Table — 21 rows across two files. */
+export async function fetchEcct(): Promise<ClassificationPage<EcctEntry>> {
+  return getJson<ClassificationPage<EcctEntry>>(`${API}/classifications/ecct`);
+}
+
+/**
+ * What a lookup query means, decided server-side.
+ *
+ * The PL shorthand and the citation half both parse in Python — `citeparse.py`
+ * is the single source of truth for what a citation is (ADR-0023), and a
+ * TypeScript copy of it would be a second parser disagreeing with the first.
+ * So this is the no-script path's handler as well as the island's endpoint: the
+ * page calls it when a query arrives in `?q=`, and the island calls the same
+ * URL from the browser.
+ *
+ * Never throws. A lookup that fails is a box that found nothing, not a page
+ * that will not render.
+ */
+export async function fetchClassificationSuggestions(
+  query: string,
+): Promise<ClassificationSuggestion[]> {
+  if (!query.trim()) return [];
+  try {
+    const body = await getJson<
+      ClassificationSuggestion[] | { suggestions: ClassificationSuggestion[] }
+    >(`${API}/classifications/suggest${qs({ q: query })}`);
+    return Array.isArray(body) ? body : (body.suggestions ?? []);
+  } catch {
+    return [];
+  }
 }
 
 /** The OpenAPI schema FastAPI generates, for `/app/docs` to render.
