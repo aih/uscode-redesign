@@ -1,10 +1,11 @@
 # Classification tables — implementation spec for aih/uscode-redesign
 
-**Status:** spec written 2026-08-11. **Wave 1 landed 2026-08-11** on branch `classification-wave1`
-([PR #44](https://github.com/aih/uscode-redesign/pull/44), open) — C1 (parser, fixtures, ADR-0067)
+**Status:** spec written 2026-08-11. **Wave 1 landed 2026-08-11** and is merged into `main`
+([PR #44](https://github.com/aih/uscode-redesign/pull/44)) — C1 (parser, fixtures, ADR-0067)
 and C2a (schema, migration `3c8d9ab6d527`); see
 [§ What Wave 1 measured](#what-wave-1-measured) for the six places this spec was wrong.
-**Wave 2 landed 2026-08-11** on branch `c2b-classification-loader` — C2b (fetch, loader, CLI, poll,
+**Wave 2 landed 2026-08-11** on branch `c2b-classification-loader`
+([PR #45](https://github.com/aih/uscode-redesign/pull/45), open) — C2b (fetch, loader, CLI, poll,
 migration `0044883c483c`), with the whole corpus loaded once from the live source; see
 [§ What Wave 2 measured](#what-wave-2-measured). Nothing is reachable from the reader yet. Wave 3
 (C3 storage + API, C4 reader pages) is next; C5 unstarted. An orchestrating session starts at
@@ -341,8 +342,9 @@ The first full-corpus run. Where this section and an earlier one disagree, this 
 measurement.
 
 1. **The corpus is 144,837 rows across 31 `pl` files, plus 21 ECCT rows in two files.** The estimate
-   in §1 was 100–150k. 130 warnings, 0 skipped lines, 2 rows without a public law, 12,148 rows
-   without a `usc_identifier`, and 114 seconds to fetch and load all 33 documents from cold.
+   in §1 was 100–150k. 131 warnings, 0 skipped lines, 2 rows without a public law, 1,533 rows
+   without a `usc_identifier` (1,531 of them appendix rows, which derive none by rule), 6,053 whose
+   Stat. page has no integer form, and 107 seconds to fetch and load all 33 documents from cold.
 2. **Wave 1's three measured files were not representative, and the other 28 carried four defects.**
    The first parse of them warned 10,584 times, left 3,717 rows with no public law at all, and
    dropped 29 lines. Two files put their Sec. column one character left of their header; a Stat.

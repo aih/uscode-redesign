@@ -397,11 +397,10 @@ standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`.
 OLRC's tables record which provision of which Public Law was classified to which Code section.
 Wave 1 — the parser (`ingest/classification.py`, parse side only) and the four tables
 (`classification_files`, `classification_entries`, `ecct_entries`,
-`classification_source_checks`, migration `3c8d9ab6d527`) — is on branch `classification-wave1`
-and **not merged** (PR #44). Wave 2 — the fetch, `load_file`, the backfill, the poll, the
-`classification` / `classification-check` subcommands and migration `0044883c483c` — is on branch
-`c2b-classification-loader`, also unmerged, and **the whole corpus is loaded once from the live
-source: 144,837 rows across 31 Public Law order tables plus 21 ECCT rows, 131 warnings, 0 skipped
+`classification_source_checks`, migration `3c8d9ab6d527`) — is **merged** (PR #44). Wave 2 — the
+fetch, `load_file`, the backfill, the poll, the `classification` / `classification-check`
+subcommands and migration `0044883c483c` — is on branch `c2b-classification-loader`, **not merged**
+(PR #45), and **the whole corpus is loaded once from the live source: 144,837 rows across 31 Public Law order tables plus 21 ECCT rows, 131 warnings, 0 skipped
 lines, 107 seconds from cold** (`docs/verification/classification-*.json`, one artifact per
 document). Nothing is reachable from the reader — no storage protocol, no API route, no page.
 Wave 3 (C3 storage + API, C4 reader pages) is next; the spec's § What Wave 2 measured carries what
