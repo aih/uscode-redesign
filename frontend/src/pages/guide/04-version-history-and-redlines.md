@@ -83,3 +83,8 @@ behind `?source=1` and closed by default. The API returns the same comparison as
 citation that is a link in the section view is plain text here.
 
 **A change in whitespace alone is not shown in the reading redline.** The source view shows it.
+
+**Comparisons are rate limited.** Building one is the most expensive thing this site does, so a
+burst of eight is allowed and the allowance refills at one every two seconds. Past that the page
+answers `429` with a `Retry-After` header saying how many seconds to wait, and offers a link back to
+the section you were comparing.

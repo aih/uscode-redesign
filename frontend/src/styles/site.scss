@@ -2752,6 +2752,65 @@ main[id] {
   gap: 0.75rem;
 }
 
+/* The way back from a dead end: the nearest identifier above the failed one
+ * that resolves, with the trail to it. A list rather than the sticky
+ * `Breadcrumbs` component, because it describes somewhere the reader is *not* —
+ * putting it in the chrome would say this page is at that position in the Code,
+ * and the page is a 404. */
+.deadend {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+}
+
+.deadend__heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.deadend__trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--ui);
+  font-size: 0.95rem;
+}
+
+/* The separator is drawn between items rather than after them, so the trail
+ * does not end on one. `--wrap` shows the whole trail at every width, the same
+ * reason `.usa-breadcrumb`'s own 480px-and-up separator had to be replaced. */
+.deadend__step + .deadend__step::before {
+  content: "›";
+  margin-right: 0.5rem;
+  color: var(--muted);
+}
+
+.deadend__step--last a {
+  font-weight: 600;
+}
+
+.deadend__elsewhen {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.deadend__else {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .cite {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;

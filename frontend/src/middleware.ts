@@ -94,7 +94,7 @@ function canonicalUrl(url: URL): URL | null {
   return clean;
 }
 
-export const onRequest = defineMiddleware((context, next) => {
+export const onRequest = defineMiddleware(async (context, next) => {
   if (context.request.method === "GET") {
     const clean = canonicalUrl(context.url);
     // `pathname + search` rather than the absolute URL: the reader sits behind
@@ -118,14 +118,40 @@ export const onRequest = defineMiddleware((context, next) => {
   const retryAfter = match[1].check(key);
   if (retryAfter === null) return next();
 
+  const headers = {
+    "Retry-After": String(Math.ceil(retryAfter)),
+    // A shed request is a fact about this caller at this moment, never a
+    // cacheable fact about the URL (ADR-0018).
+    "Cache-Control": "no-store",
+  };
+
+  // `/app/diff/` is limited and is a page a reader navigates to, so shedding it
+  // used to hand back plain text with no chrome and no way back — the dead end
+  // task B6 names. A navigation gets the error page at the URL it asked for;
+  // `/app/preview/`'s fetch does not send `Accept: text/html` and still gets the
+  // text body `CitePreview` was already handling by status (ADR-0041).
+  if ((context.request.headers.get("accept") ?? "").includes("text/html")) {
+    const rendered = await context.rewrite(
+      new Request(new URL("/app/429", context.url), {
+        // The page offers the way back to what was refused, and after the
+        // rewrite it can no longer see which URL that was.
+        headers: { "x-usc-wanted": wantedIdentifier(context.url.pathname) },
+      }),
+    );
+    const response = new Response(rendered.body, rendered);
+    for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
+    return response;
+  }
+
   return new Response("Too many requests. Please slow down and try again.", {
     status: 429,
-    headers: {
-      "Retry-After": String(Math.ceil(retryAfter)),
-      "Content-Type": "text/plain; charset=utf-8",
-      // A shed request is a fact about this caller at this moment, never a
-      // cacheable fact about the URL (ADR-0018).
-      "Cache-Control": "no-store",
-    },
+    headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
   });
 });
+
+/** `/app/diff/us/usc/t16/s45f` → `/us/usc/t16/s45f`. The identifier under a
+ *  limited route, or an empty string when the path carries none. */
+function wantedIdentifier(pathname: string): string {
+  const match = /^\/app\/(?:diff|preview)(\/us\/usc\/.+)$/u.exec(pathname);
+  return match ? match[1] : "";
+}

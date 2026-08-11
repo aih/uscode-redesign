@@ -285,7 +285,7 @@ const releaseContext = served
     )
   }
 
-  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} identifier={identifier} />}
 
   {
     section && (

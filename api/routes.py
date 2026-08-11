@@ -21,6 +21,7 @@ template — the surface that answers people is `/app`, and the bare citation UR
 
 from __future__ import annotations
 
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -279,6 +280,34 @@ def _locate(
     return None, None
 
 
+#: `/us/usc/t5a/s3` — an appendix title followed straight by a flat section
+#: number. OLRC publishes no such identifier: 0 of the corpus's 461 appendix
+#: sections use this form (see `citeparse`'s class docstring). The real ones put
+#: the enacting law or act between the two, which is why matching on `/s` here
+#: cannot catch a reachable identifier.
+_FLAT_APPENDIX = re.compile(r"^/us/usc/t(\d+)a/s")
+
+
+def _appendix_hint(identifier: str) -> str | None:
+    """Why a flat appendix section resolves to nothing, or None.
+
+    Written against the identifier rather than against a `ParsedCitation`, so
+    the citation endpoint and the identifier lookup give the same answer to the
+    same question — a reader who types `5 USC App. 3` into the box and a reader
+    who lands on `/us/usc/t5a/s3` have made one mistake, not two.
+    """
+    match = _FLAT_APPENDIX.match(identifier)
+    if match is None:
+        return None
+    return (
+        f"Title {match.group(1)} Appendix is published under the law that enacted "
+        "each provision, not under a flat section number. Its identifiers look "
+        "like /us/usc/t5a/pl/92/463/s1 (by public law) or "
+        "/us/usc/t50a/act/1917-05-18/ch15/s212 (by act and date). This site "
+        f"cannot yet translate {identifier} into one of those."
+    )
+
+
 def _why_not(parsed: ParsedCitation) -> str | None:
     """Something specific to say when a well-formed citation resolves to nothing.
 
@@ -287,12 +316,7 @@ def _why_not(parsed: ParsedCitation) -> str | None:
     worse than "not found".
     """
     if parsed.appendix and parsed.kind != "title":
-        return (
-            f"Title {parsed.title_num.rstrip('a')} Appendix is published under the "
-            "law that enacted each provision, not under a flat section number — "
-            "its identifiers look like /us/usc/t5a/pl/92/463/s1. This site cannot "
-            f"yet translate {parsed.identifier!r} into one of those."
-        )
+        return _appendix_hint(parsed.identifier)
     return None
 
 
@@ -514,7 +538,12 @@ def get_by_identifier(
     if toc is not None:
         return TocOut.of(toc, note=resolved.note)
 
-    raise HTTPException(status_code=404, detail=not_found(path, resolved))
+    # The one 404 this site can diagnose. Reaching the reader matters as much as
+    # reaching an API client: a bare "nothing here" reads as "this provision was
+    # never enacted", and the truth is that it exists under a different scheme.
+    hint = _appendix_hint(path)
+    detail = not_found(path, resolved)
+    raise HTTPException(status_code=404, detail=f"{detail} — {hint}" if hint else detail)
 
 
 def _section_response(

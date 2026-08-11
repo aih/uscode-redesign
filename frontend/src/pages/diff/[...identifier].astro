@@ -154,7 +154,7 @@ const currentCrumb: Entry | null = after
 ---
 
 <Base title={title} crumbs={crumbs} current={currentCrumb}>
-  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} identifier={identifier} />}
 
   {
     before && after && diff && (

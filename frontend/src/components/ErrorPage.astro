@@ -8,20 +8,92 @@
  * "not at this release point" are different answers and only one of them means
  * the URL is wrong. A 409 is a question — an ambiguous release label — so its
  * candidates arrive as links.
+ *
+ * ## The way back
+ *
+ * Given `identifier`, the page looks up the nearest identifier above it that
+ * does resolve and offers that, with the trail to it. `/us/usc/t16/s45f/c/99`
+ * offers § 45f; `/us/usc/t16/s99999` offers Title 16. Nothing is offered when
+ * nothing above it resolves either, because a made-up trail points at another
+ * 404.
+ *
+ * It does **not** render a search box. There is one on this site (ADR-0023) and
+ * it is in the chrome above, at every width since ADR-0064 — a second would
+ * duplicate the `site-q` id that `/` and the shortcut map both reach by, and
+ * put two boxes on screen with one of them filled in. The pointer to it is a
+ * sentence.
  */
-import { APP } from "../lib/url";
+import { fetchVersions, nearestAncestor } from "../lib/api";
+import { APP, appHref, trimNum, versionsHref } from "../lib/url";
+import type { Entry } from "../lib/types";
 
 interface Props {
   status: number;
   detail: string;
   candidates?: string[];
+  /** The identifier that failed, when the page knows it. Drives the way back. */
+  identifier?: string | null;
 }
 
-const { status, detail, candidates = [] } = Astro.props;
+const { status, detail, candidates = [], identifier = null } = Astro.props;
 
 const headline =
-  { 404: "not found", 409: "which release point?", 422: "that request doesn’t parse" }[status] ??
-  "something went wrong";
+  {
+    404: "not found",
+    409: "which release point?",
+    422: "that request doesn’t parse",
+    429: "too many requests",
+  }[status] ?? "something went wrong";
+
+/** The nearest thing above the failed identifier that exists. One extra call at
+ *  most per ancestor, on a page nobody reaches on purpose, and every failure
+ *  inside it is swallowed — a second error while explaining the first is not
+ *  the reader's problem. */
+let back: { entry: Entry; crumbs: Entry[] } | null = null;
+
+/**
+ * When the identifier is absent *here* but present at other release points.
+ *
+ * An identifier can vanish at a release point without being repealed (gotcha
+ * 3), and a 404 that names only the release point searched leaves the reader
+ * unable to tell that case from a typo. `/versions` spans every release point,
+ * so it answers the question the 404 raises: it did exist, and here is when.
+ */
+let elsewhen: string | null = null;
+
+if (identifier) {
+  const [ancestor, versions] = await Promise.all([
+    // A 404 has already established that this identifier resolves to nothing,
+    // so the search starts above it. Every other status refused the *work* —
+    // 429 is the one that reaches here — and the provision is very likely still
+    // there, so it is the first thing tried and the best thing to offer.
+    nearestAncestor(identifier, {}, status !== 404).catch(() => null),
+    status === 404 ? fetchVersions(identifier).catch(() => null) : Promise.resolve(null),
+  ]);
+  back = ancestor;
+
+  const labels = (versions?.versions ?? []).flatMap((version) => version.releases);
+  if (labels.length > 0) {
+    const where =
+      labels[0] === labels[labels.length - 1]
+        ? labels[0]
+        : `${labels[0]} through ${labels[labels.length - 1]}`;
+    const many = labels.length === 1 ? "one release point" : `${labels.length} release points`;
+    elsewhen = `This provision is in the Code at ${many}, ${where}.`;
+  }
+}
+
+/** `Title 16—` + `CONSERVATION` → `Title 16—CONSERVATION`. USLM carries the
+ *  dash that joins a number to its heading in print, so a space after it would
+ *  be a second separator. Unlike `Breadcrumbs`, this trail shows the heading as
+ *  well as the number: it is naming somewhere the reader has not been. */
+function label(entry: Entry): string {
+  const num = trimNum(entry.num);
+  const heading = entry.heading ?? "";
+  if (!num) return heading || entry.identifier;
+  if (!heading) return num.replace(/[—–-]\s*$/u, "").trim();
+  return /[—–-]\s*$/u.test(num) ? `${num.trimEnd()}${heading}` : `${num} ${heading}`;
+}
 ---
 
 <h1 class="doc-title">{status} — {headline}</h1>
@@ -39,4 +111,32 @@ const headline =
   )
 }
 
-<p class="formats"><a href={`${APP}/`}>Start from the top</a></p>
+{
+  elsewhen && (
+    <p class="deadend__elsewhen">
+      {elsewhen} <a href={versionsHref(identifier ?? "")}>See its version history</a>.
+    </p>
+  )
+}
+
+{
+  back && (
+    <nav class="deadend" aria-labelledby="deadend-h">
+      <h2 class="deadend__heading" id="deadend-h">Where this sits</h2>
+      <ol class="deadend__trail">
+        {back.crumbs.map((crumb) => (
+          <li class="deadend__step">
+            <a href={appHref(crumb.identifier)}>{label(crumb)}</a>
+          </li>
+        ))}
+        <li class="deadend__step deadend__step--last">
+          <a href={appHref(back.entry.identifier)}>{label(back.entry)}</a>
+        </li>
+      </ol>
+    </nav>
+  )
+}
+
+<p class="deadend__else">
+  Or search from the box above, or <a href={`${APP}/`}>start from the top</a>.
+</p>

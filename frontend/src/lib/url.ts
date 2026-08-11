@@ -204,6 +204,31 @@ export function trimNum(num: string | null | undefined): string {
   return num.trim().replace(/\.$/u, "");
 }
 
+/**
+ * The identifiers to try, nearest first, when one resolves to nothing.
+ *
+ * `/us/usc/t16/s45f/c/5` → `/us/usc/t16/s45f`, `/us/usc/t16`. Stops at the
+ * title: `/us/usc` is the front page and is not an identifier the API answers,
+ * and anything above it belongs to a different code.
+ *
+ * Every segment is a candidate rather than only the title, because the trail a
+ * reader wants back is the nearest thing that exists — a mistyped subsection of
+ * a real section should offer the section, not the whole title. The list is
+ * short by construction (a section identifier has at most a handful of
+ * segments), which is what makes trying them one at a time affordable on a page
+ * nobody reaches on purpose.
+ */
+export function ancestorIdentifiers(identifier: string): string[] {
+  const parts = identifier.replace(/\/+$/u, "").split("/").filter(Boolean);
+  // ["us", "usc", "t16", …] — anything shorter has no title in it.
+  if (parts.length < 4 || parts[0] !== "us" || parts[1] !== "usc") return [];
+  const out: string[] = [];
+  for (let end = parts.length - 1; end >= 3; end -= 1) {
+    out.push(`/${parts.slice(0, end).join("/")}`);
+  }
+  return out;
+}
+
 /** `05` → `5`, `05a` → `5a`. OLRC's `titlesAffected` carries the *file-naming*
  * form of a title number — zero-padded, because that is how the zips are named
  * — and no URL in this reader uses it: the identifier scheme is `/us/usc/t5a`

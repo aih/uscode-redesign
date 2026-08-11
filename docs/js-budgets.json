@@ -5,6 +5,7 @@
   "budgets": {
     "/app/": 18500,
     "/app/404": 18500,
+    "/app/429": 18500,
     "/app/about": 18500,
     "/app/demo": 18500,
     "/app/design": 34000,
