@@ -76,11 +76,13 @@ MAX_LIMIT = 500
 what a page shows and well short of what a table dump would cost."""
 
 IDENTIFIER_LIMIT = 200
-"""The by-identifier route returns one section's whole classification history in
-one answer, so it takes no `offset` — it takes a ceiling instead. Measured over
-the loaded corpus, the busiest identifier carries far fewer rows than this; a
-section that ever exceeded it would be truncated rather than paged, which is
-recorded here rather than discovered."""
+"""The default page on the by-identifier route, which is spec §4's number.
+
+It is a default and not a ceiling. Measured over the loaded corpus, **14
+identifiers carry more than 200 rows and `/us/usc/t10/s113` carries 412** — and
+`_history_order` is newest law first, so a fixed 200 would drop that section's
+1996-2000 classifications and say nothing about it. The route takes `limit` and
+`offset` under `MAX_LIMIT` like the paged routes."""
 
 _limit_classification = rate_limit("classification", capacity=120, per_second=10.0)
 """ADR-0029, sized for a server rather than for a person. `/app/classification`
@@ -392,16 +394,21 @@ def classifications_for_section(
 def classifications_for_identifier(
     identifier: str,
     classification: ClassificationDep,
+    limit: int = Query(default=IDENTIFIER_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
 ) -> ClassificationPageOut:
     """The rows whose derived `usc_identifier` is this path, newest law first.
 
     Both dash spellings are tried: the stored value uses OLRC's EN DASH and a
-    caller's path may carry a plain hyphen (gotcha 17). Bounded at 200 rows and
-    unpaged — this is one section's history, and the answer is meant to be
-    whole.
+    caller's path may carry a plain hyphen (gotcha 17).
+
+    A section's history runs past one page: 14 identifiers carry more than the
+    default 200 rows and `/us/usc/t10/s113` carries 412. `total` says how many
+    there are and `offset` reaches them; the order being newest law first, the
+    rows past the first page are the oldest classifications.
     """
     path = normalize_identifier(f"us/usc/{identifier}")
-    page = classification.entries_for_identifier(path, limit=IDENTIFIER_LIMIT)
+    page = classification.entries_for_identifier(path, limit=limit, offset=offset)
     return ClassificationPageOut.of(page)
 
 

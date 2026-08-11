@@ -330,13 +330,20 @@ def test_the_code_route_takes_a_hyphen_and_answers_with_the_en_dash(api):
 
 
 def test_the_code_route_reads_newest_law_first(api):
-    rows = _rows(api, "/api/v1/classifications/code/42/254c-2?limit=100")
+    """42 U.S.C. 201, which three different laws classified to — 118-86, 118-84
+    and 110-18, in two documents. A section with one row cannot tell a sort from
+    no sort at all, which is what this test asserted until it named this one."""
+    rows = _rows(api, "/api/v1/classifications/code/42/201?limit=500")
     laws = [
         (row["pl_congress"], row["pl_num"])
         for row in rows
         if row["pl_congress"] is not None
     ]
+
+    assert len(laws) >= 3
     assert laws == sorted(laws, reverse=True)
+    known = [law for law in laws if law in {(118, 86), (118, 84), (110, 18)}]
+    assert known == [(118, 86), (118, 84), (110, 18)]
 
 
 def test_the_code_route_can_prefix_match(api):
@@ -401,12 +408,39 @@ def test_the_identifier_route_matches_both_dash_spellings(api):
     }
 
 
-def test_the_identifier_route_is_bounded_and_unpaged(api):
+def test_the_identifier_route_defaults_to_200_rows(api):
     body = api.get("/api/v1/classifications/us/usc/t18/s3551").json()
     assert body["limit"] == 200
     assert body["offset"] == 0
     assert body["file"] is None
     assert len(body["items"]) <= 200
+
+
+def test_the_identifier_route_can_reach_past_its_default_page(api):
+    """A section's history runs past 200 rows — 14 identifiers do, and
+    `/us/usc/t10/s113` carries 412 — and the order is newest law first, so an
+    unreachable second page would be the oldest classifications silently gone.
+    """
+    route = "/api/v1/classifications/us/usc/t42/s201"
+    whole = _rows(api, f"{route}?limit=500")
+    assert len(whole) >= 3, "need a section with enough history to page"
+
+    first = api.get(f"{route}?limit=2").json()
+    second = api.get(f"{route}?limit=2&offset=2").json()
+
+    assert first["total"] == second["total"] == len(whole)
+    assert second["offset"] == 2
+    assert first["items"] == whole[:2]
+    assert second["items"] == whole[2:4]
+    # The last row of the history is reachable, which a fixed page would hide —
+    # and it is the oldest, since the order is newest law first.
+    last = api.get(f"{route}?limit=1&offset={len(whole) - 1}").json()
+    assert last["items"] == whole[-1:]
+
+
+def test_the_identifier_routes_limit_is_bounded_at_500(api):
+    assert api.get("/api/v1/classifications/us/usc/t18/s3551?limit=500").status_code == 200
+    assert api.get("/api/v1/classifications/us/usc/t18/s3551?limit=501").status_code == 422
 
 
 def test_an_identifier_nothing_classifies_to_is_an_empty_page(api):

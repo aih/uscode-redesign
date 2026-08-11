@@ -371,12 +371,17 @@ class ClassificationRepository(Protocol):
         ...
 
     def entries_for_identifier(
-        self, identifier: str, *, limit: int = 200
+        self, identifier: str, *, limit: int = 200, offset: int = 0
     ) -> ClassificationPage:
         """Rows whose derived `usc_identifier` is this one, newest law first.
 
         Both dash spellings are tried, because the stored value uses an EN DASH
         and a caller's may not (`identifier_variants`).
+
+        Paged like the rest. 14 identifiers carry more than 200 rows and
+        `/us/usc/t10/s113` carries 412, so a section's history is longer than one
+        page often enough that the page has to be reachable — and the order is
+        newest law first, which puts the oldest classifications last.
         """
         ...
 

@@ -343,12 +343,12 @@ class PostgresClassification:
         return self._joined_page(where, self._history_order(), limit, offset)
 
     def entries_for_identifier(
-        self, identifier: str, *, limit: int = 200
+        self, identifier: str, *, limit: int = 200, offset: int = 0
     ) -> ClassificationPage:
         where = [
             ClassificationEntryRow.usc_identifier.in_(identifier_variants(identifier))
         ]
-        return self._joined_page(where, self._history_order(), limit, 0)
+        return self._joined_page(where, self._history_order(), limit, offset)
 
     @staticmethod
     def _history_order() -> tuple:
