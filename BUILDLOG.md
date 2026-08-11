@@ -2356,3 +2356,28 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     no scenario for it here.
   - **`previewHref` still has no caller** — unchanged from session 43, and still a reader href built
     outside `url.ts` against architecture rule 5.
+
+## 067 — 2026-08-11 — Session 45: the compare tests asked CI for a change its corpus never saw
+
+- **Tool/model:** Claude Code, Fable 5.
+- **Asked:** PR 40's e2e jobs failed — six `compare.spec.ts` tests and two guide scenarios timed out
+  waiting for `.compare__go`; review and push a fix to the branch.
+- **Diagnosed:** The control's named default renders only when `previousChangedRelease` finds more
+  than one group in the section's version timeline. The tests used § 45f; the CI corpus is Title 16
+  at 119-99 and 119-102not101 alone, and § 45f is identical at both, so in CI the timeline was one
+  group, `previous` was null, and the link never existed. The same corpus put one option in the
+  from-select, so `selectOption` at index 1 had nothing to select. The tests passed locally only
+  because the full corpus was behind them.
+- **Decided:** Point the tests at a section the CI corpus saw change rather than skip them there.
+  A content-hash query found exactly two: § 2201 and § 2206, both amended by Pub. L. 119-102.
+  § 2201 carries the tests; the provision tests use `(b)(1)`, which exists and changed in both of
+  its versions; the form test selects index 0. No component change — the control behaved as
+  specified on the data it was given.
+- **Produced:** `d8a419d` — `frontend/tests/e2e/compare.spec.ts`,
+  `frontend/src/pages/guide/04-version-history-and-redlines.md`.
+- **Verified:**
+  - All 12 compare tests and both guide scenarios pass locally; `tests/guide.test.ts` (the ratchet)
+    passes. On the full corpus § 2201's default pair is `from=119-99&to=119-102not101` — the same
+    URLs CI builds, so the local run exercised the redline CI renders.
+  - CI green on both the push and pull_request runs of `d8a419d` (runs 31486531480, 31486534828):
+    `make test`, `make test-web`, `make test-e2e` all passing.
