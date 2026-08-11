@@ -76,6 +76,15 @@
  * same number the jump itself lands on, at every width and with no second copy
  * of `--sticky-h` in this file.
  *
+ * A key that finds nothing says so. `[` and `]` on a section with no top-level
+ * provisions — a one-paragraph repeal is the ordinary case — had nothing to
+ * reach and reported nothing, which from the reader's side is exactly what an
+ * unbound key looks like. `say()` writes one sentence into the `role="status"`
+ * region `Base.astro` renders, clears it after five seconds, and returns true
+ * so the key is treated as handled rather than falling through to the browser.
+ * The region is on screen as well as announced: a sighted reader pressing a key
+ * that appears dead needs the same sentence a screen reader is given.
+ *
  * `is:inline` keeps this a plain, unbundled script — Astro would otherwise turn
  * it into an ES module, where `document.currentScript` is always `null`. It is
  * on every route, so its bytes are on every route's budget (ADR-0046): the
@@ -140,9 +149,20 @@ const targets = {
       return found;
     }
 
+    let t;
+    function say(m) {
+      const b = document.getElementById("keysay");
+      if (b) {
+        b.textContent = m;
+        clearTimeout(t);
+        t = setTimeout(() => (b.textContent = ""), 5000);
+      }
+      return true;
+    }
+
     function step(direction) {
       const list = provisions();
-      if (list.length === 0) return false;
+      if (!list.length) return say("This section has no subsections to step through.");
       let current = -1;
       list.forEach((el, index) => {
         const line = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;

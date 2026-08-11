@@ -1085,6 +1085,53 @@
   text-decoration: underline;
 }
 
+/* What a keyboard shortcut says when it found nothing to do. Fixed to the foot
+ * of the viewport, because it answers a key that was just pressed and the
+ * reader is looking wherever they were — not at the top of the document, and
+ * not at the footer.
+ *
+ * Empty most of the time, and `:empty` takes it out of the layout entirely: a
+ * `role="status"` region has to be in the document before the text arrives or
+ * the announcement is missed, so it cannot be conditionally rendered, and a
+ * permanently present empty box at the foot of every page is a 1.1rem strip
+ * nothing is in. */
+.keysay {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(30rem, calc(100vw - 2rem));
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 0.25rem;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+
+.keysay:empty {
+  display: none;
+}
+
+/* The accelerator on the shortcuts row, at the far end of it the way a desktop
+ * menu prints one. Its own `--panel` against the panel's `--page` so it reads
+ * as a key rather than as text, in both themes and on a hovered row — where the
+ * row goes to `--rule` and this does not. */
+.navdrop__kbd {
+  margin-left: auto;
+  padding: 0.05rem 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0.2rem;
+}
+
 .navdrop__num {
   flex: none;
   font-weight: 600;

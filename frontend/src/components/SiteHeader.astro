@@ -235,6 +235,22 @@ const wordmark = "United States Code";
                   {/* `/app/docs`, not FastAPI's `/docs`. The bare Swagger page
                       is a different site — no navbar, no footer, no way back. */}
                   <li><a class="navdrop__item" href={`${APP}/docs`}>API docs</a></li>
+                  {/* The same progressive-enhancement shape the footer's copy
+                      uses: an `<a>` to the chapter that lists the keys in prose,
+                      which `KeyboardNav` intercepts to open the dialog instead.
+                      Here as well as in the footer because the footer is the
+                      bottom of the document — a reader who has not scrolled
+                      there has never been told the keys exist, which is the
+                      whole of the debt this row settles. */}
+                  <li>
+                    <a
+                      class="navdrop__item"
+                      href={`${APP}/guide/02-reading#keyboard-shortcuts`}
+                      data-shortcuts-open
+                    >
+                      Keyboard shortcuts <kbd class="navdrop__kbd">?</kbd>
+                    </a>
+                  </li>
                   {/* The disclaimer this site carries in the footer — "a
                       conceptual redesign … not an official publication" — is the
                       single most important sentence on the page for anyone who
