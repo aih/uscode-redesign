@@ -1,4 +1,5 @@
-.PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
+.PHONY: dev dev-web dev-all dev-data ci-data ci-classification-data \
+        test test-web test-slow test-all fixtures \
         verify verify-deep load-all shots loadtest navprofile spine-explain \
         test-e2e test-a11y demo-video measure footnav mobilebar diffcost
 
@@ -40,7 +41,7 @@ dev-data:
 # uscode.house.gov on every push — that violates the source-etiquette rule, and
 # ADR-0013 says every consumer pulls from the mirror rather than the origin.
 # Committing a 5 MB zip is the cheaper honest answer than wiring CI to S3.
-ci-data:
+ci-data: ci-classification-data
 	uv run alembic upgrade head
 	uv run python -m ingest inventory --from-file tests/fixtures/releasepoints.json
 	rm -rf .ci-data && mkdir -p .ci-data
@@ -49,6 +50,26 @@ ci-data:
 		--source-zip samples/uslm1/xml_usc16@119-99.zip
 	uv run python -m ingest load samples/uslm1/usc16.xml --release 119-102not101
 	rm -rf .ci-data
+
+# The classification tables (ADR-0067), offline for the same reason: the
+# committed slices copied to the filenames the index pages link, then loaded
+# through `--from-file`, which reads a directory instead of the network. The
+# artifacts go under .ci-data — a slice is ~80 rows and the committed
+# docs/verification/classification-*.json describe the real files.
+CLS_DIR = .ci-data/classification
+
+ci-classification-data:
+	uv run alembic upgrade head
+	rm -rf $(CLS_DIR) && mkdir -p $(CLS_DIR)
+	cp tests/fixtures/tables_slice.shtml $(CLS_DIR)/tables.shtml
+	cp tests/fixtures/priortables_slice.shtml $(CLS_DIR)/priortables.shtml
+	cp tests/fixtures/tbl118pl_2nd_slice.htm $(CLS_DIR)/tbl118pl_2nd.htm
+	cp tests/fixtures/tbl110pl_1st_slice.htm $(CLS_DIR)/tbl110pl_1st.htm
+	cp tests/fixtures/tbl104pl_slice.htm $(CLS_DIR)/tbl104pl.htm
+	cp tests/fixtures/ecct.html $(CLS_DIR)/ecct.html
+	uv run python -m ingest classification --force --from-file $(CLS_DIR) \
+		--out $(CLS_DIR)/verification --manifest $(CLS_DIR)/manifest.json
+	rm -rf $(CLS_DIR)
 
 test:
 	uv run pytest
