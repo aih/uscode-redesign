@@ -48,6 +48,10 @@ export interface DiffLine {
   depth: number;
   kind: ReadingKind;
   spans: Span[];
+  /** `@identifier` of the provision this line belongs to, from
+   *  `ReadingBlock.owner`. A provision-level comparison shows the whole section
+   *  and marks the part that was asked about; this is what it marks by. */
+  owner: string | null;
 }
 
 export interface DocumentDiff {
@@ -123,7 +127,13 @@ export function documentDiff(from: ReadingBlock[], to: ReadingBlock[]): Document
 
     if (op.mark === "equal") {
       for (const block of op.blocks) {
-        lines.push({ mark: "equal", depth: block.depth, kind: block.kind, spans: plain(block.text) });
+        lines.push({
+          mark: "equal",
+          depth: block.depth,
+          kind: block.kind,
+          spans: plain(block.text),
+          owner: block.owner,
+        });
       }
       continue;
     }
@@ -294,15 +304,27 @@ function pairLine(removed: ReadingBlock, added: ReadingBlock): DiffLine {
 
   // The line's depth is the one it has *now*; a re-levelled line reads at its
   // new depth, which is what the reader will see on the section page.
-  return { mark: "changed", depth: added.depth, kind: added.kind, spans };
+  return { mark: "changed", depth: added.depth, kind: added.kind, spans, owner: added.owner };
 }
 
 function insertLine(block: ReadingBlock): DiffLine {
-  return { mark: "insert", depth: block.depth, kind: block.kind, spans: [{ mark: "insert", text: block.text }] };
+  return {
+    mark: "insert",
+    depth: block.depth,
+    kind: block.kind,
+    spans: [{ mark: "insert", text: block.text }],
+    owner: block.owner,
+  };
 }
 
 function deleteLine(block: ReadingBlock): DiffLine {
-  return { mark: "delete", depth: block.depth, kind: block.kind, spans: [{ mark: "delete", text: block.text }] };
+  return {
+    mark: "delete",
+    depth: block.depth,
+    kind: block.kind,
+    spans: [{ mark: "delete", text: block.text }],
+    owner: block.owner,
+  };
 }
 
 function plain(text: string): Span[] {
@@ -333,11 +355,29 @@ export function diffSummary(diff: DocumentDiff): string {
  * node is: the input here is statutory text pulled out of XML, and it reaches
  * the page through `set:html`.
  */
-export function diffLinesHtml(lines: DiffLine[]): string {
+export function diffLinesHtml(lines: DiffLine[], focus?: string | null): string {
+  let anchored = false;
   return lines
     .map((line) => {
       const classes = ["diff-line", `diff-line--${line.mark}`];
       if (line.kind === "note") classes.push("diff-line--note");
+      // A provision-level comparison (task B5) shows the whole section and
+      // marks the part that was asked about — ADR-0001's rule that a request
+      // for `/c/5` is answered with the section, applied to a redline. Prefix
+      // and not equality: `/c/5` owns the lines of everything under it too.
+      const inFocus = Boolean(
+        focus && line.owner && (line.owner === focus || line.owner.startsWith(`${focus}/`)),
+      );
+      let attrs = "";
+      if (inFocus) {
+        classes.push("diff-line--focus");
+        // The first line of the run carries the id, so the fragment scrolls to
+        // the top of the provision rather than to its last paragraph.
+        if (!anchored) {
+          anchored = true;
+          attrs = ' id="diff-focus"';
+        }
+      }
       const inner = line.spans
         .map((span) => {
           const text = escapeHtml(span.text);
@@ -348,7 +388,30 @@ export function diffLinesHtml(lines: DiffLine[]): string {
         .join("");
       // `--depth` rather than a class per level: the outline goes as deep as
       // USLM allows, and `site.scss` already owns the step size.
-      return `<p class="${classes.join(" ")}" style="--depth: ${line.depth - 1}">${inner}</p>`;
+      return `<p class="${classes.join(" ")}"${attrs} style="--depth: ${line.depth - 1}">${inner}</p>`;
     })
     .join("");
+}
+
+/** Did any line belong to `focus`? The page says so when nothing did, rather
+ *  than rendering an unmarked redline that looks like the whole-section one. */
+export function hasFocus(lines: DiffLine[], focus: string | null): boolean {
+  if (!focus) return false;
+  return lines.some(
+    (line) => line.owner && (line.owner === focus || line.owner.startsWith(`${focus}/`)),
+  );
+}
+
+/** How much of the change is inside `focus`. The summary line reports it, so a
+ *  reader who asked about one subsection is told whether the amendment they are
+ *  looking at touched it at all. */
+export function focusSummary(lines: DiffLine[], focus: string | null): string | null {
+  if (!focus) return null;
+  let touched = 0;
+  for (const line of lines) {
+    const inFocus = line.owner === focus || line.owner?.startsWith(`${focus}/`);
+    if (inFocus && line.mark !== "equal") touched += 1;
+  }
+  if (touched === 0) return "No change inside it at these two release points.";
+  return touched === 1 ? "1 changed line inside it." : `${touched} changed lines inside it.`;
 }

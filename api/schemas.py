@@ -8,6 +8,7 @@ an internal field was renamed. Nothing here imports from `db`.
 from __future__ import annotations
 
 import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -310,6 +311,16 @@ class DiffOut(BaseModel):
     identifier: str
     from_: DiffSectionOut = Field(alias="from")
     to: DiffSectionOut
+    guids: Literal["strip", "keep"] = Field(
+        default="strip",
+        description=(
+            "Whether `@id` guids took part in this diff. They regenerate at "
+            "every release point by design (ADR-0003), so `strip` compares what "
+            "the section says and `keep` compares the bytes as stored. Reported "
+            "rather than assumed: the two answers differ and a caller should "
+            "never have to guess which one it got."
+        ),
+    )
     ops: list[DiffOpOut]
 
 

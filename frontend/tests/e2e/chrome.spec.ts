@@ -204,6 +204,7 @@ test.describe("the menus collapse below the desktop breakpoint (ADR-0058)", () =
       "Downloads",
       "User guide",
       "API docs",
+      "Keyboard shortcuts ?",
       "About",
       "Compact",
       "Dark",

@@ -39,6 +39,21 @@ export default defineConfig({
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
+      // `shed.spec.ts` empties the `/app/diff/` token bucket on purpose. That
+      // bucket is global and keyed on the client address (ADR-0029), and every
+      // worker here shares one address — so beside it, any spec whose subject
+      // is a redline gets a 429 instead of the thing it came to assert.
+      testIgnore: "**/shed.spec.ts",
+    },
+    {
+      name: "ratelimit",
+      testMatch: "**/shed.spec.ts",
+      // After everything else has finished, so the bucket it spends is nobody
+      // else's, and serially, so it is not competing with itself either.
+      dependencies: ["desktop"],
+      fullyParallel: false,
+      workers: 1,
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
     },
   ],
 });

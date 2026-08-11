@@ -607,12 +607,22 @@ export interface ReadingBlock {
    * source constantly and in meaning rarely; normalizing here is what keeps
    * reformatting out of the redline. */
   text: string;
+  /**
+   * `@identifier` of the nearest enclosing element that carries one, or null.
+   *
+   * The redline needs it to answer "which of these lines is the subsection I
+   * asked about" (task B5): a provision-level comparison still shows the whole
+   * section, so the only way to mark the part in question is to know which
+   * lines belong to it. Inherited rather than per-element — a `<content>` under
+   * `(c)(5)` has no identifier of its own and is part of it.
+   */
+  owner: string | null;
 }
 
 /** The fragment as the lines a reader reads, in document order. */
 export function readingBlocks(fragment: UslmElement): ReadingBlock[] {
   const blocks: ReadingBlock[] = [];
-  collectBlocks(fragment, 1, "text", blocks);
+  collectBlocks(fragment, 1, "text", blocks, fragment.getAttribute?.("identifier") ?? null);
   return blocks;
 }
 
@@ -621,13 +631,14 @@ function collectBlocks(
   depth: number,
   kind: ReadingKind,
   out: ReadingBlock[],
+  owner: string | null,
 ): void {
   let line = "";
 
   const flush = (): void => {
     const text = normalizeSpace(line);
     line = "";
-    if (text) out.push({ depth, kind, text });
+    if (text) out.push({ depth, kind, text, owner });
   };
 
   for (let i = 0; i < el.childNodes.length; i++) {
@@ -658,6 +669,7 @@ function collectBlocks(
         LEVEL_TAGS.has(tag) ? depth + 1 : depth,
         NOTE_TAGS.has(tag) ? "note" : kind,
         out,
+        child.getAttribute?.("identifier") || owner,
       );
     } else if (tag in INLINE_TAGS || tag === "ref") {
       // Inline formatting is part of the word it sits in — `10<sup>3</sup>` is

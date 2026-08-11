@@ -22,11 +22,11 @@ template — the surface that answers people is `/app`, and the bare citation UR
 from __future__ import annotations
 
 import re
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from api.diff import diff_ops
+from api.diff import cached_diff_ops, diff_ops, strip_guids
 from api.schemas import (
     CitationOut,
     CorpusStatusOut,
@@ -434,11 +434,24 @@ def diff(
         alias="from", description="Release point label to diff from.", examples=["119-99"]
     ),
     to: str = Query(description="Release point label to diff to.", examples=["119-102not101"]),
+    guids: Literal["strip", "keep"] = Query(
+        default="strip",
+        description=(
+            "Whether `@id` guids take part in the diff. They regenerate at every "
+            "release point by design (ADR-0003), so `strip` — the default — "
+            "compares what the section says. `keep` diffs the bytes as stored."
+        ),
+    ),
 ) -> DiffOut:
-    """Diffs the two release points' verbatim XML (docs/adr/0016): a generic
-    text diff, computed here because it needs no USLM vocabulary at all —
-    presentation (wrapping `ops` in `<ins>`/`<del>`) is `frontend/src/lib`'s
-    job, same as the section renderer itself."""
+    """Diffs the two release points' XML (docs/adr/0016): a generic text diff,
+    computed here because it needs no USLM vocabulary at all — presentation
+    (wrapping `ops` in `<ins>`/`<del>`) is `frontend/src/lib`'s job, same as the
+    section renderer itself.
+
+    `@id` guids are dropped before the comparison unless `guids=keep`. They are
+    regenerated at every release point whether or not the law changed (gotcha
+    1), so about half of what this endpoint used to report was identifier churn
+    — 31 of § 45f's 51 ops — and computing it was about half the cost."""
     path = normalize_identifier(identifier)
     title_num = title_num_from_identifier(path)
     from_resolved = resolve_release_or_404(
@@ -455,16 +468,35 @@ def diff(
     if to_section is None:
         raise HTTPException(status_code=404, detail=not_found(path, to_resolved))
 
-    if from_resolved.is_exact and to_resolved.is_exact:
+    pinned = from_resolved.is_exact and to_resolved.is_exact
+    if pinned:
         # Both endpoints pinned: the redline between two published release points
         # is as fixed as the two texts it is drawn from.
         response.headers["Cache-Control"] = IMMUTABLE
+
+    strip = guids == "strip"
+    from_xml = strip_guids(from_section.xml) if strip else from_section.xml
+    to_xml = strip_guids(to_section.xml) if strip else to_section.xml
+
+    # Memoised on the *resolved* labels, and only when both were pinned: an
+    # unpinned label names a different release point the moment a newer one is
+    # loaded, so caching under it would serve a redline for a pair the URL no
+    # longer means.
+    if pinned:
+        ops = cached_diff_ops(
+            (path, from_resolved.release.label, to_resolved.release.label, strip),
+            from_xml,
+            to_xml,
+        )
+    else:
+        ops = diff_ops(from_xml, to_xml)
 
     return DiffOut(
         identifier=path,
         from_=DiffSectionOut.of(from_section),
         to=DiffSectionOut.of(to_section),
-        ops=[DiffOpOut.of(op) for op in diff_ops(from_section.xml, to_section.xml)],
+        guids=guids,
+        ops=[DiffOpOut.of(op) for op in ops],
     )
 
 

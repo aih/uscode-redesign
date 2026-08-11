@@ -55,11 +55,19 @@ import { RateLimiter } from "./lib/ratelimit";
 const preview = new RateLimiter("preview", 60, 5);
 
 /**
- * The reader's redline. Tighter, because `documentDiff` holds the event loop for
- * a whole section and nothing prefetches this — a person reads one redline at a
- * time, and 30 a minute after a burst of 8 is well past attentive reading.
+ * The reader's redline. Still the tightest budget here — `documentDiff` holds
+ * the event loop for a whole section and nothing prefetches this — but no
+ * longer sized for a page three clicks away.
+ *
+ * ADR-0029 set it at 8 with 30 a minute after, when reaching a redline meant
+ * section → version history → pick two release points. ADR-0066 put "Compare
+ * with…" on every section header, so a comparison is now one click from any
+ * provision and a reader working through a chapter makes them at the rate they
+ * open sections. 20 with 60 a minute after is the same kind of bound — it still
+ * sheds a script walking the `?from=`/`?to=` axis, which is the traffic ADR-0037
+ * exists for — against a reader who now has a reason to ask more often.
  */
-const diff = new RateLimiter("diff", 8, 0.5);
+const diff = new RateLimiter("diff", 20, 1);
 
 /** `context.url.pathname` carries Astro's `base`, so these are full paths. */
 const LIMITED: ReadonlyArray<readonly [string, RateLimiter]> = [

@@ -10,7 +10,7 @@
   "routesWithViolations": 4,
   "totals": {
     "violations": 8,
-    "nodes": 1955,
+    "nodes": 1990,
     "critical": 1,
     "serious": 7,
     "moderate": 0,
@@ -23,7 +23,7 @@
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 1162,
+          "nodes": 1197,
           "firstTarget": "div[data-role=\"redoc-description\"] > p:nth-child(1) > code",
           "help": "Elements must meet minimum color contrast ratio thresholds",
           "seenAt": [

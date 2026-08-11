@@ -5,7 +5,7 @@ order: 4
 summary: Every release point at which a section's text changed, and a readable redline between any two of them.
 covers:
   routes: ["/app/versions", "/app/diff"]
-  adrs: [16, 26]
+  adrs: [16, 26, 66]
 ---
 
 ## Tracking change in the Code
@@ -27,6 +27,46 @@ steps:
     caption: "The version history: one entry per distinct text."
   - expect: { selector: "main", contains: "119-99" }
     caption: Each entry says when that text first appeared, and what it stood unchanged through.
+```
+
+## Compare with…
+
+Every section page carries a **Compare with…** control under its heading. Opening it offers one
+comparison by name — the last release point at which this section held different text — and a list
+of every older release point.
+
+The Code republishes every title at every release point whether or not anything changed, so the
+release point immediately before the one you are reading usually holds exactly the same section.
+The named comparison skips to the one that does not.
+
+```scenario
+id: compare-from-the-section
+title: Compare a section with the last release point that changed it
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - click: .compare__summary
+    caption: Compare with… opens under the section heading.
+  - click: .compare__go
+    caption: The offer names the last release point holding different text.
+  - expect: { selector: ".diff-verdict", visible: true }
+    caption: The redline between that release point and the one you were reading.
+```
+
+If you are reading a subsection rather than a whole section, the comparison keeps it: the redline
+covers the whole section, and the subsection you came from is marked inside it with a line above
+saying how much of the change is in it — including when the answer is none.
+
+```scenario
+id: compare-keeps-the-provision
+title: Compare a subsection and see it marked in the section's redline
+steps:
+  - goto: /app/us/usc/t16/s45f/c/5
+  - click: .compare__summary
+  - click: .compare__go
+  - expect: { selector: ".diff-focusnote", contains: "(c)(5)" }
+    caption: The redline says which subsection it was asked about.
+  - expect: { selector: "#diff-focus", visible: true }
+    caption: And marks it inside the whole section.
 ```
 
 ## The redline

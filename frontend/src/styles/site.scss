@@ -2752,6 +2752,137 @@ main[id] {
   gap: 0.75rem;
 }
 
+/* The provision a comparison was asked about, marked inside the whole
+ * section's redline (task B5). A left edge and a tint rather than a background
+ * on the text: the lines already carry `<ins>`/`<del>` colour, and a second
+ * fill under them would be two meanings on one surface. */
+.diff-line--focus {
+  border-left: 3px solid var(--target-edge);
+  padding-left: 0.5rem;
+  background: var(--panel);
+}
+
+.diff-focusnote {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  background: var(--panel);
+  border-left: 3px solid var(--target-edge);
+}
+
+/* "Compare with…" on the section header (task B5, ADR-0066). A `<details>` in
+ * the page body — not the sticky bar, which `ReleasePicker` owns and which
+ * `--sticky-h` budgets. The chip is `.rpswitch__summary`'s vocabulary so the
+ * two disclosures on a section page read as the same kind of control. */
+.compare {
+  margin: 0 0 1rem;
+  position: relative;
+  max-width: var(--measure);
+}
+
+.compare__summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  color: var(--link);
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid var(--rule);
+  border-radius: 0.15rem;
+  list-style: none;
+}
+
+/* Safari draws its own triangle through a pseudo-element `list-style` does not
+ * reach. */
+.compare__summary::-webkit-details-marker {
+  display: none;
+}
+
+.compare__summary::after {
+  content: "▾";
+  color: var(--muted);
+  margin-left: 0.15rem;
+}
+
+.compare[open] > .compare__summary::after {
+  content: "▴";
+}
+
+.compare__summary:hover {
+  background: var(--field);
+  border-color: var(--edge);
+}
+
+.compare__summary:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: 0;
+}
+
+/* In flow rather than absolute, unlike `.rpswitch__panel`: nothing here is
+ * pinned, so pushing the statute down while the panel is open costs the reader
+ * nothing and avoids a second overlay to keep off the sticky bar. */
+.compare__panel {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 0.25rem;
+}
+
+.compare__default {
+  margin: 0 0 0.75rem;
+}
+
+.compare__go {
+  font-family: var(--ui);
+  font-weight: 600;
+}
+
+.compare__hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.compare__hint--none {
+  margin: 0 0 0.75rem;
+}
+
+.compare__label {
+  margin-top: 0;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+}
+
+.compare__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.compare__select {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* USWDS gives `.usa-button` `width: 100%` below 480px, which at 320 takes the
+ * whole row and squeezes the select beside it to nothing — ADR-0056's trap, met
+ * again on a second two-control row. */
+.compare__submit {
+  flex: none;
+  width: auto;
+  margin-right: 0;
+}
+
 /* The way back from a dead end: the nearest identifier above the failed one
  * that resolves, with the trail to it. A list rather than the sticky
  * `Breadcrumbs` component, because it describes somewhere the reader is *not* —

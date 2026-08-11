@@ -1,0 +1,105 @@
+---
+/**
+ * "Compare with…" on the section header (task B5).
+ *
+ * `/app/diff` was two hops from the text it compares — section, then version
+ * history, then pick two release points — which is three clicks to answer the
+ * question a versioned reader asks most often about a provision they are
+ * already looking at.
+ *
+ * The default is not "the previous release point". The Code is republished in
+ * full at every one and few titles change at any (gotcha 10), so that redline
+ * is usually empty; the offer is the last release point that held *different
+ * text*, which `lib/compare.ts` reads off `content_first_seen`. One click, and
+ * it is a link rather than a form so it is also a URL to paste.
+ *
+ * The "…" is the rest: a `<select>` of every older release point, as a plain
+ * GET form. Same shape as `ReleasePicker` (ADR-0056) and for the same reasons —
+ * a native `<details>` costs no script, and a GET form produces a URL.
+ *
+ * When the reader is looking at a provision rather than a whole section, both
+ * routes carry it through as `?at=`, so the comparison lands on the subsection
+ * they were reading. That is ADR-0044's own finding — the release switcher used
+ * to drop the provision — met again on a different control.
+ */
+import type { Release } from "../lib/types";
+import { diffAction, diffHref } from "../lib/url";
+
+interface Props {
+  identifier: string;
+  /** The release point on screen. The `to` side of every comparison here. */
+  selected: string;
+  /** Label of the last release point holding different text, or null when
+   *  there is none — this text is as old as the corpus this site holds. */
+  previous: string | null;
+  /** Every release point older than `selected`, newest first. */
+  options: Release[];
+  /** A sub-section path under the section, e.g. `/c/5`. */
+  provision?: string | null;
+}
+
+const { identifier, selected, previous, options, provision = null } = Astro.props;
+
+function date(release: Release): string {
+  const [year, month, day] = release.currency_date.split("-");
+  return `${month}/${day}/${year}`;
+}
+---
+
+{
+  options.length > 0 && (
+    <details class="compare">
+      {/* The caret is drawn by the stylesheet, the arrangement `.rpswitch`
+          already uses: a `<summary>` draws its marker on a `display: list-item`
+          box and this one is flex for the touch target (ADR-0060). */}
+      <summary class="compare__summary">Compare with…</summary>
+
+      <div class="compare__panel">
+        {previous ? (
+          <p class="compare__default">
+            <a class="compare__go" href={diffHref(identifier, previous, selected, provision)}>
+              What changed since {previous}
+            </a>
+            <span class="compare__hint">
+              {previous} is the last release point holding different text.
+            </span>
+          </p>
+        ) : (
+          /* Not an empty panel and not a disabled control: the reason is
+             specific and worth saying. */
+          <p class="compare__hint compare__hint--none">
+            This text has not changed since the oldest release point this site
+            holds, so there is no previous version to compare it with. Any older
+            release point below gives the same, empty redline.
+          </p>
+        )}
+
+        <form class="compare__form" method="get" action={diffAction(identifier)}>
+          {/* `to` is fixed to the release on screen: the page reads from → to,
+              and the text the reader is looking at is the destination. */}
+          <input type="hidden" name="to" value={selected} />
+          {provision && <input type="hidden" name="at" value={provision} />}
+          <label class="usa-label compare__label" for="compare-from">
+            Or compare with
+          </label>
+          <div class="compare__row">
+            <select class="usa-select compare__select" id="compare-from" name="from">
+              {options.map((option) => (
+                <option value={option.label} selected={option.label === previous}>
+                  {option.label} — {date(option)}
+                </option>
+              ))}
+            </select>
+            <button
+              class="usa-button compare__submit"
+              type="submit"
+              aria-label="Compare with this release point"
+            >
+              Compare
+            </button>
+          </div>
+        </form>
+      </div>
+    </details>
+  )
+}

@@ -63,9 +63,32 @@ export function versionsHref(identifier: string): string {
   return `${APP}/versions${encodePath(identifier)}`;
 }
 
-/** `/app/diff/…?from=&to=` — a redline between two release points (Day 4). */
-export function diffHref(identifier: string, from: string, to: string): string {
-  return `${APP}/diff${encodePath(identifier)}?${new URLSearchParams({ from, to }).toString()}`;
+/**
+ * `/app/diff/…?from=&to=` — a redline between two release points (Day 4).
+ *
+ * `provision` names a sub-section path — `/c/5` — of the section being
+ * compared. It rides as a query parameter rather than a fragment because the
+ * server has to act on it: the redline is built page-side, and a fragment never
+ * leaves the browser. The page anchors and marks that provision inside the
+ * whole section's redline, which is ADR-0001's rule about never losing context
+ * applied to a comparison.
+ */
+export function diffHref(
+  identifier: string,
+  from: string,
+  to: string,
+  provision?: string | null,
+): string {
+  const params = new URLSearchParams({ from, to });
+  if (provision) params.set("at", provision);
+  return `${diffAction(identifier)}?${params.toString()}`;
+}
+
+/** The path half of `diffHref`, for a GET form whose own fields supply the
+ *  query string. Rule 5 is about every reader href being built here, and a
+ *  form action is one. */
+export function diffAction(identifier: string): string {
+  return `${APP}/diff${encodePath(identifier)}`;
 }
 
 /** `/api/v1/sections/…/diff?from=&to=` — the *source-level* redline: the same

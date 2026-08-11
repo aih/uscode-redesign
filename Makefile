@@ -1,6 +1,6 @@
 .PHONY: dev dev-web dev-all dev-data ci-data test test-web test-slow test-all fixtures \
         verify verify-deep load-all shots loadtest navprofile spine-explain \
-        test-e2e test-a11y demo-video measure footnav mobilebar
+        test-e2e test-a11y demo-video measure footnav mobilebar diffcost
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -104,6 +104,13 @@ shots:
 # names the commit it was measured at.
 measure:
 	cd frontend && node scripts/measure.mjs
+
+# What the API's redline costs with and without the @id guid churn, per section
+# (ADR-0066) -> docs/verification/diffcost.json. Times the diff in process, so
+# the endpoint's own rate limiter is not in the way. Needs the site running
+# (`make dev-all`).
+diffcost:
+	uv run python scripts/diffcost.py
 
 # How tall the footer's own links are once opened, at six widths, and how many
 # columns they are in (ADR-0062) -> docs/verification/footnav.json. Needs the
