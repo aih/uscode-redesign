@@ -2158,3 +2158,94 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     the same two sentences. Whoever merges second owns them: this branch alone makes it 462 e2e
     tests and ADRs numbered to 0062.
 
+
+## 065 — 2026-08-10 — Session 43: the phone gets a bar, and the sheet stops holding a second menu
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Workstream B task B9 — apply the Mobile section of `docs/menu-refinement-spec.md` below
+  64em: a 52px bar (Menu, wordmark, theme toggle), an always-visible search row beneath it, a menu
+  sheet ordered Titles / My Provisions / divider / reference and help links / divider / Compact and
+  Dark, hit targets at 44px or more. Mind the two recorded USWDS traps. Re-run the contrast checks
+  in dark for the new menu surfaces.
+- **Decided:** [ADR-0064](docs/adr/0064-a-bar-and-a-search-row-below-64em.md).
+  - **`.navbar` is the bar below 64em and `display: contents` above it**, so its three children
+    become items of the row ADR-0061 built and the desktop header is byte-identical. `.navtools` is
+    `flex: 1 1 100%`, which retires ADR-0058's addendum and the two band-scoped `flex-basis` rules
+    it left: those were about a row the box *shared*, and a wrap calculation over one item has one
+    answer.
+  - **More is not a disclosure below 64em.** Its summary is `display: none` and its
+    `::details-content` is forced visible — `.navmenu`'s desktop arrangement run the other way
+    round — with the same `@supports not selector(::details-content)` fallback ADR-0058 wrote. The
+    group labels serve as the spec's two dividers and also name what is under them.
+  - **The wordmark is written twice, one copy displayed per band.** It has to precede the menu at
+    desktop and follow it on the bar, so one DOM cannot give both bands a reading order that matches
+    the tab order. `order` on a flex item is the one-line alternative and is what ADR-0061 decision
+    4 refused. `display: contents` on the `<nav>` would have reached the same layout without moving
+    anything and was rejected for a different reason: whether a boxless landmark survives in the
+    platform accessibility tree is not a claim this repo can check — `page.accessibility.snapshot`
+    is gone from Playwright and axe computes landmarks from the DOM, so neither instrument answers
+    it. `.navbar` is a plain `<div>`, where the same declaration costs nothing.
+  - **`ThemeToggle` renders twice and ships its script once**, from the later instance, and binds
+    every `[data-theme-toggle]`. Rendering the script twice would bind every button twice and a
+    click would toggle the theme and toggle it back.
+- **Produced:** `docs/adr/0064-*.md`; `frontend/src/components/SiteHeader.astro`,
+  `ThemeToggle.astro`, `frontend/src/styles/site.scss`; `frontend/scripts/mobilebar.mjs` +
+  `docs/verification/mobilebar.json` + a `make mobilebar` target; guide chapters 02 and 06;
+  `docs/ia-map.md`; `tests/e2e/chrome.spec.ts`, `theme.spec.ts`, `typography.spec.ts`,
+  `a11y.spec.ts`; regenerated `a11y.json`, `js-bytes.json`, `measure.json` and 48 screenshots.
+- **Verified:**
+  - `make mobilebar`, against the compose stack, before and after. Header **148 → 104px at 320** and
+    **104 → 104 at 375, 420, 640, 700 and 1023**; bar **52px** at every one of them, from the one
+    `min-height` declaration that says so; the search box on screen with nothing opened at all
+    seven widths; smallest hit target **44px** on the bar and in the sheet. Desktop unchanged —
+    73.52px of header, 168.08px of sticky stack at 1280.
+  - **The sticky stack is back at 225.13px** at 640, 700 and 1023, which is ADR-0061's figure
+    against an 18rem (288px) token — 63px of headroom. The first version of the search row spent
+    half a rem of padding at each end and measured **233px**, which is 55px and under the 60
+    `sticky.spec.ts` requires an addition to argue past. A quarter rem each is what the 8px bought
+    back, and the failing test is what found it.
+  - **Contrast, both themes.** `uv run python scripts/contrast.py` — **20 pairs, 40 checks, 0
+    failures**, and `docs/verification/contrast.json` byte-identical: the bar and the sheet paint
+    `--ink` on `--panel`/`--page` with an `--edge` rule, all already declared. Computed for the
+    surfaces themselves: sheet **17.02:1 light / 15.17:1 dark**, bar **15.70 / 13.27**, sheet border
+    **4.36 / 5.76**, and the menu-row hover — `--ink` on `--rule`, which neither instrument declares
+    — **12.92 / 7.54**. The axe scan covers the same surfaces rendered: `menus-open` opens the sheet
+    at 375 in both themes and is unchanged.
+  - `make test` — **545 passed**. `make test-web` — **320 passed**, guide ratchet green with
+    ADR-0064 claimed by chapter 02, and every route still inside `docs/js-budgets.json` (`/app/`
+    17,770 → **17,845**; no ceiling raised — the first draft of the island was 18,155 and the
+    rationale moved to the frontmatter, which is ADR-0055's rule).
+  - `make test-e2e` — **497 passed, 2 skipped** (488 before), including all **272** a11y scans at
+    the same **8 route/rule pairs**.
+  - `make shots` — no page scrolls sideways at 320 or at 1280 zoomed to 200%; the one known reflow
+    (`/app/docs`, task A4) is unchanged.
+  - **Two defects the geometry probe found**, both in code this task rearranged. `.navdrop__summary`
+    was 32px wider than the sheet holding it — `width: 100%` plus 2rem of side padding on a
+    `<summary>` that computes `content-box`, which is ADR-0061's recorded trap in a horizontal form
+    nobody had met — so the Titles caret was drawn past the right edge of a panel whose
+    `overflow-y: auto` clips the other axis. It was invisible on every narrow window. And the bar's
+    wordmark took `:root[data-theme="dark"] a` at 0-2-1 over a two-class rule, coming out link-blue
+    in dark; that is the third component to need the three-class count.
+- **Adjacent, not fixed:**
+  - **The theme is reachable twice below 64em** — on the bar and in the sheet's DISPLAY group. The
+    Mobile section of the spec lists both and this implements both; they are one setting, stay in
+    step, and cannot disagree. Two controls for one thing on one screen is still worth a look in
+    use, and dropping the sheet's row is a one-line change.
+  - **`docs/verification/a11y.json` moves 1787 → 1955 nodes, and neither number is this session's.**
+    The whole difference is `/redoc at 375px in light`, a page `main.py` serves and the reader's
+    stylesheet cannot reach. Two consecutive full runs here gave 1955, which is what CLAUDE.md
+    records; session 42 recorded the same file as not reproducible run to run and saw 1787. The gate
+    is on (route, rule) pairs and those are unchanged at 8, but a node count in this artifact should
+    not be read as a measurement until the vendored bundle's variance is understood.
+  - **`measure.json`'s scroll heights were three sessions stale** — last written at `db0a642`, before
+    ADR-0061 took a band of chrome off every page. Most of the 14,717 → 13,954 at 375 is that, not
+    this. Worth adding `make measure` to whatever runs `make shots`, since both are page geometry
+    and only one of them is a gate.
+  - **`.navdrop--more` carries an `open` attribute nothing reads below 64em.** `SiteHeader`'s script
+    still treats it as one of the `[data-navmenu]` set and closes it; the CSS forcing its content
+    visible outranks that, so the attribute is inert rather than wrong. Excluding it from the set at
+    that width is tidier and was left alone.
+  - **The bar's hit targets are asserted, the search row's "i" is not.** It is an 18px glyph whose
+    target is grown past 44px with `::after`, which a bounding box cannot see; `chrome.spec.ts`
+    covers it by clicking 8px outside the circle, and `mobilebar.mjs` excludes it by name rather
+    than reporting a number it would have to caveat.
