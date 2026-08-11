@@ -495,6 +495,12 @@ class ClassificationEntry(Base):
     new_section_quote: Mapped[str | None] = mapped_column(String, nullable=True)  # 202 "1948"
     stat_volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
     stat_pages: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
+    # The Stat. cell's tokens verbatim, because not every page of the Statutes at
+    # Large is a number: 110 Stat. 1321-9 and 3009-587 are single pages, and 1,658
+    # of the 104th's 11,737 rows cite one, which `stat_pages` cannot hold. It also
+    # keeps a range distinguishable from its endpoints — `863-866` is one token
+    # here and two integers there.
+    stat_page_labels: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
 
 
 class EcctEntry(Base):

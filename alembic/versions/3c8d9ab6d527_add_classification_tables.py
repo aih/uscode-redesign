@@ -122,6 +122,14 @@ def upgrade() -> None:
             server_default=sa.text("'{}'::integer[]"),
             nullable=False,
         ),
+        # Verbatim tokens beside the integers: 110 Stat. 1321-9 is one page and not
+        # a number, and 1,658 of the 104th's rows cite one.
+        sa.Column(
+            "stat_page_labels",
+            postgresql.ARRAY(sa.String()),
+            server_default=sa.text("'{}'::character varying[]"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["file_id"], ["classification_files.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("file_id", "row_seq"),
