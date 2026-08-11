@@ -41,7 +41,12 @@ const ADR_DIR = fileURLToPath(new URL("../../docs/adr/", import.meta.url));
  * fetches (which is machinery behind a feature `06-working-with-text` does
  * cover). The guide itself is excluded for the obvious reason.
  */
-const UNDOCUMENTED_ROUTES = new Set(["/app/404", "/app/healthz", "/app/preview"]);
+/** Routes a reader never types and never sees in the address bar. The two
+ *  error pages are rendered *at* the URL that failed — 404 by Astro, 429 by
+ *  a rewrite in `middleware.ts` — so what they do is documented where the
+ *  thing that fails is documented, and neither owns a route a chapter could
+ *  sensibly claim. */
+const UNDOCUMENTED_ROUTES = new Set(["/app/404", "/app/429", "/app/healthz", "/app/preview"]);
 
 /** The guide does not document itself, chapter by chapter. */
 function isGuidesOwnRoute(route: string): boolean {

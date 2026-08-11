@@ -21,11 +21,12 @@ template — the surface that answers people is `/app`, and the bare citation UR
 
 from __future__ import annotations
 
-from typing import Annotated
+import re
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from api.diff import diff_ops
+from api.diff import cached_diff_ops, diff_ops, strip_guids
 from api.schemas import (
     CitationOut,
     CorpusStatusOut,
@@ -279,6 +280,34 @@ def _locate(
     return None, None
 
 
+#: `/us/usc/t5a/s3` — an appendix title followed straight by a flat section
+#: number. OLRC publishes no such identifier: 0 of the corpus's 461 appendix
+#: sections use this form (see `citeparse`'s class docstring). The real ones put
+#: the enacting law or act between the two, which is why matching on `/s` here
+#: cannot catch a reachable identifier.
+_FLAT_APPENDIX = re.compile(r"^/us/usc/t(\d+)a/s")
+
+
+def _appendix_hint(identifier: str) -> str | None:
+    """Why a flat appendix section resolves to nothing, or None.
+
+    Written against the identifier rather than against a `ParsedCitation`, so
+    the citation endpoint and the identifier lookup give the same answer to the
+    same question — a reader who types `5 USC App. 3` into the box and a reader
+    who lands on `/us/usc/t5a/s3` have made one mistake, not two.
+    """
+    match = _FLAT_APPENDIX.match(identifier)
+    if match is None:
+        return None
+    return (
+        f"Title {match.group(1)} Appendix is published under the law that enacted "
+        "each provision, not under a flat section number. Its identifiers look "
+        "like /us/usc/t5a/pl/92/463/s1 (by public law) or "
+        "/us/usc/t50a/act/1917-05-18/ch15/s212 (by act and date). This site "
+        f"cannot yet translate {identifier} into one of those."
+    )
+
+
 def _why_not(parsed: ParsedCitation) -> str | None:
     """Something specific to say when a well-formed citation resolves to nothing.
 
@@ -287,12 +316,7 @@ def _why_not(parsed: ParsedCitation) -> str | None:
     worse than "not found".
     """
     if parsed.appendix and parsed.kind != "title":
-        return (
-            f"Title {parsed.title_num.rstrip('a')} Appendix is published under the "
-            "law that enacted each provision, not under a flat section number — "
-            "its identifiers look like /us/usc/t5a/pl/92/463/s1. This site cannot "
-            f"yet translate {parsed.identifier!r} into one of those."
-        )
+        return _appendix_hint(parsed.identifier)
     return None
 
 
@@ -410,11 +434,24 @@ def diff(
         alias="from", description="Release point label to diff from.", examples=["119-99"]
     ),
     to: str = Query(description="Release point label to diff to.", examples=["119-102not101"]),
+    guids: Literal["strip", "keep"] = Query(
+        default="strip",
+        description=(
+            "Whether `@id` guids take part in the diff. They regenerate at every "
+            "release point by design (ADR-0003), so `strip` — the default — "
+            "compares what the section says. `keep` diffs the bytes as stored."
+        ),
+    ),
 ) -> DiffOut:
-    """Diffs the two release points' verbatim XML (docs/adr/0016): a generic
-    text diff, computed here because it needs no USLM vocabulary at all —
-    presentation (wrapping `ops` in `<ins>`/`<del>`) is `frontend/src/lib`'s
-    job, same as the section renderer itself."""
+    """Diffs the two release points' XML (docs/adr/0016): a generic text diff,
+    computed here because it needs no USLM vocabulary at all — presentation
+    (wrapping `ops` in `<ins>`/`<del>`) is `frontend/src/lib`'s job, same as the
+    section renderer itself.
+
+    `@id` guids are dropped before the comparison unless `guids=keep`. They are
+    regenerated at every release point whether or not the law changed (gotcha
+    1), so about half of what this endpoint used to report was identifier churn
+    — 31 of § 45f's 51 ops — and computing it was about half the cost."""
     path = normalize_identifier(identifier)
     title_num = title_num_from_identifier(path)
     from_resolved = resolve_release_or_404(
@@ -431,16 +468,35 @@ def diff(
     if to_section is None:
         raise HTTPException(status_code=404, detail=not_found(path, to_resolved))
 
-    if from_resolved.is_exact and to_resolved.is_exact:
+    pinned = from_resolved.is_exact and to_resolved.is_exact
+    if pinned:
         # Both endpoints pinned: the redline between two published release points
         # is as fixed as the two texts it is drawn from.
         response.headers["Cache-Control"] = IMMUTABLE
+
+    strip = guids == "strip"
+    from_xml = strip_guids(from_section.xml) if strip else from_section.xml
+    to_xml = strip_guids(to_section.xml) if strip else to_section.xml
+
+    # Memoised on the *resolved* labels, and only when both were pinned: an
+    # unpinned label names a different release point the moment a newer one is
+    # loaded, so caching under it would serve a redline for a pair the URL no
+    # longer means.
+    if pinned:
+        ops = cached_diff_ops(
+            (path, from_resolved.release.label, to_resolved.release.label, strip),
+            from_xml,
+            to_xml,
+        )
+    else:
+        ops = diff_ops(from_xml, to_xml)
 
     return DiffOut(
         identifier=path,
         from_=DiffSectionOut.of(from_section),
         to=DiffSectionOut.of(to_section),
-        ops=[DiffOpOut.of(op) for op in diff_ops(from_section.xml, to_section.xml)],
+        guids=guids,
+        ops=[DiffOpOut.of(op) for op in ops],
     )
 
 
@@ -514,7 +570,12 @@ def get_by_identifier(
     if toc is not None:
         return TocOut.of(toc, note=resolved.note)
 
-    raise HTTPException(status_code=404, detail=not_found(path, resolved))
+    # The one 404 this site can diagnose. Reaching the reader matters as much as
+    # reaching an API client: a bare "nothing here" reads as "this provision was
+    # never enacted", and the truth is that it exists under a different scheme.
+    hint = _appendix_hint(path)
+    detail = not_found(path, resolved)
+    raise HTTPException(status_code=404, detail=f"{detail} — {hint}" if hint else detail)
 
 
 def _section_response(

@@ -55,11 +55,19 @@ import { RateLimiter } from "./lib/ratelimit";
 const preview = new RateLimiter("preview", 60, 5);
 
 /**
- * The reader's redline. Tighter, because `documentDiff` holds the event loop for
- * a whole section and nothing prefetches this — a person reads one redline at a
- * time, and 30 a minute after a burst of 8 is well past attentive reading.
+ * The reader's redline. Still the tightest budget here — `documentDiff` holds
+ * the event loop for a whole section and nothing prefetches this — but no
+ * longer sized for a page three clicks away.
+ *
+ * ADR-0029 set it at 8 with 30 a minute after, when reaching a redline meant
+ * section → version history → pick two release points. ADR-0066 put "Compare
+ * with…" on every section header, so a comparison is now one click from any
+ * provision and a reader working through a chapter makes them at the rate they
+ * open sections. 20 with 60 a minute after is the same kind of bound — it still
+ * sheds a script walking the `?from=`/`?to=` axis, which is the traffic ADR-0037
+ * exists for — against a reader who now has a reason to ask more often.
  */
-const diff = new RateLimiter("diff", 8, 0.5);
+const diff = new RateLimiter("diff", 20, 1);
 
 /** `context.url.pathname` carries Astro's `base`, so these are full paths. */
 const LIMITED: ReadonlyArray<readonly [string, RateLimiter]> = [
@@ -94,7 +102,7 @@ function canonicalUrl(url: URL): URL | null {
   return clean;
 }
 
-export const onRequest = defineMiddleware((context, next) => {
+export const onRequest = defineMiddleware(async (context, next) => {
   if (context.request.method === "GET") {
     const clean = canonicalUrl(context.url);
     // `pathname + search` rather than the absolute URL: the reader sits behind
@@ -118,14 +126,40 @@ export const onRequest = defineMiddleware((context, next) => {
   const retryAfter = match[1].check(key);
   if (retryAfter === null) return next();
 
+  const headers = {
+    "Retry-After": String(Math.ceil(retryAfter)),
+    // A shed request is a fact about this caller at this moment, never a
+    // cacheable fact about the URL (ADR-0018).
+    "Cache-Control": "no-store",
+  };
+
+  // `/app/diff/` is limited and is a page a reader navigates to, so shedding it
+  // used to hand back plain text with no chrome and no way back — the dead end
+  // task B6 names. A navigation gets the error page at the URL it asked for;
+  // `/app/preview/`'s fetch does not send `Accept: text/html` and still gets the
+  // text body `CitePreview` was already handling by status (ADR-0041).
+  if ((context.request.headers.get("accept") ?? "").includes("text/html")) {
+    const rendered = await context.rewrite(
+      new Request(new URL("/app/429", context.url), {
+        // The page offers the way back to what was refused, and after the
+        // rewrite it can no longer see which URL that was.
+        headers: { "x-usc-wanted": wantedIdentifier(context.url.pathname) },
+      }),
+    );
+    const response = new Response(rendered.body, rendered);
+    for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
+    return response;
+  }
+
   return new Response("Too many requests. Please slow down and try again.", {
     status: 429,
-    headers: {
-      "Retry-After": String(Math.ceil(retryAfter)),
-      "Content-Type": "text/plain; charset=utf-8",
-      // A shed request is a fact about this caller at this moment, never a
-      // cacheable fact about the URL (ADR-0018).
-      "Cache-Control": "no-store",
-    },
+    headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
   });
 });
+
+/** `/app/diff/us/usc/t16/s45f` → `/us/usc/t16/s45f`. The identifier under a
+ *  limited route, or an empty string when the path carries none. */
+function wantedIdentifier(pathname: string): string {
+  const match = /^\/app\/(?:diff|preview)(\/us\/usc\/.+)$/u.exec(pathname);
+  return match ? match[1] : "";
+}

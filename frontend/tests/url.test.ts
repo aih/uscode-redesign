@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ancestorIdentifiers,
   apiDiffHref,
   apiHref,
   appHref,
@@ -269,5 +270,41 @@ describe("searchHref", () => {
   it("encodes the characters that would otherwise change the query", () => {
     expect(searchHref("11 U.S.C. § 523")).toContain("%C2%A7");
     expect(searchHref("a&b")).toContain("a%26b");
+  });
+});
+
+describe("ancestorIdentifiers", () => {
+  it("walks up from nearest to furthest and stops at the title", () => {
+    expect(ancestorIdentifiers("/us/usc/t16/s45f/c/5")).toEqual([
+      "/us/usc/t16/s45f/c",
+      "/us/usc/t16/s45f",
+      "/us/usc/t16",
+    ]);
+  });
+
+  it("offers the title for a section that does not exist", () => {
+    expect(ancestorIdentifiers("/us/usc/t16/s99999")).toEqual(["/us/usc/t16"]);
+  });
+
+  it("stops above the title rather than offering /us/usc, which is not an identifier", () => {
+    expect(ancestorIdentifiers("/us/usc/t16")).toEqual([]);
+    expect(ancestorIdentifiers("/us/usc")).toEqual([]);
+    expect(ancestorIdentifiers("/us")).toEqual([]);
+  });
+
+  it("refuses a path that is not a US Code identifier", () => {
+    expect(ancestorIdentifiers("/uk/legislation/t16/s1")).toEqual([]);
+    expect(ancestorIdentifiers("")).toEqual([]);
+  });
+
+  it("ignores a trailing slash rather than producing an empty last segment", () => {
+    expect(ancestorIdentifiers("/us/usc/t16/s45f/")).toEqual(["/us/usc/t16"]);
+  });
+
+  it("keeps the en dash OLRC actually publishes (gotcha 17)", () => {
+    expect(ancestorIdentifiers("/us/usc/t16/s45a\u20131/b")).toEqual([
+      "/us/usc/t16/s45a\u20131",
+      "/us/usc/t16",
+    ]);
   });
 });

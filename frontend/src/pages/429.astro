@@ -1,0 +1,32 @@
+---
+/**
+ * The rate limiter's page (ADR-0029).
+ *
+ * `/app/diff/` is limited and is a page a reader navigates to, so shedding it
+ * used to hand back `text/plain` with no chrome, no way back and no way to ask
+ * a different question. `middleware.ts` rewrites here instead when the request
+ * accepts HTML, which keeps the URL the reader asked for; a fetch — the hover
+ * card's, which reads the status and says "Preview unavailable" itself
+ * (ADR-0041) — still gets the plain text it was handling.
+ *
+ * `Retry-After` is on the response the middleware builds around this render.
+ */
+import Base from "../layouts/Base.astro";
+import ErrorPage from "../components/ErrorPage.astro";
+
+// `Cache-Control` and `Retry-After` are the middleware's, on the response it
+// builds around this render — it is the thing that knows how long to wait.
+Astro.response.status = 429;
+
+/** The identifier the shed request was for, handed over by the middleware so
+ *  the page can offer the way back to it. Absent when the URL carried none. */
+const wanted = Astro.request.headers.get("x-usc-wanted") ?? "";
+---
+
+<Base title="Too many requests · U.S. Code">
+  <ErrorPage
+    status={429}
+    detail="This page is rate limited, and you have reached the limit for the moment. Comparing two release points is the most expensive thing this site does. Wait a few seconds and try again."
+    identifier={wanted}
+  />
+</Base>

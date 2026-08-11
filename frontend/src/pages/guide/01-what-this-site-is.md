@@ -5,7 +5,7 @@ order: 1
 summary: A reader for the United States Code where every provision has an address, at every point in time it has existed.
 covers:
   routes: ["/app/", "/app/about", "/app/demo"]
-  adrs: [37, 38]
+  adrs: [37, 38, 65]
 ---
 
 This is a conceptual redesign of the [Office of the Law Revision Counsel](https://uscode.house.gov/)'s
@@ -24,6 +24,29 @@ The site also allows you to trace the history of a provision. The
 Code is republished in full at each **release point**, named for the last public law it includes.
 Add `?release=` or `?date=` to any address and you get that provision as it stood then, rather than
 as it stands now.
+
+## An address that answers nothing
+
+An address the site cannot answer says which release point it searched, because "no such provision"
+and "not at this release point" are different answers and only one of them means the address is
+wrong. Below that it offers the nearest address above the failed one that does exist, with the trail
+to it — a section that is not there offers its title; a bad subsection of a real section offers the
+section.
+
+```scenario
+id: notfound-offers-the-way-back
+title: A section that does not exist offers the title it would be in
+steps:
+  - goto: /app/us/usc/t16/s99999
+  - expect: { selector: ".lede", contains: "nothing at /us/usc/t16/s99999" }
+  - expect: { selector: ".deadend__step--last a", contains: "Title 16" }
+```
+
+Appendix titles are a case the site can name. `5 U.S.C. App. 3` parses to `/us/usc/t5a/s3`, and the
+Office of the Law Revision Counsel publishes no such address: appendix provisions are filed under
+the law that enacted them, at addresses like `/us/usc/t5a/pl/92/463/s1` or
+`/us/usc/t50a/act/1917-05-18/ch15/s212`. Asking for the flat form says so rather than answering
+"not found". This site cannot yet translate one form into the other.
 
 ## Landing page
 

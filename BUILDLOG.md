@@ -2249,3 +2249,110 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     target is grown past 44px with `::after`, which a bounding box cannot see; `chrome.spec.ts`
     covers it by clicking 8px outside the circle, and `mobilebar.mjs` excludes it by name rather
     than reporting a number it would have to caveat.
+
+## 066 — 2026-08-11 — Session 44: workstream B's last three tasks
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Pull `main`, reassess, then handle the open work in B5, B6 and B11.
+- **Decided:** [ADR-0065](docs/adr/0065-a-dead-end-says-where-else-to-go.md),
+  [ADR-0066](docs/adr/0066-compare-from-the-section-header.md), plus an addendum to ADR-0064
+  settling B11's item 1.
+
+  **B11 first, all six items**, because two of them are the instruments B5 and B6 would then be
+  measured with.
+
+  - **Item 3 — the a11y node count.** The mechanism is measured, not guessed: axe against an
+    unrendered `/redoc` reports **one** node, `html-has-lang`, off the server's own `<html>`; a
+    rendered one reports 174. `1955 - 1787 = 168` is one scan of seven losing the race between
+    `load` and the vendored bundle's first paint. A route may now declare `readyWhen`, a selector
+    the scan waits for — a wait rather than a longer timeout, because a page that never draws is a
+    scan of nothing and this suite would call it clean.
+  - **Item 4 — `make measure`.** Split. The characters-per-line check is a check and now runs in
+    `make test-e2e`, which CI runs on every push (four cases, 2.9 s); the scroll lengths gate
+    nothing and stay in the target, which now stamps the commit it measured. The measuring code
+    moved to `scripts/measure-lines.mjs` so the two cannot drift apart while both look right.
+  - **Item 5 — `--ink` on `--rule`.** Declared. Three rules paint it and `color-pairs.json` listed
+    `--rule` only as a divider. 12.92:1 light, 7.54:1 dark — the same numbers session 43 computed by
+    hand, now an instrument's. 21 pairs, 42 checks, 0 failures.
+  - **Item 6 — `.navdrop--more`'s inert `open`.** Fixed, and it was not only inert: closing More at
+    375 is invisible there and shows up at 1280, where the menu the reader left open has been shut
+    behind their back. The script now counts a `[data-navmenu]` as a menu only while its summary
+    passes `checkVisibility()`, asked per event.
+  - **Item 1 — the duplicated theme control.** **Both stay.** Measured with the sheet open at
+    320×768 and 375×812: 553px tall, no scrolling, the Dark row at y=498 — above the fold at both,
+    so the 44px is not taken from anything. What decides it is that the bar's copy has **no word**:
+    its label is `display: none` and the name is in `aria-label`, so the Display row is the only
+    place below 64em where `Dark` is on screen. `site.scss` already makes that argument for menu
+    rows, in the comment retiring ADR-0059's band-scoped rule.
+  - **Item 2 — the two shortcut debts.** `[` and `]` now write one sentence into a `role="status"`
+    region when a section has no top-level provisions, on screen as well as announced. The shortcut
+    list joins the More menu's Help group with `?` printed on it, the same
+    `<a>`-intercepted-by-the-island shape the footer uses.
+
+  **B6 — dead ends.** The nearest resolving ancestor with its trail, rendered in the page body
+  rather than through `Breadcrumbs`, because the chrome's trail says *where you are* and this names
+  somewhere the reader is not. A provision absent at one release point but present at others says
+  when. One appendix explanation, named from the identifier and given by both surfaces, naming both
+  real forms. A shed `/app/diff/` is rewritten to `/app/429` at the URL it asked for. **No search
+  box on the error page** — a deliberate narrowing of what B6 asked for, since this site has one box
+  and it is in the chrome at every width. **The redirects table gotcha 3 suggests is declined**, and
+  the ADR says what would be needed to build it honestly.
+
+  **B5 — compare in two clicks.** `CompareWith` on every section header. The default is the last
+  release point that held *different* text, from the version timeline — **not `content_first_seen`**,
+  which does not mean what it is called. `?at=/c/5` rides through both routes and the redline marks
+  that provision inside the whole section. The API diff drops `@id` by default and memoises on the
+  resolved pair.
+- **Produced:** `docs/adr/0065-*.md`, `docs/adr/0066-*.md`; `api/diff.py`, `api/routes.py`,
+  `api/schemas.py`; `frontend/src/lib/compare.ts`, `frontend/src/components/CompareWith.astro`,
+  `frontend/src/pages/429.astro`, `frontend/scripts/measure-lines.mjs`,
+  `frontend/tests/e2e/{compare,deadend,shed}.spec.ts`, `frontend/tests/e2e/ratelimited.ts`,
+  `frontend/tests/compare.test.ts`, `scripts/diffcost.py` + a `make diffcost` target;
+  `docs/verification/diffcost.json`; guide chapters 01, 02, 04 and 08; `docs/a11y/routes.json`,
+  `docs/js-budgets.json`, `CLAUDE.md`. Twelve commits, `d2477eb`..`29f3950`.
+- **Verified:**
+  - `make test` — **558 passed** (545 before). `make test-web` — **346 passed** (320 before).
+    `make test-e2e` — **536 passed, 2 skipped** (497 before), including all **272** a11y scans.
+  - `make shots` — no page scrolls sideways at 320 or at 1280 zoomed to 200%; the one known reflow
+    (`/app/docs`, task A4) is unchanged.
+  - `uv run python scripts/contrast.py` — **21 pairs, 42 checks, 0 failures**.
+  - `make measure` — median **67** characters at 768 and 1280 in both densities, unchanged. Every
+    scroll height **+40px**, uniformly across three sections and two widths: the Compare chip,
+    closed. Attributable because the file now names the commit.
+  - `make mobilebar` — unchanged in every figure: header 104px at 375–1023, bar 52px, sticky stack
+    225.13px, smallest hit target 44px.
+  - `make diffcost` — § 45f 492.1 ms → 3.3, § 1801 500.9 → 3.5, § 1536 **4,063.9 → 1.8**, § 668dd
+    3,216.1 → 7.2; ops 124 → 5, 195 → 3, 362 → 5, 399 → 3.
+  - `docs/verification/a11y.json` — **8 route/rule pairs over 1,990 nodes**, up from 1,955.
+- **Corrections to earlier claims in this session:**
+  - Commit `d2477eb` said the readiness wait "pins the number rather than moving it". It moved it:
+    `/redoc`'s `color-contrast` goes **166 → 171 nodes per scan**, uniformly across all seven, so the
+    total is 1,990 rather than 1,955. The probe behind that claim ran at one viewport and caught less
+    of ReDoc than the suite does. The claim that mattered — that every scan now reports the same
+    number — holds.
+  - The first draft of `CompareWith` used `section.content_first_seen` and shipped a default that
+    produced "No changes" on § 45f. `content_first_seen` follows the stored fragment's
+    `first_release_id`, and an incremental load can attach an earlier release point to a row without
+    lowering it, so it is not the earliest release holding that text. The version timeline's
+    `releases` is. The test now asserts the redline the default reaches is **not** empty.
+- **Adjacent, not fixed:**
+  - **The reader's diff limiter went 8/0.5s → 20/1s**, and the trigger was the browser suite shedding
+    its own requests. The argument in ADR-0066 is that a comparison is now one click from every
+    section where it used to be three, so a reader has reason to ask more often — but the change was
+    *found* by a test failure, and it is worth re-deriving from a measurement of what the reader's
+    diff page actually costs rather than from what the suite happens to need.
+  - **`docs/verification/loadtest.json` is now stale for `/app/diff` three times over** — ADR-0026
+    moved the reader off the endpoint, ADR-0066 made the endpoint 150–2,000× cheaper, and the
+    reader's own limiter changed. Regenerating it needs the deployed box.
+  - **Nothing pages the "Compare with…" select.** A title with 381 release points puts 380 options in
+    the markup of every section page — the debt `docs/ia-map.md` already records against the release
+    switcher, now carried twice on the same page.
+  - **The section page makes a sixth API call.** `/versions` is in the existing `Promise.all` and
+    warm answers in ~8 ms, so it costs no wall clock — but that was measured against the local
+    corpus, not the deployed one.
+  - **`elsewhen` fires on no case the CI corpus contains.** Every Title 16 section sampled exists
+    from the earliest release point, so the only local trigger is a `?date=` before the corpus
+    starts. On the deployed 58-title corpus it will fire on the case gotcha 3 describes, and there is
+    no scenario for it here.
+  - **`previewHref` still has no caller** — unchanged from session 43, and still a reader href built
+    outside `url.ts` against architecture rule 5.

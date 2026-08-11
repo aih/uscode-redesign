@@ -2,28 +2,27 @@
 
 Paste `00-CONVENTIONS.md` above any task prompt, then this file, then the task you want.
 
-**To resume in a new session, one line:**
-
-> Read `CLAUDE.md` and `claude-code/WORKSTREAM-B-STATE.md`, then do task B5.
+**Workstream B is complete.** B1–B6 and B7–B11 have all landed. What is left on this workstream is
+the re-measurement noted under "Candidate tasks" below, which needs the deployed box.
 
 ---
 
 ## Where the work is
 
-**Merged.** B1–B3 landed on `main` in PR #24 (`8e7a21c`) and deployed. Work continues on `main`
-until the next branch is cut. Working tree clean apart from untracked `claude-code/`.
+**Merged.** B1–B3 landed in PR #24, B7–B10 in PRs #38 and #39. B5, B6 and B11 are on branch
+`b5-b6-b11`, twelve commits, `d2477eb`..`611d17c`.
 
 All suites green as of the last commit:
 
 | suite | count |
 |---|---|
-| `make test` | 527 |
-| `make test-web` | 271 |
-| `make test-e2e` | 386 passed, 2 skipped (258 of them the a11y scan) |
+| `make test` | 558 |
+| `make test-web` | 346 |
+| `make test-e2e` | 536 passed, 2 skipped (272 of them the a11y scan) |
 | `make shots` | reflow clean at 320 CSS px and 1280@200% |
 
-`docs/verification/a11y.json`: **8 route/rule pairs over 1,794 nodes** — unchanged from the ADR-0039
-baseline, and everything in it is still `docs/a11y/known-violations.json`'s.
+`docs/verification/a11y.json`: **8 route/rule pairs over 1,990 nodes**, and everything in it is still
+`docs/a11y/known-violations.json`'s. The node count is reproducible run to run since session 44.
 
 ## Done: B1, B2
 
@@ -161,12 +160,38 @@ drifted and builds beside the live index, so search stays up. `deploy-on-box.sh`
 failure it prevents is silent — a field the new code queries and the old index lacks is *absent, not
 broken*, so `title:16` returns an empty page that looks like a title with nothing in it.
 
-## Remaining: B5, B6
+## Done: B5, B6, B11 (session 44)
 
-**B5** ("Compare with…" on the section header — `/app/diff` is still two hops from the text it
-compares, and the **5.1 s** API diff is its cost problem), **B6** (dead ends).
+**B11 — the chrome's six loose ends** (all six; item 1 settled as an ADR-0064 addendum, item 6 as a
+fix). The a11y node count is reproducible — a route may declare `readyWhen` and the two vendored
+bundles do, because a scan that lost the race against their own first paint reported **one** node
+where a rendered one reports 174. `make measure` is split: the character-count check runs in
+`make test-e2e` on every push, the scroll lengths stay in the target and name the commit they were
+taken at. `--ink` on `--rule` is a declared pair (12.92:1 / 7.54:1). `.navdrop--more`'s `open` was
+not merely inert — closing it at 375 is invisible and shows up at 1280. The theme control stays in
+both places, on a measurement and on the fact that the bar's copy carries no word. `[` and `]` say
+why they did nothing, and the shortcut list is in the Help menu.
+
+**B6 — dead ends** (ADR-0065). The nearest resolving ancestor with its trail; a provision absent
+here saying when it is present; one appendix explanation given by both surfaces, naming both real
+forms; and `/app/429`, a shed diff rendered as a page at the URL it asked for. **No search box on
+the error page** and **the redirects table declined** — both deliberate, both in the ADR.
+
+**B5 — compare in two clicks** (ADR-0066). `CompareWith` on every section header, defaulting to the
+last release point that held *different* text. `?at=` carries the provision through and the redline
+marks it inside the whole section. The API diff drops `@id` by default and memoises on the resolved
+pair: **§ 1536 4,063.9 ms → 1.8 ms**, 399 ops → 3 on § 668dd (`make diffcost`).
 
 ## Standing decisions — do not silently reverse these
+
+0. **The compare default is read from the version timeline, never from `content_first_seen`.** That
+   field follows the stored fragment's `first_release_id` and an incremental load can attach an
+   earlier release point to a row without lowering it, so on real data § 45f's newest group reports
+   `first_seen: 119-99` while its own `releases` run from `117-80`. Using it ships a "Compare with…"
+   whose default produces "No changes", which looks exactly like a broken feature. `versions[].releases`
+   comes from `section_release_map` and is authoritative. `compare.test.ts` pins this.
+
+
 
 1. **The release switcher is not in the sticky chrome, and that is measured.** Before the move the
    stack had 19px of headroom under `--sticky-h` at 700px and 55px at 1280px; the date field costs
@@ -236,6 +261,16 @@ compares, and the **5.1 s** API diff is its cost problem), **B6** (dead ends).
 - **The box's own throughput ceiling is unmeasured.** At C=8 over a ~120 ms round trip the ceiling is
   8 ÷ 0.12 ≈ 65 rps as arithmetic, and every fast row sits just under it — so those rows describe the
   link, not the box. Measuring the box needs a load generator running on it.
+- **`docs/verification/loadtest.json` is stale for `/app/diff` three times over** — ADR-0026 moved the
+  reader off the API endpoint, ADR-0066 made that endpoint 150–2,000x cheaper, and the reader's own
+  limiter went 8/0.5s to 20/1s. Regenerating it needs the deployed box (`make loadtest BASE=…`), and
+  it is the one measurement this workstream still owes.
+- **The reader's diff limiter was resized on an argument, not a measurement.** ADR-0066 argues a
+  comparison is now one click where it was three, so a reader asks more often — but the change was
+  found by the browser suite shedding its own requests. Worth re-deriving from what `/app/diff`
+  actually costs.
+- **Nothing pages the "Compare with…" select** — 380 options in the markup of every section page on a
+  full corpus, which is the release-switcher debt now carried twice on one page.
 - **`scripts/loadtest.sh` speaks HTTP/1.1** — `hey` has an `-h2` flag and the script does not pass it,
   while `navprofile.py` negotiates h2 through curl. The two artifacts' latencies are not directly
   comparable until it does.
@@ -259,6 +294,14 @@ docs/adr/0044                           release context, and the switcher that k
 docs/adr/0049                           the measured ranking, and the scopes
 docs/adr/0050                           the pinned rail
 docs/adr/0051                           the index rebuilds itself (there is no ADR-0048)
+docs/adr/0065                           a dead end says where else to go
+docs/adr/0066                           compare from the section header, and the guid-free diff
+docs/verification/diffcost.json          what the API redline costs, with and without the guids
+scripts/diffcost.py                      make diffcost — times the diff in process, past the limiter
+frontend/src/lib/compare.ts              which release point to compare with, and why not the previous
+frontend/src/components/CompareWith.astro
+frontend/src/pages/429.astro             the shed-request page the middleware rewrites to
+frontend/tests/e2e/shed.spec.ts          its own Playwright project: it empties a global bucket
 frontend/src/layouts/Base.astro         where the chrome is assembled
 frontend/src/components/ChapterRail.astro
 frontend/src/components/ReleaseContext.astro   replaces the deleted Provenance.astro
@@ -268,6 +311,7 @@ frontend/tests/e2e/sticky.spec.ts       the headroom the switcher's move bought
 frontend/scripts/scenarios.mjs          the scenario DSL, now with a `select` verb
 ```
 
-Guide chapters claiming these ADRs: **02** (`reading`) holds 43; **03**
-(`reading-at-a-point-in-time`) holds 44. A new ADR turns `make test-web` red until some chapter
+Guide chapters claiming these ADRs: **02** (`reading`) holds 43 and 64; **03**
+(`reading-at-a-point-in-time`) holds 44; **01** (`what-this-site-is`) holds 65; **04**
+(`version-history-and-redlines`) holds 66. A new ADR turns `make test-web` red until some chapter
 claims it.

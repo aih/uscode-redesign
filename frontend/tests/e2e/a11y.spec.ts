@@ -50,6 +50,19 @@ interface Route {
   path: string;
   name: string;
   expectStatus?: number;
+  /**
+   * A selector the scan waits for before running axe, for a page whose content
+   * is drawn by its own script rather than sent as markup.
+   *
+   * `load` on such a page fires on the shell, and axe then measures however much
+   * of it had painted. On the two vendored bundles (ADR-0032) that is the whole
+   * difference between a scan worth 169 nodes and one worth 1: unrendered, the
+   * only rule that fires is `html-has-lang`, which reads the server's own
+   * `<html>`. It is a race the settle timeout below usually wins and does not
+   * always, which is what made the node count in `docs/verification/a11y.json`
+   * differ between runs of identical code.
+   */
+  readyWhen?: string;
 }
 
 /**
@@ -170,6 +183,14 @@ async function open(page: Page, route: Route, theme?: string): Promise<void> {
   const response = await page.goto(route.path, { waitUntil: "load" });
   const expected = route.expectStatus ?? 200;
   expect(response?.status(), `${route.path} answered unexpectedly`).toBe(expected);
+  if (route.readyWhen) {
+    // Not a settle timeout: a page that never draws is a scan of nothing, and
+    // this suite would report it as a clean one.
+    await page
+      .locator(route.readyWhen)
+      .first()
+      .waitFor({ state: "attached", timeout: 20_000 });
+  }
   // The islands settle after paint — the watch widget resolves to one button,
   // the copy column injects itself. Scanning before that measures a page no
   // reader ever sees. `make shots` waits for the same reason.

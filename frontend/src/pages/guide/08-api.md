@@ -39,6 +39,12 @@ steps:
 `?release=` and `?date=` work exactly as they do in the reader, and `?format=xml` returns the
 **source USLM verbatim** — the OLRC's own markup for that section, unmodified.
 
+On `/api/v1/sections/{identifier}/diff`, `?guids=` takes `strip` or `keep` and defaults to `strip`.
+`@id` guids are regenerated at every release point whether or not the text changed, so `strip`
+removes them before comparing and the ops describe what the section says. `keep` compares the two
+fragments as stored, and its ops reassemble either side byte for byte. The response carries the
+`guids` field naming which it did.
+
 On `/api/v1/search`, `?sort=` takes `relevance`, `citation` or `recent`; `?limit=` is 1 to 100 and
 defaults to 20; `?offset=` runs to 1000.
 

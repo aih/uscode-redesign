@@ -5,7 +5,7 @@
  * (Caddy in front, ADR-0015), `localhost:8000` for `npm run dev`'s own proxy.
  */
 
-import { API } from "./url";
+import { API, ancestorIdentifiers } from "./url";
 import type {
   Citation,
   Diff,
@@ -215,6 +215,49 @@ export async function fetchSearch(
  * second, hand-written description of the API to drift out of date. */
 export async function fetchOpenApi(): Promise<OpenApiSchema> {
   return getJson<OpenApiSchema>("/openapi.json");
+}
+
+/**
+ * The nearest identifier above a failed one that does resolve, with the trail
+ * to it — what a 404 offers instead of only "start from the top".
+ *
+ * Tries `ancestorIdentifiers()` nearest first and stops at the first hit, so a
+ * mistyped subsection of a real section leads back to that section rather than
+ * to the whole title. Every call is allowed to fail: this runs on a page that
+ * is already an error, and a second error while explaining the first should
+ * cost the reader nothing.
+ *
+ * Returns null when nothing above it resolves either — an identifier whose
+ * title does not exist has no trail to offer, and inventing one would point at
+ * another 404.
+ */
+export async function nearestAncestor(
+  identifier: string,
+  params: ReleaseParams = {},
+  /** Try the identifier itself before its ancestors. For a status that does not
+   *  mean "this does not exist" — a shed 429 refused the *work*, and the
+   *  provision it was asked about is very likely still there. */
+  includeSelf = false,
+): Promise<{ entry: Entry; crumbs: Entry[] } | null> {
+  const chain = includeSelf
+    ? [identifier, ...ancestorIdentifiers(identifier)]
+    : ancestorIdentifiers(identifier);
+  for (const candidate of chain) {
+    let body: Section | Toc;
+    try {
+      body = await fetchIdentifier(candidate, params);
+    } catch {
+      continue;
+    }
+    if (isToc(body)) {
+      return { entry: body.node, crumbs: body.ancestors };
+    }
+    return {
+      entry: { identifier: body.identifier, num: body.num, heading: body.heading, level: "section" },
+      crumbs: body.ancestors ?? [],
+    };
+  }
+  return null;
 }
 
 /** The section's change timeline — the version page's own data (Day 4). */

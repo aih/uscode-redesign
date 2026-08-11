@@ -18,6 +18,7 @@ import CitePreview from "../../../components/CitePreview.astro";
 import CopyColumn from "../../../components/CopyColumn.astro";
 import Neighbors from "../../../components/Neighbors.astro";
 import SectionContents from "../../../components/SectionContents.astro";
+import CompareWith from "../../../components/CompareWith.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import WatchButton from "../../../components/WatchButton.astro";
 import {
@@ -26,6 +27,7 @@ import {
   fetchLabels,
   fetchNeighbors,
   fetchToc,
+  fetchVersions,
   releaseParams,
 } from "../../../lib/api";
 import { REVALIDATE, setPublicCache } from "../../../lib/cache";
@@ -33,6 +35,7 @@ import { ACCOUNTS_ENABLED } from "../../../lib/features";
 import { sectionCommands } from "../../../lib/palette";
 import { cachedReleases } from "../../../lib/releasecache";
 import { citedIdentifiers } from "../../../lib/refs";
+import { comparableReleases, previousChangedRelease } from "../../../lib/compare";
 import type {
   Entry,
   Labels,
@@ -40,6 +43,7 @@ import type {
   Release,
   Section,
   Toc,
+  Versions,
 } from "../../../lib/types";
 import { isToc } from "../../../lib/types";
 import {
@@ -93,6 +97,9 @@ let sectionHtml = "";
 /** One rendered body per further occurrence the source published under this same
  *  identifier — normally empty (ADR-0021). */
 let duplicateHtml: string[] = [];
+/** The section's change timeline, for the "Compare with…" default. Null when
+ *  the call failed. */
+let timeline: Versions | null = null;
 let toc: Toc | null = null;
 let section: Section | null = null;
 let titleNum: string | null = null;
@@ -153,7 +160,7 @@ if (body && isToc(body)) {
   // that 500ed with its text sitting in memory. The parent TOC is the other,
   // for the same reason: without it the reader loses the rail and still has the
   // section, the sticky bar and the neighbours.
-  [labels, neighbors, releases, parentToc] = await Promise.all([
+  [labels, neighbors, releases, parentToc, timeline] = await Promise.all([
     fetchLabels(
       citedIdentifiers([fragment, ...dupFragments].flatMap((f) => hrefs(f))),
       selected,
@@ -169,6 +176,14 @@ if (body && isToc(body)) {
           return null;
         })
       : Promise.resolve(null),
+    // The third call allowed to fail, and for the same reason: without it the
+    // "Compare with…" default is missing and the reader still has the statute.
+    // It runs in this batch rather than after it, so it costs the page nothing
+    // in wall clock — the same finding ADR-0043's fourth call was measured on.
+    fetchVersions(section.identifier).catch((error) => {
+      console.error(`versions for ${section.identifier}:`, error);
+      return null;
+    }),
   ]);
 
   crumbs = section.ancestors ?? [];
@@ -199,6 +214,17 @@ const remainder = section ? identifier.slice(section.identifier.length) : "";
 const picker =
   releases.length > 0 && body
     ? { action: appHref(identifier), options: releases, selected }
+    : null;
+/** "Compare with…" — the offer and the list behind it (task B5, ADR-0066).
+ *  Both come out of `releases`, which is already in hand for the switcher
+ *  (ADR-0045 caches it per title), so the control costs no extra call. */
+const compareOptions = section ? comparableReleases(selected, releases) : [];
+const compare =
+  section && compareOptions.length > 0
+    ? {
+        previous: previousChangedRelease(timeline?.versions ?? [], selected),
+        options: compareOptions,
+      }
     : null;
 const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
 /** The last crumb: the thing on screen, unlinked. `ancestors` stops at the
@@ -285,7 +311,7 @@ const releaseContext = served
     )
   }
 
-  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} identifier={identifier} />}
 
   {
     section && (
@@ -301,6 +327,16 @@ const releaseContext = served
             Version history — every release point where this text changed
           </a>
         </p>
+
+        {compare && (
+          <CompareWith
+            identifier={section.identifier}
+            selected={selected}
+            previous={compare.previous}
+            options={compare.options}
+            provision={remainder || null}
+          />
+        )}
 
         {/* Same reasoning as the navbar's account control: an island that can
             only ever be told 401 is a request per page view for nothing. */}

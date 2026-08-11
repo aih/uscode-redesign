@@ -332,6 +332,12 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
         `KeyboardNav`'s opens the help dialog on the same click. */}
     <CommandPalette commands={commands} />
     <ShortcutsDialog />
+    {/* What a shortcut says when it did nothing. `[` and `]` on a section with
+        no top-level provisions — a one-paragraph repeal — used to be silent,
+        which is indistinguishable from a key that is not bound. Polite, so it
+        does not interrupt; on screen as well as announced, because a sighted
+        reader pressing a key that appears dead needs the same sentence. */}
+    <p class="keysay" id="keysay" role="status" aria-live="polite"></p>
     <KeyboardNav
       previous={bar?.previous}
       next={bar?.next}

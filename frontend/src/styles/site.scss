@@ -1085,6 +1085,53 @@
   text-decoration: underline;
 }
 
+/* What a keyboard shortcut says when it found nothing to do. Fixed to the foot
+ * of the viewport, because it answers a key that was just pressed and the
+ * reader is looking wherever they were — not at the top of the document, and
+ * not at the footer.
+ *
+ * Empty most of the time, and `:empty` takes it out of the layout entirely: a
+ * `role="status"` region has to be in the document before the text arrives or
+ * the announcement is missed, so it cannot be conditionally rendered, and a
+ * permanently present empty box at the foot of every page is a 1.1rem strip
+ * nothing is in. */
+.keysay {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(30rem, calc(100vw - 2rem));
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 0.25rem;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+
+.keysay:empty {
+  display: none;
+}
+
+/* The accelerator on the shortcuts row, at the far end of it the way a desktop
+ * menu prints one. Its own `--panel` against the panel's `--page` so it reads
+ * as a key rather than as text, in both themes and on a hovered row — where the
+ * row goes to `--rule` and this does not. */
+.navdrop__kbd {
+  margin-left: auto;
+  padding: 0.05rem 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0.2rem;
+}
+
 .navdrop__num {
   flex: none;
   font-weight: 600;
@@ -2703,6 +2750,196 @@ main[id] {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+/* The provision a comparison was asked about, marked inside the whole
+ * section's redline (task B5). A left edge and a tint rather than a background
+ * on the text: the lines already carry `<ins>`/`<del>` colour, and a second
+ * fill under them would be two meanings on one surface. */
+.diff-line--focus {
+  border-left: 3px solid var(--target-edge);
+  padding-left: 0.5rem;
+  background: var(--panel);
+}
+
+.diff-focusnote {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  background: var(--panel);
+  border-left: 3px solid var(--target-edge);
+}
+
+/* "Compare with…" on the section header (task B5, ADR-0066). A `<details>` in
+ * the page body — not the sticky bar, which `ReleasePicker` owns and which
+ * `--sticky-h` budgets. The chip is `.rpswitch__summary`'s vocabulary so the
+ * two disclosures on a section page read as the same kind of control. */
+.compare {
+  margin: 0 0 1rem;
+  position: relative;
+  max-width: var(--measure);
+}
+
+.compare__summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  color: var(--link);
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid var(--rule);
+  border-radius: 0.15rem;
+  list-style: none;
+}
+
+/* Safari draws its own triangle through a pseudo-element `list-style` does not
+ * reach. */
+.compare__summary::-webkit-details-marker {
+  display: none;
+}
+
+.compare__summary::after {
+  content: "▾";
+  color: var(--muted);
+  margin-left: 0.15rem;
+}
+
+.compare[open] > .compare__summary::after {
+  content: "▴";
+}
+
+.compare__summary:hover {
+  background: var(--field);
+  border-color: var(--edge);
+}
+
+.compare__summary:focus-visible {
+  outline: 0.25rem solid var(--target-edge);
+  outline-offset: 0;
+}
+
+/* In flow rather than absolute, unlike `.rpswitch__panel`: nothing here is
+ * pinned, so pushing the statute down while the panel is open costs the reader
+ * nothing and avoids a second overlay to keep off the sticky bar. */
+.compare__panel {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 0.25rem;
+}
+
+.compare__default {
+  margin: 0 0 0.75rem;
+}
+
+.compare__go {
+  font-family: var(--ui);
+  font-weight: 600;
+}
+
+.compare__hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.compare__hint--none {
+  margin: 0 0 0.75rem;
+}
+
+.compare__label {
+  margin-top: 0;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+}
+
+.compare__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.compare__select {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* USWDS gives `.usa-button` `width: 100%` below 480px, which at 320 takes the
+ * whole row and squeezes the select beside it to nothing — ADR-0056's trap, met
+ * again on a second two-control row. */
+.compare__submit {
+  flex: none;
+  width: auto;
+  margin-right: 0;
+}
+
+/* The way back from a dead end: the nearest identifier above the failed one
+ * that resolves, with the trail to it. A list rather than the sticky
+ * `Breadcrumbs` component, because it describes somewhere the reader is *not* —
+ * putting it in the chrome would say this page is at that position in the Code,
+ * and the page is a 404. */
+.deadend {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+}
+
+.deadend__heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.deadend__trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--ui);
+  font-size: 0.95rem;
+}
+
+/* The separator is drawn between items rather than after them, so the trail
+ * does not end on one. `--wrap` shows the whole trail at every width, the same
+ * reason `.usa-breadcrumb`'s own 480px-and-up separator had to be replaced. */
+.deadend__step + .deadend__step::before {
+  content: "›";
+  margin-right: 0.5rem;
+  color: var(--muted);
+}
+
+.deadend__step--last a {
+  font-weight: 600;
+}
+
+.deadend__elsewhen {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.deadend__else {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 .cite {

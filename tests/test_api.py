@@ -566,6 +566,51 @@ def test_an_appendix_title_follows_its_parent(client):
             assert nums.index(parent) == nums.index(appendix) - 1, appendix
 
 
+def test_an_appendix_section_404_explains_the_scheme(client):
+    """Gotcha 7 plus `citeparse`'s own finding: `5 U.S.C. App. 3` parses to
+    `/us/usc/t5a/s3` and OLRC publishes no such identifier — 0 of the corpus's
+    461 appendix sections use the flat form. A bare "nothing here" reads as
+    "never enacted", when the truth is that it is filed under the law that
+    enacted it."""
+    response = client.get(f"{API}/us/usc/t5a/s3")
+    assert response.status_code == 404
+
+    detail = response.json()["detail"]
+    assert "Title 5 Appendix is published under the law that enacted" in detail
+    # Both real forms, which is what makes the sentence actionable.
+    assert "/us/usc/t5a/pl/92/463/s1" in detail
+    assert "/us/usc/t50a/act/1917-05-18/ch15/s212" in detail
+    # And it still says which release point was searched.
+    assert "release point" in detail
+
+
+def test_the_citation_endpoint_gives_the_same_appendix_answer(client):
+    """One rule, asked twice. A reader who types the citation into the box and a
+    reader who lands on the identifier have made one mistake, not two."""
+    message = client.get(f"{API}/citation", params={"q": "5 USC App. 3"}).json()["message"]
+    detail = client.get(f"{API}/us/usc/t5a/s3").json()["detail"]
+
+    assert message is not None
+    assert message in detail
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    [
+        "/us/usc/t5a/pl/92/463/s1",  # the real public-law form
+        "/us/usc/t16/s99999",  # an ordinary title
+        "/us/usc/t5a",  # the appendix title itself, which is a real node
+    ],
+)
+def test_the_appendix_explanation_is_not_offered_where_it_does_not_apply(client, identifier):
+    """It fires on the flat form alone. Attaching it to a real appendix
+    identifier that merely failed for another reason would be a confident
+    invented reason, which is worse than "not found"."""
+    response = client.get(f"{API}{identifier}")
+    if response.status_code == 404:
+        assert "published under the law that enacted" not in response.json()["detail"]
+
+
 def test_ingested_titles_are_ordered_too(client):
     """The same list, reached by a different route (`/app/releases` renders it),
     and so the same bug — `ingested_titles` is the unpadded form."""

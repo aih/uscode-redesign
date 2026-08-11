@@ -25,9 +25,23 @@ import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { IMMUTABLE, REVALIDATE } from "../../lib/cache";
-import { documentDiff, diffLinesHtml, diffSummary, sourceDelta } from "../../lib/diffdoc";
+import {
+  documentDiff,
+  diffLinesHtml,
+  diffSummary,
+  focusSummary,
+  hasFocus,
+  sourceDelta,
+} from "../../lib/diffdoc";
 import type { DocumentDiff, SourceDelta } from "../../lib/diffdoc";
-import { apiDiffHref, appHref, diffHref, trimNum, versionsHref } from "../../lib/url";
+import {
+  apiDiffHref,
+  appHref,
+  diffHref,
+  provisionLabel,
+  trimNum,
+  versionsHref,
+} from "../../lib/url";
 import { sourceRedline } from "../../lib/xmlredline";
 import { parseFragment, readingBlocks } from "../../lib/uslm";
 import type { Entry, Section } from "../../lib/types";
@@ -38,6 +52,12 @@ import { isToc } from "../../lib/types";
 const identifier = `/${Astro.params.identifier ?? ""}`.replace(/\/+$/u, "");
 const from = Astro.url.searchParams.get("from");
 const to = Astro.url.searchParams.get("to");
+/** The sub-section this comparison is *about*, when it came from a provision
+ *  page (task B5). A query parameter rather than a fragment, because the
+ *  redline is built here and a fragment never leaves the browser. The whole
+ *  section is still rendered — ADR-0001 — and this decides what is marked. */
+const at = Astro.url.searchParams.get("at");
+const focus = at ? `${identifier}${at}` : null;
 
 let before: Section | null = null;
 let after: Section | null = null;
@@ -91,6 +111,9 @@ Astro.response.headers.set("Cache-Control", pinned ? IMMUTABLE : REVALIDATE);
 // can pivot to a different pair without going back to the timeline page.
 const versions = after ? await fetchVersions(identifier).catch(() => null) : null;
 const entries = versions?.versions ?? [];
+
+/** Did the asked-about provision appear in either text? */
+const focused = diff !== null && hasFocus(diff.lines, focus);
 
 const unchanged = diff !== null && diff.changed === 0 && diff.inserted === 0 && diff.deleted === 0;
 
@@ -154,7 +177,7 @@ const currentCrumb: Entry | null = after
 ---
 
 <Base title={title} crumbs={crumbs} current={currentCrumb}>
-  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} identifier={identifier} />}
 
   {
     before && after && diff && (
@@ -179,6 +202,26 @@ const currentCrumb: Entry | null = after
           <strong>{after.release.label}</strong>.{" "}
           <strong class="diff-verdict">{diffSummary(diff)}.</strong>
         </p>
+
+        {/* A comparison that came from a provision page says what it did with
+            that provision, and says it before the redline rather than leaving
+            the reader to find the highlight. */}
+        {focus && (
+          <p class="diff-focusnote">
+            {focused ? (
+              <>
+                Marked below: <strong>{provisionLabel(at ?? "")}</strong>.{" "}
+                {focusSummary(diff.lines, focus)}{" "}
+                <a href="#diff-focus">Jump to it</a>.
+              </>
+            ) : (
+              <>
+                There is no <strong>{provisionLabel(at ?? "")}</strong> in this section at either
+                release point, so the whole section is shown unmarked.
+              </>
+            )}
+          </p>
+        )}
 
         {/* One line, and only where there is something behind the link. Which
             of `sourceDelta`'s two differing cases it is — guids alone, or an
@@ -252,7 +295,7 @@ const currentCrumb: Entry | null = after
           </form>
         )}
 
-        <div class="diff-view diff-view--text" set:html={diffLinesHtml(diff.lines)} />
+        <div class="diff-view diff-view--text" set:html={diffLinesHtml(diff.lines, focus)} />
 
         {/* The XML is still there for whoever wants it — this page just no
             longer makes everyone else read it (ADR-0026). It renders here now

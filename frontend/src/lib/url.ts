@@ -63,9 +63,32 @@ export function versionsHref(identifier: string): string {
   return `${APP}/versions${encodePath(identifier)}`;
 }
 
-/** `/app/diff/…?from=&to=` — a redline between two release points (Day 4). */
-export function diffHref(identifier: string, from: string, to: string): string {
-  return `${APP}/diff${encodePath(identifier)}?${new URLSearchParams({ from, to }).toString()}`;
+/**
+ * `/app/diff/…?from=&to=` — a redline between two release points (Day 4).
+ *
+ * `provision` names a sub-section path — `/c/5` — of the section being
+ * compared. It rides as a query parameter rather than a fragment because the
+ * server has to act on it: the redline is built page-side, and a fragment never
+ * leaves the browser. The page anchors and marks that provision inside the
+ * whole section's redline, which is ADR-0001's rule about never losing context
+ * applied to a comparison.
+ */
+export function diffHref(
+  identifier: string,
+  from: string,
+  to: string,
+  provision?: string | null,
+): string {
+  const params = new URLSearchParams({ from, to });
+  if (provision) params.set("at", provision);
+  return `${diffAction(identifier)}?${params.toString()}`;
+}
+
+/** The path half of `diffHref`, for a GET form whose own fields supply the
+ *  query string. Rule 5 is about every reader href being built here, and a
+ *  form action is one. */
+export function diffAction(identifier: string): string {
+  return `${APP}/diff${encodePath(identifier)}`;
 }
 
 /** `/api/v1/sections/…/diff?from=&to=` — the *source-level* redline: the same
@@ -202,6 +225,31 @@ export function signupHref(next?: string | null): string {
 export function trimNum(num: string | null | undefined): string {
   if (!num) return "";
   return num.trim().replace(/\.$/u, "");
+}
+
+/**
+ * The identifiers to try, nearest first, when one resolves to nothing.
+ *
+ * `/us/usc/t16/s45f/c/5` → `/us/usc/t16/s45f`, `/us/usc/t16`. Stops at the
+ * title: `/us/usc` is the front page and is not an identifier the API answers,
+ * and anything above it belongs to a different code.
+ *
+ * Every segment is a candidate rather than only the title, because the trail a
+ * reader wants back is the nearest thing that exists — a mistyped subsection of
+ * a real section should offer the section, not the whole title. The list is
+ * short by construction (a section identifier has at most a handful of
+ * segments), which is what makes trying them one at a time affordable on a page
+ * nobody reaches on purpose.
+ */
+export function ancestorIdentifiers(identifier: string): string[] {
+  const parts = identifier.replace(/\/+$/u, "").split("/").filter(Boolean);
+  // ["us", "usc", "t16", …] — anything shorter has no title in it.
+  if (parts.length < 4 || parts[0] !== "us" || parts[1] !== "usc") return [];
+  const out: string[] = [];
+  for (let end = parts.length - 1; end >= 3; end -= 1) {
+    out.push(`/${parts.slice(0, end).join("/")}`);
+  }
+  return out;
 }
 
 /** `05` → `5`, `05a` → `5a`. OLRC's `titlesAffected` carries the *file-naming*

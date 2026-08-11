@@ -10,24 +10,27 @@
  */
 import { expect, test } from "@playwright/test";
 
+import { gotoDiff, settleDiff } from "./ratelimited";
+
 // Two release points the dev/CI database actually holds (`make dev-data` /
 // `make ci-data`), for a section whose text changed between them.
 const DIFF = "/app/diff/us/usc/t16/s2201?from=119-99&to=119-102not101";
 
 test("the source link renders the redline in the page, not as JSON", async ({ page }) => {
-  await page.goto(DIFF);
+  await gotoDiff(page, DIFF);
   await expect(page.locator(".diff-view--source")).toHaveCount(0);
 
   await page.getByRole("link", { name: /source redline/i }).click();
   await page.waitForLoadState("load");
+  await settleDiff(page);
 
   // Same site, same page — the panel, not `/api/v1/…/diff`.
   expect(new URL(page.url()).pathname).toBe(new URL(DIFF, page.url()).pathname);
-  await expect(page.locator(".diff-view--source")).toBeVisible();
+  await expect(page.locator(".diff-view--source")).toBeVisible({ timeout: 30_000 });
 });
 
 test("it scrolls to the panel, clear of the sticky chrome", async ({ page }) => {
-  await page.goto(`${DIFF}&source=1#source`);
+  await gotoDiff(page, `${DIFF}&source=1#source`);
   await page.waitForTimeout(400);
 
   const heading = page.locator("#source");
@@ -45,7 +48,7 @@ test("it scrolls to the panel, clear of the sticky chrome", async ({ page }) => 
 });
 
 test("a slow render says so instead of looking dead", async ({ page }) => {
-  await page.goto(DIFF);
+  await gotoDiff(page, DIFF);
 
   // The indicator lives between the click and the next paint, so it cannot be
   // asserted from outside: any Playwright query races the navigation the click
@@ -68,5 +71,6 @@ test("a slow render says so instead of looking dead", async ({ page }) => {
   expect(shown.spinner).toBe(true);
 
   await page.waitForLoadState("load");
-  await expect(page.locator(".diff-view--source")).toBeVisible();
+  await settleDiff(page);
+  await expect(page.locator(".diff-view--source")).toBeVisible({ timeout: 30_000 });
 });

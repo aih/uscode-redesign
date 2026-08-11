@@ -7,7 +7,14 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { diffLinesHtml, diffSummary, documentDiff, sourceDelta } from "../src/lib/diffdoc";
+import {
+  diffLinesHtml,
+  diffSummary,
+  documentDiff,
+  focusSummary,
+  hasFocus,
+  sourceDelta,
+} from "../src/lib/diffdoc";
 import { parseFragment, readingBlocks } from "../src/lib/uslm";
 
 const NS = 'xmlns="http://xml.house.gov/schemas/uslm/1.0"';
@@ -230,5 +237,76 @@ describe("diffSummary", () => {
 
   it("reads in the order the redline does", () => {
     expect(summaryOf(3, 1, 2)).toBe("3 lines changed, 1 line added, 2 lines removed");
+  });
+});
+
+/**
+ * A provision-level comparison (task B5, ADR-0066).
+ *
+ * `/app/diff?at=/c/5` still renders the whole section — ADR-0001's rule that a
+ * request for a provision is answered with its context — and marks the part
+ * that was asked about. Which lines those are is `ReadingBlock.owner`.
+ */
+describe("marking the provision a comparison was asked about", () => {
+  const S = "/us/usc/t16/s45f";
+  const before = `<section ${NS} identifier="${S}"><num>§ 45f.</num><subsection identifier="${S}/a"><num>(a)</num><content>Alpha stays.</content></subsection><subsection identifier="${S}/c"><num>(c)</num><paragraph identifier="${S}/c/5"><num>(5)</num><content>Charlie five before.</content></paragraph></subsection></section>`;
+  const after = `<section ${NS} identifier="${S}"><num>§ 45f.</num><subsection identifier="${S}/a"><num>(a)</num><content>Alpha stays.</content></subsection><subsection identifier="${S}/c"><num>(c)</num><paragraph identifier="${S}/c/5"><num>(5)</num><content>Charlie five after.</content></paragraph></subsection></section>`;
+
+  it("gives every block the identifier of the nearest element that carries one", () => {
+    const owners = blocks(after).map((block) => block.owner);
+    expect(owners).toContain(S);
+    expect(owners).toContain(`${S}/a`);
+    expect(owners).toContain(`${S}/c/5`);
+  });
+
+  it("marks the asked-about provision and nothing else", () => {
+    const html = diffLinesHtml(diffOf(before, after).lines, `${S}/c/5`);
+    const marked = [...html.matchAll(/<p class="[^"]*diff-line--focus[^"]*"[^>]*>(.*?)<\/p>/gu)].map(
+      (match) => match[1],
+    );
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toContain("Charlie five");
+    // The rest of the section is still rendered, just not marked — a
+    // provision-level comparison keeps its context (ADR-0001).
+    expect(html).toContain("Alpha stays.");
+    expect(marked[0]).not.toContain("Alpha stays.");
+  });
+
+  it("marks everything under the provision, not only the element itself", () => {
+    const html = diffLinesHtml(diffOf(before, after).lines, `${S}/c`);
+    expect((html.match(/diff-line--focus/gu) ?? []).length).toBeGreaterThan(1);
+  });
+
+  it("anchors the first marked line only, so the jump lands at the top of it", () => {
+    const html = diffLinesHtml(diffOf(before, after).lines, `${S}/c`);
+    expect((html.match(/id="diff-focus"/gu) ?? []).length).toBe(1);
+  });
+
+  it("marks nothing and anchors nothing when no focus is asked for", () => {
+    const html = diffLinesHtml(diffOf(before, after).lines);
+    expect(html).not.toContain("diff-line--focus");
+    expect(html).not.toContain('id="diff-focus"');
+  });
+
+  it("does not mark a sibling whose identifier is a string prefix", () => {
+    // `/c/5` must not match `/c/50`. The rule is the identifier itself or a
+    // `/`-delimited descendant of it.
+    const withFifty = `<section ${NS} identifier="${S}"><paragraph identifier="${S}/c/50"><num>(50)</num><content>Fifty.</content></paragraph></section>`;
+    const html = diffLinesHtml(diffOf(withFifty, withFifty).lines, `${S}/c/5`);
+    expect(html).not.toContain("diff-line--focus");
+  });
+
+  it("reports how much of the change is inside the provision", () => {
+    const lines = diffOf(before, after).lines;
+    expect(focusSummary(lines, `${S}/c/5`)).toMatch(/1 changed line/u);
+    expect(focusSummary(lines, `${S}/a`)).toMatch(/No change inside it/u);
+    expect(focusSummary(lines, null)).toBeNull();
+  });
+
+  it("says whether the provision is in the section at all", () => {
+    const lines = diffOf(before, after).lines;
+    expect(hasFocus(lines, `${S}/c/5`)).toBe(true);
+    expect(hasFocus(lines, `${S}/z/9`)).toBe(false);
+    expect(hasFocus(lines, null)).toBe(false);
   });
 });

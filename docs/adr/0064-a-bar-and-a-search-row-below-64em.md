@@ -93,6 +93,22 @@ Mobile section of the spec asks for both and this implements both. They are one 
 stay in step, so nothing can disagree; it is still two controls for one thing on one screen, and
 dropping the sheet's row is a one-line change if that reads worse in use than it does on paper.
 
+**Settled: both stay** (task B11 item 1, 2026-08-11). Measured with the sheet open at 320×768 and
+375×812: it is 553px tall inside a 768px viewport, does not scroll, and the Dark row sits at y=498,
+above the fold at both. So the 44px is not being taken from anything.
+
+What decides it is that the bar's copy has no word. `.navbar > .theme-toggle .theme-toggle__label`
+is `display: none` and the island writes the name into `aria-label`, so a screen reader is told what
+the moon does and a sighted reader is not. The DISPLAY row is the only place below 64em where the
+word `Dark` — or `Light`, once it is on — appears on screen. `site.scss` already makes this argument
+in the comment retiring ADR-0059's band-scoped rule: *a menu row that reads `≡` and nothing else is
+a menu row nobody can use, and a menu is where there is space for the word.* The same sentence,
+applied to the bar rather than to the row, is the reason the row stays.
+
+The pair is a shortcut and its named home, which is the arrangement `t` and `b` already have against
+the links they duplicate (ADR-0055). Dropping the row would also leave DISPLAY holding one setting
+with a word and one without, reachable in different places.
+
 **The header is 112px where it was 104** at 375 through 1023, and 112 where it was 148 at 320 —
 before the padding trim below. A bar that carries three things is taller than a row that carries
 the wordmark alone.
@@ -106,6 +122,11 @@ bar's rule rather than 8.
 **`.navdrop--more` keeps an `open` attribute nothing reads below 64em.** `SiteHeader`'s script still
 closes it as one of the `[data-navmenu]` set; the CSS forcing its content visible outranks that, so
 the attribute is inert rather than wrong.
+
+**Fixed** (task B11 item 6, 2026-08-11). The script now counts a `[data-navmenu]` as a menu only
+while its `<summary>` passes `checkVisibility()`, asked per event rather than once at parse. The
+attribute was not only inert: closing More at 375 is invisible there and shows up at 1280, where a
+menu the reader left open has been shut behind their back. `chrome.spec.ts` runs that sequence.
 
 ### What it buys
 

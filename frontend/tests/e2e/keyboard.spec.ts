@@ -175,6 +175,47 @@ test.describe("keyboard shortcuts", () => {
     await page.waitForTimeout(400);
     await expect(page).toHaveURL(/releases/u);
   });
+
+  test("[ and ] say why they did nothing on a section with no subsections", async ({ page }) => {
+    // § 688 is a one-paragraph repeal: no top-level provisions, so nothing for
+    // these two to step through. Silence there is indistinguishable from a key
+    // that is not bound at all.
+    await page.goto("/app/us/usc/t16/s688");
+    // The island's own selector. The page does carry a contents list — the
+    // source credit is on it — and none of its rows is a provision, which is
+    // the state these keys have nothing to do in.
+    await expect(page.locator('.contents__link[href^="#/"]')).toHaveCount(0);
+
+    const said = page.locator("#keysay");
+    await expect(said).toBeEmpty();
+
+    await page.keyboard.press("]");
+    await expect(said).toHaveText(/no subsections/u);
+    await expect(said).toBeVisible();
+
+    await page.keyboard.press("[");
+    await expect(said).toHaveText(/no subsections/u);
+  });
+
+  test("the message is a polite status region, and clears itself", async ({ page }) => {
+    await page.goto("/app/us/usc/t16/s688");
+    const said = page.locator("#keysay");
+    await expect(said).toHaveAttribute("role", "status");
+    await expect(said).toHaveAttribute("aria-live", "polite");
+
+    await page.keyboard.press("]");
+    await expect(said).not.toBeEmpty();
+    // Five seconds in the island; this only has to outlast it.
+    await expect(said).toBeEmpty({ timeout: 8000 });
+    await expect(said).toBeHidden();
+  });
+
+  test("a section that has subsections says nothing", async ({ page }) => {
+    await page.goto(SECTION);
+    await page.keyboard.press("]");
+    await page.waitForTimeout(400);
+    await expect(page.locator("#keysay")).toBeEmpty();
+  });
 });
 
 test.describe("the shortcut list", () => {
@@ -233,5 +274,21 @@ test.describe("the shortcut list", () => {
     await page.goto(RELEASES);
     await page.keyboard.press("Shift+Slash");
     await expect(page.locator(DIALOG)).toBeVisible();
+  });
+
+  test("the Help menu offers it, so it is findable without knowing the key", async ({ page }) => {
+    // `?` and the footer were the only two ways in, and neither is visible to a
+    // reader who does not already know the keys exist or has not scrolled to
+    // the bottom of the document.
+    await page.goto(SECTION);
+    await page.locator(".navdrop--more > summary").click();
+    const row = page.locator(".navdrop__list [data-shortcuts-open]");
+    await expect(row).toBeVisible();
+    await expect(row).toContainText("Keyboard shortcuts");
+    await expect(row.locator("kbd")).toHaveText("?");
+
+    await row.click();
+    await expect(page.locator(DIALOG)).toBeVisible();
+    await expect(page).toHaveURL(/s45f/u);
   });
 });

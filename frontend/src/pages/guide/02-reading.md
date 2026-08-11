@@ -157,7 +157,9 @@ steps:
     caption: The display switches are the last group.
 ```
 
-The light/dark switch is on the bar itself, one tap from any page.
+The light/dark switch is on the bar itself, one tap from any page. The moon on the bar and the
+**Dark** row under Display are the same setting: either one moves both, and both name the theme they
+will switch to rather than the one you are in.
 
 ```scenario
 id: theme-on-the-bar
@@ -170,6 +172,10 @@ steps:
     caption: The moon on the bar switches the page to dark.
   - expect: { selector: ".navbar > .theme-toggle", contains: "Light" }
     caption: The switch now names the way back.
+  - click: .navmenu__summary
+    caption: The Display group holds the same switch.
+  - expect: { selector: ".navdrop__list .theme-toggle__label", contains: "Light" }
+    caption: It reads Light too — one setting, named the same way in both places.
 ```
 
 **The breadcrumb** at the top of every page runs from the title down to the provision on screen:
@@ -281,7 +287,18 @@ steps:
 
 ## Keyboard shortcuts
 
-Press <kbd>?</kbd> on any page for this list, or use the **Keyboard shortcuts** link in the footer.
+Press <kbd>?</kbd> on any page for this list. It is also **More › Help › Keyboard shortcuts** in the
+navigation bar, and **Keyboard shortcuts** in the footer.
+
+```scenario
+id: shortcuts-from-the-menu
+title: Open the shortcut list from the Help menu
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - click: .navdrop--more > summary
+  - click: .navdrop__list [data-shortcuts-open]
+  - expect: { selector: "#shortcuts", visible: true }
+```
 
 **Moving between sections**, on a section page:
 
@@ -316,7 +333,17 @@ combination held with Ctrl, Alt or ⌘. A jump inside a page takes the keyboard 
 continues from where you landed.
 
 <kbd>[</kbd> and <kbd>]</kbd> step through the provision rows of the contents list, not its source
-credit and notes rows. A section with no subsections has nothing to step through.
+credit and notes rows. On a section with no subsections — a one-paragraph repeal, for instance —
+they say so at the foot of the screen rather than doing nothing.
+
+```scenario
+id: brackets-on-a-repeal
+title: Step through a section that has no subsections
+steps:
+  - goto: /app/us/usc/t16/s688
+  - press: "]"
+  - expect: { selector: "#keysay", contains: "no subsections" }
+```
 
 <kbd>t</kbd> goes to the top of the page's content, past the navigation. <kbd>b</kbd> goes to the
 foot of the page, where the site's own links are.
