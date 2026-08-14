@@ -52,6 +52,15 @@ import {
   readOffset,
 } from "../../lib/url";
 
+/** Strip `scope=` when the form submitted an empty value (the "Every table"
+ *  option). The select always posts its value; an empty one means no scope and
+ *  belongs in a clean URL without the param. */
+if (Astro.url.searchParams.get("scope") === "") {
+  const clean = new URL(Astro.url);
+  clean.searchParams.delete("scope");
+  return Astro.redirect(clean.toString(), 302);
+}
+
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
 /** `?scope=118-2` narrows the lookup to one table — the select's no-script
  *  round trip. A value naming no table scopes nothing. */
