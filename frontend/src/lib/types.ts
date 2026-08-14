@@ -321,12 +321,15 @@ export interface ClassificationFile {
  * different schedules (ADR-0036, ADR-0067 decision 4). */
 export interface ClassificationSource {
   url: string;
-  /** Null means no check has ever been recorded here. */
+  /** Before any recorded check this is the date the tables were first loaded,
+   * flagged `baseline`. */
   last_checked_at: string | null;
   hours_since_check: number | null;
   ok: boolean;
-  /** The last check failed, is over a week old, or never happened. */
+  /** The last check failed or is over a week old. */
   stale: boolean;
+  /** No check has been recorded; `last_checked_at` is the first-load date. */
+  baseline?: boolean;
   files_seen: number | null;
   changed_files: string[];
   latest_covered_text: string | null;

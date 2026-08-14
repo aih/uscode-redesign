@@ -99,6 +99,41 @@ def _every_row(api, url: str, *, page: int = 500) -> list[dict]:
 # --------------------------------------------------------------- 1. the registry
 
 
+def test_the_check_source_reports_the_first_load_date_before_any_check():
+    """No check row → the baseline: the date the tables were first loaded,
+    flagged so the reader names a date rather than 'no record of checking'.
+    No database — this is `ClassificationCheckOut.of` alone."""
+    from api.schemas import CLASSIFICATION_BASELINE_CHECKED_AT, ClassificationCheckOut
+
+    out = ClassificationCheckOut.of(None, url="https://example.test/tables.shtml")
+    assert out.baseline is True
+    assert out.last_checked_at == CLASSIFICATION_BASELINE_CHECKED_AT
+    assert out.last_checked_at.date().isoformat() == "2026-08-13"
+    assert out.ok is True, "nothing failed — nothing was attempted"
+    assert out.hours_since_check is not None
+    assert out.url == "https://example.test/tables.shtml"
+
+
+def test_a_recorded_check_is_not_a_baseline():
+    import datetime
+
+    from api.schemas import ClassificationCheckOut
+    from storage import ClassificationCheckInfo
+
+    info = ClassificationCheckInfo(
+        checked_at=datetime.datetime.now(datetime.timezone.utc),
+        source_url="https://uscode.house.gov/classification/tables.shtml",
+        ok=True,
+        files_seen=33,
+        changed_files=(),
+        latest_covered_text=None,
+        error=None,
+    )
+    out = ClassificationCheckOut.of(info, url=info.source_url)
+    assert out.baseline is False
+    assert out.stale is False
+
+
 def test_the_registry_lists_the_documents_and_when_it_last_looked(api):
     body = api.get("/api/v1/classifications/tables").json()
 

@@ -151,9 +151,42 @@ describe("classificationNote", () => {
     expect(note.detail).toBe("1 table changed at that check.");
   });
 
-  // `ClassificationCheckOut` reports "no check has ever run" as ok: false, so a
-  // page reading `ok` alone said a check had failed when none was ever made.
-  it("does not call a check that never happened a failure", () => {
+  // Before any check row exists the API reports the first-load date, flagged
+  // baseline — the page names a date instead of "no record of checking".
+  it("names the first-load date when no check has ever run", () => {
+    const note = classificationNote(
+      classification({
+        last_checked_at: "2026-08-13T00:00:00Z",
+        hours_since_check: 30,
+        ok: true,
+        stale: false,
+        baseline: true,
+      }),
+    )!;
+    expect(note.tone).toBe("ok");
+    expect(note.text).toContain("last checked on 08/13/2026");
+    expect(note.text).toContain("when this site loaded them");
+    expect(note.text).not.toContain("failed");
+    expect(note.text).not.toContain("no record");
+  });
+
+  it("warns on the baseline once it is older than the site's own bound", () => {
+    const note = classificationNote(
+      classification({
+        last_checked_at: "2026-08-13T00:00:00Z",
+        hours_since_check: 24 * 10,
+        ok: true,
+        stale: true,
+        baseline: true,
+      }),
+    )!;
+    expect(note.tone).toBe("warning");
+    expect(note.text).toContain("08/13/2026");
+    expect(note.detail).toContain("may have published a newer one");
+  });
+
+  // Against an API older than the `baseline` field the old wording survives.
+  it("falls back to the no-record warning without a baseline date", () => {
     const note = classificationNote(
       classification({ last_checked_at: null, hours_since_check: null, ok: false, stale: true }),
     )!;
