@@ -2719,5 +2719,14 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     fingerprint says "Nothing changed since 119-102not101".
   - The integration test runs the fixture-corpus assertions (5,095 rows, §45f spot checks) in CI
     via `USC_REQUIRE_INTEGRATION`; against the full dev corpus it exports 300 rows and checks shape.
-  - The full-corpus export and the first upload to `dreamproit/uscode` are the next step (task 7);
-    `docs/verification/hf-dataset.json` lands with that upload.
+  - Full export ran on this box: `current` 65,938 rows / 3 shards / 0.19 GB, `versions` 489,738
+    rows / 20 shards / 2.98 GB, ~25 minutes. (The first two runs died at ~2 minutes — the harness's
+    default timeout SIGTERMs a backgrounded `make`; the run that survived was `nohup`ed.)
+  - One-time setup ran: `hf auth login` (fine-grained token, `repo.write` on `dreamproit`),
+    `make hf-init`, `make hf-upload` → hub commit `a34c462`. Round-trip verified:
+    `load_dataset("dreamproit/uscode", "current")` from the hub returns 65,938 rows with §45f
+    intact; `versions` streams. `docs/verification/hf-dataset.json` committed.
+  - The dataset then got its reader surface: an "as a dataset" section on `/app/about`, the
+    matching subsection and scenario in guide chapter 01 (which now claims ADR-0069, replacing the
+    `INFRASTRUCTURE_ADRS` line), and a README section. `make test-web` green; `astro build` green;
+    the new scenario runs with the e2e suite in CI.
