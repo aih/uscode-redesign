@@ -172,11 +172,13 @@ Three answers, meaning three different things.
 
 The classification tables are polled separately from the Code's text: they are a different source
 page on the same site, republished as new laws are classified. The index page says when this site
-last looked and how many tables had changed at that check.
+last looked and how many tables had changed at that check. Before the first poll runs, the
+last-checked date shown is the date the tables were loaded from uscode.house.gov; each poll after
+that updates it.
 
-Three states get a warning instead: no check has ever run here, the last check failed, or the last
-check succeeded longer ago than the daily schedule intends. The tables shown are the ones this site
-holds; a warning means OLRC may have published a newer one since anybody asked.
+Two states get a warning instead: the last check failed, or the last check succeeded longer ago
+than the daily schedule intends. The tables shown are the ones this site holds; a warning means
+OLRC may have published a newer one since anybody asked.
 
 ## Limitations
 

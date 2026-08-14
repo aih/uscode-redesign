@@ -598,6 +598,14 @@ class ClassificationFileOut(BaseModel):
         )
 
 
+CLASSIFICATION_BASELINE_CHECKED_AT = datetime.datetime(
+    2026, 8, 13, tzinfo=datetime.timezone.utc
+)
+"""When the classification corpus was first fetched and loaded from the live
+source (BUILDLOG 069–071). Reported as the last-checked date, flagged
+`baseline`, until a `classification_source_checks` row exists."""
+
+
 class ClassificationCheckOut(BaseModel):
     """When this mirror last asked OLRC what classification tables exist.
 
@@ -608,13 +616,20 @@ class ClassificationCheckOut(BaseModel):
 
     url: str = Field(examples=["https://uscode.house.gov/classification/tables.shtml"])
     last_checked_at: datetime.datetime | None = Field(
-        default=None, description="null means no check has ever been recorded here."
+        default=None,
+        description="When this site last looked at the source. Before any check "
+        "is recorded this is the date the tables were first fetched and loaded, "
+        "flagged `baseline`.",
     )
     hours_since_check: float | None = None
     ok: bool = Field(description="Did the last check reach and parse the page?")
     stale: bool = Field(
-        description="True when the last check failed, is over a week old, or has "
-        "never happened."
+        description="True when the last check failed or is over a week old."
+    )
+    baseline: bool = Field(
+        default=False,
+        description="True when no check has been recorded here and "
+        "`last_checked_at` is the date the tables were first loaded.",
     )
     files_seen: int | None = Field(
         default=None, description="How many documents the entry pages listed."
@@ -631,14 +646,29 @@ class ClassificationCheckOut(BaseModel):
     def of(
         cls, check: ClassificationCheckInfo | None, *, url: str
     ) -> "ClassificationCheckOut":
+        baseline = check is None
         if check is None:
-            return cls(url=url, ok=False, stale=True)
+            # The loader writes no check row, so a box that has loaded the
+            # tables but never run `classification-check` has a corpus and no
+            # record of looking. The date the tables were first fetched and
+            # loaded from the live source stands in as the last-checked date
+            # until the first real check row lands; the daily cron then owns it.
+            check = ClassificationCheckInfo(
+                checked_at=CLASSIFICATION_BASELINE_CHECKED_AT,
+                source_url=url,
+                ok=True,
+                files_seen=None,
+                changed_files=(),
+                latest_covered_text=None,
+                error=None,
+            )
         return cls(
             url=check.source_url,
             last_checked_at=check.checked_at,
             hours_since_check=round(check.age().total_seconds() / 3600, 2),
             ok=check.ok,
             stale=check.is_stale(),
+            baseline=baseline,
             files_seen=check.files_seen,
             changed_files=list(check.changed_files),
             latest_covered_text=check.latest_covered_text,
