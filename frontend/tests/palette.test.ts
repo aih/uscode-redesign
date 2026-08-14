@@ -104,6 +104,10 @@ describe("siteCommands", () => {
     expect(siteCommands().map((command) => command.href)).toContain("/app/settings");
   });
 
+  it("reaches the classification tables", () => {
+    expect(siteCommands().map((command) => command.href)).toContain("/app/classification");
+  });
+
   it("gives every row a distinct id", () => {
     const ids = siteCommands().map((command) => command.id);
 

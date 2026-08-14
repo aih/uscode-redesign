@@ -201,6 +201,7 @@ test.describe("the menus collapse below the desktop breakpoint (ADR-0058)", () =
       "Titles",
       "My Provisions",
       "Release points",
+      "Classification tables",
       "Downloads",
       "User guide",
       "API docs",
@@ -365,7 +366,7 @@ test("at desktop the menus are rows of links with no hamburger", async ({ page }
   await expect(page.locator(".footmenu__summary")).toBeHidden();
 });
 
-test("the footer's nine links are in four named groups (ADR-0063)", async ({ page }) => {
+test("the footer's ten links are in four named groups (ADR-0063)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/app/");
 
@@ -385,6 +386,7 @@ test("the footer's nine links are in four named groups (ADR-0063)", async ({ pag
   expect(hrefs).toEqual([
     "/app/",
     "/app/releases",
+    "/app/classification",
     "/app/guide",
     "/app/search/syntax",
     "/app/guide/02-reading#keyboard-shortcuts",
@@ -396,7 +398,7 @@ test("the footer's nine links are in four named groups (ADR-0063)", async ({ pag
 
   // Each label names the list under it, so the groups are navigable structure
   // rather than type set to look like it.
-  await expect(page.locator('.footnav ul[aria-labelledby="footnav-browse"] a')).toHaveCount(2);
+  await expect(page.locator('.footnav ul[aria-labelledby="footnav-browse"] a')).toHaveCount(3);
 });
 
 test("the columns stack as the window narrows", async ({ page }) => {

@@ -18,19 +18,19 @@
  * the most important sentence on the page for anyone who arrived from a search
  * engine, and it had no room here to say anything more.
  *
- * Below 64em the nine links collapse into `.footmenu`, the same `<details>`
+ * Below 64em the ten links collapse into `.footmenu`, the same `<details>`
  * disclosure the navbar uses (ADR-0058). Nothing here is sticky, so this panel
  * opens in flow rather than over the page. The disclaimer below it is not part
  * of the disclosure: it is the sentence a reader who arrived from a search
  * engine most needs, and it stays on screen.
  *
- * The nine are in four named groups — Browse, Learn, Developers, Site
+ * The ten are in four named groups — Browse, Learn, Developers, Site
  * (ADR-0063). Each label is a real `<h2>` naming its own list, so the groups
  * are headings a screen reader can jump between rather than type set to look
  * like headings. The columns are four from 40em, two from 25em and one below
  * that.
  */
-import { APP, syntaxHref } from "../lib/url";
+import { APP, classificationHref, syntaxHref } from "../lib/url";
 
 declare const __COMMIT_HASH__: string;
 const commitHash: string = __COMMIT_HASH__;
@@ -84,6 +84,11 @@ const commitUrl = commitHash !== "unknown" ? `${repoUrl}/commit/${commitHash}` :
                 <li><a class="usa-footer__primary-link" href={`${APP}/`}>Titles</a></li>
                 <li>
                   <a class="usa-footer__primary-link" href={`${APP}/releases`}>Release points</a>
+                </li>
+                <li>
+                  <a class="usa-footer__primary-link" href={classificationHref()}>
+                    Classification tables
+                  </a>
                 </li>
               </ul>
             </div>
