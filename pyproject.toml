@@ -17,6 +17,13 @@ dependencies = [
 ]
 
 [dependency-groups]
+# The HF dataset export/upload (ADR-0069). A separate group so the API image
+# and plain `uv sync` don't grow by pyarrow; Makefile targets and CI's Python
+# job pass --group dataset.
+dataset = [
+    "huggingface-hub>=0.35",
+    "pyarrow>=21",
+]
 dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
