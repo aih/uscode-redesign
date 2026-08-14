@@ -2732,7 +2732,8 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     (ADR-0068), so a plain submission may now carry an empty `scope` parameter while still being
     the same page and the same query. The test should assert the stable fact — pathname plus
     `q=118-42` — rather than the whole serialized query string.
-- **Produced:** one test change in `frontend/tests/e2e/classification.spec.ts`.
+- **Produced:** one test change in `frontend/tests/e2e/classification.spec.ts`, and, in the commit
+  before it, the `scope=`-stripping redirect at the top of `pages/classification/index.astro`.
 - **Verified:**
   - GitHub Actions job `94799323500` failed only at
     `tests/e2e/classification.spec.ts:68` with `page.waitForURL` timing out while waiting for
@@ -2742,3 +2743,34 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - Supporting local setup re-used the committed offline fixture path:
     `docker compose up -d --wait db`, `DATABASE_URL=$(grep '^DATABASE_URL=' .env.example) uv run make ci-data`,
     local API on :8001, and Astro on :4321.
+- **Left failing:** the same test, on both Actions runs of the resulting commit `6b8952c`. The
+  relaxed assertion is right and the redirect is what broke it, in the deployed shape rather than
+  against Astro alone.
+
+## 074 — 2026-08-14 — Session 52: the empty-scope redirect leaves the site
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Review PR #48's remaining test failure, fix it, update the PR.
+- **Reviewed:** `make test-e2e` failed one test on both runs of `6b8952c` —
+  `classification.spec.ts:68`, `page.waitForURL` timing out — and blocked the four `ratelimit`
+  tests that depend on the `desktop` project. The trace's page snapshot showed the index still on
+  screen with `118-42` in the box and the submit button focused: the click landed, the navigation
+  did not. Reproduced from the compose stack:
+  `GET /app/classification?scope=&q=118-42` → `302`, `Location: http://localhost/app/classification?q=118-42`.
+- **Decided:** the redirect target is a path. `astro/dist/core/app/node.js` builds `Astro.url`
+  from `x-forwarded-host`/`x-forwarded-port` only when `security.allowedDomains` names the host
+  (`validate-headers.js`), and with that unset it discards the request's own `Host` too and falls
+  back to the literal `localhost` with no port — so `Astro.url.origin` is `http://localhost` for
+  every request behind `deploy/Caddyfile`, and an absolute redirect built from it sends the
+  browser to port 80. On the deployed box it would also downgrade `https` to `http`. It is the
+  only place in `frontend/src` that built a URL from `Astro.url`; the redirect now composes
+  `classificationHref()` with the surviving parameters, which also keeps `/app` spelled once
+  (architecture rule 5).
+- **Produced:** two commits on `classification-lookup-scope`: the redirect fix, and this entry.
+  The e2e test gains one line — the final URL carries no `scope` — so the redirect itself is
+  asserted rather than only tolerated.
+- **Verified:** `make test-e2e` **605 passed, 2 skipped** locally against the compose stack and
+  the full local corpus, the four `ratelimit` tests among them; `classification.spec.ts` 12/12.
+  The three redirect shapes by hand: `?scope=&title=18&section=3551` → `302` to
+  `/app/classification?title=18&section=3551`, `?scope=` → `302` to `/app/classification`,
+  `?scope=118-2&q=35` → `200`.

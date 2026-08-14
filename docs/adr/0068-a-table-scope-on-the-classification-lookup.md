@@ -71,3 +71,20 @@ island appends the scope to the fetch and re-asks when the select changes.
   reached for on its own.
 - **Restricting the full `NNN-NN` form to the scoped congress.** A law of another congress typed
   on a table page still leads to its own table.
+
+## Addendum, 2026-08-14 — the empty scope, and the redirect that left the site
+
+A `<select>` always posts its value, so a no-script submission with "Every table" chosen arrives as
+`?scope=&q=118-42`. `/app/classification` answers it correctly and the URL is one nobody would
+write, so the page redirects `scope=` away when it is present and empty.
+
+The target is a path, composed from `classificationHref()` and the surviving parameters. Built as
+`new URL(Astro.url)` with the parameter deleted, the redirect was
+`http://localhost/app/classification?q=118-42` — port 80, off the site. Astro's Node adapter reads
+`x-forwarded-host` and `x-forwarded-port` only when `security.allowedDomains` names the host
+(`astro/dist/core/app/validate-headers.js`); with that unset it discards the request's own `Host`
+as well and falls back to the literal `localhost` with no port, so `Astro.url.origin` is
+`http://localhost` for every request behind `deploy/Caddyfile`. On the deployed box the same
+redirect would have downgraded `https` to `http`. This was the only place in `frontend/src` that
+built a URL from `Astro.url`; `classification.spec.ts`'s no-script test now asserts that the URL it
+lands on carries no `scope`.
