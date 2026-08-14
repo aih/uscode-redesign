@@ -15,7 +15,7 @@ ratchet uses, reading `frontend/src/pages/` from disk. The chapter column is eac
 cd frontend && npx vitest run tests/guide.test.ts
 
 # every inbound link, with the file and line that makes it
-cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|syntaxHref|settingsHref|loginHref|signupHref|previewHref|\$\{APP\}/' pages components layouts
+cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|syntaxHref|settingsHref|loginHref|signupHref|previewHref|classificationHref|classificationEcctHref|\$\{APP\}/' pages components layouts
 ```
 
 `Base.astro`'s props are what "chrome" means in the last column: `crumbs` (breadcrumb trail),
@@ -26,23 +26,26 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 
 | Route | Page file | Purpose | Reached from | Exits to | Chrome |
 |---|---|---|---|---|---|
-| `/app/` | `index.astro` | The titles loaded, in numeric order (ADR-0025) | `SiteHeader:108,173,270`, `SiteFooter:84`, `ErrorPage:42`, `AccountsOff:32` | a title TOC, `/app/demo`, `/app/guide` | header, footer |
+| `/app/` | `index.astro` | The titles loaded, in numeric order (ADR-0025) | `SiteHeader:118,183,303`, `SiteFooter:84`, `ErrorPage:42`, `AccountsOff:32` | a title TOC, `/app/demo`, `/app/guide` | header, footer |
 | `/app/us/usc/…` | `us/usc/[...identifier].astro` | A section with the named provision anchored in place, or a structural node's TOC | `index.astro:46`, `releases.astro:87`, `search.astro:181`, `provisions.astro:64`, `goto.astro:66,116`, `Neighbors`, `SectionBar`, `KeyboardNav`, `CopyColumn`, `Breadcrumbs`, every `<ref>` in the text | prev/next/up, `/app/versions`, `/app/diff`, the API in JSON or XML, the citation URL | breadcrumb, release context + switcher, sticky bar, chapter rail |
 | `/app/us/usc/?id=…` | `us/usc/index.astro` | Guid lookup in a browser; 307s to the identifier it pins | the `Cite this exact text` link on a section page | the section it resolved to | header, footer |
 | `/app/versions/…` | `versions/[...identifier].astro` | Every release point at which this section's text changed | `us/usc/[...identifier].astro:197`, `diff/[...identifier].astro:176` | the text at any listed release, a diff between any two | breadcrumb only — the page spans every release point, so it is reading none |
 | `/app/diff/…` | `diff/[...identifier].astro` | A reading-text redline between two release points (ADR-0026) | `versions/[...identifier].astro:88`, its own from/to picker | back to the text, `/app/versions`, the source redline, the API diff | breadcrumb only — the page is about two release points, so a bar naming one would mislead |
-| `/app/releases` | `releases.astro` | Every release point, its currency date, and when the source was last checked (ADR-0036) | `SiteHeader:192`, `SiteFooter:86`, `about.astro:70`, `search/syntax.astro:219`, `AccountsOff:37` | a title at a chosen release point | header, footer |
+| `/app/releases` | `releases.astro` | Every release point, its currency date, and when the source was last checked (ADR-0036) | `SiteHeader:202`, `SiteFooter:86`, `about.astro:69`, `search/syntax.astro:223`, `AccountsOff:37` | a title at a chosen release point | header, footer |
+| `/app/classification` | `classification/index.astro` | The classification tables: the lookup box, the session being classified now, the registry of every table, and — with `?title=`+`?section=` — every row ever classified to one section (ADR-0067) | `SiteHeader:209`, `SiteFooter:89`, `palette.ts:70`, `classification/[congress]/[session].astro:181`, `classification/ecct.astro:80`, `ClassificationLookup:86` (the no-script form's action) | one table, the ECCT, a section in the reader | header, footer |
+| `/app/classification/<congress>/<session>` | `classification/[congress]/[session].astro` | One classification table, sorted in public law or U.S. Code order, filtered by law, law section, title or section, 50 rows to a page | `classification/index.astro:341,375`, the lookup's own suggestions (`api/classification.py`'s `_app_path`) | a section in the reader, govinfo, the OLRC statviewer, the ECCT, back to the index | header, footer, wide |
+| `/app/classification/ecct` | `classification/ecct.astro` | The Editorial Classification Change Table — where a provision moved without a law moving it | `classification/index.astro:392`, `classification/[congress]/[session].astro:332` | back to the index; no cell links into the reader, by rule | header, footer, wide |
 | `/app/goto` | `goto.astro` | The one search box's target: routes a citation to its provision, anything else to `/app/search` | `SiteSearch:57` (form action), `search.astro:102,158`, `search/syntax.astro:91,288`, its own examples | the provision, or `/app/search` | header, footer, prefilled box |
 | `/app/search` | `search.astro` | Keyword results (ADR-0028), strict by default (ADR-0031) | `goto.astro:45,58,123`, `search/syntax.astro` examples, its own pager | a section per result, `/app/search/syntax`, `/app/goto` | header, footer, prefilled box |
-| `/app/search/syntax` | `search/syntax.astro` | The operators the search box accepts, each with a live example | `SiteFooter:94`, `SiteSearch:98`, `about.astro:84`, `search.astro:126,155`, `AccountsOff:42` | a worked search for every operator, `/app/goto`, `/app/releases` | header, footer |
-| `/app/guide` | `guide/index.astro` | Contents of the user guide (ADR-0038) | `SiteHeader:224`, `SiteFooter:93`, `index.astro:38`, `demo.astro:50,56`, `GuideLayout:45,77` | any chapter | header, footer |
-| `/app/guide/<chapter>` | `guide/*.md` | One chapter, nine of them | `guide/index.astro`, the pager in `GuideLayout`, `SiteFooter:104` (Keyboard shortcuts, to chapter 02 — intercepted by `KeyboardNav` into the dialog when the island has run) | the next and previous chapter, the routes it documents | header, footer, wide |
+| `/app/search/syntax` | `search/syntax.astro` | The operators the search box accepts, each with a live example | `SiteFooter:99`, `SiteSearch:98`, `about.astro:83`, `search.astro:126,155`, `AccountsOff:42` | a worked search for every operator, `/app/goto`, `/app/releases` | header, footer |
+| `/app/guide` | `guide/index.astro` | Contents of the user guide (ADR-0038) | `SiteHeader:241`, `SiteFooter:98`, `index.astro:38`, `demo.astro:50,56`, `GuideLayout:45,77` | any chapter | header, footer |
+| `/app/guide/<chapter>` | `guide/*.md` | One chapter, ten of them | `guide/index.astro`, the pager in `GuideLayout`, `SiteFooter:109` (Keyboard shortcuts, to chapter 02 — intercepted by `KeyboardNav` into the dialog when the island has run) | the next and previous chapter, the routes it documents | header, footer, wide |
 | `/app/demo` | `demo.astro` | The captioned demo video, recorded from the guide's scenarios | `index.astro:37` | `/app/guide` | header, footer |
-| `/app/design` | `design.astro` | The design system: every component the reader is built from, with specimen data, and the contrast of every declared colour pair computed in the browser (ADR-0053) | `SiteFooter:125` | nothing — every link on it is a specimen under title 0, which OLRC does not publish | header, footer |
-| `/app/about` | `about.astro` | What this site is, and what it is not | `SiteHeader:233`, `SiteFooter:131,144` | `/app/releases`, `/app/docs`, `/app/search/syntax`, OLRC, the repository | header, footer |
-| `/app/docs` | `docs.astro` | The OpenAPI schema in this site's chrome, rather than the bare Swagger page | `SiteHeader:227`, `SiteFooter:116`, `about.astro:77`, `AccountsOff:47` | `/docs`, `/redoc`, `/openapi.json` | header, footer |
-| `/app/provisions` | `provisions.astro` | The watchlist. Switched off in the UI (ADR-0034) | `SiteHeader:180`, `AuthNav:48` | a watched provision, `/app/login` | header, footer |
-| `/app/settings` | `settings.astro` | How links open, and the theme. Switched off in the UI | `palette.ts:82` (the command palette, ADR-0062), `AuthNav:49` | `/app/login` | header, footer |
+| `/app/design` | `design.astro` | The design system: every component the reader is built from, with specimen data, and the contrast of every declared colour pair computed in the browser (ADR-0053) | `SiteFooter:130` | almost nothing — every link on it is a specimen under title 0, which OLRC does not publish, and the classification specimen's govinfo and statviewer links name public law 0-1 and volume 0. The two exceptions are real: the lookup specimen submits to `/app/classification`, and the palette specimen's rows are `siteCommands()` | header, footer |
+| `/app/about` | `about.astro` | What this site is, and what it is not | `SiteHeader:266`, `SiteFooter:136,149` | `/app/releases`, `/app/docs`, `/app/search/syntax`, OLRC, the repository | header, footer |
+| `/app/docs` | `docs.astro` | The OpenAPI schema in this site's chrome, rather than the bare Swagger page | `SiteHeader:244`, `SiteFooter:121`, `about.astro:76`, `AccountsOff:47` | `/docs`, `/redoc`, `/openapi.json` | header, footer |
+| `/app/provisions` | `provisions.astro` | The watchlist. Switched off in the UI (ADR-0034) | `SiteHeader:190`, `AuthNav:48` | a watched provision, `/app/login` | header, footer |
+| `/app/settings` | `settings.astro` | How links open, and the theme. Switched off in the UI | `palette.ts:88` (the command palette, ADR-0062), `AuthNav:49` | `/app/login` | header, footer |
 | `/app/login` | `login.astro` | Sign in. Switched off in the UI | `provisions.astro:46`, `settings.astro:52`, `signup.astro:53`, `AuthNav:35` | `/app/signup`, the `?next=` destination | header, footer |
 | `/app/signup` | `signup.astro` | Create an account. Switched off in the UI | `login.astro:58`, `AuthNav:37` | `/app/login`, the `?next=` destination | header, footer |
 | `/app/404` | `404.astro` | Anything under `/app` that is not a citation | any wrong URL | `/app/` | header, footer |
@@ -54,7 +57,7 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 
 `/app/settings` was here until ADR-0062. Its only linker was `AuthNav.astro:49`, which
 `SiteHeader` does not render while `ACCOUNTS_ENABLED` is false (ADR-0034), leaving prose in guide
-chapter 06 as the one way in. The command palette's `Reading settings` row (`lib/palette.ts:82`)
+chapter 06 as the one way in. The command palette's `Reading settings` row (`lib/palette.ts:88`)
 now links it from every page — behind ⌘K, so it is a keyboard route rather than a visible one.
 
 `/app/login` and `/app/signup` are in the same position one hop further out: reachable only from
@@ -67,7 +70,7 @@ they are listed here so the state is recorded rather than assumed.
 link into it from outside itself is on `/app/versions`, and the only link to `/app/versions` is one
 line under the section heading. A reader on `§ 45f` who wants to know what changed goes: section →
 version history → pick two releases → diff. The command palette's `Compare with the previous
-release point` row (ADR-0062, `lib/palette.ts:121`) makes it one keystroke, against the release
+release point` row (ADR-0062, `lib/palette.ts:131`) makes it one keystroke, against the release
 point before the one on screen. Task B5 still owns the "Compare with…" affordance on the section
 header, and the arbitrary pair; B5 is defined in `claude-code/WORKSTREAM-B-STATE.md`, not in
 `docs/backlog.md`.
@@ -75,10 +78,10 @@ header, and the arbitrary pair; B5 is defined in `claude-code/WORKSTREAM-B-STATE
 **`/app/demo` has one inbound link**, on the front page, and only for a reader who has not scrolled
 past the first paragraph.
 
-**Five routes lost their visible header link to a menu** (ADR-0061): `/app/releases`, `/app/guide`,
-`/app/docs`, `/app/about` and the Downloads control are behind **More**, so the header no longer
-shows where they are. Each keeps a link in the footer, which lists all nine destinations in the
-open, and each is still one click from any page once More is open.
+**Six routes are behind the header's menu rather than in it** (ADR-0061): `/app/releases`,
+`/app/classification`, `/app/guide`, `/app/docs`, `/app/about` and the Downloads control are behind
+**More**, so the header does not show where they are. Each keeps a link in the footer, which lists
+all ten destinations in the open, and each is still one click from any page once More is open.
 
 ## Duplicate paths
 
