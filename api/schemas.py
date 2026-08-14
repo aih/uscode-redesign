@@ -893,7 +893,9 @@ class ClassificationSuggestionOut(BaseModel):
         description="`pl` — a public law's rows on its session page. "
         "`section-notes` — the section's notes in the reader, where OLRC's own "
         "classification history is printed. `section-classifications` — the "
-        "classification rows for that section.",
+        "classification rows for that section, across every table. "
+        "`section-in-table` — the rows for that section in the one table the "
+        "request was scoped to.",
         examples=["pl"],
     )
     label: str = Field(examples=["Public Law 119-70"])
