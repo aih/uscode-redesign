@@ -110,6 +110,24 @@ setPublicCache(Astro.response.headers, null, false);
     stored text is unchanged from the previous release point. The site uses a diff algorithm to identify what changed, and to store differences. 
   </p>
 
+  <h2 class="toc-group">The corpus as a dataset</h2>
+
+  <p>
+    The parsed corpus is published as a Hugging Face dataset at{" "}
+    <a
+      class="usa-link usa-link--external"
+      rel="noopener"
+      href="https://huggingface.co/datasets/dreamproit/uscode">dreamproit/uscode</a
+    >, in two configurations: <code>current</code> — one row per section, carrying the text in
+    force at the newest release point — and <code>versions</code> — one row per distinct text a
+    section has had, with the release points it was in force. Each row carries the section's
+    plain text, its verbatim USLM XML, its citation, its place in the Code's hierarchy, and its
+    release-point metadata. The dataset is refreshed when OLRC publishes a new release point.
+    With the Python <code>datasets</code> library, {" "}
+    <code>load_dataset("dreamproit/uscode", "current", split="train")</code> loads the current
+    text of every section; the dataset card documents both configurations field by field.
+  </p>
+
   <p class="doc-meta">
     The source, the design decisions behind it and the build log are public:{" "}
     <a

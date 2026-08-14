@@ -5,7 +5,7 @@ order: 1
 summary: A reader for the United States Code where every provision has an address, at every point in time it has existed.
 covers:
   routes: ["/app/", "/app/about", "/app/demo"]
-  adrs: [37, 38, 65]
+  adrs: [37, 38, 65, 69]
 ---
 
 This is a conceptual redesign of the [Office of the Law Revision Counsel](https://uscode.house.gov/)'s
@@ -81,6 +81,25 @@ Their controls are still visible on the page to explain their intended functiona
 [Accounts and watchlists](/app/guide/07-accounts).
 
 The site also serves a `robots.txt` disallowing search engine crawlers.
+
+## The corpus as a dataset
+
+The parsed corpus is published as a Hugging Face dataset at
+[dreamproit/uscode](https://huggingface.co/datasets/dreamproit/uscode), in two configurations:
+`current` — one row per section, carrying the text in force at the newest release point — and
+`versions` — one row per distinct text a section has had, with the release points it was in
+force. Each row carries the section's plain text, its verbatim USLM XML, its citation, its place
+in the Code's hierarchy, and its release-point metadata. The dataset is refreshed when OLRC
+publishes a new release point; the dataset card documents every field. The
+[About page](/app/about) describes it and shows how to load it.
+
+```scenario
+id: about-names-the-dataset
+title: The About page describes the Hugging Face dataset
+steps:
+  - goto: /app/about
+  - expect: { selector: "main", contains: "dreamproit/uscode" }
+```
 
 ## Video demonstration
 

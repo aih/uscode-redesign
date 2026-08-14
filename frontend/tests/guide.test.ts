@@ -85,7 +85,6 @@ const INFRASTRUCTURE_ADRS = new Set([
   46, // the per-route JavaScript byte budget — a test harness
   47, // declining a shared cache in front of the spine — a deployment decision
   51, // the search index rebuilds itself on a mapping change — a deploy step
-  69, // the Hugging Face dataset export — publishing infrastructure, no reader surface
 ]);
 
 const chapters = readChapters();
