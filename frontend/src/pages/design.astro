@@ -1085,7 +1085,23 @@ const TYPE_ROLES = [
   </p>
 
   <div class="spec">
-    <ClassificationLookup idPrefix="classlookup-specimen" />
+    <ClassificationLookup
+      idPrefix="classlookup-specimen"
+      scopeOptions={[
+        { value: "119-1", label: "119th Congress, session 1" },
+        { value: "118-2", label: "118th Congress, session 2" },
+        { value: "104-all", label: "104th Congress, whole congress" },
+      ]}
+    />
+  </div>
+
+  <p>
+    On a session table's page the same component is scoped to that table: no select, the form
+    posts back to the table, and a bare law number means a law of that congress.
+  </p>
+
+  <div class="spec">
+    <ClassificationLookup idPrefix="classlookup-scoped-specimen" scope={{ congress: 0, session: "1" }} />
   </div>
 
   {/* -------------------------------------------------------------- messages */}

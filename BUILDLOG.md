@@ -2680,7 +2680,119 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   `shed.spec.ts` stayed green here across a full combined run, but it is still the
   timing-sensitive test Wave 3 flagged.
 
-## 072 — 2026-08-14 — Session 50: the corpus as a Hugging Face dataset
+## 072 — 2026-08-14 — Session 50: a table scope on the classification lookup
+
+- **Tool/model:** Claude Code, Fable 5. One session, sequential.
+- **Asked:** Review the experience of finding an entry in a session classification table — the
+  pagination makes it slow — and enhance it: put the lookup search on the session table page,
+  filtered by session alongside the existing filters, and let a user add that filter on the
+  general classification search too.
+- **Reviewed:** the session page had four filters and nothing that sets one — filters arrived only
+  from index-page suggestions or hand-edited URLs, so finding a row on the page itself was the
+  pager (the 104th's table: 11,737 rows, 118 clicks of Next). The lookup box existed only on the
+  index, and the suggest endpoint could not read a bare law number, so the congress on screen had
+  to be retyped.
+- **Decided:** ADR-0068. `suggest` takes optional `congress`+`session`; a bare law number then
+  means a law of that congress (tried only when `citeparse` read nothing, so `16 usc 3831` never
+  becomes a law), and a citation gains a leading `section-in-table` suggestion counted by
+  `entries_for_file`. The session page renders `ClassificationLookup` scoped to itself — form
+  posts back to the page, `?q=` answered server-side by the shared new `ClassificationMatches` —
+  and the index box offers the scope as `<select name="scope">` (`118-2`/`104-all`, split at the
+  last dash because the session half never carries one, read back by `parseClassificationScope`).
+  A field-per-filter form was declined; the box reaches the same filtered URLs.
+- **Produced:** three commits on `c5-classification-chrome` (PR #47): the API scope, the scoped
+  frontend, the docs. New: `docs/adr/0068`, `ClassificationMatches.astro`. The JS budget rose with
+  the island the session pages now ship: `/app/classification/[congress]` 18,500 → 24,000,
+  `/app/classification` 23,000 → 24,000 (534 bytes of scope handling in the island itself),
+  `/app/design` 39,000 → 39,500 — the design page renders both variants, the scoped specimen
+  under congress 0.
+- **Verified:** `make test` **746** (was 738; 8 new suggest-scope tests, including
+  scope-names-no-table and the citation-never-read-as-bare guard), `make test-web` **375** (was
+  370; scope value round-trip, scoped suggest URL, `section-in-table` href). The three
+  classification guide scenarios plus the two new ones (`classification-table-lookup`,
+  `classification-scoped-lookup`) ran green in Playwright against this worktree's dev server and
+  the full local corpus (`SITE=http://localhost:4399 npx playwright test tests/e2e/guide.spec.ts
+  -g classification` — 7 passed); `make test-e2e` becomes **607**. Live checks against the loaded
+  corpus: `suggest?q=35&congress=118&session=2` → Public Law 118-35; `16 usc 3831` scoped to
+  118/2 correctly offers no in-table row (0 rows there) while `42 usc 254c-2` offers 3, first.
+- **Open:** the a11y route matrix gained no state for the session page's lookup — the component
+  and its open-listbox state are already scanned on `/app/classification`; the deployed box still
+  serves the pre-Wave-3 image, so none of this is visible there until the next deploy.
+
+## 073 — 2026-08-14 — Session 51: fix the scoped classification no-script e2e assertion
+
+- **Tool/model:** GitHub Copilot Coding Agent.
+- **Asked:** Fix the failing GitHub Actions job `make test-e2e (Playwright)` for PR #48 by
+  inspecting the Actions logs, finding the root cause, and landing the smallest correct fix.
+- **Decided:**
+  - The failure was in `frontend/tests/e2e/classification.spec.ts`, not in the reader route: the
+    no-script lookup test still assumed the index form would navigate to
+    `/app/classification?q=118-42` exactly.
+  - Session 50 added the optional table-scope `<select name="scope">` to that same form
+    (ADR-0068), so a plain submission may now carry an empty `scope` parameter while still being
+    the same page and the same query. The test should assert the stable fact — pathname plus
+    `q=118-42` — rather than the whole serialized query string.
+- **Produced:** one test change in `frontend/tests/e2e/classification.spec.ts`, and, in the commit
+  before it, the `scope=`-stripping redirect at the top of `pages/classification/index.astro`.
+- **Verified:**
+  - GitHub Actions job `94799323500` failed only at
+    `tests/e2e/classification.spec.ts:68` with `page.waitForURL` timing out while waiting for
+    `/app/classification?q=118-42`.
+  - Targeted local rerun passed:
+    `SITE=http://localhost:4321 npx playwright test tests/e2e/classification.spec.ts -g "is a plain GET form with scripting off"` → 1 passed.
+  - Supporting local setup re-used the committed offline fixture path:
+    `docker compose up -d --wait db`, `DATABASE_URL=$(grep '^DATABASE_URL=' .env.example) uv run make ci-data`,
+    local API on :8001, and Astro on :4321.
+- **Left failing:** the same test, on both Actions runs of the resulting commit `6b8952c`. The
+  relaxed assertion is right and the redirect is what broke it, in the deployed shape rather than
+  against Astro alone.
+
+## 074 — 2026-08-14 — Session 52: the empty-scope redirect leaves the site
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Review PR #48's remaining test failure, fix it, update the PR.
+- **Reviewed:** `make test-e2e` failed one test on both runs of `6b8952c` —
+  `classification.spec.ts:68`, `page.waitForURL` timing out — and blocked the four `ratelimit`
+  tests that depend on the `desktop` project. The trace's page snapshot showed the index still on
+  screen with `118-42` in the box and the submit button focused: the click landed, the navigation
+  did not. Reproduced from the compose stack:
+  `GET /app/classification?scope=&q=118-42` → `302`, `Location: http://localhost/app/classification?q=118-42`.
+- **Decided:** the redirect target is a path. `astro/dist/core/app/node.js` builds `Astro.url`
+  from `x-forwarded-host`/`x-forwarded-port` only when `security.allowedDomains` names the host
+  (`validate-headers.js`), and with that unset it discards the request's own `Host` too and falls
+  back to the literal `localhost` with no port — so `Astro.url.origin` is `http://localhost` for
+  every request behind `deploy/Caddyfile`, and an absolute redirect built from it sends the
+  browser to port 80. On the deployed box it would also downgrade `https` to `http`. It is the
+  only place in `frontend/src` that built a URL from `Astro.url`; the redirect now composes
+  `classificationHref()` with the surviving parameters, which also keeps `/app` spelled once
+  (architecture rule 5).
+- **Also fixed:** `shed.spec.ts`, which the four blocked `ratelimit` tests had been hiding. With
+  the classification test green those ran again, and `it offers the section that was being
+  compared` failed in one of the two Actions runs of the same commit with `200` where it expected
+  `429`. `spendTheBucket` returns on the first shed request, which leaves the bucket holding
+  between zero and one token against a refill of one a second (ADR-0066), so the navigation after
+  it has under a second to arrive. `gotoShed` spends and re-navigates until the navigation itself
+  is shed, five attempts.
+- **Also fixed:** the freshness warning on `/app/classification`, which read "uscode.house.gov's
+  classification tables have never been checked from here, and it failed. Nothing below is known to
+  be out of date, and nothing below is known to be current either." Two defects in one sentence:
+  `ClassificationCheckOut` reports "no check has ever run" as `ok: false`, so the page's `ok`
+  branch called a check that never happened a failure; and the trailing clause stated the same
+  thing twice in the negative. `classificationNote` in `lib/currency.ts` now answers it in the
+  shape `currencyNote` already used for the corpus poll — never checked, the last check failed
+  (with the error), a check older than the schedule intends, and the quiet case — and the page
+  renders the note rather than composing the sentence itself. Guide chapter 10 names the three
+  warning states; `docs/deploy-status.md`'s expected first-deploy string is updated.
+- **Produced:** four commits on `classification-lookup-scope`: the redirect fix, this entry, the
+  shed helper, the freshness note. The classification e2e test gains one line — the final URL carries no `scope` — so
+  the redirect itself is asserted rather than only tolerated.
+- **Verified:** `make test-e2e` **605 passed, 2 skipped** locally against the compose stack and
+  the full local corpus, the four `ratelimit` tests among them; `classification.spec.ts` 12/12;
+  `make test-web` **381** (+6 `classificationNote` cases). The three redirect shapes by hand:
+  `?scope=&title=18&section=3551` → `302` to `/app/classification?title=18&section=3551`,
+  `?scope=` → `302` to `/app/classification`, `?scope=118-2&q=35` → `200`.
+
+## 075 — 2026-08-14 — Session 53: the corpus as a Hugging Face dataset
 
 - **Tool/model:** Claude Code, Fable 5.
 - **Asked:** A pipeline that processes the US Code XML for upload to Hugging Face; a

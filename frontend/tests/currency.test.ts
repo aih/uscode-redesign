@@ -9,8 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { currencyNote, humanizeAge, usDate } from "../src/lib/currency";
-import type { Status } from "../src/lib/types";
+import { classificationNote, currencyNote, humanizeAge, usDate } from "../src/lib/currency";
+import type { ClassificationSource, Status } from "../src/lib/types";
 
 function status(overrides: Partial<Status["source"]> = {}, corpus: Partial<Status["corpus"]> = {}): Status {
   return {
@@ -114,5 +114,66 @@ describe("currencyNote", () => {
       status({}, { latest_release: null, latest_currency_date: null }),
     )!;
     expect(note.detail).toContain("No release point is loaded here yet.");
+  });
+});
+
+describe("classificationNote", () => {
+  function classification(
+    overrides: Partial<ClassificationSource> = {},
+  ): ClassificationSource {
+    return {
+      url: "https://uscode.house.gov/classification/tables.shtml",
+      last_checked_at: "2026-08-14T09:00:00Z",
+      hours_since_check: 3,
+      ok: true,
+      stale: false,
+      files_seen: 32,
+      changed_files: [],
+      latest_covered_text: "Public Laws 118-35 to 118-274",
+      error: null,
+      ...overrides,
+    };
+  }
+
+  it("renders nothing when the registry request failed", () => {
+    expect(classificationNote(null)).toBeNull();
+  });
+
+  it("is quiet when the check is recent", () => {
+    const note = classificationNote(classification())!;
+    expect(note.tone).toBe("ok");
+    expect(note.text).toContain("3 hours ago");
+    expect(note.detail).toBeUndefined();
+  });
+
+  it("says how many tables changed at the last check", () => {
+    const note = classificationNote(classification({ changed_files: ["usc118-2.html"] }))!;
+    expect(note.detail).toBe("1 table changed at that check.");
+  });
+
+  // `ClassificationCheckOut` reports "no check has ever run" as ok: false, so a
+  // page reading `ok` alone said a check had failed when none was ever made.
+  it("does not call a check that never happened a failure", () => {
+    const note = classificationNote(
+      classification({ last_checked_at: null, hours_since_check: null, ok: false, stale: true }),
+    )!;
+    expect(note.tone).toBe("warning");
+    expect(note.text).toContain("no record of checking");
+    expect(note.text).not.toContain("failed");
+  });
+
+  it("warns, and quotes the error, when the last check failed", () => {
+    const note = classificationNote(
+      classification({ ok: false, stale: true, error: "HTTP 503" }),
+    )!;
+    expect(note.text).toContain("failed");
+    expect(note.detail).toContain("HTTP 503");
+  });
+
+  it("warns when the last successful check is older than the site's own bound", () => {
+    const note = classificationNote(classification({ stale: true, hours_since_check: 24 * 9 }))!;
+    expect(note.tone).toBe("warning");
+    expect(note.text).toContain("9 days ago");
+    expect(note.detail).toContain("may have published a newer one");
   });
 });

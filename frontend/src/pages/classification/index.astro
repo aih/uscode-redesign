@@ -25,6 +25,7 @@
  */
 import Base from "../../layouts/Base.astro";
 import ClassificationLookup from "../../components/ClassificationLookup.astro";
+import ClassificationMatches from "../../components/ClassificationMatches.astro";
 import ClassificationTable from "../../components/ClassificationTable.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import {
@@ -34,7 +35,7 @@ import {
   fetchClassificationTables,
   fetchClassificationsForSection,
 } from "../../lib/api";
-import { humanizeAge } from "../../lib/currency";
+import { classificationNote } from "../../lib/currency";
 import { resultCitation } from "../../lib/cite";
 import type {
   ClassificationEntryPage,
@@ -45,12 +46,35 @@ import type {
 import {
   classificationEcctHref,
   classificationHref,
-  classificationSuggestionHref,
+  classificationScopeValue,
   normalizeSectionKey,
+  parseClassificationScope,
   readOffset,
 } from "../../lib/url";
 
+/** Strip `scope=` when the form submitted an empty value (the "Every table"
+ *  option). The select always posts its value; an empty one means no scope and
+ *  belongs in a clean URL without the param.
+ *
+ *  The target is a path, never `Astro.url` with a parameter removed: the Node
+ *  adapter only trusts a request's `Host` when `security.allowedDomains` names
+ *  it, and with that unset it falls back to the literal `localhost` with no
+ *  port. So `Astro.url.origin` is `http://localhost` behind this deployment's
+ *  proxy, and an absolute redirect built from it sends the browser to port 80. */
+if (Astro.url.searchParams.get("scope") === "") {
+  const rest = new URLSearchParams(Astro.url.searchParams);
+  rest.delete("scope");
+  const remaining = rest.toString();
+  return Astro.redirect(
+    remaining ? `${classificationHref()}?${remaining}` : classificationHref(),
+    302,
+  );
+}
+
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
+/** `?scope=118-2` narrows the lookup to one table — the select's no-script
+ *  round trip. A value naming no table scopes nothing. */
+const scope = parseClassificationScope(Astro.url.searchParams.get("scope"));
 const titleFilter = Astro.url.searchParams.get("title")?.trim().toLowerCase() || null;
 const rawSection = Astro.url.searchParams.get("section")?.trim() || null;
 const sectionFilter = rawSection ? normalizeSectionKey(rawSection) : null;
@@ -77,7 +101,7 @@ try {
 }
 
 const suggestions: ClassificationSuggestion[] = query
-  ? await fetchClassificationSuggestions(query)
+  ? await fetchClassificationSuggestions(query, scope)
   : [];
 
 /** Which page of the by-section view. Only that view is paged — the registry
@@ -134,7 +158,10 @@ const current = data?.current ?? null;
 
 const totalRows = data?.entry_total ?? 0;
 
-const source = data?.source ?? null;
+/** How current the registry is, in the shape `/app/` gives the corpus's own
+ *  poll: never checked, the last check failed, and a check older than the
+ *  schedule intends are three sentences rather than one (`lib/currency.ts`). */
+const note = classificationNote(data?.source ?? null);
 
 /** "Public Laws 118-3 through 118-158", or the verbatim covered text where the
  *  source wrote one with a gap in it. */
@@ -149,6 +176,14 @@ function coverage(file: ClassificationFile): string {
 function sessionName(file: ClassificationFile): string {
   return file.session === 0 ? "Whole congress" : `Session ${file.session}`;
 }
+
+/** The scope select's options — one per table, in the registry's own order
+ *  (newest first). */
+const scopeOptions = files.map((file) => ({
+  value: classificationScopeValue(file.congress, file.session_label),
+  label: `${ordinal(file.congress)} Congress, ${sessionName(file).toLowerCase()}`,
+}));
+const scopeValue = scope ? classificationScopeValue(scope.congress, scope.session) : "";
 
 function usDate(iso: string | null): string {
   if (!iso) return "—";
@@ -186,36 +221,9 @@ function ordinal(n: number): string {
           {totalRows.toLocaleString()} rows across {files.length} tables are held here.
         </p>
 
-        <ClassificationLookup value={query} />
+        <ClassificationLookup value={query} scopeOptions={scopeOptions} scopeValue={scopeValue} />
 
-        {query && (
-          <section class="classfind" aria-labelledby="classfind-heading">
-            <h2 class="toc-group" id="classfind-heading">
-              {suggestions.length === 0
-                ? `Nothing matches “${query}”`
-                : `Matches for “${query}”`}
-            </h2>
-            {suggestions.length === 0 ? (
-              <p class="doc-meta">
-                A public law is written <code>118-33</code>, a provision of one{" "}
-                <code>118-33 101</code>, and a Code section <code>16 usc 3831</code>.
-              </p>
-            ) : (
-              <ul class="classfind__list">
-                {suggestions.map((suggestion) => (
-                  <li>
-                    <a class="classfind__link" href={classificationSuggestionHref(suggestion)}>
-                      {suggestion.label}
-                    </a>
-                    {suggestion.detail && (
-                      <span class="classfind__hint"> {suggestion.detail}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
+        {query && <ClassificationMatches query={query} suggestions={suggestions} />}
 
         {bySection && (
           <section class="classsection" aria-labelledby="classsection-heading">
@@ -305,30 +313,20 @@ function ordinal(n: number): string {
           </section>
         )}
 
-        {source &&
-          (source.stale ? (
+        {note &&
+          (note.tone === "warning" ? (
             <div class="usa-alert usa-alert--warning usa-alert--slim" role="status">
               <div class="usa-alert__body">
                 <p class="usa-alert__text">
-                  {source.last_checked_at
-                    ? `The last check of uscode.house.gov's classification tables was ${humanizeAge(source.hours_since_check)}`
-                    : "uscode.house.gov's classification tables have never been checked from here"}
-                  {source.ok ? "." : ", and it failed."} Nothing below is known to be out of date,
-                  and nothing below is known to be current either.
+                  {note.text}
+                  {note.detail && ` ${note.detail}`}
                 </p>
               </div>
             </div>
           ) : (
             <p class="doc-meta source-currency" role="status">
-              Checked uscode.house.gov for new classification tables{" "}
-              {humanizeAge(source.hours_since_check)}.
-              {source.changed_files.length > 0 && (
-                <span class="source-currency__detail">
-                  {" "}
-                  {source.changed_files.length} table
-                  {source.changed_files.length === 1 ? "" : "s"} changed at that check.
-                </span>
-              )}
+              {note.text}
+              {note.detail && <span class="source-currency__detail"> {note.detail}</span>}
             </p>
           ))}
 

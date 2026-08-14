@@ -75,7 +75,16 @@ test.describe("the classification lookup", () => {
 
     await page.locator("[data-classlookup-input]").fill("118-42");
     await page.locator(".classlookup__go").click();
-    await page.waitForURL(/\/app\/classification\?q=118-42/, { timeout: 5000 });
+    await page.waitForURL(
+      (url) => url.pathname === "/app/classification" && url.searchParams.get("q") === "118-42",
+      { timeout: 5000 },
+    );
+    // The scope select always posts its value, so a submission with no scope
+    // carries an empty one; the page redirects it away. The redirect is a path:
+    // an absolute one built from `Astro.url` carries the adapter's `localhost`
+    // fallback rather than the proxy's host and port, and the browser follows it
+    // off the site — which is a timeout here rather than a wrong page.
+    expect(new URL(page.url()).searchParams.has("scope")).toBe(false);
     // The same parse, rendered as links rather than as a listbox.
     await expect(page.locator(".classfind__link").first()).toBeVisible();
     await expect(page.locator(".classfind__link").first()).toHaveAttribute(

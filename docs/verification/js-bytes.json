@@ -4,7 +4,7 @@
   "excluded": "CopyColumn's <script type=\"application/json\" data-copy-targets> — its size is the section's provision list rather than code, so it varies per URL and is measured nowhere.",
   "client_bundles": "None. `astro build` emits no client JavaScript for this site; dist/client/_astro holds only CSS, because every island is is:inline and Astro never bundles those.",
   "validated_against": "The rendered page — see docs/adr/0046 for the comparison against a live /app/us/usc/… response.",
-  "total_bytes": 460504,
+  "total_bytes": 467310,
   "routes": [
     {
       "route": "/app/",
@@ -69,7 +69,7 @@
     {
       "route": "/app/classification",
       "page": "pages/classification/index.astro",
-      "bytes": 22773,
+      "bytes": 23534,
       "scripts": 9,
       "components": [
         "AuthNav.astro",
@@ -85,10 +85,11 @@
     {
       "route": "/app/classification/[congress]",
       "page": "pages/classification/[congress]/[session].astro",
-      "bytes": 18250,
-      "scripts": 8,
+      "bytes": 23534,
+      "scripts": 9,
       "components": [
         "AuthNav.astro",
+        "ClassificationLookup.astro",
         "CommandPalette.astro",
         "DensityToggle.astro",
         "KeyboardNav.astro",
@@ -130,7 +131,7 @@
     {
       "route": "/app/design",
       "page": "pages/design.astro",
-      "bytes": 38383,
+      "bytes": 39144,
       "scripts": 12,
       "components": [
         "ApparatusDisclosure.astro",

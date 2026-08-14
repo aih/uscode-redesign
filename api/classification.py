@@ -45,7 +45,7 @@ from api.schemas import (
     EcctOut,
     ErrorOut,
 )
-from citeparse import parse_citation
+from citeparse import ParsedCitation, parse_citation
 from params import (
     RepositoryDep,
     normalize_identifier,
@@ -55,6 +55,7 @@ from params import (
 )
 from storage import (
     CLASSIFICATION_SOURCE_URL,
+    ClassificationFileInfo,
     ClassificationRepository,
     Repository,
     UnknownPublicLawError,
@@ -118,6 +119,17 @@ _PL_FILTER = re.compile(r"^(?:(?P<congress>\d{2,3})-)?(?P<num>\d{1,4})$")
 _PL_SHORTHAND = re.compile(
     r"^(?:(?:pub(?:lic)?\.?|p\.?)\s*l(?:aw)?\.?\s*)?"
     r"(?P<congress>\d{2,3})-(?P<num>\d{1,4})"
+    r"(?:[\s,]+(?:sec(?:tion)?\.?\s*|§\s*)?(?P<section>\S.*?))?$",
+    re.IGNORECASE,
+)
+
+#: The same shorthand without its congress — `33`, `33 101`, `pl 33 § 2` — which
+#: names a law only when the request says which congress it is scoped to. Only
+#: tried for a query `citeparse` read nothing in, so `16 usc 3831` never becomes
+#: "Public Law 118-16 § usc 3831".
+_PL_SHORTHAND_BARE = re.compile(
+    r"^(?:(?:pub(?:lic)?\.?|p\.?)\s*l(?:aw)?\.?\s*)?"
+    r"(?P<num>\d{1,4})"
     r"(?:[\s,]+(?:sec(?:tion)?\.?\s*|§\s*)?(?P<section>\S.*?))?$",
     re.IGNORECASE,
 )
@@ -438,6 +450,16 @@ def classification_suggest(
             max_length=200,
         ),
     ],
+    congress: int | None = Query(
+        default=None,
+        description="With `session`, scope the lookup to one table — what the "
+        "lookup box on a session page sends.",
+    ),
+    session: str | None = Query(
+        default=None,
+        description="`1`, `2` or `all` (`0` accepted), with `congress`. One "
+        "without the other scopes nothing.",
+    ),
 ) -> ClassificationSuggestOut:
     """What comes back is decided by what the string parses as.
 
@@ -453,24 +475,52 @@ def classification_suggest(
     history. When classification rows mention it, the second leads to those.
     Either may appear without the other.
 
+    **`congress` and `session` together scope the lookup to one table.** A bare
+    law number — `33`, `33 101` — then means that law of the scoped congress, and
+    a citation gains a first suggestion counting the rows classified to it *in
+    that table*, ahead of the corpus-wide answers. A scope naming no held table
+    scopes nothing; the corpus-wide answers are unchanged either way.
+
     An empty `suggestions` is the answer for a string that is neither, and for a
     law or a section nothing is held about.
     """
     query = q.strip()
+    scope = None
+    if congress is not None and session is not None:
+        scope = classification.get_file(
+            congress=congress, session=_session_number(session)
+        )
     suggestions: list[ClassificationSuggestionOut] = []
     if query:
-        suggestions.extend(_pl_suggestions(classification, query))
-        suggestions.extend(_citation_suggestions(classification, repository, query))
+        parsed = parse_citation(query)
+        suggestions.extend(
+            _pl_suggestions(
+                classification, query, scope=scope, allow_bare=parsed is None
+            )
+        )
+        suggestions.extend(
+            _citation_suggestions(classification, repository, parsed, scope=scope)
+        )
     return ClassificationSuggestOut(query=q, suggestions=suggestions)
 
 
 def _pl_suggestions(
-    classification: ClassificationRepository, query: str
+    classification: ClassificationRepository,
+    query: str,
+    *,
+    scope: ClassificationFileInfo | None = None,
+    allow_bare: bool = True,
 ) -> list[ClassificationSuggestionOut]:
     match = _PL_SHORTHAND.match(query)
-    if match is None:
+    if match is not None:
+        congress = int(match.group("congress"))
+    elif scope is not None and allow_bare:
+        match = _PL_SHORTHAND_BARE.match(query)
+        if match is None:
+            return []
+        congress = scope.congress
+    else:
         return []
-    congress = int(match.group("congress"))
     law_num = int(match.group("num"))
     file = classification.file_covering_law(congress=congress, law_num=law_num)
     if file is None:
@@ -506,13 +556,45 @@ def _pl_suggestions(
 def _citation_suggestions(
     classification: ClassificationRepository,
     repository: Repository,
-    query: str,
+    parsed: ParsedCitation | None,
+    *,
+    scope: ClassificationFileInfo | None = None,
 ) -> list[ClassificationSuggestionOut]:
-    parsed = parse_citation(query)
     if parsed is None or parsed.kind != "section" or parsed.section_num is None:
         return []
 
     suggestions: list[ClassificationSuggestionOut] = []
+    if scope is not None:
+        section = normalize_section_input(parsed.section_num)
+        in_table = classification.entries_for_file(
+            congress=scope.congress,
+            session=scope.session,
+            title_num=parsed.title_num,
+            section=section,
+            limit=1,
+        )
+        if in_table.total:
+            suggestions.append(
+                ClassificationSuggestionOut(
+                    kind="section-in-table",
+                    label=(
+                        f"{parsed.title_num} U.S.C. § {parsed.section_num} — "
+                        "rows in this table"
+                    ),
+                    detail=f"{in_table.total} row{'' if in_table.total == 1 else 's'}",
+                    href=_app_path(
+                        f"/classification/{scope.congress}/{scope.session_label}",
+                        {"title": parsed.title_num, "section": section},
+                    ),
+                    congress=scope.congress,
+                    session=scope.session,
+                    session_label=scope.session_label,
+                    title_num=parsed.title_num,
+                    section=section,
+                    count=in_table.total,
+                )
+            )
+
     entry, identifier = _resolve_section(repository, parsed.section_variants)
     if entry is not None and identifier is not None:
         suggestions.append(

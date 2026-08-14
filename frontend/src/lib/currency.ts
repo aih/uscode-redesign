@@ -21,7 +21,7 @@
  * and without a clock — `frontend/tests/currency.test.ts`.
  */
 
-import type { Status } from "./types";
+import type { ClassificationSource, Status } from "./types";
 
 export type Tone = "ok" | "warning";
 
@@ -118,5 +118,52 @@ export function currencyNote(status: Status | null): CurrencyNote | null {
     tone: "ok",
     text: `Checked uscode.house.gov for new release points ${ago}.`,
     detail: `${held}${published}`,
+  };
+}
+
+/**
+ * The same sentence for the classification tables' own poll.
+ *
+ * Three states the page had been collapsing into one: never checked, the last
+ * check failed, and the last check succeeded but is older than the schedule
+ * intends. `ClassificationCheckOut.ok` is false in the first two — the schema
+ * reports "no check has ever run" as `ok: false, stale: true` — so a page that
+ * reads `ok` alone says a check failed when none was ever made.
+ */
+export function classificationNote(source: ClassificationSource | null): CurrencyNote | null {
+  if (!source) return null;
+  const held = "The tables below are the ones this site holds.";
+
+  if (!source.last_checked_at) {
+    return {
+      tone: "warning",
+      text: "This site has no record of checking uscode.house.gov for new classification tables.",
+      detail: `${held} OLRC may have published a newer one.`,
+    };
+  }
+
+  const ago = humanizeAge(source.hours_since_check);
+
+  if (!source.ok) {
+    return {
+      tone: "warning",
+      text: `The last attempt to check uscode.house.gov for new classification tables failed (${ago}).`,
+      detail: `${held}${source.error ? ` The check reported: ${source.error}` : ""}`,
+    };
+  }
+
+  if (source.stale) {
+    return {
+      tone: "warning",
+      text: `uscode.house.gov was last checked for new classification tables ${ago} — longer ago than this site intends.`,
+      detail: `${held} OLRC may have published a newer one since.`,
+    };
+  }
+
+  const changed = source.changed_files.length;
+  return {
+    tone: "ok",
+    text: `Checked uscode.house.gov for new classification tables ${ago}.`,
+    detail: changed > 0 ? `${changed} table${changed === 1 ? "" : "s"} changed at that check.` : undefined,
   };
 }
