@@ -10,7 +10,7 @@
  *
  * Needs the site running: `make dev-all`.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Response } from "@playwright/test";
 
 const DIFF = "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101";
 
@@ -37,6 +37,25 @@ async function spendTheBucket(context: {
   throw new Error("the diff limiter never shed a request");
 }
 
+/**
+ * Navigate to the diff and come back with the shed response.
+ *
+ * A request is shed while the bucket holds less than one token, and it refills
+ * at one a second (ADR-0066), so `spendTheBucket` leaves somewhere between zero
+ * and one — the navigation that follows it has under a second to arrive and
+ * sometimes does not. Spending again and re-navigating is the assertion the
+ * test actually means; expecting the first navigation to lose that race is a
+ * flake, and it failed in CI while passing on the same commit beside it.
+ */
+async function gotoShed(page: Page): Promise<Response> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await spendTheBucket(page.request);
+    const response = await page.goto(DIFF);
+    if (response?.status() === 429) return response;
+  }
+  throw new Error("the diff limiter shed no navigation in five attempts");
+}
+
 test.describe("the rate limiter's page (ADR-0029)", () => {
   // Serial: these share one token bucket keyed on the client address, so a
   // parallel worker spending it would make the first test's burst arrive
@@ -44,9 +63,8 @@ test.describe("the rate limiter's page (ADR-0029)", () => {
   test.describe.configure({ mode: "serial" });
 
   test("a navigation that is shed gets the error page, not plain text", async ({ page }) => {
-    await spendTheBucket(page.request);
-    const response = await page.goto(DIFF);
-    expect(response?.status()).toBe(429);
+    const response = await gotoShed(page);
+    expect(response.status()).toBe(429);
 
     await expect(page.locator(".doc-title")).toContainText("429");
     await expect(page.locator(".lede")).toContainText("rate limited");
@@ -60,9 +78,8 @@ test.describe("the rate limiter's page (ADR-0029)", () => {
   test("it offers the section that was being compared, which still exists", async ({ page }) => {
     // A shed request refused the work, not the provision — so unlike a 404 the
     // way back is the identifier itself.
-    await spendTheBucket(page.request);
-    const response = await page.goto(DIFF);
-    expect(response?.status()).toBe(429);
+    const response = await gotoShed(page);
+    expect(response.status()).toBe(429);
     await expect(page.locator(".deadend__step--last a")).toHaveAttribute(
       "href",
       "/app/us/usc/t16/s45f",

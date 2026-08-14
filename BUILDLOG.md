@@ -2766,11 +2766,18 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   only place in `frontend/src` that built a URL from `Astro.url`; the redirect now composes
   `classificationHref()` with the surviving parameters, which also keeps `/app` spelled once
   (architecture rule 5).
-- **Produced:** two commits on `classification-lookup-scope`: the redirect fix, and this entry.
-  The e2e test gains one line — the final URL carries no `scope` — so the redirect itself is
-  asserted rather than only tolerated.
+- **Also fixed:** `shed.spec.ts`, which the four blocked `ratelimit` tests had been hiding. With
+  the classification test green those ran again, and `it offers the section that was being
+  compared` failed in one of the two Actions runs of the same commit with `200` where it expected
+  `429`. `spendTheBucket` returns on the first shed request, which leaves the bucket holding
+  between zero and one token against a refill of one a second (ADR-0066), so the navigation after
+  it has under a second to arrive. `gotoShed` spends and re-navigates until the navigation itself
+  is shed, five attempts.
+- **Produced:** three commits on `classification-lookup-scope`: the redirect fix, this entry, the
+  shed helper. The classification e2e test gains one line — the final URL carries no `scope` — so
+  the redirect itself is asserted rather than only tolerated.
 - **Verified:** `make test-e2e` **605 passed, 2 skipped** locally against the compose stack and
-  the full local corpus, the four `ratelimit` tests among them; `classification.spec.ts` 12/12.
-  The three redirect shapes by hand: `?scope=&title=18&section=3551` → `302` to
-  `/app/classification?title=18&section=3551`, `?scope=` → `302` to `/app/classification`,
-  `?scope=118-2&q=35` → `200`.
+  the full local corpus, the four `ratelimit` tests among them; `classification.spec.ts` 12/12;
+  `make test-web` **375**. The three redirect shapes by hand:
+  `?scope=&title=18&section=3551` → `302` to `/app/classification?title=18&section=3551`,
+  `?scope=` → `302` to `/app/classification`, `?scope=118-2&q=35` → `200`.
