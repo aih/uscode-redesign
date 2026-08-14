@@ -22,6 +22,12 @@
  * and accessibility suites treat it as a fixed target — every other route's
  * appearance depends on what the corpus happens to hold.
  *
+ * `ClassificationLookup` is here in full, script and all, because it asks the
+ * API only on input and nothing on this page types into it (ADR-0067). It is
+ * the one island whose no-data property is a property of *when* it fetches
+ * rather than of what it renders, so `design.spec.ts`'s request assertion is
+ * what holds the claim up.
+ *
  * The cost of that is the specimen text below: it is a specimen, under title 0,
  * which OLRC does not publish. Its citations and links therefore resolve to
  * nothing, and the page says so rather than borrowing a real provision's
@@ -42,6 +48,8 @@ import ApparatusDisclosure from "../components/ApparatusDisclosure.astro";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import ChapterRail from "../components/ChapterRail.astro";
 import CitationNotFound from "../components/CitationNotFound.astro";
+import ClassificationLookup from "../components/ClassificationLookup.astro";
+import ClassificationTable from "../components/ClassificationTable.astro";
 import CommandPalette from "../components/CommandPalette.astro";
 import CopyColumn from "../components/CopyColumn.astro";
 import NoResults from "../components/NoResults.astro";
@@ -61,7 +69,14 @@ import { setPublicCache } from "../lib/cache";
 import { documentDiff, diffLinesHtml, diffSummary } from "../lib/diffdoc";
 import { sectionCommands } from "../lib/palette";
 import { previewFailureHtml } from "../lib/preview";
-import type { Citation, Entry, Release, SearchResultItem, VersionEntry } from "../lib/types";
+import type {
+  Citation,
+  ClassificationEntry,
+  Entry,
+  Release,
+  SearchResultItem,
+  VersionEntry,
+} from "../lib/types";
 import { appHref } from "../lib/url";
 import { copyableIdentifiers, outline, parseFragment, readingBlocks, render } from "../lib/uslm";
 
@@ -379,6 +394,126 @@ const APPENDIX: Citation = {
     "/us/usc/t5a/s3 to show.",
 };
 
+/** Four classification rows, one per state a cell can be in (ADR-0067).
+ *
+ * A classification row is the one specimen on this page whose *unlinked*
+ * rendering is as common as its linked one: 1,533 rows of the corpus derive no
+ * `usc_identifier`, 1,531 of them appendix rows, which derive none by rule. So
+ * the citation column is shown both ways — row 3 is the appendix case — along
+ * with the row that carries no public law and no Statutes at Large page,
+ * because its columns ran together in the source.
+ *
+ * Everything here is under title 0, as the rest of the page is, so the two
+ * links each row can make — the provision in the reader, the law on govinfo —
+ * resolve to nothing. The Statutes at Large volume is 0 for the same reason.
+ */
+const CLASSIFICATION_ROWS: ClassificationEntry[] = [
+  {
+    congress: 0,
+    session: 2,
+    session_label: "2",
+    row_seq: 0,
+    raw_line: '0     1                             0-1      101(a)                   3',
+    title_raw: "0",
+    title_num: "0",
+    is_appendix: false,
+    section_raw: "1",
+    section_norm: "1",
+    description_raw: "",
+    is_note: false,
+    action: null,
+    transfer_counterpart: null,
+    act_name: null,
+    usc_identifier: "/us/usc/t0/s1",
+    pl_congress: 0,
+    pl_num: 1,
+    pl_label: "0-1",
+    pl_section_raw: "101(a)",
+    new_section_quote: null,
+    stat_volume: null,
+    stat_pages: [3],
+    stat_page_labels: ["3"],
+  },
+  {
+    congress: 0,
+    session: 2,
+    session_label: "2",
+    row_seq: 1,
+    raw_line: '0     2            nt new        0-1      104 "50506"              1544, 1545',
+    title_raw: "0",
+    title_num: "0",
+    is_appendix: false,
+    section_raw: "2",
+    section_norm: "2",
+    description_raw: "nt new",
+    is_note: true,
+    action: "new",
+    transfer_counterpart: null,
+    act_name: null,
+    usc_identifier: "/us/usc/t0/s2",
+    pl_congress: 0,
+    pl_num: 1,
+    pl_label: "0-1",
+    pl_section_raw: "104",
+    new_section_quote: "50506",
+    stat_volume: null,
+    stat_pages: [1544, 1545],
+    stat_page_labels: ["1544", "1545"],
+  },
+  {
+    congress: 0,
+    session: 2,
+    session_label: "2",
+    row_seq: 2,
+    raw_line: "0A    101          Specimen Act nt new0-24    1                        100",
+    title_raw: "0A",
+    title_num: "0a",
+    is_appendix: true,
+    section_raw: "101",
+    section_norm: "101",
+    description_raw: "Specimen Act nt new",
+    is_note: true,
+    action: "new",
+    transfer_counterpart: null,
+    act_name: "Specimen Act",
+    usc_identifier: null,
+    pl_congress: 0,
+    pl_num: 24,
+    pl_label: "0-24",
+    pl_section_raw: "1",
+    new_section_quote: null,
+    stat_volume: null,
+    stat_pages: [100],
+    stat_page_labels: ["100"],
+  },
+  {
+    congress: 0,
+    session: 2,
+    session_label: "2",
+    row_seq: 3,
+    raw_line: '0     3                             1401(a)(1) "Subchapter',
+    title_raw: "0",
+    title_num: "0",
+    is_appendix: false,
+    section_raw: "3",
+    section_norm: "3",
+    description_raw: "",
+    is_note: false,
+    action: null,
+    transfer_counterpart: null,
+    act_name: null,
+    usc_identifier: "/us/usc/t0/s3",
+    pl_congress: null,
+    pl_num: null,
+    pl_label: null,
+    pl_section_raw: '1401(a)(1) "Subchapter',
+    new_section_quote: null,
+    stat_volume: null,
+    stat_pages: [],
+    stat_page_labels: [],
+  },
+];
+
 /** Every colour token that takes part in a declared pair, in first-seen order.
  *  The swatches and the table are the same list read twice. */
 const TOKENS = [
@@ -432,6 +567,7 @@ const TYPE_ROLES = [
     <p class="apidocs__contents-item"><a href="#density">Reading density</a></p>
     <p class="apidocs__contents-item"><a href="#print">Print</a></p>
     <p class="apidocs__contents-item"><a href="#search">Search results</a></p>
+    <p class="apidocs__contents-item"><a href="#classification">Classification rows</a></p>
     <p class="apidocs__contents-item"><a href="#messages">Messages</a></p>
   </nav>
 
@@ -917,6 +1053,39 @@ const TYPE_ROLES = [
 
   <div class="spec">
     <SearchFacets facets={FACETS} query="conservation title:16" total={194} />
+  </div>
+
+  {/* -------------------------------------------------------- classification */}
+  <h2 class="toc-group" id="classification">Classification rows</h2>
+
+  <p>
+    A row of an OLRC classification table (ADR-0067): the Code citation a provision was
+    classified to, what was done to it, the public law, the law's own section designator, and
+    the page of the Statutes at Large. Every cell has a rendering for the case where the source
+    supplies nothing, and the four rows below are those cases — 1,533 rows of the corpus carry
+    no identifier to link to, 2 carry no public law, and 127 carry a Statutes at Large page the
+    parser could not separate from the column beside it.
+  </p>
+
+  <div class="spec">
+    <ClassificationTable
+      entries={CLASSIFICATION_ROWS}
+      caption="Classification rows, specimen"
+      statVolume={0}
+    />
+  </div>
+
+  <p class="spec__label">The lookup</p>
+
+  <p>
+    A public law, a provision of one, or a Code citation, answered as you type. The box below is
+    the component; it asks the API only once something is typed into it, and nothing on this
+    page types into it. Its listbox open, with one option active, is one of the states the
+    accessibility scan visits on <code>/app/classification</code> rather than here.
+  </p>
+
+  <div class="spec">
+    <ClassificationLookup idPrefix="classlookup-specimen" />
   </div>
 
   {/* -------------------------------------------------------------- messages */}
