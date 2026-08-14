@@ -8,6 +8,7 @@ working (PLAN.md Day 7).
 
 from __future__ import annotations
 
+import io
 from typing import Iterator
 
 from ingest.base import UslmParser
@@ -29,6 +30,16 @@ def parser_for(source: XmlSource) -> UslmParser:
     if parser_class is None:  # pragma: no cover - unreachable while PARSERS is total
         raise UnknownUslmSchemaError(f"no parser registered for USLM {version}")
     return parser_class()
+
+
+def parser_for_fragment(xml: str) -> UslmParser:
+    """Return a parser for a stored section fragment, chosen by its namespace.
+
+    Stored fragments carry their `xmlns` declarations (verified across both
+    loaded schema generations), so the same sniff works on them — wrapped in
+    `BytesIO` because `XmlSource` treats a bare `str` as a path.
+    """
+    return parser_for(io.BytesIO(xml.encode("utf-8")))
 
 
 def iter_sections(source: XmlSource) -> Iterator[SectionRecord]:
