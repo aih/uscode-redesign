@@ -255,6 +255,53 @@ def main(argv: list[str] | None = None) -> int:
         "--cache-dir", type=Path, default=classification_mod.CACHE_DIR
     )
 
+    hf_export_parser = subparsers.add_parser(
+        "hf-export",
+        help="Export the corpus as Hugging Face parquet shards (ADR-0069)",
+    )
+    hf_export_parser.add_argument(
+        "--out", type=Path, default=Path("data/hf"), help="Output directory"
+    )
+    hf_export_parser.add_argument(
+        "--config",
+        choices=("current", "versions"),
+        action="append",
+        default=None,
+        help="Export one config (repeatable); default both",
+    )
+    hf_export_parser.add_argument("--batch-size", type=int, default=500)
+    hf_export_parser.add_argument(
+        "--limit", type=int, default=None, help="Export at most this many rows per config"
+    )
+    hf_export_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Export even when the corpus fingerprint is unchanged",
+    )
+
+    hf_upload_parser = subparsers.add_parser(
+        "hf-upload",
+        help="Upload the exported shards (and card) to the Hugging Face dataset repo",
+    )
+    hf_upload_parser.add_argument("--repo", default=None, help="Dataset repo id")
+    hf_upload_parser.add_argument(
+        "--data-dir", type=Path, default=Path("data/hf"), help="Exported shards directory"
+    )
+    hf_upload_parser.add_argument(
+        "--init",
+        action="store_true",
+        help="One-time setup: create the repo and upload the card; pushes no shards",
+    )
+    hf_upload_parser.add_argument(
+        "--card",
+        action="store_true",
+        help="Also upload docs/hf/dataset-card.md as README.md",
+    )
+    hf_upload_parser.add_argument("--message", default=None, help="Commit message")
+    hf_upload_parser.add_argument(
+        "--private", action="store_true", help="Create the repo private (--init only)"
+    )
+
     load_parser = subparsers.add_parser("load", help="Load one USLM title file")
     load_parser.add_argument("xmlfile", type=Path)
     load_parser.add_argument(
@@ -291,6 +338,8 @@ def main(argv: list[str] | None = None) -> int:
         "verify": _cmd_verify,
         "classification": _cmd_classification,
         "classification-check": _cmd_classification_check,
+        "hf-export": _cmd_hf_export,
+        "hf-upload": _cmd_hf_upload,
         "load": _cmd_load,
     }[args.command](args)
 
@@ -688,6 +737,56 @@ def _cmd_classification_check(args: argparse.Namespace) -> int:
         return 0
     print(f"CHANGED ({len(result.changed_files)}): {', '.join(result.changed_files)}")
     return 10
+
+
+_HF_DEPS_HINT = (
+    "the HF dataset pipeline needs the `dataset` dependency group: "
+    "run `uv sync --group dataset` (ADR-0069)"
+)
+
+
+def _cmd_hf_export(args: argparse.Namespace) -> int:
+    # Lazy import: pyarrow lives in the `dataset` group so the API image and a
+    # plain `uv sync` don't carry it, and `load-all` keeps working without it.
+    try:
+        from ingest import hf_export
+    except ImportError as exc:
+        print(f"hf-export unavailable ({exc}): {_HF_DEPS_HINT}", file=sys.stderr)
+        return 1
+
+    configs = tuple(args.config) if args.config else hf_export.CONFIGS
+    report = hf_export.export(
+        args.out,
+        configs=configs,
+        batch_size=args.batch_size,
+        limit=args.limit,
+        force=args.force,
+    )
+    return 0 if report else 1
+
+
+def _cmd_hf_upload(args: argparse.Namespace) -> int:
+    try:
+        from ingest import hf_upload
+    except ImportError as exc:
+        print(f"hf-upload unavailable ({exc}): {_HF_DEPS_HINT}", file=sys.stderr)
+        return 1
+
+    kwargs = {}
+    if args.repo:
+        kwargs["repo_id"] = args.repo
+    if args.init:
+        url = hf_upload.init_repo(private=args.private, **kwargs)
+        print(f"Repo ready: {url}")
+        return 0
+    url = hf_upload.upload(
+        data_dir=args.data_dir,
+        card=args.card,
+        message=args.message,
+        **kwargs,
+    )
+    print(f"Uploaded: {url}")
+    return 0
 
 
 def _cmd_load(args: argparse.Namespace) -> int:

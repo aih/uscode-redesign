@@ -53,6 +53,25 @@ scenario block that is simultaneously the walkthrough a reader follows, a Playwr
 on every push, and a captioned scene of the demo video `make demo-video` records. A claim that stops
 being true fails the build.
 
+## The corpus as a dataset
+
+The parsed corpus is published on Hugging Face at
+[dreamproit/uscode](https://huggingface.co/datasets/dreamproit/uscode)
+([ADR-0069](docs/adr/0069-publish-the-corpus-as-a-hugging-face-dataset.md)): a `current` config —
+one row per section at its newest release point, 65,938 rows — and a `versions` config — one row
+per distinct text with the release points it was in force, 489,738 rows. Each row carries plain
+text, verbatim USLM XML, citation, hierarchy and release metadata; `content_hash` joins the two
+configs.
+
+```python
+from datasets import load_dataset
+sections = load_dataset("dreamproit/uscode", "current", split="train")
+```
+
+`make hf-export` regenerates the shards from the loaded corpus (a no-op until OLRC publishes a new
+release point) and `make hf-upload` pushes them; `docs/verification/hf-dataset.json` records what
+was last published.
+
 ## Documents
 
 | File | Purpose |

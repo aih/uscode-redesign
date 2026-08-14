@@ -58,7 +58,9 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv sync --frozen
+      # --group dataset so the HF export integration test runs rather than
+      # skipping on a missing pyarrow (ADR-0069).
+      - run: uv sync --frozen --group dataset
 
       - name: Load the fixture corpus (offline)
         run: make ci-data

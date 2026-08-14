@@ -2791,3 +2791,54 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   `make test-web` **381** (+6 `classificationNote` cases). The three redirect shapes by hand:
   `?scope=&title=18&section=3551` → `302` to `/app/classification?title=18&section=3551`,
   `?scope=` → `302` to `/app/classification`, `?scope=118-2&q=35` → `200`.
+
+## 075 — 2026-08-14 — Session 53: the corpus as a Hugging Face dataset
+
+- **Tool/model:** Claude Code, Fable 5.
+- **Asked:** A pipeline that processes the US Code XML for upload to Hugging Face; a
+  `dreamproit/uscode` dataset repo with cards modeled on `dreamproit/bill_summary_us`; a review of
+  whether datatrove adds value; the committed update pipeline separated from the one-time setup;
+  a walkthrough of credentials and upload.
+- **Decided:**
+  - Two configs joined by `content_hash` — `current` (65,938 rows) and `versions` (489,738 rows) —
+    exported from Postgres, not by re-parsing the XML; datatrove reviewed and declined; pyarrow
+    writes the shards directly; CC0 (ADR-0069, all of it).
+  - Plain-text extraction is the parser layer's job: four new `ElementNames` vocabularies and
+    `plain_text()`/`notes_text()` on `StreamingSectionParser`, so the element-name allowlist in
+    `tests/test_architecture.py` is unchanged. Block partition per ADR-0040's artifact; unheaded
+    designators run into their text as printed; a headed provision breaks after its heading (card
+    limitation).
+  - Release ranges (`first_release`/`last_release`/`releases`/`text_since`) aggregate
+    `section_release_map` in Postgres — never `first_release_id` (ADR-0066's finding).
+  - One-time vs recurring is a command split: `hf-upload --init` (create repo + card, no data)
+    vs `hf-export` (no-op on unchanged fingerprint) → `hf-upload` (refuses a `--limit` export).
+    Auth is `hf auth login`'s stored token; nothing takes a token argument.
+  - `pyarrow`/`huggingface-hub` live in a `dataset` dependency group; the CLI imports them lazily;
+    CI's Python job syncs the group.
+  - Found and handled while exporting: four corpus identifiers embed a literal `§ ` +
+    narrow no-break space (`/us/usc/t2/s § 112g`) — kept in `identifier`, stripped from
+    `citation`/`num_value`.
+- **Produced:** `ingest/hf_export.py`, `ingest/hf_upload.py`, extraction in
+  `ingest/{base,uslm1,uslm2,records,parser}.py`, `tests/test_uslm_text.py` (15),
+  `tests/test_hf_export.py` (10, one integration), `tests/test_hf_upload.py` (5),
+  `docs/hf/dataset-card.md`, ADR-0069, the `INFRASTRUCTURE_ADRS` line, Makefile
+  `hf-export`/`hf-upload`/`hf-init`, the `dataset` group. Commits `db1813b..135b7dc` + this one.
+- **Verified:**
+  - `make test` — 768 passed (was 746). `make test-web` — 370 passed; removing the ADR-0069
+    exemption fails the ratchet with exactly `[69]`, restored and re-run green.
+  - Trial export (`--limit 200`, dev corpus): every column populates — §1's `text_since` 117-80,
+    39-release `releases` list, ancestors with headings, en-dash headings; re-run with unchanged
+    fingerprint says "Nothing changed since 119-102not101".
+  - The integration test runs the fixture-corpus assertions (5,095 rows, §45f spot checks) in CI
+    via `USC_REQUIRE_INTEGRATION`; against the full dev corpus it exports 300 rows and checks shape.
+  - Full export ran on this box: `current` 65,938 rows / 3 shards / 0.19 GB, `versions` 489,738
+    rows / 20 shards / 2.98 GB, ~25 minutes. (The first two runs died at ~2 minutes — the harness's
+    default timeout SIGTERMs a backgrounded `make`; the run that survived was `nohup`ed.)
+  - One-time setup ran: `hf auth login` (fine-grained token, `repo.write` on `dreamproit`),
+    `make hf-init`, `make hf-upload` → hub commit `a34c462`. Round-trip verified:
+    `load_dataset("dreamproit/uscode", "current")` from the hub returns 65,938 rows with §45f
+    intact; `versions` streams. `docs/verification/hf-dataset.json` committed.
+  - The dataset then got its reader surface: an "as a dataset" section on `/app/about`, the
+    matching subsection and scenario in guide chapter 01 (which now claims ADR-0069, replacing the
+    `INFRASTRUCTURE_ADRS` line), and a README section. `make test-web` green; `astro build` green;
+    the new scenario runs with the e2e suite in CI.

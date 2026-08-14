@@ -1,0 +1,77 @@
+{
+  "_comment": "What the last `make hf-upload` published (ADR-0069). Regenerate by re-running it; the shard hashes come from data/hf/manifest.json.",
+  "repo": "dreamproit/uscode",
+  "uploaded_at": "2026-08-14T16:23:09.072338+00:00",
+  "commit_url": "https://huggingface.co/datasets/dreamproit/uscode/commit/a34c462ae07710fcc3854016130d83f01df1317e",
+  "newest_release": {
+    "label": "119-102not101",
+    "seq": 381,
+    "currency_date": "2026-07-12"
+  },
+  "exported_at": "2026-08-14T16:11:36.657297+00:00",
+  "git_commit": "57f482ee82f59413cd68dc8cab2014a93cf34c8b",
+  "configs": {
+    "current": {
+      "rows": 65938,
+      "shards": [
+        "train-00000-of-00003.parquet",
+        "train-00001-of-00003.parquet",
+        "train-00002-of-00003.parquet"
+      ],
+      "bytes": 189987212,
+      "sha256": {
+        "train-00000-of-00003.parquet": "2fb2503a39d45f005ecfb21e7e6c4f32d0609fa5df6c7f5a808b6de9d176a8e8",
+        "train-00001-of-00003.parquet": "24ee3e15e12d25b0ca8b6a37b17d67e5a3acea656a8b32da57f0999ba048937a",
+        "train-00002-of-00003.parquet": "4e99d85798bf177ff490c71504d9638ca0eb3f664644950ddd2ac212ebe68585"
+      }
+    },
+    "versions": {
+      "rows": 489738,
+      "shards": [
+        "train-00000-of-00020.parquet",
+        "train-00001-of-00020.parquet",
+        "train-00002-of-00020.parquet",
+        "train-00003-of-00020.parquet",
+        "train-00004-of-00020.parquet",
+        "train-00005-of-00020.parquet",
+        "train-00006-of-00020.parquet",
+        "train-00007-of-00020.parquet",
+        "train-00008-of-00020.parquet",
+        "train-00009-of-00020.parquet",
+        "train-00010-of-00020.parquet",
+        "train-00011-of-00020.parquet",
+        "train-00012-of-00020.parquet",
+        "train-00013-of-00020.parquet",
+        "train-00014-of-00020.parquet",
+        "train-00015-of-00020.parquet",
+        "train-00016-of-00020.parquet",
+        "train-00017-of-00020.parquet",
+        "train-00018-of-00020.parquet",
+        "train-00019-of-00020.parquet"
+      ],
+      "bytes": 2983329057,
+      "sha256": {
+        "train-00000-of-00020.parquet": "bb672b49e838c6e759a95a13720d76af69313c1ea61c830e1ebffb08a61e352d",
+        "train-00001-of-00020.parquet": "31e8d1f8a14bb3d2fc2965feb952147ad32cd67f971d9b2364b8efc88339ba67",
+        "train-00002-of-00020.parquet": "30947c7f1501ba1a3db189b62d5e1876082d67787366fa62412088aeef78b009",
+        "train-00003-of-00020.parquet": "d82eeac77b8cf0d4f3123ff6985708d4570223a3a97e5afacd7b41433ca458fc",
+        "train-00004-of-00020.parquet": "06f1213af2a05f39a76258c08420f4d6d7f0ae04cb6f78183bdee8cb1d5a1365",
+        "train-00005-of-00020.parquet": "b970c683be74500264f2282bf12961d0ace767d5fc2d469f5988954f4ae4a8d8",
+        "train-00006-of-00020.parquet": "6186df437e5f6823ce483762c944d712828139861d82e503eb8a302cad62d143",
+        "train-00007-of-00020.parquet": "c2796eb4b9b2bfa7821a3ba6548aaf231ff855dbb1062ca21c01ef1921a1be03",
+        "train-00008-of-00020.parquet": "a36cfef991f0cab28856ad40d83307976e0fc75d77cd6a26d99493f316a035f7",
+        "train-00009-of-00020.parquet": "2cf8a6d974fc26e513294e632c57bf0ce3fffe09c0d83f1ab9edcf0607f1dc7e",
+        "train-00010-of-00020.parquet": "5f24b97935d943881c7fb4337ddb5e0038334584444e515a031bf075549365d5",
+        "train-00011-of-00020.parquet": "b3df8bf2c4c7d54d20bd0bb942a6a318c297b6ed8d90438b32a80911ffeb8943",
+        "train-00012-of-00020.parquet": "5cab48888c559f7f3b37aee06dab61dbec798c440ee85b502c97520904cbb753",
+        "train-00013-of-00020.parquet": "743b0338fb16d76d7d281c5170a9a9485b2e4949c8679538bbae333cb881f59c",
+        "train-00014-of-00020.parquet": "12c15baf9c2cd39535d47798bfc7a61fd752fa4319bd8fe628f3d4ca573f13c7",
+        "train-00015-of-00020.parquet": "c3dd71039e29cd844c1d43b5a7bd8d9c716d76f2749376a33f5eaaa8c16c97bc",
+        "train-00016-of-00020.parquet": "92eb9f587d0b37c814a907f348ee0e600a4df2732136a6c7977af9ecb2005056",
+        "train-00017-of-00020.parquet": "59461e072a8f800095c3cd6cac58bbbca4be7e06059ef98421197c99d23e7d4f",
+        "train-00018-of-00020.parquet": "0e2c42a439e385b467f91916d8576735c26eadff3c9d41302ef54d4fb8a37cc3",
+        "train-00019-of-00020.parquet": "06923670556d3c5e0e1127adfa9fb179937660609cafe775d3405a8eb6cb9db9"
+      }
+    }
+  }
+}

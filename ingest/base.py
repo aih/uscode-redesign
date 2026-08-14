@@ -21,6 +21,7 @@ from ingest.records import (
     DocumentMeta,
     GuidRef,
     NoteRecord,
+    NoteText,
     SectionRecord,
     StructureRecord,
 )
@@ -51,6 +52,30 @@ class ElementNames:
     title uses every level (Title 16 has no `subtitle`), and the list is a
     vocabulary to *recognize*, not a hierarchy to enforce — the tree comes from the
     document, not from this order."""
+
+    toc: str
+    """The table-of-contents element — excluded from plain text (ADR-0069)."""
+
+    text_blocks: tuple[str, ...]
+    """Local names below the section that start a new line of plain text: the
+    provision ladder (`subsection` … `subsubitem`), the leaf text carriers
+    (`chapeau`, `content`, `continuation`, `proviso`, `p`), and table/list
+    machinery. The partition follows the measured inline/block artifact of
+    ADR-0040 (`docs/verification/inline-elements.json`): `num` and `heading` are
+    deliberately absent so a provision's designator and heading share its first
+    line. Matched by local name so USLM's XHTML-namespace table elements are
+    covered without a second vocabulary."""
+
+    text_run_on: tuple[str, ...]
+    """The subset of `text_blocks` that keeps the printed Code's run-on form
+    after a bare designator — the leaf text carriers, so `(1) assure the
+    preservation…` stays one line while a sibling *provision* after a bare
+    `<num>` still breaks."""
+
+    text_spaced: tuple[str, ...]
+    """Local names whose text joins the line with a space on either side:
+    `num`, `heading`, table cells. Never the mid-word inline elements —
+    `460<i>l</i>–3` must stay one word."""
 
 
 @dataclass(slots=True)
@@ -253,6 +278,45 @@ class StreamingSectionParser:
                 element.clear()
         return count
 
+    def plain_text(self, fragment: str | etree._Element) -> str:
+        """Body text of a stored section fragment, one line per block (ADR-0069).
+
+        Excludes `<notes>`/`<note>`, `<sourceCredit>` and `<toc>`; every
+        `text_blocks` element starts a new line; a provision's `<num>` and
+        `<heading>` share its first line. `<quotedContent>` text is kept — it is
+        body text — as a block of its own unless it sits inside a sentence, the
+        same per-occurrence test ADR-0040 measured the partition with. Elements
+        are matched by local name, so XHTML-namespace table markup needs no
+        second vocabulary. Whitespace collapses within each line and empty lines
+        are dropped.
+
+        Accepts the serialized fragment or an already-parsed element, so a
+        caller extracting body and notes from one fragment parses it once.
+        """
+        root = etree.fromstring(fragment) if isinstance(fragment, str) else fragment
+        parts: list[str] = []
+        self._emit_text(root, parts, self._text_skip_locals(), self._text_block_locals())
+        return self._join_text(parts)
+
+    def notes_text(self, fragment: str | etree._Element) -> tuple[NoteText, ...]:
+        """Each note of a stored section fragment as plain text (ADR-0069).
+
+        Walks the same containers as `_collect_notes`. A note's own heading is
+        reported in `heading` and left out of `text`.
+        """
+        root = etree.fromstring(fragment) if isinstance(fragment, str) else fragment
+        collected: list[NoteText] = []
+        note_tag = self._q(self.elements.note)
+        notes_tag = self._q(self.elements.notes)
+        for child in root:
+            if child.tag == note_tag:
+                collected.append(self._note_text(child))
+            elif child.tag == notes_tag:
+                collected.extend(
+                    self._note_text(note) for note in child if note.tag == note_tag
+                )
+        return tuple(collected)
+
     # ----------------------------------------------------------------- hooks
 
     def _meta_extras(self, meta: etree._Element | None) -> dict[str, object]:
@@ -336,6 +400,125 @@ class StreamingSectionParser:
             heading=self._normalize(note.find(self._q(self.elements.heading))),
             xml=etree.tostring(note, encoding="unicode", with_tail=False),
         )
+
+    def _note_text(self, note: etree._Element) -> NoteText:
+        skip = frozenset((self.elements.toc,))
+        blocks = self._text_block_locals()
+        heading_tag = self._q(self.elements.heading)
+        parts: list[str] = []
+        if note.text:
+            parts.append(note.text)
+        for child in note:
+            if child.tag != heading_tag:
+                self._emit_text(child, parts, skip, blocks)
+            if child.tail:
+                parts.append(child.tail)
+        return NoteText(
+            topic=note.get("topic"),
+            role=note.get("role"),
+            heading=self._normalize(note.find(heading_tag)),
+            text=self._join_text(parts),
+        )
+
+    def _text_skip_locals(self) -> frozenset[str]:
+        return frozenset(
+            (
+                self.elements.notes,
+                self.elements.note,
+                self.elements.source_credit,
+                self.elements.toc,
+            )
+        )
+
+    def _text_block_locals(self) -> frozenset[str]:
+        # Quoted sections and structural levels can appear inside
+        # <quotedContent>, so the whole recognized vocabulary breaks lines.
+        return frozenset(
+            (
+                *self.elements.text_blocks,
+                *self.elements.structure,
+                self.elements.section,
+                self.elements.quoted_content,
+            )
+        )
+
+    def _emit_text(
+        self,
+        element: etree._Element,
+        parts: list[str],
+        skip: frozenset[str],
+        blocks: frozenset[str],
+    ) -> None:
+        local = self._local_name(element)
+        if local is None or local in skip:
+            return  # the subtree; its tail belongs to the parent and stays
+        block = local in blocks and not (
+            local == self.elements.quoted_content and self._in_running_prose(element)
+        )
+        spaced = local in self.elements.text_spaced
+        if block and not (
+            local in self.elements.text_run_on and self._runs_on_from_num(element)
+        ):
+            parts.append("\n")
+        elif spaced:
+            parts.append(" ")
+        if element.text:
+            parts.append(element.text)
+        for child in element:
+            self._emit_text(child, parts, skip, blocks)
+            if child.tail:
+                parts.append(child.tail)
+        if block:
+            parts.append("\n")
+        elif spaced:
+            parts.append(" ")
+
+    def _runs_on_from_num(self, element: etree._Element) -> bool:
+        """True when everything before `element` in its parent is the bare
+        `<num>` — the unheaded-provision case, where the printed Code runs the
+        designator and the text together (`(1) assure the preservation…`). A
+        heading before the block keeps the break, so a headed provision still
+        reads `(a) Statement of purpose` with its text below (ADR-0069)."""
+        parent = element.getparent()
+        if parent is None or (parent.text or "").strip():
+            return False
+        saw_num = False
+        for sibling in element.itersiblings(preceding=True):
+            if (sibling.tail or "").strip():
+                return False
+            local = self._local_name(sibling)
+            if local is None:
+                continue
+            if local != self.elements.num:
+                return False
+            saw_num = True
+        return saw_num
+
+    @staticmethod
+    def _local_name(element: etree._Element) -> str | None:
+        """Local name, or None for non-elements (comments, PIs)."""
+        tag = element.tag
+        if not isinstance(tag, str):
+            return None
+        return etree.QName(tag).localname
+
+    @staticmethod
+    def _in_running_prose(element: etree._Element) -> bool:
+        """A non-whitespace text node immediately beside the element — the test
+        `scripts/inline_elements.py` counts with (ADR-0040)."""
+        previous = element.getprevious()
+        if previous is not None:
+            before = previous.tail
+        else:
+            parent = element.getparent()
+            before = parent.text if parent is not None else None
+        return bool((before or "").strip()) or bool((element.tail or "").strip())
+
+    @staticmethod
+    def _join_text(parts: list[str]) -> str:
+        lines = ("".join(parts)).split("\n")
+        collapsed = (" ".join(line.split()) for line in lines)
+        return "\n".join(line for line in collapsed if line)
 
     def _collect_guids(
         self, element: etree._Element, section_identifier: str

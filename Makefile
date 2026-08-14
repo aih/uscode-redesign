@@ -1,7 +1,8 @@
 .PHONY: dev dev-web dev-all dev-data ci-data ci-classification-data \
         test test-web test-slow test-all fixtures \
         verify verify-deep load-all shots loadtest navprofile spine-explain \
-        test-e2e test-a11y demo-video measure footnav mobilebar diffcost
+        test-e2e test-a11y demo-video measure footnav mobilebar diffcost \
+        hf-export hf-upload hf-init
 
 # The API alone: /api/v1, the citation redirector at /us/usc, and /docs. The
 # reader is a separate process (ADR-0011), so /app answers only under `dev-all`
@@ -175,6 +176,18 @@ verify-deep:
 # Load every downloaded title, ledger-driven, resumable (ADR-0014).
 load-all:
 	uv run python -m ingest load-all
+
+# The Hugging Face dataset pipeline (ADR-0069). hf-init is one-time setup:
+# create dreamproit/uscode and upload the card, no shards. hf-export no-ops
+# when the corpus fingerprint is unchanged; hf-upload pushes data/hf/.
+hf-export:
+	uv run --group dataset python -m ingest hf-export
+
+hf-upload:
+	uv run --group dataset python -m ingest hf-upload
+
+hf-init:
+	uv run --group dataset python -m ingest hf-upload --init
 
 # Load test of the top routes: how many requests per second each holds. Every
 # row names the ADR-0029 limiter that governs it and whether it was held inside

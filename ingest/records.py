@@ -47,6 +47,17 @@ class NoteRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class NoteText:
+    """One note as plain text (ADR-0069). `text` excludes the note's own heading,
+    which rides in `heading`; the verbatim XML stays available on the section."""
+
+    topic: str | None
+    role: str | None
+    heading: str | None
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class SectionRecord:
     """One US Code section — the storage atom (ADR-0001).
 

@@ -63,6 +63,38 @@ class Uslm2Parser(StreamingSectionParser):
             "article",
             "subarticle",
         ),
+        toc="toc",
+        # As 1.x, plus the 2.x list model (<list>/<listItem>/<listContent>) and
+        # the <layout>/<header>/<row>/<column> machinery usc49.xml uses for
+        # tables (ADR-0069).
+        text_blocks=(
+            "subsection",
+            "paragraph",
+            "subparagraph",
+            "clause",
+            "subclause",
+            "item",
+            "subitem",
+            "subsubitem",
+            "level",
+            "chapeau",
+            "content",
+            "continuation",
+            "proviso",
+            "p",
+            "list",
+            "listItem",
+            "listContent",
+            "layout",
+            "header",
+            "row",
+            "table",
+            "caption",
+            "tr",
+            "br",
+        ),
+        text_run_on=("chapeau", "content", "continuation", "proviso", "p"),
+        text_spaced=("num", "heading", "column", "td", "th"),
     )
 
     def _meta_extras(self, meta: etree._Element | None) -> dict[str, object]:

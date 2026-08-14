@@ -56,6 +56,35 @@ class Uslm1Parser(StreamingSectionParser):
             "article",
             "subarticle",
         ),
+        toc="toc",
+        # The provision ladder, the leaf text carriers, and 1.x's table markup
+        # (XHTML-namespace; text extraction matches local names). `num` and
+        # `heading` stay off the list so a provision's designator and heading
+        # share one line (ADR-0069).
+        text_blocks=(
+            "subsection",
+            "paragraph",
+            "subparagraph",
+            "clause",
+            "subclause",
+            "item",
+            "subitem",
+            "subsubitem",
+            "level",
+            "chapeau",
+            "content",
+            "continuation",
+            "proviso",
+            "p",
+            "list",
+            "listItem",
+            "table",
+            "caption",
+            "tr",
+            "br",
+        ),
+        text_run_on=("chapeau", "content", "continuation", "proviso", "p"),
+        text_spaced=("num", "heading", "td", "th"),
     )
 
     def _meta_extras(self, meta: etree._Element | None) -> dict[str, object]:
