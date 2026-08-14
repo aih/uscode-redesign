@@ -462,9 +462,12 @@ PR #47. Once `deploy.yml` ships them:
 
 1. Check `/app/classification` renders the registry and reports 144,837 rows.
 2. `classification_source_checks` holds 0 rows — the loader does not write one, `classification-check`
-   does. The index page says so in as many words ("This site has no record of checking
-   uscode.house.gov for new classification tables") until the first poll. The daily cron writes one within a day of the deploy, since the new
-   `deploy/update-corpus.sh` runs the check before anything else.
+   does. Until the first poll the index page reports the baseline instead: "The classification
+   tables were last checked on 08/13/2026, when this site loaded them from uscode.house.gov"
+   (`CLASSIFICATION_BASELINE_CHECKED_AT` in `api/schemas.py`, flagged `baseline` in
+   `/api/v1/classifications/tables`). The daily cron writes a real row within a day of the deploy,
+   since the new `deploy/update-corpus.sh` runs the check before anything else, and owns the date
+   from then on.
 
 Everything else this list used to hold is done. `ingest verify` passes on the box (3,153 title-versions
 across 381 release points and 58 titles; 91.0% dedupe; the six count mismatches are exactly the

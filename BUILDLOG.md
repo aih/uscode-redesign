@@ -2842,3 +2842,13 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     matching subsection and scenario in guide chapter 01 (which now claims ADR-0069, replacing the
     `INFRASTRUCTURE_ADRS` line), and a README section. `make test-web` green; `astro build` green;
     the new scenario runs with the e2e suite in CI.
+- **Also:** the classification never-checked warning now names a date. Session 52's
+  `classificationNote` still had a "no record of checking" state for a box whose
+  `classification_source_checks` is empty — which the deployed box is until its first poll.
+  `ClassificationCheckOut.of(None)` now reports `CLASSIFICATION_BASELINE_CHECKED_AT`
+  (2026-08-13, when the tables were first fetched and loaded — BUILDLOG 069–071) as the
+  last-checked date, flagged `baseline`; the note reads "last checked on 08/13/2026, when this
+  site loaded them", warns once that date is older than the schedule's bound, and each real check
+  row — the daily cron's — replaces it outright. Guide chapter 10 and `docs/deploy-status.md`'s
+  first-deploy expectation updated; the old wording survives only as the frontend's fallback
+  against an older API. `make test` 778 (+2), `make test-web` 383 (+2).

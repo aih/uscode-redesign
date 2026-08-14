@@ -124,15 +124,26 @@ export function currencyNote(status: Status | null): CurrencyNote | null {
 /**
  * The same sentence for the classification tables' own poll.
  *
- * Three states the page had been collapsing into one: never checked, the last
- * check failed, and the last check succeeded but is older than the schedule
- * intends. `ClassificationCheckOut.ok` is false in the first two — the schema
- * reports "no check has ever run" as `ok: false, stale: true` — so a page that
- * reads `ok` alone says a check failed when none was ever made.
+ * Four states: no check row yet (the API reports the first-load date, flagged
+ * `baseline`, so the page can name a date instead of "no record"), the last
+ * check failed, the last check succeeded but is older than the schedule
+ * intends, and the quiet case. The `!last_checked_at` branch survives only as
+ * a fallback against an API older than the `baseline` field.
  */
 export function classificationNote(source: ClassificationSource | null): CurrencyNote | null {
   if (!source) return null;
   const held = "The tables below are the ones this site holds.";
+
+  if (source.baseline && source.last_checked_at) {
+    // No check row yet: the API reports the date the tables were first loaded
+    // as the last-checked date, and the daily check owns it from its first run.
+    const loaded = usDate(source.last_checked_at.slice(0, 10));
+    return {
+      tone: source.stale ? "warning" : "ok",
+      text: `The classification tables were last checked on ${loaded}, when this site loaded them from uscode.house.gov.`,
+      detail: source.stale ? `${held} OLRC may have published a newer one since.` : held,
+    };
+  }
 
   if (!source.last_checked_at) {
     return {
