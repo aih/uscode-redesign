@@ -17,39 +17,44 @@ const DIFF = "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101";
 /**
  * Spend the diff bucket, then hand back.
  *
- * Bursting through the request context rather than by navigating: the bucket is
- * 8 with a token back every two seconds, and rendering a diff takes long enough
- * that a loop of `page.goto` refills it about as fast as it drains and never
- * reaches the limit. These requests cost the server the same tokens and none of
- * the rendering.
+ * Bursting rather than navigating: the bucket is 20 with a token back every
+ * second (ADR-0066), and rendering a diff takes long enough that a loop of
+ * `page.goto` refills it about as fast as it drains. These requests cost the
+ * server the same tokens and none of the rendering — `/app/diff/none` is under
+ * the limited prefix, which the middleware matches before anything routes, and
+ * answers 400.
+ *
+ * From inside the page, not through Playwright's request context: the bucket is
+ * keyed on the client address, and the request context opens its own
+ * connections, which need not present the browser's. In CI a burst sent through
+ * it left the navigation after it answering 200 five times inside 728 ms, which
+ * a refill of one token a second cannot account for. A fetch from the page under
+ * test is the same caller as the navigation by construction.
  */
-async function spendTheBucket(context: {
-  get: (url: string, options?: { headers: Record<string, string> }) => Promise<{ status(): number }>;
-}): Promise<void> {
-  // Comfortably more than the bucket holds (20, refilling at one a second since
-  // ADR-0066): each request costs a token and takes long enough that a few come
-  // back while this runs, so the loop has to outpace the refill rather than
-  // merely match the capacity.
-  for (let i = 0; i < 80; i += 1) {
-    const response = await context.get(DIFF, { headers: { accept: "text/html" } });
-    if (response.status() === 429) return;
-  }
-  throw new Error("the diff limiter never shed a request");
+async function spendTheBucket(page: Page): Promise<void> {
+  const shed = await page.evaluate(async () => {
+    const statuses = await Promise.all(
+      // Each request its own URL, and `no-store`: 60 fetches of one path are 59
+      // reads of the browser's cache and one token spent.
+      Array.from({ length: 60 }, (_, index) =>
+        fetch(`/app/diff/none?burst=${index}`, {
+          cache: "no-store",
+          headers: { accept: "application/json" },
+        }).then((response) => response.status),
+      ),
+    );
+    return statuses.filter((status) => status === 429).length;
+  });
+  if (shed === 0) throw new Error("the diff limiter never shed a request");
 }
 
-/**
- * Navigate to the diff and come back with the shed response.
- *
- * A request is shed while the bucket holds less than one token, and it refills
- * at one a second (ADR-0066), so `spendTheBucket` leaves somewhere between zero
- * and one — the navigation that follows it has under a second to arrive and
- * sometimes does not. Spending again and re-navigating is the assertion the
- * test actually means; expecting the first navigation to lose that race is a
- * flake, and it failed in CI while passing on the same commit beside it.
- */
+/** Navigate to the diff and come back with the shed response. The burst leaves
+ *  the bucket holding between zero and one token, so the navigation has under a
+ *  second to arrive; spending again is cheaper than assuming it wins that race. */
 async function gotoShed(page: Page): Promise<Response> {
+  await page.goto("/app/");
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    await spendTheBucket(page.request);
+    await spendTheBucket(page);
     const response = await page.goto(DIFF);
     if (response?.status() === 429) return response;
   }
