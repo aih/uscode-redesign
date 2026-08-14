@@ -10,31 +10,55 @@
  *
  * Needs the site running: `make dev-all`.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Response } from "@playwright/test";
 
 const DIFF = "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101";
 
 /**
  * Spend the diff bucket, then hand back.
  *
- * Bursting through the request context rather than by navigating: the bucket is
- * 8 with a token back every two seconds, and rendering a diff takes long enough
- * that a loop of `page.goto` refills it about as fast as it drains and never
- * reaches the limit. These requests cost the server the same tokens and none of
- * the rendering.
+ * Bursting rather than navigating: the bucket is 20 with a token back every
+ * second (ADR-0066), and rendering a diff takes long enough that a loop of
+ * `page.goto` refills it about as fast as it drains. These requests cost the
+ * server the same tokens and none of the rendering — `/app/diff/none` is under
+ * the limited prefix, which the middleware matches before anything routes, and
+ * answers 400.
+ *
+ * From inside the page, not through Playwright's request context: the bucket is
+ * keyed on the client address, and the request context opens its own
+ * connections, which need not present the browser's. In CI a burst sent through
+ * it left the navigation after it answering 200 five times inside 728 ms, which
+ * a refill of one token a second cannot account for. A fetch from the page under
+ * test is the same caller as the navigation by construction.
  */
-async function spendTheBucket(context: {
-  get: (url: string, options?: { headers: Record<string, string> }) => Promise<{ status(): number }>;
-}): Promise<void> {
-  // Comfortably more than the bucket holds (20, refilling at one a second since
-  // ADR-0066): each request costs a token and takes long enough that a few come
-  // back while this runs, so the loop has to outpace the refill rather than
-  // merely match the capacity.
-  for (let i = 0; i < 80; i += 1) {
-    const response = await context.get(DIFF, { headers: { accept: "text/html" } });
-    if (response.status() === 429) return;
+async function spendTheBucket(page: Page): Promise<void> {
+  const shed = await page.evaluate(async () => {
+    const statuses = await Promise.all(
+      // Each request its own URL, and `no-store`: 60 fetches of one path are 59
+      // reads of the browser's cache and one token spent.
+      Array.from({ length: 60 }, (_, index) =>
+        fetch(`/app/diff/none?burst=${index}`, {
+          cache: "no-store",
+          headers: { accept: "application/json" },
+        }).then((response) => response.status),
+      ),
+    );
+    return statuses.filter((status) => status === 429).length;
+  });
+  if (shed === 0) throw new Error("the diff limiter never shed a request");
+}
+
+/** Navigate to the diff and come back with the shed response. The burst leaves
+ *  the bucket holding between zero and one token, so the navigation has under a
+ *  second to arrive; spending again is cheaper than assuming it wins that race. */
+async function gotoShed(page: Page): Promise<Response> {
+  await page.goto("/app/");
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await spendTheBucket(page);
+    const response = await page.goto(DIFF);
+    if (response?.status() === 429) return response;
   }
-  throw new Error("the diff limiter never shed a request");
+  throw new Error("the diff limiter shed no navigation in five attempts");
 }
 
 test.describe("the rate limiter's page (ADR-0029)", () => {
@@ -44,9 +68,8 @@ test.describe("the rate limiter's page (ADR-0029)", () => {
   test.describe.configure({ mode: "serial" });
 
   test("a navigation that is shed gets the error page, not plain text", async ({ page }) => {
-    await spendTheBucket(page.request);
-    const response = await page.goto(DIFF);
-    expect(response?.status()).toBe(429);
+    const response = await gotoShed(page);
+    expect(response.status()).toBe(429);
 
     await expect(page.locator(".doc-title")).toContainText("429");
     await expect(page.locator(".lede")).toContainText("rate limited");
@@ -60,9 +83,8 @@ test.describe("the rate limiter's page (ADR-0029)", () => {
   test("it offers the section that was being compared, which still exists", async ({ page }) => {
     // A shed request refused the work, not the provision — so unlike a 404 the
     // way back is the identifier itself.
-    await spendTheBucket(page.request);
-    const response = await page.goto(DIFF);
-    expect(response?.status()).toBe(429);
+    const response = await gotoShed(page);
+    expect(response.status()).toBe(429);
     await expect(page.locator(".deadend__step--last a")).toHaveAttribute(
       "href",
       "/app/us/usc/t16/s45f",

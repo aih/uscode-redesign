@@ -6,7 +6,7 @@ summary: Which provision of which public law became which section of the Code, f
 covers:
   routes:
     ["/app/classification", "/app/classification/[congress]", "/app/classification/ecct"]
-  adrs: [67]
+  adrs: [67, 68]
 ---
 
 A public law is not written in the Code's numbering. The Office of the Law Revision Counsel decides
@@ -54,6 +54,22 @@ steps:
   - expect: { url: "pl=118-42" }
 ```
 
+**Every table**, beside the box, is a scope. Choosing one table narrows the lookup to it: a bare
+law number — `35` — then means that law of the chosen congress, and a citation gains a first
+answer counting the rows classified to that section in that table.
+
+```scenario
+id: classification-scoped-lookup
+title: Narrow the lookup to one table
+steps:
+  - goto: /app/classification
+  - select: { selector: "#classlookup-scope", value: "118-2" }
+  - fill: { selector: "#classlookup-q", value: "42 usc 254c-2" }
+  - expect: { selector: ".classlookup__option", contains: "rows in this table" }
+  - click: .classlookup__option
+  - expect: { url: "classification/118/2?title=42" }
+```
+
 ## Reading one table
 
 A table is one congress and one session — [the 118th's second
@@ -77,6 +93,21 @@ Five columns, in the source's own order:
 by title and section. Rows come 50 at a time. Filters are shown as pills above the table and each
 one can be dismissed on its own. The address bar holds the filters, the order and the page, so a
 view is citable by its URL.
+
+The lookup box is on the table's page as well, scoped to that table. A bare law number — `35`, or
+`35 101` for one of its provisions — means a law of that congress, and choosing a match filters the
+table to it instead of paging.
+
+```scenario
+id: classification-table-lookup
+title: Find a row in a table without paging through it
+steps:
+  - goto: /app/classification/118/2
+  - fill: { selector: "#classlookup-q", value: "35" }
+  - expect: { selector: ".classlookup__option", visible: true }
+  - click: .classlookup__option
+  - expect: { url: "pl=118-35" }
+```
 
 ```scenario
 id: classification-sort
@@ -142,6 +173,10 @@ Three answers, meaning three different things.
 The classification tables are polled separately from the Code's text: they are a different source
 page on the same site, republished as new laws are classified. The index page says when this site
 last looked and how many tables had changed at that check.
+
+Three states get a warning instead: no check has ever run here, the last check failed, or the last
+check succeeded longer ago than the daily schedule intends. The tables shown are the ones this site
+holds; a warning means OLRC may have published a newer one since anybody asked.
 
 ## Limitations
 

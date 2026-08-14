@@ -532,6 +532,97 @@ def test_suggest_answers_nothing_for_a_string_that_is_neither(api):
     assert body["query"] == "conservation easements"
 
 
+# ------------------------------------------------- 6a. the lookup, table-scoped
+
+
+def test_suggest_scoped_reads_a_bare_law_number_as_the_scoped_congress(api):
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "35", "congress": 118, "session": "2"},
+    ).json()
+    [suggestion] = [s for s in body["suggestions"] if s["kind"] == "pl"]
+
+    assert suggestion["pl"] == "118-35"
+    assert suggestion["href"] == "/classification/118/2?pl=118-35"
+
+
+def test_suggest_scoped_carries_a_bare_provision_into_the_filter(api):
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "35 101", "congress": 118, "session": "2"},
+    ).json()
+    [suggestion] = [s for s in body["suggestions"] if s["kind"] == "pl"]
+
+    assert suggestion["pl_section"] == "101"
+    assert suggestion["href"] == "/classification/118/2?pl=118-35&pl_section=101"
+
+
+def test_suggest_unscoped_reads_nothing_in_a_bare_number(api):
+    """`35` names a law only when the request says which congress."""
+    body = api.get("/api/v1/classifications/suggest?q=35").json()
+    assert body["suggestions"] == []
+
+
+def test_suggest_scoped_full_shorthand_still_names_its_own_congress(api):
+    """`110-85` typed on the 118th's page is the 110th's law, not the 118th's."""
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "110-85", "congress": 118, "session": "2"},
+    ).json()
+    pls = [s for s in body["suggestions"] if s["kind"] == "pl"]
+    assert [s["pl"] for s in pls] == ["110-85"]
+    assert pls[0]["href"].startswith("/classification/110/1?")
+
+
+def test_suggest_scoped_citation_counts_the_rows_in_that_table_first(api):
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "42 USC 254c-2", "congress": 118, "session": "2"},
+    ).json()
+    kinds = [s["kind"] for s in body["suggestions"]]
+    assert "section-in-table" in kinds
+    assert kinds.index("section-in-table") < kinds.index("section-classifications")
+
+    [scoped] = [s for s in body["suggestions"] if s["kind"] == "section-in-table"]
+    assert scoped["congress"] == 118
+    assert scoped["session_label"] == "2"
+    assert scoped["title_num"] == "42"
+    assert scoped["section"] == "254c-2"
+    assert scoped["count"] > 0
+    assert scoped["href"] == "/classification/118/2?title=42&section=254c-2"
+
+
+def test_suggest_scoped_citation_with_no_rows_in_that_table_offers_none(api):
+    """The corpus-wide suggestions still answer; only the in-table one is
+    absent. 42 U.S.C. 254c-2's rows are the 118th's — the 104th's file holds
+    none."""
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "42 USC 254c-2", "congress": 104, "session": "all"},
+    ).json()
+    kinds = [s["kind"] for s in body["suggestions"]]
+    assert "section-in-table" not in kinds
+    assert "section-classifications" in kinds
+
+
+def test_suggest_scope_naming_no_held_table_scopes_nothing(api):
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "35", "congress": 99, "session": "1"},
+    ).json()
+    assert body["suggestions"] == []
+
+
+def test_suggest_never_reads_a_citation_as_a_bare_law(api):
+    """`16 usc 3831` parses as a citation, so the bare-number reading is never
+    tried — no `Public Law 118-16 § usc 3831`."""
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "16 usc 3831", "congress": 118, "session": "2"},
+    ).json()
+    assert [s for s in body["suggestions"] if s["kind"] == "pl"] == []
+
+
 # ------------------------------------------------------------------ 7. the ECCT
 
 

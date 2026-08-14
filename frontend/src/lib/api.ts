@@ -308,11 +308,16 @@ export async function fetchEcct(): Promise<EcctPage> {
  */
 export async function fetchClassificationSuggestions(
   query: string,
+  scope?: { congress: number | string; session: string } | null,
 ): Promise<ClassificationSuggestion[]> {
   if (!query.trim()) return [];
   try {
     const body = await getJson<ClassificationSuggestions>(
-      `${API}/classifications/suggest${qs({ q: query })}`,
+      `${API}/classifications/suggest${qs({
+        q: query,
+        congress: scope ? String(scope.congress) : undefined,
+        session: scope?.session,
+      })}`,
     );
     return body.suggestions ?? [];
   } catch {

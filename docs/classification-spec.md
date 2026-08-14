@@ -237,6 +237,11 @@ Two module-level limiters with docstrings justifying the numbers: `_limit_classi
      TypeScript parser; `citeparse.py` is the single source of truth) → two suggestions when it
      resolves: "§ … — notes, in the reader" → `appHref(identifier) + "#section-notes"`, and
      "Classification entries for § …" → the code-filtered view.
+   - Optional `&congress=`+`&session=` scope the lookup to one table (ADR-0068): a bare law
+     number (`33`, `33 101`) then means a law of that congress — tried only when `citeparse`
+     read nothing — and a citation gains a leading `{kind:'section-in-table'}` suggestion
+     counting that section's rows in the scoped table. A scope naming no held table scopes
+     nothing.
 7. `GET /classifications/ecct` — the whole table; `?congress=`/`?session=` once more sessions
    exist.
 

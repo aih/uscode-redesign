@@ -462,8 +462,8 @@ PR #47. Once `deploy.yml` ships them:
 
 1. Check `/app/classification` renders the registry and reports 144,837 rows.
 2. `classification_source_checks` holds 0 rows — the loader does not write one, `classification-check`
-   does. The index page says so in as many words ("have never been checked from here") until the
-   first poll. The daily cron writes one within a day of the deploy, since the new
+   does. The index page says so in as many words ("This site has no record of checking
+   uscode.house.gov for new classification tables") until the first poll. The daily cron writes one within a day of the deploy, since the new
    `deploy/update-corpus.sh` runs the check before anything else.
 
 Everything else this list used to hold is done. `ingest verify` passes on the box (3,153 title-versions

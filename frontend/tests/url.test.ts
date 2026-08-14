@@ -7,9 +7,11 @@ import {
   apiHref,
   appHref,
   classificationEcctHref,
+  classificationScopeValue,
   classificationSuggestionHref,
   classificationHref,
   classificationSuggestHref,
+  parseClassificationScope,
   compareTitles,
   readOffset,
   citationHref,
@@ -370,6 +372,37 @@ describe("classification hrefs", () => {
     // The island appends its own encoded query to this.
     expect(classificationSuggestHref("")).toBe("/api/v1/classifications/suggest?q=");
   });
+
+  it("puts a table scope ahead of the query, which stays last for the island", () => {
+    expect(classificationSuggestHref("", { congress: 118, session: "2" })).toBe(
+      "/api/v1/classifications/suggest?congress=118&session=2&q=",
+    );
+    expect(classificationSuggestHref("35 101", { congress: 104, session: "all" })).toBe(
+      "/api/v1/classifications/suggest?congress=104&session=all&q=35%20101",
+    );
+  });
+});
+
+describe("the lookup's table scope value", () => {
+  it("writes one table as `congress-session`", () => {
+    expect(classificationScopeValue(118, "2")).toBe("118-2");
+    expect(classificationScopeValue(104, "all")).toBe("104-all");
+  });
+
+  it("reads it back", () => {
+    expect(parseClassificationScope("118-2")).toEqual({ congress: 118, session: "2" });
+    expect(parseClassificationScope("104-all")).toEqual({ congress: 104, session: "all" });
+  });
+
+  it("scopes nothing for a value naming no table", () => {
+    expect(parseClassificationScope("")).toBeNull();
+    expect(parseClassificationScope(null)).toBeNull();
+    expect(parseClassificationScope(undefined)).toBeNull();
+    expect(parseClassificationScope("118")).toBeNull();
+    expect(parseClassificationScope("118-3")).toBeNull();
+    expect(parseClassificationScope("118-0")).toBeNull();
+    expect(parseClassificationScope("all-118")).toBeNull();
+  });
 });
 
 describe("classification sessions", () => {
@@ -454,6 +487,19 @@ describe("where a lookup suggestion leads", () => {
     expect(built).toBe("/app/us/usc/t42/s254c%E2%80%9315#section-notes");
     // The island's concatenation reaches the identical URL.
     expect(built).toBe(`${APP}/us/usc/t42/s254c%E2%80%9315#section-notes`);
+  });
+
+  it("takes a scoped citation suggestion to that table, filtered", () => {
+    expect(
+      classificationSuggestionHref({
+        kind: "section-in-table",
+        href: "/classification/118/2?title=42&section=254c-2",
+        congress: 118,
+        session_label: "2",
+        title_num: "42",
+        section: "254c-2",
+      }),
+    ).toBe("/app/classification/118/2?title=42&section=254c-2");
   });
 
   it("takes the second citation suggestion to the code-filtered view", () => {

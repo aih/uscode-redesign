@@ -4860,6 +4860,15 @@ dialog.palette {
   margin-top: 0;
 }
 
+/* The table scope. It shares the row and may take a line of its own below
+ * 480px, where the input's 12rem basis and the button already fill one. */
+.classlookup__scope {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 16rem;
+  margin-top: 0;
+}
+
 /* USWDS gives `.usa-button` `width: 100%` below 480px, which at 320 takes the
  * whole row and leaves the field beside it nothing (ADR-0056's trap). The row
  * wraps, so the button may have its own line — it may not have the field's. */

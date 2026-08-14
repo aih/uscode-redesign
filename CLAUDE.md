@@ -336,7 +336,7 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **738** Python tests; `make test-web` = **370** frontend tests; `make test-e2e` = **605**
+`make test` = **746** Python tests; `make test-web` = **381** frontend tests; `make test-e2e` = **607**
 Playwright tests, 322 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -344,7 +344,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(66 ADRs, numbered to 0067 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(67 ADRs, numbered to 0068 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -413,9 +413,13 @@ defects in the 28 vintages Wave 1 never measured** — a Sec. column one charact
 header in two files, a Stat. page numbered with a letter (`113 Stat. 1501A-594`), a row OLRC has
 corrected carrying an asterisk that shifts every later column, and a page butted straight against
 its Sec. designator — all fixed, and the reason a boundary is now checked against the file's own
-rows rather than trusted from the header alone (ADR-0067's addendum). What remains unbuilt by
-choice: a section page shows no classification rows, so the link runs one way; and the poll cannot
-see a change to the ECCT alone.
+rows rather than trusted from the header alone (ADR-0067's addendum). **The lookup is
+table-scopable (ADR-0068)**: `suggest` takes `congress`+`session`, under which a bare law number
+means a law of that congress and a citation's first answer counts that section's rows in the scoped
+table; each session page carries the box scoped to itself (finding a row there was otherwise up to
+118 page turns), and the index's box offers the scope as a `<select>` (`?scope=118-2`). What
+remains unbuilt by choice: a section page shows no classification rows, so the link runs one way;
+and the poll cannot see a change to the ECCT alone.
 
 **Next: (1) Day 7 hardening; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
