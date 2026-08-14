@@ -2523,3 +2523,86 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   `make ci-data` will skip the real tables until something forces it, because a slice carries the
   real file's covered-law sentence. `deploy/update-corpus.sh` is **not** wired to the check yet;
   that is C5's, along with running the backfill on the box.
+
+## 070 — 2026-08-11 — Session 48: classification tables, wave 3 — the API and the reader
+
+- **Tool/model:** Claude Code, Opus 5. An orchestrating session dispatching two implementing agents
+  in parallel (C3 storage + API, C4 reader pages) and two fresh-context reviewers, one per merge
+  candidate. The orchestrator wrote no implementation code.
+- **Asked:** Execute Wave 3 of `docs/classification-spec.md` — dispatch C3 and C4 as parallel
+  agents decoupled by the spec's API contract, verify, have a fresh-context reviewer read the
+  merged diff, and close out with the spec's status line, this entry and Wave 4's kickoff. Stop
+  before Wave 4.
+- **Produced:** branch `c4-classification-reader`, 13 commits `c9a3240..28d47d0` on top of `main`
+  (`66354dd`) — C3's four then C4's nine. **Unmerged**: this session and both agents were
+  harness-pinned to a worktree and refused git operations against the primary checkout, so the
+  branch carries both waves and lands in one merge.
+  - `storage/classification.py` — `ClassificationRepository`, five frozen refs,
+    `ClassificationError`/`UnknownPublicLawError`, `CLASSIFICATION_SOURCE_URL` and `law_in_ranges`,
+    which `ingest/classification.py` now imports back on `inventory.py`'s `SOURCE_URL` precedent.
+  - `storage/postgres_classification.py` — `PostgresClassification`, a sibling of
+    `PostgresRepository`; `get_classification()` in `storage/session.py`; the third
+    `..._agree` test.
+  - `api/classification.py` — seven routes under `/api/v1/classifications`, `REVALIDATE`
+    throughout, two limiters (120/10.0s for reader-server traffic, 30/5.0s for the browser-direct
+    suggest). `api/schemas.py` +407 lines; `main.py` inclusion and `DESCRIPTION`.
+  - `frontend/src/pages/classification/{index,[congress]/[session],ecct}.astro`,
+    `ClassificationTable.astro`, `ClassificationLookup.astro`, six `lib/url.ts` helpers, five
+    `lib/api.ts` fetchers.
+  - `tests/test_classification_api.py`, `frontend/tests/e2e/classification.spec.ts`, +21 in
+    `frontend/tests/url.test.ts`; `docs/js-budgets.json`, `docs/a11y/routes.json` and
+    `frontend/scripts/screenshots.mjs` entries; regenerated `a11y.json`, `js-bytes.json` and 4 new
+    screenshots.
+- **Decided:**
+  - **The code-filtered view is the index page.** §4's suggest route targets a view §5 never
+    defined; `/app/classification?title=…&section=…` is it, because such a view spans every
+    congress and session and has no home on a per-session page, and the lookup box is already
+    there.
+  - **A reader href is never composed from a title and a section number.** `ecct.astro` built one
+    by concatenation and 7 of its 30 links 404'd, every one a *Former classification* cell. The
+    rule is the loader's: link where `usc_identifier` is present, render text where it is not —
+    which is what `ClassificationTable` already did, so one wave shipped two components disagreeing
+    about it.
+  - **`/app/docs` was fixed rather than banked.** The wave caused the regression, the recorded
+    cause and fix were both wrong, and the real fix is one rule. Both `reflow` entries are deleted
+    rather than a third added.
+  - **Route 5 pages.** A default `limit` with no `offset` is a silent truncation, not a bound; the
+    same defect appeared independently in C4's by-section view against route 4.
+  - No new ADR: ADR-0067 already records the workstream's decisions, and the above are its
+    consequences rather than new choices. They are in the spec's § What Wave 3 measured.
+- **Verified:**
+  - `USC_REQUIRE_INTEGRATION=1 make test` — **738 passed, 13 deselected** (690 after Wave 2: +47
+    API, +1 architecture). `make test-web` — **369 passed, 23 files** (346 before). Both re-run
+    independently by this session against `28d47d0`.
+  - `make test-e2e` + `make test-a11y` — **587 passed, 2 skipped**; **315 axe scans** (272 before:
+    6 routes × 7 + 1 state), **8 violation/route pairs over 2,623 nodes**, none of them a
+    classification route. `make shots` exit 0 with zero known-reflow lines.
+  - **0 px of horizontal overflow on all six new views** at 320/375/1280/1280@200%, tables
+    scrolling inside their wrapper (525 px of content in a 288 px region at 320). Re-check with
+    `make shots`.
+  - **`/app/docs` remeasured after the fix: 0 px at 320, 375, 1280 and 1280@200%**, from 146 and 91.
+  - Two fresh-context reviews, one per merge candidate, each reproducing against the loaded
+    144,837-row corpus rather than reading. Between them they found and got fixed: route 5's
+    truncation, the by-section view's, the ECCT's guessed links, the `/app/docs` misdiagnosis,
+    three false measured claims in docstrings, two tests that passed with their feature removed,
+    an offset past the end rendering "Showing 1,000,000–2,987 of 2,987", `?offset=1.5` 422ing to an
+    error page, a double `<h1>` on failure, an island binding only its first instance, options
+    handling `mousedown` but not `click`, and ten prose-rule violations.
+  - Reproduced clean by review rather than asserted: the en-dash chain end to end with no path
+    where U+2013 reaches an HTTP header; `?sort=code` paging correct at every offset over the full
+    11,737-row 104th; the 404-vs-empty distinction at every boundary; all three nullability
+    renderings on screen; LIKE escaping with a declared escape character; both limiters shedding
+    independently; the no-JS test asserting the *server* did the parse.
+- **Open, carried into Wave 4:** the three routes are reachable only by typed URL — no menu entry,
+  no footer link, no palette row. The guide chapter is unwritten, so C4 parked the three routes in
+  `UNDOCUMENTED_ROUTES` in `frontend/tests/guide.test.ts` in a commit of its own; C5 deletes that
+  and ADR-0067's `INFRASTRUCTURE_ADRS` line together. `docs/ia-map.md` has no rows for them and
+  `/app/design` no specimens — and a `ClassificationLookup` specimen would break that page's
+  no-data property, since the island fetches `/classifications/suggest` on input, which is why
+  `WatchButton` is excluded (ADR-0053). `deploy/update-corpus.sh` is still unwired and the box
+  still holds no classification rows. `shed.spec.ts` is a pre-existing timing-sensitive test made
+  likelier to trip: `spendTheBucket` must out-run a one-token-per-second refill across 80
+  sequential requests, and this wave added 43 axe scans and 4 e2e tests to the run — not bucket
+  contention, since the new routes take their own API-side buckets and `middleware.ts` is
+  untouched. `frontend/package-lock.json` acquires `"peer": true` markers on any `npm install`;
+  they are not a dependency change.

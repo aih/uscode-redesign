@@ -1,0 +1,251 @@
+---
+/**
+ * The classification lookup: a public law, a provision of one, or a US Code
+ * citation, answered as you type (ADR-0067).
+ *
+ * ## It parses nothing
+ *
+ * `118-33`, `118-33 101` and `16 usc 3831` are all read server-side, by
+ * `/api/v1/classifications/suggest`. `citeparse.py` is the only thing on this
+ * site that decides whether a string is a citation (ADR-0023), and a TypeScript
+ * copy of it here would be a second parser disagreeing with the first. The
+ * island fetches suggestions and renders them; it never works out what a query
+ * means.
+ *
+ * ## Without JavaScript it is a form
+ *
+ * The markup the server sends is a labelled `<input name="q">` and a submit
+ * button in a GET form to `/app/classification`, which is a page that takes
+ * `?q=` and calls the same endpoint server-side. So the no-script path and the
+ * listbox path reach the same answers by the same parse; the difference is a
+ * round trip.
+ *
+ * The combobox roles are stamped by the script rather than written into the
+ * markup, so with scripting off the box announces no listbox behaviour.
+ *
+ * ## Keyboard
+ *
+ * `↑`/`↓` move `aria-activedescendant` while real focus stays in the input —
+ * the ARIA 1.2 combobox pattern, which keeps typing working between two arrow
+ * presses. `Enter` follows the active row, `Escape` closes the list and leaves
+ * the keyboard where it already was. A row navigates on `click`, so a pointer
+ * and an assistive-technology activation take the same path; `mousedown` only
+ * cancels its own default, which is the blur that would close the list first.
+ *
+ * `CommandPalette` moves real DOM focus instead, and for its own reason: its
+ * rows are links and a button, so activating one is the platform's job. These
+ * rows exist only while a request's answer is on screen, and a list that is
+ * replaced under a focused element takes the keyboard back to the top of the
+ * document.
+ *
+ * ## The request
+ *
+ * Debounced at 200 ms and superseded by its own successor through an
+ * `AbortController`, so a fast typist costs one request rather than one per
+ * keystroke. A failed fetch renders nothing: the form underneath still works,
+ * and the endpoint is rate-limited for a person rather than a crawler (spec
+ * §4).
+ *
+ * ## Where a row goes
+ *
+ * A suggestion carries a ready-made `href` — a path relative to the reader's
+ * base, percent-encoded by the API — and the same answer in structured pieces.
+ * The island prefixes `data-app` onto the path, so `/app` is still spelled once,
+ * in `lib/url.ts`. The page's own no-script list builds the same URL from the
+ * structured pieces through `classificationSuggestionHref`, which is what
+ * architecture rule 5 asks for and what an `is:inline` script cannot import.
+ * `url.test.ts` asserts the two agree, shape by shape, against the paths
+ * `api/classification.py`'s `_app_path` emits.
+ *
+ * ## More than one on a page
+ *
+ * The script binds every `[data-classlookup]` and marks each one it has set up,
+ * so a second copy of the island — `/app/design` is the case `idPrefix` exists
+ * for — gets its own handlers and the first does not get them twice. Ids are all
+ * derived from `idPrefix` for the same reason.
+ */
+import { APP, classificationHref, classificationSuggestHref } from "../lib/url";
+
+interface Props {
+  /** What the box starts with — the `?q=` a no-script submission arrived with. */
+  value?: string;
+  /** Distinguishes ids when a page renders more than one (`/app/design`). */
+  idPrefix?: string;
+}
+
+const { value = "", idPrefix = "classlookup" } = Astro.props;
+const inputId = `${idPrefix}-q`;
+const listId = `${idPrefix}-list`;
+const hintId = `${idPrefix}-hint`;
+const statusId = `${idPrefix}-status`;
+---
+
+<form
+  class="classlookup"
+  method="get"
+  action={classificationHref()}
+  role="search"
+  aria-labelledby={`${inputId}-label`}
+  data-classlookup
+  data-endpoint={classificationSuggestHref("")}
+  data-app={APP}
+  data-list={listId}
+>
+  <label class="classlookup__label" id={`${inputId}-label`} for={inputId}>
+    Find a public law or a Code section
+  </label>
+  <div class="classlookup__row">
+    <input
+      class="usa-input classlookup__input"
+      id={inputId}
+      type="search"
+      name="q"
+      value={value}
+      placeholder="118-33, 118-33 101, or 16 usc 3831"
+      autocomplete="off"
+      spellcheck="false"
+      enterkeyhint="go"
+      aria-describedby={hintId}
+      data-classlookup-input
+    />
+    <button class="usa-button classlookup__go" type="submit">Look up</button>
+  </div>
+  <p class="classlookup__hint" id={hintId}>
+    A public law goes to its rows in the session table; a Code citation goes to that section's
+    notes in the reader.
+  </p>
+
+  {/* Empty and hidden until a request answers. The script gives it its listbox
+      role at the same time, so nothing announces a list that is not there. */}
+  <ul class="classlookup__list" id={listId} hidden data-classlookup-list></ul>
+
+  <p class="usa-sr-only" id={statusId} role="status" data-classlookup-status></p>
+</form>
+
+<script is:inline>
+  {
+    for (const box of document.querySelectorAll("[data-classlookup]")) {
+      if (box.dataset.classlookupReady) continue;
+      box.dataset.classlookupReady = "1";
+      const input = box.querySelector("[data-classlookup-input]");
+      const list = box.querySelector("[data-classlookup-list]");
+      const status = box.querySelector("[data-classlookup-status]");
+      const endpoint = box.dataset.endpoint;
+      const app = box.dataset.app;
+      const listId = box.dataset.list;
+      let items = [];
+      let active = -1;
+      let timer = null;
+      let pending = null;
+
+      input.setAttribute("role", "combobox");
+      input.setAttribute("aria-autocomplete", "list");
+      input.setAttribute("aria-expanded", "false");
+      input.setAttribute("aria-controls", listId);
+      list.setAttribute("role", "listbox");
+      list.setAttribute("aria-label", "Lookup suggestions");
+
+      function close() {
+        list.hidden = true;
+        list.replaceChildren();
+        input.setAttribute("aria-expanded", "false");
+        input.removeAttribute("aria-activedescendant");
+        items = [];
+        active = -1;
+      }
+
+      function mark(next) {
+        active = next;
+        for (let i = 0; i < items.length; i++) {
+          items[i].setAttribute("aria-selected", i === active ? "true" : "false");
+        }
+        if (active >= 0) {
+          input.setAttribute("aria-activedescendant", items[active].id);
+          items[active].scrollIntoView({ block: "nearest" });
+        } else {
+          input.removeAttribute("aria-activedescendant");
+        }
+      }
+
+      function show(suggestions) {
+        list.replaceChildren();
+        items = suggestions.map((suggestion, index) => {
+          const option = document.createElement("li");
+          option.id = listId + "-opt-" + index;
+          option.className = "classlookup__option";
+          option.setAttribute("role", "option");
+          option.setAttribute("aria-selected", "false");
+          const href = app + suggestion.href;
+          option.dataset.href = href;
+          const label = document.createElement("span");
+          label.className = "classlookup__option-label";
+          label.textContent = suggestion.label;
+          option.append(label);
+          if (suggestion.detail) {
+            const detail = document.createElement("span");
+            detail.className = "classlookup__option-hint";
+            detail.textContent = suggestion.detail;
+            option.append(detail);
+          }
+          option.addEventListener("mousedown", (event) => event.preventDefault());
+          option.addEventListener("click", () => location.assign(href));
+          list.append(option);
+          return option;
+        });
+        list.hidden = items.length === 0;
+        input.setAttribute("aria-expanded", items.length > 0 ? "true" : "false");
+        active = -1;
+        input.removeAttribute("aria-activedescendant");
+        status.textContent =
+          items.length === 0 ? "No matches" : items.length + " suggestions available";
+      }
+
+      function ask() {
+        const query = input.value.trim();
+        if (query.length < 2) {
+          close();
+          return;
+        }
+        pending?.abort();
+        pending = new AbortController();
+        fetch(endpoint + encodeURIComponent(query), {
+          headers: { accept: "application/json" },
+          signal: pending.signal,
+        })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((body) => {
+            if (body) show(body.suggestions || []);
+          })
+          .catch(() => {});
+      }
+
+      input.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(ask, 200);
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          if (!list.hidden) event.preventDefault();
+          close();
+          return;
+        }
+        if (event.key === "Enter" && active >= 0) {
+          event.preventDefault();
+          location.assign(items[active].dataset.href);
+          return;
+        }
+        if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+        if (items.length === 0) return;
+        event.preventDefault();
+        if (event.key === "ArrowDown") {
+          mark(active >= items.length - 1 ? 0 : active + 1);
+        } else {
+          mark(active <= 0 ? items.length - 1 : active - 1);
+        }
+      });
+
+      input.addEventListener("blur", () => setTimeout(close, 200));
+    }
+  }
+</script>

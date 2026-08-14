@@ -15,6 +15,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from api.diff import DiffOp
 from citeparse import ParsedCitation
 from storage import (
+    ClassificationCheckInfo,
+    ClassificationEntryRef,
+    ClassificationFileInfo,
+    ClassificationPage,
+    EcctEntryRef,
     GuidResolution,
     Neighbors,
     ReleaseRef,
@@ -521,6 +526,421 @@ class CitationOut(BaseModel):
 class ErrorOut(BaseModel):
     detail: str
     candidates: list[str] | None = None
+
+
+# ------------------------------------------------- classification tables (ADR-0067)
+
+
+class ClassificationFileOut(BaseModel):
+    """One source document in the registry — a Public Law order table, or an ECCT."""
+
+    kind: str = Field(
+        description="`pl` (Public Law order table) or `ecct` (Editorial "
+        "Classification Change Table). A string and not an enum: the source has "
+        "already added one document type to this family.",
+        examples=["pl"],
+    )
+    congress: int = Field(examples=[119])
+    session: int = Field(
+        description="1 or 2, and **0 for the 104th's single whole-congress file**. "
+        "The database never holds a NULL here.",
+        examples=[2],
+    )
+    session_label: str = Field(
+        description="`1`, `2` or `all` — the same value spelled the way the "
+        "reader's URLs do. `all` is session 0.",
+        examples=["2"],
+    )
+    source_url: str
+    source_filename: str = Field(examples=["tbl119pl_2nd.htm"])
+    covered_laws_text: str | None = Field(
+        default=None,
+        description="The page header's public-law range, verbatim. Null for an ECCT.",
+        examples=["Public Law 119-70 and Public Laws 119-74 through 119-102"],
+    )
+    covered_ranges: list[str] = Field(
+        default_factory=list,
+        description="That header parsed into gap-aware segments. A law inside one "
+        "of these has a table covering it, whether or not it classified anything.",
+        examples=[["70-70", "74-102"]],
+    )
+    first_law: int | None = None
+    last_law: int | None = None
+    prepared_date: datetime.date | None = None
+    stat_volume: int | None = Field(
+        default=None,
+        description="The Statutes at Large volume named in the column header. Null "
+        "for the 104th, whose congress spans two volumes.",
+        examples=[140],
+    )
+    fetched_at: datetime.datetime
+    row_count: int
+    skipped_lines: int
+
+    @classmethod
+    def of(cls, info: ClassificationFileInfo) -> "ClassificationFileOut":
+        return cls(
+            kind=info.kind,
+            congress=info.congress,
+            session=info.session,
+            session_label=info.session_label,
+            source_url=info.source_url,
+            source_filename=info.source_filename,
+            covered_laws_text=info.covered_laws_text,
+            covered_ranges=list(info.covered_ranges),
+            first_law=info.first_law,
+            last_law=info.last_law,
+            prepared_date=info.prepared_date,
+            stat_volume=info.stat_volume,
+            fetched_at=info.fetched_at,
+            row_count=info.row_count,
+            skipped_lines=info.skipped_lines,
+        )
+
+
+class ClassificationCheckOut(BaseModel):
+    """When this mirror last asked OLRC what classification tables exist.
+
+    Its own check, and not the one `/api/v1/status` reports: that reads the
+    release-point poll, and interleaving the two would make the corpus-freshness
+    answer flap between two unrelated sources (ADR-0067).
+    """
+
+    url: str = Field(examples=["https://uscode.house.gov/classification/tables.shtml"])
+    last_checked_at: datetime.datetime | None = Field(
+        default=None, description="null means no check has ever been recorded here."
+    )
+    hours_since_check: float | None = None
+    ok: bool = Field(description="Did the last check reach and parse the page?")
+    stale: bool = Field(
+        description="True when the last check failed, is over a week old, or has "
+        "never happened."
+    )
+    files_seen: int | None = Field(
+        default=None, description="How many documents the entry pages listed."
+    )
+    changed_files: list[str] = Field(
+        default_factory=list,
+        description="Source filenames whose covered-law text differed from the "
+        "registry at that check. Non-empty means a load is pending.",
+    )
+    latest_covered_text: str | None = None
+    error: str | None = None
+
+    @classmethod
+    def of(
+        cls, check: ClassificationCheckInfo | None, *, url: str
+    ) -> "ClassificationCheckOut":
+        if check is None:
+            return cls(url=url, ok=False, stale=True)
+        return cls(
+            url=check.source_url,
+            last_checked_at=check.checked_at,
+            hours_since_check=round(check.age().total_seconds() / 3600, 2),
+            ok=check.ok,
+            stale=check.is_stale(),
+            files_seen=check.files_seen,
+            changed_files=list(check.changed_files),
+            latest_covered_text=check.latest_covered_text,
+            error=check.error,
+        )
+
+
+class ClassificationTablesOut(BaseModel):
+    """The registry of source documents, and how fresh it is."""
+
+    source: ClassificationCheckOut
+    files: list[ClassificationFileOut] = Field(
+        description="Every document held, newest congress and session first — "
+        "both kinds, told apart by `kind`."
+    )
+    current: ClassificationFileOut | None = Field(
+        default=None,
+        description="The newest Public Law order table, which is the session "
+        "OLRC is still adding to. Null when none is loaded.",
+    )
+    entry_total: int = Field(
+        description="Rows across every Public Law order table held."
+    )
+
+
+class ClassificationEntryOut(BaseModel):
+    """One row of a Classification Table: a public-law provision and where it
+    landed in the Code."""
+
+    congress: int = Field(
+        description="The congress of the *document* this row came from, which is "
+        "the session page it appears on. Not necessarily `pl_congress`.",
+        examples=[118],
+    )
+    session: int = Field(examples=[2])
+    session_label: str = Field(examples=["2"])
+    row_seq: int = Field(description="0-based order within the document.")
+    raw_line: str = Field(
+        description="The source line, tag-stripped and verbatim. The fallback for "
+        "the 129 rows whose columns could not all be read."
+    )
+    title_raw: str = Field(examples=["18"])
+    title_num: str = Field(
+        description="A string — `5a` is a title and `5` is a different one. Never "
+        "sorted as text.",
+        examples=["18"],
+    )
+    is_appendix: bool
+    section_raw: str = Field(examples=["3551"])
+    section_norm: str = Field(
+        description="Lowercased, with dashes folded to a plain hyphen. The "
+        "spelling typed input is matched against.",
+        examples=["254c-15"],
+    )
+    description_raw: str = Field(
+        description="The Description cell verbatim. `''` means the section was "
+        "amended; the vocabulary otherwise is an open set (`nt`, `new`, `nt new`, "
+        "`prec`, `tr fr T/S`, `tr to T/S`, `omitted`, `repealed`, `gen amd`, "
+        "`ed chg`, …).",
+        examples=["nt"],
+    )
+    is_note: bool
+    action: str | None = None
+    transfer_counterpart: str | None = Field(
+        default=None, description="The other end of a transfer.", examples=["42/290ee-10"]
+    )
+    act_name: str | None = Field(
+        default=None, description="Named on appendix rows, whose Code citation is an act."
+    )
+    usc_identifier: str | None = Field(
+        default=None,
+        description="The USLM `@identifier` this row's citation derives to, "
+        "**spelled with an EN DASH** as the corpus spells it. Null for 1,533 of "
+        "the loaded rows — 1,531 of them appendix rows, which derive none by rule "
+        "— and those rows are rendered without a link rather than dropped.",
+        examples=["/us/usc/t18/s3551"],
+    )
+    pl_congress: int | None = None
+    pl_num: int | None = None
+    pl_label: str | None = Field(
+        default=None,
+        description="`pl_congress-pl_num`, or null for the 2 rows whose Pub. L. "
+        "cell could not be read. Those rows are kept.",
+        examples=["118-35"],
+    )
+    pl_section_raw: str = Field(
+        description="`''` means the row is about the whole law.", examples=["101(3)"]
+    )
+    new_section_quote: str | None = Field(
+        default=None,
+        description="The section being added to the underlying act, when the Sec. "
+        "cell named one in quotes.",
+        examples=["1948"],
+    )
+    stat_volume: int | None = Field(default=None, examples=[138])
+    stat_pages: list[int] = Field(
+        default_factory=list,
+        description="Pages that have an integer form. **Empty for 6,053 rows that "
+        "do cite a page**, because a page of the Statutes at Large is not always a "
+        "number. A statviewer link is buildable only from a volume and one of these.",
+    )
+    stat_page_labels: list[str] = Field(
+        default_factory=list,
+        description="The Stat. cell's tokens verbatim — the column to display. "
+        "`3009-587` and `1501A-594` are single pages, and a range is one token "
+        "here where it is two integers in `stat_pages`.",
+        examples=[["3009-587"]],
+    )
+
+    @classmethod
+    def of(cls, entry: ClassificationEntryRef) -> "ClassificationEntryOut":
+        return cls(
+            congress=entry.congress,
+            session=entry.session,
+            session_label=entry.session_label,
+            row_seq=entry.row_seq,
+            raw_line=entry.raw_line,
+            title_raw=entry.title_raw,
+            title_num=entry.title_num,
+            is_appendix=entry.is_appendix,
+            section_raw=entry.section_raw,
+            section_norm=entry.section_norm,
+            description_raw=entry.description_raw,
+            is_note=entry.is_note,
+            action=entry.action,
+            transfer_counterpart=entry.transfer_counterpart,
+            act_name=entry.act_name,
+            usc_identifier=entry.usc_identifier,
+            pl_congress=entry.pl_congress,
+            pl_num=entry.pl_num,
+            pl_label=entry.pl_label,
+            pl_section_raw=entry.pl_section_raw,
+            new_section_quote=entry.new_section_quote,
+            stat_volume=entry.stat_volume,
+            stat_pages=list(entry.stat_pages),
+            stat_page_labels=list(entry.stat_page_labels),
+        )
+
+
+class ClassificationPageOut(BaseModel):
+    """One page of classification rows, and the size of the set it came from."""
+
+    items: list[ClassificationEntryOut]
+    total: int = Field(
+        description="Rows the filters matched, not rows returned — what a pager needs."
+    )
+    limit: int
+    offset: int
+    sort: str | None = Field(
+        default=None,
+        description="The ordering in force: `pl` (the source's own order) or "
+        "`code` (title through the Code's ordering, then section). Present on the "
+        "session-page route alone.",
+    )
+    file: ClassificationFileOut | None = Field(
+        default=None,
+        description="The document these rows came from. Present when one document "
+        "answered the request — the session page, and the table covering a public "
+        "law — and null when the rows span documents.",
+    )
+
+    @classmethod
+    def of(
+        cls,
+        page: ClassificationPage,
+        *,
+        sort: str | None = None,
+        file: ClassificationFileInfo | None = None,
+    ) -> "ClassificationPageOut":
+        return cls(
+            items=[ClassificationEntryOut.of(entry) for entry in page.items],
+            total=page.total,
+            limit=page.limit,
+            offset=page.offset,
+            sort=sort,
+            file=ClassificationFileOut.of(file) if file else None,
+        )
+
+
+class EcctEntryOut(BaseModel):
+    """One row of the Editorial Classification Change Table: a provision OLRC
+    moved without Congress amending it."""
+
+    congress: int
+    session: int
+    session_label: str
+    row_seq: int
+    former_raw: str = Field(examples=["42:294t nt"])
+    former_title_num: str | None = None
+    former_section_norm: str | None = None
+    former_is_note: bool = False
+    new_raw: str = Field(examples=["42:294u new"])
+    new_title_num: str | None = None
+    new_section_norm: str | None = None
+    new_is_note: bool = False
+    provision_affected: str = Field(
+        description="The full public-law citation string, verbatim."
+    )
+    provision_prompting: str
+    affected_pl_congress: int | None = None
+    affected_pl_num: int | None = None
+    prompting_pl_congress: int | None = None
+    prompting_pl_num: int | None = None
+
+    @classmethod
+    def of(cls, entry: EcctEntryRef) -> "EcctEntryOut":
+        return cls(
+            congress=entry.congress,
+            session=entry.session,
+            session_label=entry.session_label,
+            row_seq=entry.row_seq,
+            former_raw=entry.former_raw,
+            former_title_num=entry.former_title_num,
+            former_section_norm=entry.former_section_norm,
+            former_is_note=entry.former_is_note,
+            new_raw=entry.new_raw,
+            new_title_num=entry.new_title_num,
+            new_section_norm=entry.new_section_norm,
+            new_is_note=entry.new_is_note,
+            provision_affected=entry.provision_affected,
+            provision_prompting=entry.provision_prompting,
+            affected_pl_congress=entry.affected_pl_congress,
+            affected_pl_num=entry.affected_pl_num,
+            prompting_pl_congress=entry.prompting_pl_congress,
+            prompting_pl_num=entry.prompting_pl_num,
+        )
+
+
+class EcctOut(BaseModel):
+    """The Editorial Classification Change Table, whole."""
+
+    items: list[EcctEntryOut] = Field(
+        description="Newest session first, then source order within a document."
+    )
+    total: int = Field(
+        description="Equal to the length of `items`. This table is not paged — it "
+        "is 21 rows across two documents."
+    )
+
+
+class ClassificationSuggestionOut(BaseModel):
+    """One thing the lookup box can offer for what was typed.
+
+    `href` is a path **relative to the reader's base** (`/app`), always starting
+    with `/`: `/classification/119/2?pl=119-70`, `/us/usc/t16/s45f#section-notes`,
+    `/classification?title=16&section=45f`. The structured fields beside it carry
+    the same answer in pieces, so a caller that builds its own URLs through
+    `lib/url.ts` (architecture rule 5) never has to parse this string.
+    """
+
+    kind: str = Field(
+        description="`pl` — a public law's rows on its session page. "
+        "`section-notes` — the section's notes in the reader, where OLRC's own "
+        "classification history is printed. `section-classifications` — the "
+        "classification rows for that section.",
+        examples=["pl"],
+    )
+    label: str = Field(examples=["Public Law 119-70"])
+    detail: str | None = Field(
+        default=None,
+        description="A second line for the row: what the suggestion leads to.",
+        examples=["119th Congress, 2nd session table"],
+    )
+    href: str
+    congress: int | None = None
+    session: int | None = Field(
+        default=None, description="0 is the 104th's whole-congress file."
+    )
+    session_label: str | None = Field(
+        default=None, description="`1`, `2` or `all` — how `href` spells `session`."
+    )
+    pl: str | None = Field(default=None, examples=["119-70"])
+    pl_section: str | None = Field(
+        default=None, description="A provision of that law, when one was typed."
+    )
+    title_num: str | None = None
+    section: str | None = Field(
+        default=None, description="The `section_norm` spelling — a plain hyphen."
+    )
+    identifier: str | None = Field(
+        default=None,
+        description="The USLM `@identifier`, as the corpus spells it (EN DASH). "
+        "Percent-encode it before putting it in a URL.",
+        examples=["/us/usc/t16/s45f"],
+    )
+    fragment: str | None = Field(
+        default=None, description="The anchor `href` ends at.", examples=["#section-notes"]
+    )
+    count: int | None = Field(
+        default=None, description="How many rows are behind this suggestion, when known."
+    )
+
+
+class ClassificationSuggestOut(BaseModel):
+    """What the lookup box can offer for what was typed."""
+
+    query: str = Field(description="The string that was looked up, as given.")
+    suggestions: list[ClassificationSuggestionOut] = Field(
+        description="Empty when the string is neither a public law this mirror "
+        "covers nor a citation anything is known about, which is an answer rather "
+        "than an error."
+    )
 
 
 class WatchlistItemOut(BaseModel):

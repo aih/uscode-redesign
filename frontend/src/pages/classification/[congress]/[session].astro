@@ -1,0 +1,339 @@
+---
+/**
+ * `/app/classification/{congress}/{session}` — one classification table
+ * (ADR-0067).
+ *
+ * `session` is `1`, `2`, or `all`. The database writes the 104th's
+ * whole-congress file as session `0`, which is not a session anyone would type;
+ * `sessionSegment`/`sessionNumber` in `lib/url.ts` map between the two.
+ *
+ * Nothing on this page sorts, filters or slices. `?sort=code` orders by title
+ * through `title_sort_key`, which is server-side because a title number is a
+ * string and `5a` is not `5` (gotcha 16); the filters and the page bound are the
+ * API's query parameters. The largest session file is ~9,700 rows and the
+ * 104th's is 11,737, so the page has to be a page.
+ *
+ * An empty result is not an error. A table that covers a law and classified
+ * nothing to the title you filtered by answers 200 with no rows, and that reads
+ * differently on screen from "no table covers this congress", which is a 404.
+ */
+import Base from "../../../layouts/Base.astro";
+import ClassificationTable from "../../../components/ClassificationTable.astro";
+import ErrorPage from "../../../components/ErrorPage.astro";
+import {
+  ApiError,
+  CLASSIFICATION_PAGE_SIZE,
+  fetchClassificationEntries,
+} from "../../../lib/api";
+import type { ClassificationEntryPage } from "../../../lib/types";
+import {
+  CLASSIFICATION_SORTS,
+  classificationEcctHref,
+  classificationHref,
+  normalizeSectionKey,
+  readOffset,
+  sessionNumber,
+} from "../../../lib/url";
+
+const congressParam = Astro.params.congress ?? "";
+const sessionParam = Astro.params.session ?? "";
+
+const congress = /^\d+$/u.test(congressParam) ? Number(congressParam) : null;
+const session = sessionNumber(sessionParam);
+
+// A congress that is not a number, or a session outside `1|2|all`, names no
+// file at all — so it is a 404 here rather than a query the API would refuse.
+if (congress == null || session == null) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const params = Astro.url.searchParams;
+const pl = params.get("pl")?.trim() || null;
+const plSection = params.get("pl_section")?.trim() || null;
+const title = params.get("title")?.trim() || null;
+/** Typed input carries a plain hyphen; `section_norm` is what it is matched
+ *  against, and it is spelled with one too (spec § What Wave 1 measured 3). */
+const rawSection = params.get("section")?.trim() || null;
+const section = rawSection ? normalizeSectionKey(rawSection) : null;
+
+/** An unrecognized `?sort=` is the source's own order rather than a 400 —
+ *  a mistyped URL should still show the table. */
+const requestedSort = params.get("sort");
+const sort = (CLASSIFICATION_SORTS as readonly string[]).includes(requestedSort ?? "")
+  ? (requestedSort as string)
+  : "pl";
+
+const offset = readOffset(params.get("offset"));
+
+const SORT_LABELS: Record<string, string> = {
+  pl: "Public law order",
+  code: "U.S. Code order",
+};
+
+let page: ClassificationEntryPage | null = null;
+let failure: { status: number; detail: string } | null = null;
+
+try {
+  // One call. The document these rows came from — its covered range and its
+  // Statutes at Large volume — rides back on the same response.
+  page = await fetchClassificationEntries(congress, sessionParam, {
+    pl,
+    pl_section: plSection,
+    title,
+    section,
+    sort,
+    limit: CLASSIFICATION_PAGE_SIZE,
+    offset,
+  });
+} catch (error) {
+  if (error instanceof ApiError) {
+    failure = { status: error.status, detail: error.detail };
+    Astro.response.status = error.status;
+  } else {
+    console.error("classification entries request failed", error);
+    failure = {
+      status: 503,
+      detail: "The classification tables are unavailable right now. Please try again shortly.",
+    };
+    Astro.response.status = 503;
+  }
+}
+
+function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+}
+
+const sessionName = session === 0 ? "whole congress" : `session ${session}`;
+const heading = `${ordinal(congress)} Congress, ${sessionName}`;
+
+/** Every link on this page is built from one place, so a filter survives a sort
+ *  change and a page turn. The offset is dropped on a sort change: page three of
+ *  one ordering is not page three of another. */
+function href(opts: { sort?: string; offset?: number | null } = {}): string {
+  return classificationHref(congress, sessionParam, {
+    pl,
+    plSection,
+    title,
+    section,
+    sort: opts.sort ?? sort,
+    offset: opts.offset ?? null,
+  });
+}
+
+/** The same view with one filter removed — what a pill's dismiss control does. */
+const filters: { name: string; label: string; href: string }[] = [];
+if (pl) {
+  filters.push({
+    name: "Public law",
+    label: pl,
+    href: classificationHref(congress, sessionParam, { plSection, title, section, sort }),
+  });
+}
+if (plSection) {
+  filters.push({
+    name: "Law section",
+    label: plSection,
+    href: classificationHref(congress, sessionParam, { pl, title, section, sort }),
+  });
+}
+if (title) {
+  filters.push({
+    name: "Title",
+    label: title,
+    href: classificationHref(congress, sessionParam, { pl, plSection, section, sort }),
+  });
+}
+if (section) {
+  filters.push({
+    name: "Section",
+    label: section,
+    href: classificationHref(congress, sessionParam, { pl, plSection, title, sort }),
+  });
+}
+
+const file = page?.file ?? null;
+const total = page?.total ?? 0;
+const items = page?.items ?? [];
+/** An offset past the last row. The request succeeded and named a page that is
+ *  not there, which is not the same as a table that matched nothing — and the
+ *  range has to be counted off what came back, or `?offset=999999` reads
+ *  "Showing 1,000,000–2,987 of 2,987". */
+const pastEnd = total > 0 && offset >= total;
+const shownFrom = items.length > 0 ? offset + 1 : 0;
+const shownTo = offset + items.length;
+---
+
+<Base title={`Classification table: ${heading} · U.S. Code`} wide>
+  {/* `ErrorPage` carries its own `<h1>`. `/app/classification/104/1` is a real
+      congress and a session it has no table for, so titling the failure with
+      the table's own name would name a table that does not exist. */}
+  {!failure && <h1 class="doc-title">{heading}</h1>}
+
+  {failure && <ErrorPage status={failure.status} detail={failure.detail} />}
+
+  {
+    !failure && (
+      <>
+        <p class="lede">
+          Which provision of which public law was classified to which section of the Code.{" "}
+          <a href={classificationHref()}>All classification tables</a>.
+        </p>
+
+        {file && (
+          <p class="doc-meta">
+            {file.covered_laws_text ?? file.covered_ranges.join(", ")}
+            {file.stat_volume != null && ` · Statutes at Large volume ${file.stat_volume}`}
+            {" · "}
+            {file.row_count.toLocaleString()} rows in the source table
+          </p>
+        )}
+
+        {filters.length > 0 && (
+          <div class="filterpills">
+            <span class="filterpills__label" id="filterpills-label">
+              Filtered by
+            </span>
+            <ul class="filterpills__list" aria-labelledby="filterpills-label">
+              {filters.map((filter) => (
+                <li>
+                  <span class="filterpills__pill">
+                    <span class="filterpills__name">{filter.name}</span>
+                    <span class="filterpills__value">{filter.label}</span>
+                    <a
+                      class="filterpills__clear"
+                      href={filter.href}
+                      aria-label={`Remove the ${filter.name.toLowerCase()} filter ${filter.label}`}
+                    >
+                      <span aria-hidden="true">×</span>
+                    </a>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <a class="filterpills__all" href={classificationHref(congress, sessionParam, { sort })}>
+              Clear all
+            </a>
+          </div>
+        )}
+
+        <h2 class="toc-group">
+          {total === 0
+            ? "No rows"
+            : `${total.toLocaleString()} row${total === 1 ? "" : "s"}`}
+        </h2>
+
+        {pastEnd && (
+          <p>
+            That is past the last of {total.toLocaleString()} rows.{" "}
+            <a href={href({ offset: 0 })}>Back to the first page</a>.
+          </p>
+        )}
+
+        {total > 0 && (
+          <>
+            <nav class="sortbar" aria-label="Sort rows">
+              <span class="sortbar__label" id="sortbar-label">
+                Order
+              </span>
+              <ul class="sortbar__list" aria-labelledby="sortbar-label">
+                {CLASSIFICATION_SORTS.map((option) => (
+                  <li>
+                    {option === sort ? (
+                      <span class="sortbar__option sortbar__option--on" aria-current="true">
+                        {SORT_LABELS[option]}
+                      </span>
+                    ) : (
+                      <a class="sortbar__option" href={href({ sort: option })}>
+                        {SORT_LABELS[option]}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            {items.length > 0 && (
+              <>
+                <p class="doc-meta">
+                  Showing {shownFrom.toLocaleString()}–{shownTo.toLocaleString()} of{" "}
+                  {total.toLocaleString()}.
+                </p>
+
+                <ClassificationTable
+                  entries={items}
+                  caption={`${heading}, rows ${shownFrom.toLocaleString()}–${shownTo.toLocaleString()}`}
+                  statVolume={file?.stat_volume ?? null}
+                />
+              </>
+            )}
+          </>
+        )}
+
+        {total === 0 &&
+          (filters.length > 0 ? (
+            <p>
+              This table classified nothing matching those filters.{" "}
+              <a href={classificationHref(congress, sessionParam, { sort })}>
+                Show the whole table
+              </a>
+              .
+            </p>
+          ) : (
+            <p>This table holds no rows.</p>
+          ))}
+
+        {!pastEnd && (offset > 0 || total > offset + CLASSIFICATION_PAGE_SIZE) && (
+          <nav class="searchpager" aria-label="Table pages">
+            {offset > 0 && (
+              <a
+                class="usa-button usa-button--outline"
+                href={href({ offset: Math.max(0, offset - CLASSIFICATION_PAGE_SIZE) })}
+              >
+                ← Previous
+              </a>
+            )}
+            {total > offset + CLASSIFICATION_PAGE_SIZE && (
+              <a
+                class="usa-button usa-button--outline"
+                href={href({ offset: offset + CLASSIFICATION_PAGE_SIZE })}
+              >
+                Next →
+              </a>
+            )}
+          </nav>
+        )}
+
+        <details class="classkey">
+          <summary class="classkey__summary">What the Description column says</summary>
+          <dl class="classkey__list">
+            <dt>Amended</dt>
+            <dd>The source leaves the column blank.</dd>
+            <dt>nt</dt>
+            <dd>Note.</dd>
+            <dt>nt [tbl]</dt>
+            <dd>Note, table.</dd>
+            <dt>new</dt>
+            <dd>A new section or note.</dd>
+            <dt>nt new</dt>
+            <dd>A new note.</dd>
+            <dt>prec</dt>
+            <dd>Preceding the section named.</dd>
+            <dt>tr fr / tr to</dt>
+            <dd>Transferred from, or to, the title and section that follow.</dd>
+            <dt>gen amd</dt>
+            <dd>Generally amended.</dd>
+            <dt>omitted, repealed</dt>
+            <dd>As written.</dd>
+            <dt>ed chg, nt ed chg</dt>
+            <dd>
+              An editorial reclassification, recorded in the{" "}
+              <a href={classificationEcctHref()}>Editorial Classification Change Table</a>.
+            </dd>
+          </dl>
+        </details>
+      </>
+    )
+  }
+</Base>

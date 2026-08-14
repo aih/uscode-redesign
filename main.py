@@ -33,6 +33,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from api.auth import auth
+from api.classification import router as classification_router
 from api.routes import api
 from api.settings import settings
 from api.watchlists import default_watchlist, watchlists
@@ -50,6 +51,20 @@ the USLM `@identifier`.
   parameter is needed, and the link keeps meaning the same text forever.
 * `/api/v1/us/usc/t16/ch1` — a table of contents at a release point.
 
+**Classification tables.** `/api/v1/classifications/…` mirrors OLRC's
+Classification Tables — which provision of which public law was classified to
+which Code section — and the Editorial Classification Change Table. They are a
+mirror of published documents rather than a view of the corpus, so no route
+there takes a release point.
+
+* `/api/v1/classifications/pl/118/35` — everything Public Law 118-35 classified.
+  **404 and an empty page mean different things**: 404 says no table covers that
+  law, 200 with no rows says one does and the law classified nothing.
+* `/api/v1/classifications/code/18/3551` — everything ever classified to a
+  section, newest law first.
+* `/api/v1/classifications/tables/119/2/entries` — one session's table, sorted
+  `pl` or `code`, filtered and paged. `session` is `1`, `2` or `all`.
+
 The bare citation URL — `/us/usc/t16/s45f/c/5` — is not documented here because it
 is not a machine route: it is a **307 redirect** to whichever surface the caller
 can read (`/app` for HTML, `/api/v1` otherwise), so `curl` it with `-L` or address
@@ -60,13 +75,16 @@ label means a law that was *skipped*: at `119-102not101` the text is current
 through 07/12/2026 **except** for Public Law 119-101. Responses carry that caveat
 rather than only a date.
 
-**Rate limits.** Five routes are throttled per client (ADR-0029). Each is a token
-bucket: a burst up to the capacity, refilled at the sustained rate. Over budget,
-the response is **429** with a `Retry-After` header in seconds.
+**Rate limits.** Seven route families are throttled per client (ADR-0029). Each is
+a token bucket: a burst up to the capacity, refilled at the sustained rate. Over
+budget, the response is **429** with a `Retry-After` header in seconds.
 
 * `GET /api/v1/search` — burst 120, then 10 a second.
 * `GET /api/v1/citation` — burst 120, then 10 a second.
 * `GET /api/v1/labels` — burst 300, then 30 a second.
+* `GET /api/v1/classifications/…` — burst 120, then 10 a second.
+* `GET /api/v1/classifications/suggest` — burst 30, then 5 a second. Tighter than
+  the rest of that family because a browser calls it directly, as someone types.
 * `GET /api/v1/sections/{identifier}/diff` — burst 5, then 1 every 5 seconds.
 * `POST /api/v1/auth/signup` — burst 10, then 30 an hour.
 
@@ -106,6 +124,7 @@ app.include_router(auth)  # /api/v1/auth: signup, login, logout, me (PLAN §4)
 app.include_router(watchlists)  # /api/v1/watchlists CRUD
 app.include_router(default_watchlist)  # /api/v1/watchlist: the reader's default list
 app.include_router(settings)  # /api/v1/settings: per-user preferences
+app.include_router(classification_router)  # /api/v1/classifications: OLRC's tables
 app.include_router(citation_router)  # the citation URL, redirecting to a surface
 from api.search import router as search_router
 app.include_router(search_router)

@@ -1,13 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  APP,
   ancestorIdentifiers,
   apiDiffHref,
   apiHref,
   appHref,
+  classificationEcctHref,
+  classificationSuggestionHref,
+  classificationHref,
+  classificationSuggestHref,
   compareTitles,
+  readOffset,
   citationHref,
   diffHref,
+  govinfoPlawHref,
+  normalizeSectionKey,
+  sessionNumber,
+  sessionSegment,
+  statViewerHref,
   gotoHref,
   loginHref,
   provisionLabel,
@@ -306,5 +317,171 @@ describe("ancestorIdentifiers", () => {
       "/us/usc/t16/s45a\u20131",
       "/us/usc/t16",
     ]);
+  });
+});
+
+describe("classification hrefs", () => {
+  it("names the index when it has no congress and session", () => {
+    expect(classificationHref()).toBe("/app/classification");
+    expect(classificationHref(118)).toBe("/app/classification");
+    expect(classificationHref(null, "2")).toBe("/app/classification");
+  });
+
+  it("names one table", () => {
+    expect(classificationHref(118, "2")).toBe("/app/classification/118/2");
+    expect(classificationHref(104, "all")).toBe("/app/classification/104/all");
+  });
+
+  it("omits the defaults, so one view has one URL", () => {
+    expect(classificationHref(118, "2", { sort: "pl", offset: 0 })).toBe(
+      "/app/classification/118/2",
+    );
+    expect(classificationHref(118, "2", { sort: "code" })).toBe(
+      "/app/classification/118/2?sort=code",
+    );
+    expect(classificationHref(118, "2", { offset: 50 })).toBe(
+      "/app/classification/118/2?offset=50",
+    );
+  });
+
+  it("carries the filters under the API's own parameter names", () => {
+    expect(classificationHref(118, "2", { pl: "118-42", plSection: "793", title: "7" })).toBe(
+      "/app/classification/118/2?pl=118-42&pl_section=793&title=7",
+    );
+  });
+
+  it("normalizes a typed section to the plain hyphen section_norm carries", () => {
+    // The corpus spells `254c-15` with an EN DASH and `section_norm` with a
+    // hyphen (gotcha 17, spec \u00a7 What Wave 1 measured 3). Typed input is matched
+    // against the latter.
+    expect(classificationHref(118, "2", { section: "254C\u201315" })).toBe(
+      "/app/classification/118/2?section=254c-15",
+    );
+  });
+
+  it("has one address for the ECCT", () => {
+    expect(classificationEcctHref()).toBe("/app/classification/ecct");
+  });
+
+  it("encodes the suggest query rather than pasting it into a URL", () => {
+    expect(classificationSuggestHref("118-33 101")).toBe(
+      "/api/v1/classifications/suggest?q=118-33%20101",
+    );
+    // The island appends its own encoded query to this.
+    expect(classificationSuggestHref("")).toBe("/api/v1/classifications/suggest?q=");
+  });
+});
+
+describe("classification sessions", () => {
+  it("writes the 104th's whole-congress file as `all`", () => {
+    expect(sessionSegment(0)).toBe("all");
+    expect(sessionSegment(1)).toBe("1");
+    expect(sessionSegment(2)).toBe("2");
+  });
+
+  it("reads it back", () => {
+    expect(sessionNumber("all")).toBe(0);
+    expect(sessionNumber("1")).toBe(1);
+    expect(sessionNumber("2")).toBe(2);
+  });
+
+  it("refuses anything that is not a session, so the page can 404", () => {
+    expect(sessionNumber("0")).toBeNull();
+    expect(sessionNumber("3")).toBeNull();
+    expect(sessionNumber("")).toBeNull();
+    expect(sessionNumber("../etc")).toBeNull();
+  });
+});
+
+describe("normalizeSectionKey", () => {
+  it("lowercases and folds every dash the source uses onto the plain hyphen", () => {
+    expect(normalizeSectionKey(" 254C\u201315 ")).toBe("254c-15");
+    expect(normalizeSectionKey("45A\u20111")).toBe("45a-1");
+    expect(normalizeSectionKey("45a-1")).toBe("45a-1");
+  });
+});
+
+describe("readOffset", () => {
+  it("reads a page offset", () => {
+    expect(readOffset("50")).toBe(50);
+    expect(readOffset("0")).toBe(0);
+  });
+
+  it("floors a fraction rather than passing a 422 to the API", () => {
+    // The route declares `offset` an int; `Number("1.5")` is 1.5, which reaches
+    // FastAPI intact and renders an error page where the table should be.
+    expect(readOffset("1.5")).toBe(1);
+    expect(readOffset("99.99")).toBe(99);
+  });
+
+  it("treats anything unreadable or negative as the first page", () => {
+    expect(readOffset("abc")).toBe(0);
+    expect(readOffset("-5")).toBe(0);
+    expect(readOffset("")).toBe(0);
+    expect(readOffset(null)).toBe(0);
+    expect(readOffset(undefined)).toBe(0);
+    expect(readOffset("Infinity")).toBe(0);
+    expect(readOffset("NaN")).toBe(0);
+  });
+});
+
+describe("where a lookup suggestion leads", () => {
+  // The API returns a ready-made path and the same answer in structured pieces.
+  // The page builds from the pieces (architecture rule 5) and the island
+  // concatenates `/app` onto the path, because an `is:inline` script imports
+  // nothing. These assertions are what keeps the two from drifting apart: each
+  // `href` below is exactly what `api/classification.py`'s `_app_path` emits.
+  it("takes a public law to its rows on the session page", () => {
+    expect(
+      classificationSuggestionHref({
+        kind: "pl",
+        href: "/classification/118/2?pl=118-42&pl_section=793",
+        congress: 118,
+        session_label: "2",
+        pl: "118-42",
+        pl_section: "793",
+      }),
+    ).toBe("/app/classification/118/2?pl=118-42&pl_section=793");
+  });
+
+  it("takes a citation to the section's notes, percent-encoding the en dash", () => {
+    const built = classificationSuggestionHref({
+      kind: "section-notes",
+      href: "/us/usc/t42/s254c%E2%80%9315#section-notes",
+      identifier: "/us/usc/t42/s254c–15",
+      fragment: "#section-notes",
+    });
+    expect(built).toBe("/app/us/usc/t42/s254c%E2%80%9315#section-notes");
+    // The island's concatenation reaches the identical URL.
+    expect(built).toBe(`${APP}/us/usc/t42/s254c%E2%80%9315#section-notes`);
+  });
+
+  it("takes the second citation suggestion to the code-filtered view", () => {
+    expect(
+      classificationSuggestionHref({
+        kind: "section-classifications",
+        href: "/classification?title=16&section=45f",
+        title_num: "16",
+        section: "45f",
+      }),
+    ).toBe("/app/classification?title=16&section=45f");
+  });
+
+  it("falls back to the path it was given for a kind it does not know", () => {
+    expect(
+      classificationSuggestionHref({ kind: "something-new", href: "/classification/119/2" }),
+    ).toBe("/app/classification/119/2");
+  });
+});
+
+describe("the two source links a classification row carries", () => {
+  it("builds govinfo's public law page from (congress, number)", () => {
+    expect(govinfoPlawHref(118, 42)).toBe("https://www.govinfo.gov/app/details/PLAW-118publ42");
+  });
+
+  it("builds OLRC's statviewer from (volume, page)", () => {
+    expect(statViewerHref(138, 290)).toBe(
+      "https://uscode.house.gov/statviewer.htm?volume=138&page=290",
+    );
   });
 });

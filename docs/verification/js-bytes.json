@@ -4,7 +4,7 @@
   "excluded": "CopyColumn's <script type=\"application/json\" data-copy-targets> — its size is the section's provision list rather than code, so it varies per URL and is measured nowhere.",
   "client_bundles": "None. `astro build` emits no client JavaScript for this site; dist/client/_astro holds only CSS, because every island is is:inline and Astro never bundles those.",
   "validated_against": "The rendered page — see docs/adr/0046 for the comparison against a live /app/us/usc/… response.",
-  "total_bytes": 396708,
+  "total_bytes": 455981,
   "routes": [
     {
       "route": "/app/",
@@ -54,6 +54,52 @@
     {
       "route": "/app/about",
       "page": "pages/about.astro",
+      "bytes": 18250,
+      "scripts": 8,
+      "components": [
+        "AuthNav.astro",
+        "CommandPalette.astro",
+        "DensityToggle.astro",
+        "KeyboardNav.astro",
+        "SiteHeader.astro",
+        "ThemeToggle.astro",
+        "Base.astro"
+      ]
+    },
+    {
+      "route": "/app/classification",
+      "page": "pages/classification/index.astro",
+      "bytes": 22773,
+      "scripts": 9,
+      "components": [
+        "AuthNav.astro",
+        "ClassificationLookup.astro",
+        "CommandPalette.astro",
+        "DensityToggle.astro",
+        "KeyboardNav.astro",
+        "SiteHeader.astro",
+        "ThemeToggle.astro",
+        "Base.astro"
+      ]
+    },
+    {
+      "route": "/app/classification/[congress]",
+      "page": "pages/classification/[congress]/[session].astro",
+      "bytes": 18250,
+      "scripts": 8,
+      "components": [
+        "AuthNav.astro",
+        "CommandPalette.astro",
+        "DensityToggle.astro",
+        "KeyboardNav.astro",
+        "SiteHeader.astro",
+        "ThemeToggle.astro",
+        "Base.astro"
+      ]
+    },
+    {
+      "route": "/app/classification/ecct",
+      "page": "pages/classification/ecct.astro",
       "bytes": 18250,
       "scripts": 8,
       "components": [

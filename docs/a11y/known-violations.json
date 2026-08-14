@@ -22,16 +22,18 @@
     "A pair listed here is reported and allowed; anything else fails. A pair that has stopped",
     "overflowing also fails, so a fixed bug cannot go on looking like a bug."
   ],
-  "reflow": [
-    {
-      "page": "docs",
-      "view": "320",
-      "overflowPx": 3,
-      "owner": "A4",
-      "recorded": "2026-08-03",
-      "reason": "The per-endpoint parameter tables on /app/docs push the page 3px sideways at 320 CSS px. Same tables as the scrollable-region-focusable entry below."
-    }
+  "_reflowFixed": [
+    "/app/docs held the only two entries this list ever had, and both are fixed rather than",
+    "banked (2026-08-11). The cause was never the parameter tables the 2026-08-03 entry named:",
+    "those sit inside .table-scroll and contribute nothing to document width. It was endpoint",
+    "paths in the prose lists, which are single unbroken tokens in no scroll region —",
+    "`/api/v1/classifications/tables/119/2/entries` measured 422px wide, right edge 466, which is",
+    "466-320=146 and 466-375=91, the two numbers that were recorded. `overflow-wrap: anywhere` on",
+    "code in .apidocs__intro and .endpoint__prose takes both widths to 0. The page overflowed 50px",
+    "at 320 before ADR-0067's routes joined the schema, so the 3px this list recorded on",
+    "2026-08-03 had been stale for some time."
   ],
+  "reflow": [],
   "entries": [
     {
       "rule": "color-contrast",

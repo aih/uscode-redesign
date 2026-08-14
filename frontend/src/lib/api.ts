@@ -8,7 +8,12 @@
 import { API, ancestorIdentifiers } from "./url";
 import type {
   Citation,
+  ClassificationEntryPage,
+  ClassificationSuggestion,
+  ClassificationSuggestions,
+  ClassificationTables,
   Diff,
+  EcctPage,
   Entry,
   Labels,
   Neighbors,
@@ -205,6 +210,114 @@ export async function fetchSearch(
   return getJson<SearchResponse>(
     `${API}/search${qs({ q: query, offset, limit, sort, ...release })}`,
   );
+}
+
+/* ------------------------------------------------- classification tables
+ *
+ * ADR-0067's routes, under `/api/v1/classifications/…`. Everything here goes
+ * through `getJson`, so a 404 from the API arrives as an `ApiError` a page can
+ * hand to `ErrorPage` — which is the difference the spec asks these pages to
+ * keep: "no table covers Public Law 119-72" is a 404, and "a table covers it
+ * and it classified nothing" is a 200 with an empty `items`.
+ */
+
+/** The registry of source documents, and when this site last checked them. */
+export async function fetchClassificationTables(): Promise<ClassificationTables> {
+  return getJson<ClassificationTables>(`${API}/classifications/tables`);
+}
+
+/** How many rows one session page asks for. Well under the API's own bound of
+ *  500: the largest session file is ~9,700 rows and the 104th's is 11,737, so
+ *  an unbounded fetch here would be a page nobody can read and a query nobody
+ *  budgeted for. */
+export const CLASSIFICATION_PAGE_SIZE = 50;
+
+export interface ClassificationEntryQuery {
+  pl?: string | null;
+  pl_section?: string | null;
+  title?: string | null;
+  section?: string | null;
+  sort?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * One session's table, filtered, sorted and paged by the API.
+ *
+ * Nothing is sorted or sliced here: `?sort=code` orders by title through
+ * `title_sort_key`, which is server-side by gotcha 16. `sort` must already be
+ * one of the two the API accepts — it is a `Literal` there and an unrecognized
+ * value is a 422, while the *page* falls back silently, so the normalization
+ * happens before the call.
+ *
+ * `session` takes the label (`1`, `2`, `all`) rather than the number: the route
+ * accepts either and the label is what the URL already carries.
+ */
+export async function fetchClassificationEntries(
+  congress: number,
+  session: string,
+  query: ClassificationEntryQuery = {},
+): Promise<ClassificationEntryPage> {
+  return getJson<ClassificationEntryPage>(
+    `${API}/classifications/tables/${congress}/${session}/entries${qs({ ...query })}`,
+  );
+}
+
+/**
+ * Everything ever classified to one Code section, newest public law first — the
+ * order a section's classification history reads in. A section nothing was ever
+ * classified to is an empty page: the tables cover 1996 onward, so silence here
+ * is ordinary rather than an error.
+ *
+ * `limit` is always sent. The route's own default is 100 and the busiest
+ * sections are well past it — 42 U.S.C. § 1396a has 353 rows, § 1395l 282,
+ * 26 U.S.C. § 1 243 — so a caller that omits it gets a hundred rows beside a
+ * total that says there are more, with nothing on screen saying which hundred.
+ */
+export async function fetchClassificationsForSection(
+  titleNum: string,
+  section: string,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<ClassificationEntryPage> {
+  const { limit = CLASSIFICATION_PAGE_SIZE, offset = 0 } = opts;
+  return getJson<ClassificationEntryPage>(
+    `${API}/classifications/code/${encodeURIComponent(titleNum)}/${encodeURIComponent(section)}${qs({ limit, offset })}`,
+  );
+}
+
+/** The whole Editorial Classification Change Table — 21 rows across two files. */
+export async function fetchEcct(): Promise<EcctPage> {
+  return getJson<EcctPage>(`${API}/classifications/ecct`);
+}
+
+/**
+ * What a lookup query means, decided server-side.
+ *
+ * The PL shorthand and the citation half both parse in Python — `citeparse.py`
+ * is the single source of truth for what a citation is (ADR-0023), and a
+ * TypeScript copy of it would be a second parser disagreeing with the first.
+ * So this is the no-script path's handler as well as the island's endpoint: the
+ * page calls it when a query arrives in `?q=`, and the island calls the same
+ * URL from the browser.
+ *
+ * An empty list is a normal answer rather than a failure — the two citation
+ * kinds are independent and either may be absent. It never throws for the same
+ * reason: a lookup that fails is a box that found nothing, not a page that will
+ * not render.
+ */
+export async function fetchClassificationSuggestions(
+  query: string,
+): Promise<ClassificationSuggestion[]> {
+  if (!query.trim()) return [];
+  try {
+    const body = await getJson<ClassificationSuggestions>(
+      `${API}/classifications/suggest${qs({ q: query })}`,
+    );
+    return body.suggestions ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** The OpenAPI schema FastAPI generates, for `/app/docs` to render.
