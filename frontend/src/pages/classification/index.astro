@@ -54,11 +54,21 @@ import {
 
 /** Strip `scope=` when the form submitted an empty value (the "Every table"
  *  option). The select always posts its value; an empty one means no scope and
- *  belongs in a clean URL without the param. */
+ *  belongs in a clean URL without the param.
+ *
+ *  The target is a path, never `Astro.url` with a parameter removed: the Node
+ *  adapter only trusts a request's `Host` when `security.allowedDomains` names
+ *  it, and with that unset it falls back to the literal `localhost` with no
+ *  port. So `Astro.url.origin` is `http://localhost` behind this deployment's
+ *  proxy, and an absolute redirect built from it sends the browser to port 80. */
 if (Astro.url.searchParams.get("scope") === "") {
-  const clean = new URL(Astro.url);
-  clean.searchParams.delete("scope");
-  return Astro.redirect(clean.toString(), 302);
+  const rest = new URLSearchParams(Astro.url.searchParams);
+  rest.delete("scope");
+  const remaining = rest.toString();
+  return Astro.redirect(
+    remaining ? `${classificationHref()}?${remaining}` : classificationHref(),
+    302,
+  );
 }
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
