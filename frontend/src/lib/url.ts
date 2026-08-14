@@ -381,14 +381,43 @@ export function classificationEcctHref(): string {
   return `${APP}/classification/ecct`;
 }
 
+/** One table as the lookup scopes to it: `118-2`, `104-all`.
+ *
+ * The value of the scope `<select>` and of the session page's `?scope=`, so a
+ * no-script submission round-trips it. A dash rather than a slash because the
+ * value rides in a query string, where a slash would be percent-encoded. */
+export function classificationScopeValue(
+  congress: number | string,
+  session: string,
+): string {
+  return `${congress}-${session}`;
+}
+
+/** The scope value back into its parts. Anything that names no table — an
+ *  empty select, a hand-edited value — scopes nothing rather than erroring. */
+export function parseClassificationScope(
+  value: string | null | undefined,
+): { congress: number; session: ClassificationSession } | null {
+  const match = /^(\d+)-(1|2|all)$/u.exec(value ?? "");
+  if (!match) return null;
+  return { congress: Number(match[1]), session: match[2] as ClassificationSession };
+}
+
 /** `/api/v1/classifications/suggest?q=…` — what the lookup's listbox fetches.
  *
  * Built here rather than in the island for architecture rule 5's reason and one
  * more: an `is:inline` script imports nothing, so a URL written inside it is a
  * second copy of this one. The page renders `classificationSuggestHref("")` into
- * a data attribute and the island appends the encoded query to it. */
-export function classificationSuggestHref(query: string): string {
-  return `${API}/classifications/suggest?q=${encodeURIComponent(query)}`;
+ * a data attribute and the island appends the encoded query to it — which is
+ * why `q=` is always the last parameter, with the scope's two ahead of it. */
+export function classificationSuggestHref(
+  query: string,
+  scope?: { congress: number | string; session: string } | null,
+): string {
+  const prefix = scope
+    ? `${API}/classifications/suggest?congress=${scope.congress}&session=${scope.session}&q=`
+    : `${API}/classifications/suggest?q=`;
+  return prefix + encodeURIComponent(query);
 }
 
 /**
@@ -400,7 +429,7 @@ export function classificationSuggestHref(query: string): string {
  * suggestion is the corpus's EN DASH, which `appHref` percent-encodes and a
  * pasted string would not.
  *
- * The three kinds the API defines today, and an unknown one falls back to the
+ * The four kinds the API defines today, and an unknown one falls back to the
  * path it was given: a suggestion this reader does not recognise should still
  * go somewhere rather than nowhere.
  */
@@ -424,6 +453,17 @@ export function classificationSuggestionHref(suggestion: {
   }
   if (suggestion.kind === "section-notes" && suggestion.identifier) {
     return `${appHref(suggestion.identifier)}${suggestion.fragment ?? ""}`;
+  }
+  if (
+    suggestion.kind === "section-in-table" &&
+    suggestion.congress != null &&
+    suggestion.session_label &&
+    suggestion.title_num
+  ) {
+    return classificationHref(suggestion.congress, suggestion.session_label, {
+      title: suggestion.title_num,
+      section: suggestion.section,
+    });
   }
   if (suggestion.kind === "section-classifications" && suggestion.title_num) {
     return classificationHref(null, null, {

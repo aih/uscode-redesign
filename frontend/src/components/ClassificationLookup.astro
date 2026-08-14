@@ -63,6 +63,15 @@
  * so a second copy of the island — `/app/design` is the case `idPrefix` exists
  * for — gets its own handlers and the first does not get them twice. Ids are all
  * derived from `idPrefix` for the same reason.
+ *
+ * ## Scoped to one table
+ *
+ * `scope` fixes the box to one session table: the form posts to that table's
+ * page, the suggest request carries `congress`/`session`, and the endpoint then
+ * reads a bare law number as that congress's law and counts a citation's rows
+ * in that table. `scopeOptions` is the user-selectable form of the same thing —
+ * a `<select name="scope">` the index page reads back through
+ * `parseClassificationScope`. The two are not passed together.
  */
 import { APP, classificationHref, classificationSuggestHref } from "../lib/url";
 
@@ -71,37 +80,82 @@ interface Props {
   value?: string;
   /** Distinguishes ids when a page renders more than one (`/app/design`). */
   idPrefix?: string;
+  /** Fix the lookup to one table — the session page's box. `session` is the
+   *  URL's spelling: `1`, `2` or `all`. */
+  scope?: { congress: number; session: string } | null;
+  /** Offer a table scope as a `<select>` — the index page's box. */
+  scopeOptions?: { value: string; label: string }[];
+  /** The selected option, round-tripped from a no-script `?scope=`. */
+  scopeValue?: string;
 }
 
-const { value = "", idPrefix = "classlookup" } = Astro.props;
+const {
+  value = "",
+  idPrefix = "classlookup",
+  scope = null,
+  scopeOptions = [],
+  scopeValue = "",
+} = Astro.props;
 const inputId = `${idPrefix}-q`;
 const listId = `${idPrefix}-list`;
 const hintId = `${idPrefix}-hint`;
 const statusId = `${idPrefix}-status`;
+const scopeId = `${idPrefix}-scope`;
+
+const action = scope
+  ? classificationHref(scope.congress, scope.session)
+  : classificationHref();
+const label = scope ? "Find a row in this table" : "Find a public law or a Code section";
+const placeholder = scope ? "35, 35 101, or 16 usc 3831" : "118-33, 118-33 101, or 16 usc 3831";
+const hint = scope
+  ? "A bare number means a public law of this congress. A law leads to its rows in this table; a Code citation to the rows classified to that section here, or its notes in the reader."
+  : "A public law goes to its rows in the session table; a Code citation goes to that section's notes in the reader.";
 ---
 
 <form
   class="classlookup"
   method="get"
-  action={classificationHref()}
+  action={action}
   role="search"
   aria-labelledby={`${inputId}-label`}
   data-classlookup
-  data-endpoint={classificationSuggestHref("")}
+  data-endpoint={classificationSuggestHref("", scope)}
   data-app={APP}
   data-list={listId}
 >
   <label class="classlookup__label" id={`${inputId}-label`} for={inputId}>
-    Find a public law or a Code section
+    {label}
   </label>
   <div class="classlookup__row">
+    {
+      scopeOptions.length > 0 && (
+        <>
+          <label class="usa-sr-only" for={scopeId}>
+            Limit the lookup to one table
+          </label>
+          <select
+            class="usa-select classlookup__scope"
+            id={scopeId}
+            name="scope"
+            data-classlookup-scope
+          >
+            <option value="">Every table</option>
+            {scopeOptions.map((option) => (
+              <option value={option.value} selected={option.value === scopeValue}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </>
+      )
+    }
     <input
       class="usa-input classlookup__input"
       id={inputId}
       type="search"
       name="q"
       value={value}
-      placeholder="118-33, 118-33 101, or 16 usc 3831"
+      placeholder={placeholder}
       autocomplete="off"
       spellcheck="false"
       enterkeyhint="go"
@@ -111,8 +165,7 @@ const statusId = `${idPrefix}-status`;
     <button class="usa-button classlookup__go" type="submit">Look up</button>
   </div>
   <p class="classlookup__hint" id={hintId}>
-    A public law goes to its rows in the session table; a Code citation goes to that section's
-    notes in the reader.
+    {hint}
   </p>
 
   {/* Empty and hidden until a request answers. The script gives it its listbox
@@ -130,6 +183,7 @@ const statusId = `${idPrefix}-status`;
       const input = box.querySelector("[data-classlookup-input]");
       const list = box.querySelector("[data-classlookup-list]");
       const status = box.querySelector("[data-classlookup-status]");
+      const scope = box.querySelector("[data-classlookup-scope]");
       const endpoint = box.dataset.endpoint;
       const app = box.dataset.app;
       const listId = box.dataset.list;
@@ -200,6 +254,20 @@ const statusId = `${idPrefix}-status`;
           items.length === 0 ? "No matches" : items.length + " suggestions available";
       }
 
+      /* The select's value is `118-2` — split at its last dash, since the
+         session half is `1`, `2` or `all` and never carries one. */
+      function scopeParams() {
+        if (!scope || !scope.value) return "";
+        const split = scope.value.lastIndexOf("-");
+        if (split < 1) return "";
+        return (
+          "&congress=" +
+          encodeURIComponent(scope.value.slice(0, split)) +
+          "&session=" +
+          encodeURIComponent(scope.value.slice(split + 1))
+        );
+      }
+
       function ask() {
         const query = input.value.trim();
         if (query.length < 2) {
@@ -208,7 +276,7 @@ const statusId = `${idPrefix}-status`;
         }
         pending?.abort();
         pending = new AbortController();
-        fetch(endpoint + encodeURIComponent(query), {
+        fetch(endpoint + encodeURIComponent(query) + scopeParams(), {
           headers: { accept: "application/json" },
           signal: pending.signal,
         })
@@ -222,6 +290,12 @@ const statusId = `${idPrefix}-status`;
       input.addEventListener("input", () => {
         clearTimeout(timer);
         timer = setTimeout(ask, 200);
+      });
+
+      /* A new scope re-answers the query already typed. */
+      scope?.addEventListener("change", () => {
+        clearTimeout(timer);
+        ask();
       });
 
       input.addEventListener("keydown", (event) => {

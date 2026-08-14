@@ -1,0 +1,48 @@
+---
+/**
+ * The lookup's no-script answers: what `?q=` matched, as links (ADR-0067).
+ *
+ * Rendered by `/app/classification` and by each session table page over the
+ * same endpoint the island's listbox reads, so the two paths give one parse's
+ * answers. Each link is built from the suggestion's structured pieces through
+ * `classificationSuggestionHref` — a reader URL is `lib/url.ts`'s to write
+ * (architecture rule 5).
+ */
+import type { ClassificationSuggestion } from "../lib/types";
+import { classificationSuggestionHref } from "../lib/url";
+
+interface Props {
+  /** The `?q=` as it arrived. */
+  query: string;
+  suggestions: ClassificationSuggestion[];
+  /** Distinguishes ids when two pages share a layout region. */
+  headingId?: string;
+}
+
+const { query, suggestions, headingId = "classfind-heading" } = Astro.props;
+---
+
+<section class="classfind" aria-labelledby={headingId}>
+  <h2 class="toc-group" id={headingId}>
+    {suggestions.length === 0 ? `Nothing matches “${query}”` : `Matches for “${query}”`}
+  </h2>
+  {
+    suggestions.length === 0 ? (
+      <p class="doc-meta">
+        A public law is written <code>118-33</code>, a provision of one <code>118-33 101</code>,
+        and a Code section <code>16 usc 3831</code>.
+      </p>
+    ) : (
+      <ul class="classfind__list">
+        {suggestions.map((suggestion) => (
+          <li>
+            <a class="classfind__link" href={classificationSuggestionHref(suggestion)}>
+              {suggestion.label}
+            </a>
+            {suggestion.detail && <span class="classfind__hint"> {suggestion.detail}</span>}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</section>

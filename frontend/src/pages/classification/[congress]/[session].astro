@@ -13,17 +13,26 @@
  * API's query parameters. The largest session file is ~9,700 rows and the
  * 104th's is 11,737, so the page has to be a page.
  *
+ * The lookup box is here as well as on the index, scoped to this table: its
+ * form posts back to this page, `?q=` is the no-script path, and the suggest
+ * request carries this congress and session — a bare law number then means a
+ * law of this congress, and a citation's first answer is the rows in this
+ * table. Finding one row otherwise means paging through as many as 118 pages.
+ *
  * An empty result is not an error. A table that covers a law and classified
  * nothing to the title you filtered by answers 200 with no rows, and that reads
  * differently on screen from "no table covers this congress", which is a 404.
  */
 import Base from "../../../layouts/Base.astro";
+import ClassificationLookup from "../../../components/ClassificationLookup.astro";
+import ClassificationMatches from "../../../components/ClassificationMatches.astro";
 import ClassificationTable from "../../../components/ClassificationTable.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
 import {
   ApiError,
   CLASSIFICATION_PAGE_SIZE,
   fetchClassificationEntries,
+  fetchClassificationSuggestions,
 } from "../../../lib/api";
 import type { ClassificationEntryPage } from "../../../lib/types";
 import {
@@ -64,6 +73,13 @@ const sort = (CLASSIFICATION_SORTS as readonly string[]).includes(requestedSort 
   : "pl";
 
 const offset = readOffset(params.get("offset"));
+
+/** The lookup's no-script path, answered by the same endpoint the island
+ *  calls — scoped to this table, so a bare law number resolves here. */
+const query = (params.get("q") ?? "").trim();
+const suggestions = query
+  ? await fetchClassificationSuggestions(query, { congress, session: sessionParam })
+  : [];
 
 const SORT_LABELS: Record<string, string> = {
   pl: "Public law order",
@@ -189,6 +205,10 @@ const shownTo = offset + items.length;
             {file.row_count.toLocaleString()} rows in the source table
           </p>
         )}
+
+        <ClassificationLookup value={query} scope={{ congress, session: sessionParam }} />
+
+        {query && <ClassificationMatches query={query} suggestions={suggestions} />}
 
         {filters.length > 0 && (
           <div class="filterpills">
