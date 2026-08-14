@@ -60,6 +60,10 @@
           "px": 53.44
         },
         {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
           "name": "soon__trigger",
           "px": 44
         },
@@ -152,6 +156,10 @@
         {
           "name": "usa-nav__link",
           "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
         },
         {
           "name": "navdrop__item",
@@ -256,6 +264,10 @@
           "px": 53.44
         },
         {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
           "name": "soon__trigger",
           "px": 44
         },
@@ -348,6 +360,10 @@
         {
           "name": "usa-nav__link",
           "px": 53.28
+        },
+        {
+          "name": "navdrop__item",
+          "px": 53.44
         },
         {
           "name": "navdrop__item",
@@ -452,6 +468,10 @@
           "px": 53.44
         },
         {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
           "name": "soon__trigger",
           "px": 44
         },
@@ -550,6 +570,10 @@
           "px": 53.44
         },
         {
+          "name": "navdrop__item",
+          "px": 53.44
+        },
+        {
           "name": "soon__trigger",
           "px": 44
         },
@@ -641,6 +665,10 @@
         },
         {
           "name": "navdrop__summary",
+          "px": 44
+        },
+        {
+          "name": "navdrop__item",
           "px": 44
         },
         {

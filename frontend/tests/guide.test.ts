@@ -51,14 +51,6 @@ const UNDOCUMENTED_ROUTES = new Set([
   "/app/429",
   "/app/healthz",
   "/app/preview",
-  // The three classification-table routes (ADR-0067). These *are* features and
-  // they do need a chapter; the chapter is phase C5's, which also removes 67
-  // from INFRASTRUCTURE_ADRS below. Wave 3 ships the pages and Wave 4 ships the
-  // documentation, so for one wave these three lines are the deferral —
-  // `docs/classification-spec.md` § Waves. C5 deletes them.
-  "/app/classification",
-  "/app/classification/[congress]",
-  "/app/classification/ecct",
 ]);
 
 /** The guide does not document itself, chapter by chapter. */
@@ -93,9 +85,6 @@ const INFRASTRUCTURE_ADRS = new Set([
   46, // the per-route JavaScript byte budget — a test harness
   47, // declining a shared cache in front of the spine — a deployment decision
   51, // the search index rebuilds itself on a mapping change — a deploy step
-  67, // the classification tables: scraping and schema, with no reader surface yet.
-  //     Remove this line when C4/C5 ship /app/classification and its chapter
-  //     (docs/classification-spec.md, phase C5).
 ]);
 
 const chapters = readChapters();

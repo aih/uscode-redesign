@@ -27,7 +27,7 @@
  */
 
 import type { Release } from "./types";
-import { APP, diffHref, settingsHref, syntaxHref, versionsHref } from "./url";
+import { APP, classificationHref, diffHref, settingsHref, syntaxHref, versionsHref } from "./url";
 
 export interface PaletteCommand {
   /** Stable name for the row. The e2e suite selects on it, and it is what the
@@ -62,6 +62,12 @@ export function siteCommands(): PaletteCommand[] {
       label: "Release points",
       hint: "Every published release point, and how current this site is",
       href: `${APP}/releases`,
+    },
+    {
+      id: "classification",
+      label: "Classification tables",
+      hint: "Which provision of which public law was classified to which section",
+      href: classificationHref(),
     },
     {
       id: "guide",

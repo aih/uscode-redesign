@@ -2606,3 +2606,76 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   contention, since the new routes take their own API-side buckets and `middleware.ts` is
   untouched. `frontend/package-lock.json` acquires `"peer": true` markers on any `npm install`;
   they are not a dependency change.
+
+## 071 — 2026-08-13 — Session 49: classification tables, wave 4 — the chrome, the chapter and the box
+
+- **Tool/model:** Claude Code, Opus 5. One session, sequential, no subagents — C5 edits shared
+  chrome files and asserts on everything the earlier waves produced.
+- **Asked:** Execute Wave 4 of `docs/classification-spec.md` per `claude-code/WAVE-4-KICKOFF.md` —
+  link the three reader routes from the chrome, write the guide chapter and delete both deferrals,
+  map the routes, put the two new components on `/app/design`, wire the poll into
+  `deploy/update-corpus.sh`, and load the corpus on the deployed box.
+- **Decided:**
+  - **The tables go under More ▸ Reference, beside Release points, not under Browse.** They are a
+    finding aid over the Code rather than a way through it. The footer's Browse group takes them
+    anyway, since that group is where a reader looks for "everything this site holds"; the
+    `footnav-browse` count assertion moves 2 → 3 and the footer is ten links.
+  - **The classification poll runs first in `update-corpus.sh` and independently of the corpus
+    chain.** Two sources, two check tables, neither load depending on the other — and a
+    release-point check that fails exits the script, so a classification poll behind it would stop
+    being recorded for as long as the other source was down. `--check-only` records without
+    loading, `--force` sweeps past both gates, and each early exit now carries the classification
+    status so a failure up there is a red run rather than a line in a log.
+  - **`ClassificationLookup` is rendered in full on `/app/design`**, the first of C4's three
+    options: the island fetches on input and nothing on that page types into it, so the page still
+    reaches no data. The alternative — a script-less mode — would have put a rendering on the
+    design page that exists nowhere else, which is the drift ADR-0053 exists to prevent.
+  - **No demo scene.** `docs/demo/scenes.json` and the committed `.vtt` are generated from the
+    guide's `demo: true` scenarios, and adding one makes both stale until `make demo-video` reruns.
+    The five new scenarios are tests, not scenes.
+- **Produced:** branch `c5-classification-chrome`, PR #47, six commits `dabfdc2..34365ce` plus this
+  entry. This session was harness-pinned to a worktree again, exactly as Wave 3 was, so it branched
+  off Wave 3's unmerged tip (`1ee12d4`); Wave 3 merged as PR #46 while the work was in flight and
+  the branch was rebased onto `cd3a98b`, which is that merge.
+  - `SiteHeader.astro`, `SiteFooter.astro`, `lib/palette.ts` — one destination each, with
+    `chrome.spec.ts`'s ordered row list, its footer href list, its Browse count and a
+    `palette.test.ts` row moving in the same commit.
+  - `frontend/src/pages/guide/10-classification-tables.md` — `covers.routes` the three routes,
+    `covers.adrs` [67], five scenarios. The three routes leave `UNDOCUMENTED_ROUTES` and ADR-0067
+    leaves `INFRASTRUCTURE_ADRS` in the same commit.
+  - `deploy/update-corpus.sh` — `classification-check`, and `classification` on exit 10.
+  - `design.astro` — four specimen classification rows and the lookup; `docs/js-budgets.json`
+    raises `/app/design` 34,000 → 39,000.
+  - `docs/ia-map.md` — three new rows, and every other row's `file:line` re-derived.
+  - `docs/verification/a11y.json`, `footnav.json`, `mobilebar.json` and six screenshots
+    regenerated; `frontend/scripts/footnav.mjs`'s three ADR-0062 references corrected to ADR-0063.
+- **Verified:**
+  - `make test` — **738 passed, 13 deselected**, unchanged: this wave touches no Python but the
+    deploy script.
+  - `make test-web` — **370 passed, 23 files** (369 before; the palette row's own test).
+  - `make test-e2e` + `make test-a11y` — **603 passed, 2 skipped** over 605, including the five new
+    guide scenarios and the whole `ratelimit` project. **322 axe scans** (315 before: the guide
+    chapter, expanded from disk, at three viewports × two themes plus forced colours), **8
+    violation/route pairs over 2,623 nodes** — the same eight, all
+    `docs/a11y/known-violations.json`'s.
+  - `make shots` — exit 0, no page scrolling sideways at 320 or at 1280 zoomed to 200%. Six
+    screenshots moved: `/app/design`, the guide index, a guide chapter and three demo views.
+  - `make footnav` — the footer's link block **675 → 732px at 320 and 375**, unchanged from 420 up.
+    `make mobilebar` — one 53.44px row added to the sheet at every width below 64em, header still
+    **104px**, sticky stack still **225.13px**, which is ADR-0064's number.
+  - **The scenarios hold on both corpora.** The CI fixture index page covers Public Laws 118-35 to
+    118-274, so `118-42` has rows there as it does in the full corpus; 18 U.S.C. § 3551's one
+    fixture row is `118-35`, which is also on the first page of its 26 real ones.
+  - **The backfill ran on the deployed box** (SSM, `docker compose exec api uv run python -m ingest
+    classification --quiet`): **33 documents linked, 33 loaded, 0 unchanged, 0 skipped, 0 failed;
+    144,858 rows in 110.0 s** — 144,837 entries, 21 ECCT, 33 files, the development corpus's
+    totals. Re-check with the count query in `docs/deploy-status.md`.
+- **Open:** **the box holds 144,837 rows it cannot serve** until a deploy carries Wave 3's reader —
+  the running image predates it, so `/app/classification` and `/api/v1/classifications/tables`
+  answer 404 there.
+  `classification_source_checks` is empty on the box: the loader writes no check row, and the new
+  `update-corpus.sh` writes the first one on the daily cron after the deploy, so the index page
+  reads "have never been checked from here" until then. The `/app/design` script budget is 15%
+  higher for one island, which is the price of that page rendering every island.
+  `shed.spec.ts` stayed green here across a full combined run, but it is still the
+  timing-sensitive test Wave 3 flagged.

@@ -2,7 +2,7 @@
  * How much of a screen the footer's own links take, once opened.
  *
  * ADR-0058 collapsed the nine of them behind a disclosure because they were
- * 326px of menu at 375px; ADR-0062 grouped them under four headings, which
+ * 326px of menu at 375px; ADR-0063 grouped them under four headings, which
  * buys columns at most widths and costs a label row at the narrowest. That
  * trade is a number, so it is measured rather than described.
  *
@@ -13,7 +13,7 @@
  * has opened it — the closed state is one 44px summary at every width and says
  * nothing about the layout underneath. Writes docs/verification/footnav.json.
  *
- * To reproduce the before column of ADR-0062's table, run it against a tree at
+ * To reproduce the before column of ADR-0063's table, run it against a tree at
  * f5d49a0, the commit before the grouping.
  */
 import { mkdir, writeFile } from "node:fs/promises";
@@ -63,7 +63,7 @@ await writeFile(
     {
       _comment:
         "Height of the footer's link block, disclosure open, per viewport width. " +
-        "Regenerate with `make footnav` against a running site (ADR-0062).",
+        "Regenerate with `make footnav` against a running site (ADR-0063).",
       page: "/app/us/usc/t16/s45f",
       results,
     },

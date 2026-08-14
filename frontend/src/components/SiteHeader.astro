@@ -93,7 +93,7 @@ import {
   DOWNLOADS_ENABLED,
   DOWNLOADS_NOTICE,
 } from "../lib/features";
-import { APP, appHref } from "../lib/url";
+import { APP, appHref, classificationHref } from "../lib/url";
 import { NAV_TITLES } from "../data/nav-titles";
 
 interface Props {
@@ -200,6 +200,13 @@ const wordmark = "United States Code";
                 <ul class="navdrop__list" aria-labelledby="navmore-reference">
                   <li>
                     <a class="navdrop__item" href={`${APP}/releases`}>Release points</a>
+                  </li>
+                  {/* OLRC's classification tables (ADR-0067): which provision of
+                      which public law was classified where. Reference rather
+                      than Browse, because it is a finding aid over the Code
+                      rather than a way through it. */}
+                  <li>
+                    <a class="navdrop__item" href={classificationHref()}>Classification tables</a>
                   </li>
                   {/* Not a link, because there is nothing to link to yet — it
                       explains itself instead of 404ing. See `ComingSoon` for

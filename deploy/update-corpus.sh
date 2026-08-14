@@ -29,6 +29,9 @@
 # mirror push -> load-all -> verify. Every step runs inside the `api` container
 # via `docker compose exec`, so the box needs no Python of its own.
 #
+# The classification tables (ADR-0067) are a second source with its own poll and
+# its own check table, run first and independently of all of that.
+#
 # data/uscreleasepoints.json is ephemeral inside the container: only
 # data/releases and data/manifests are volume-mounted (docker-compose.prod.yml),
 # not the inventory JSON. That means the chain has to happen as one script run,
@@ -182,6 +185,48 @@ dump_to_mirror() {
 
 echo "=== $(date -u +%FT%TZ) corpus update starting (mode: ${MODE}) ==="
 
+# The classification tables (ADR-0067), first and on their own.
+#
+# They are a second source on the same host, polled by the same three exit
+# codes, and nothing below depends on them: the tables record which provision
+# of which public law was classified where, and the release-point chain loads
+# the Code's text. So this runs before the poll rather than after the load —
+# a release-point check that fails exits this script, and burying the
+# classification poll behind that would stop recording it for as long as the
+# other source was down.
+#
+# --force sweeps the tables whether or not the covered-law sentence moved,
+# which is the weekly repair for a table OLRC edited without extending its
+# range. It is the same weekly Actions run that forces the corpus sweep.
+CLASSIFICATION_STATUS=0
+run classification-check
+case "$?" in
+    0)  echo "no classification table has changed" ;;
+    10)
+        echo "a classification table has changed"
+        if [ "$MODE" = "check-only" ]; then
+            echo "check-only: not loading"
+        elif ! run classification --quiet; then
+            echo "the classification load failed — see above"
+            CLASSIFICATION_STATUS=1
+        fi
+        ;;
+    *)
+        echo "the classification check failed — see above"
+        CLASSIFICATION_STATUS=1
+        ;;
+esac
+
+# A forced sweep re-fetches and re-loads every table, ignoring both the
+# covered-text gate and the content hash. The check above has already run and
+# recorded; this is the repair pass behind it.
+if [ "$MODE" = "force" ]; then
+    run classification --force --quiet || {
+        echo "the forced classification sweep failed — see above"
+        CLASSIFICATION_STATUS=1
+    }
+fi
+
 # The poll. One request to uscode.house.gov, one source_checks row whatever
 # happens, and an exit code that says whether there is work: 0 nothing new,
 # 10 new release points, 1 the check itself failed.
@@ -202,13 +247,16 @@ case "$CHECK_STATUS" in
         ;;
 esac
 
+# Every early exit carries the classification status, so a poll or a load that
+# failed up there is a red run rather than a line in a log nobody reads — the
+# same reason a failed dump exits non-zero at the bottom of this script.
 if [ "$MODE" = "check-only" ]; then
     echo "=== $(date -u +%FT%TZ) check complete (check-only) ==="
-    exit 0
+    exit "$CLASSIFICATION_STATUS"
 fi
 if [ "$MODE" != "force" ] && [ "$CHECK_STATUS" -eq 0 ]; then
     echo "=== $(date -u +%FT%TZ) nothing to do ==="
-    exit 0
+    exit "$CLASSIFICATION_STATUS"
 fi
 
 # Pull BEFORE anything else, exactly as scripts/run-backfill-ec2.sh does, and
@@ -285,5 +333,9 @@ fi
 echo "=== $(date -u +%FT%TZ) corpus update complete ==="
 
 # A failed backup exits non-zero even though the corpus loaded fine, so it shows
-# up as a red weekly run rather than as a line in a log nobody reads.
-exit "$DUMP_STATUS"
+# up as a red weekly run rather than as a line in a log nobody reads. A failed
+# classification poll or load reads the same way.
+if [ "$DUMP_STATUS" -ne 0 ]; then
+    exit "$DUMP_STATUS"
+fi
+exit "$CLASSIFICATION_STATUS"

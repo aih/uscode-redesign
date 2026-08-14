@@ -28,18 +28,19 @@ control (ADR-0033). Every response carries a cache policy (ADR-0018); every expe
 route is rate-limited (ADR-0029); CSP and frame headers are ADR-0030; accounts and bulk downloads are
 built-and-off in the UI, a UI switch and not a security control (ADR-0034).
 
-There is a **user guide at `/app/guide`** (ADR-0038) — nine markdown chapters in
+There is a **user guide at `/app/guide`** (ADR-0038) — ten markdown chapters in
 `frontend/src/pages/guide/`, rendered by Astro against `GuideLayout`. It is *executable*: each
 behavioural claim carries a ` ```scenario ` block that is at once the documented walkthrough, a
 Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo-video`. A Vitest
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 29 route entries (one expanding to
-every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and ten
-interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 35 route entries (one expanding to
+every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and
+fourteen interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
 (ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
-(ADR-0058), both navbar dropdowns (ADR-0061) and the command palette (ADR-0062) — **272 scans**,
+(ADR-0058), both navbar dropdowns (ADR-0061), the command palette (ADR-0062) and the open
+classification lookup (ADR-0067) — **322 scans**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -335,15 +336,15 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **690** Python tests; `make test-web` = **346** frontend tests; `make test-e2e` = **536**
-Playwright tests, 272 of which are the accessibility scan (**all three are required** — reader
+`make test` = **738** Python tests; `make test-web` = **370** frontend tests; `make test-e2e` = **605**
+Playwright tests, 322 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(65 ADRs, numbered to 0066 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(66 ADRs, numbered to 0067 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -393,23 +394,28 @@ ADR-0064**, described above, which completes the spec.
 **Workstream B is complete.** B5, B6 and B11 landed together (ADR-0065, ADR-0066); state and
 standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`.
 
-**The classification tables are a workstream in flight** (`docs/classification-spec.md`, ADR-0067).
+**The classification tables are built** (`docs/classification-spec.md`, ADR-0067).
 OLRC's tables record which provision of which Public Law was classified to which Code section.
-Wave 1 — the parser (`ingest/classification.py`, parse side only) and the four tables
+Waves 1, 2 and 3 are **merged** (PRs #44, #45, #46) — the parser, the four tables
 (`classification_files`, `classification_entries`, `ecct_entries`,
-`classification_source_checks`, migration `3c8d9ab6d527`) — is **merged** (PR #44). Wave 2 — the
-fetch, `load_file`, the backfill, the poll, the `classification` / `classification-check`
-subcommands and migration `0044883c483c` — is on branch `c2b-classification-loader`, **not merged**
-(PR #45), and **the whole corpus is loaded once from the live source: 144,837 rows across 31 Public Law order tables plus 21 ECCT rows, 131 warnings, 0 skipped
-lines, 107 seconds from cold** (`docs/verification/classification-*.json`, one artifact per
-document). Nothing is reachable from the reader — no storage protocol, no API route, no page.
-Wave 3 (C3 storage + API, C4 reader pages) is next; the spec's § What Wave 2 measured carries what
-those agents need and § Waves carries the dispatch order. **The first full-corpus parse found four
+`classification_source_checks`, migrations `3c8d9ab6d527` and `0044883c483c`), the fetch, the
+loader, the poll, the `classification` / `classification-check` subcommands, the storage protocol,
+seven API routes under `/api/v1/classifications` and three reader routes under
+`/app/classification`. **Wave 4 is PR #47** on `c5-classification-chrome`: the chrome links, guide
+chapter 10, the `/app/design` specimens, `docs/ia-map.md`'s three rows and the `update-corpus.sh`
+poll wiring.
+**The whole corpus is loaded from the live source in both places** — the development box and the
+deployed one: **144,837 rows across 31 Public Law order tables plus 21 ECCT rows, 33 documents, 0
+failed, ~110 seconds from cold** (`docs/verification/classification-*.json`, one artifact per
+document). The deployed box holds those rows and answers 404 for every route that would show them
+until the next deploy carries Wave 3's reader (`docs/deploy-status.md`). **The first full-corpus parse found four
 defects in the 28 vintages Wave 1 never measured** — a Sec. column one character left of its own
 header in two files, a Stat. page numbered with a letter (`113 Stat. 1501A-594`), a row OLRC has
 corrected carrying an asterisk that shifts every later column, and a page butted straight against
 its Sec. designator — all fixed, and the reason a boundary is now checked against the file's own
-rows rather than trusted from the header alone (ADR-0067's addendum).
+rows rather than trusted from the header alone (ADR-0067's addendum). What remains unbuilt by
+choice: a section page shows no classification rows, so the link runs one way; and the poll cannot
+see a change to the ECCT alone.
 
 **Next: (1) Day 7 hardening; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
@@ -433,7 +439,7 @@ link is the only way in (`docs/ia-map.md`); **`previewHref` in `lib/url.ts`
 has no caller** — `CitePreview.astro:199` builds `` `/app/preview${identifier}` `` inline in browser
 JavaScript, a reader href built outside `url.ts` against architecture rule 5, and the exact inlining
 that function's docstring says it replaced; **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 1,990 nodes**, down from 41 over 2,251, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 2,623 nodes**, down from 41 pairs, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by
