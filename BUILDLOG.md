@@ -2679,3 +2679,42 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   higher for one island, which is the price of that page rendering every island.
   `shed.spec.ts` stayed green here across a full combined run, but it is still the
   timing-sensitive test Wave 3 flagged.
+
+## 072 — 2026-08-14 — Session 50: a table scope on the classification lookup
+
+- **Tool/model:** Claude Code, Fable 5. One session, sequential.
+- **Asked:** Review the experience of finding an entry in a session classification table — the
+  pagination makes it slow — and enhance it: put the lookup search on the session table page,
+  filtered by session alongside the existing filters, and let a user add that filter on the
+  general classification search too.
+- **Reviewed:** the session page had four filters and nothing that sets one — filters arrived only
+  from index-page suggestions or hand-edited URLs, so finding a row on the page itself was the
+  pager (the 104th's table: 11,737 rows, 118 clicks of Next). The lookup box existed only on the
+  index, and the suggest endpoint could not read a bare law number, so the congress on screen had
+  to be retyped.
+- **Decided:** ADR-0068. `suggest` takes optional `congress`+`session`; a bare law number then
+  means a law of that congress (tried only when `citeparse` read nothing, so `16 usc 3831` never
+  becomes a law), and a citation gains a leading `section-in-table` suggestion counted by
+  `entries_for_file`. The session page renders `ClassificationLookup` scoped to itself — form
+  posts back to the page, `?q=` answered server-side by the shared new `ClassificationMatches` —
+  and the index box offers the scope as `<select name="scope">` (`118-2`/`104-all`, split at the
+  last dash because the session half never carries one, read back by `parseClassificationScope`).
+  A field-per-filter form was declined; the box reaches the same filtered URLs.
+- **Produced:** three commits on `c5-classification-chrome` (PR #47): the API scope, the scoped
+  frontend, the docs. New: `docs/adr/0068`, `ClassificationMatches.astro`. The JS budget rose with
+  the island the session pages now ship: `/app/classification/[congress]` 18,500 → 24,000,
+  `/app/classification` 23,000 → 24,000 (534 bytes of scope handling in the island itself),
+  `/app/design` 39,000 → 39,500 — the design page renders both variants, the scoped specimen
+  under congress 0.
+- **Verified:** `make test` **746** (was 738; 8 new suggest-scope tests, including
+  scope-names-no-table and the citation-never-read-as-bare guard), `make test-web` **375** (was
+  370; scope value round-trip, scoped suggest URL, `section-in-table` href). The three
+  classification guide scenarios plus the two new ones (`classification-table-lookup`,
+  `classification-scoped-lookup`) ran green in Playwright against this worktree's dev server and
+  the full local corpus (`SITE=http://localhost:4399 npx playwright test tests/e2e/guide.spec.ts
+  -g classification` — 7 passed); `make test-e2e` becomes **607**. Live checks against the loaded
+  corpus: `suggest?q=35&congress=118&session=2` → Public Law 118-35; `16 usc 3831` scoped to
+  118/2 correctly offers no in-table row (0 rows there) while `42 usc 254c-2` offers 3, first.
+- **Open:** the a11y route matrix gained no state for the session page's lookup — the component
+  and its open-listbox state are already scanned on `/app/classification`; the deployed box still
+  serves the pre-Wave-3 image, so none of this is visible there until the next deploy.
