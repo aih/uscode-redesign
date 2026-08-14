@@ -8,14 +8,14 @@ and C2a (schema, migration `3c8d9ab6d527`); see
 ([PR #45](https://github.com/aih/uscode-redesign/pull/45)) — C2b (fetch, loader, CLI, poll,
 migration `0044883c483c`), with the whole corpus loaded once from the live source; see
 [§ What Wave 2 measured](#what-wave-2-measured). **Wave 3 landed 2026-08-11** on branch
-`c4-classification-reader` (unmerged) — C3 (storage protocol, seven API routes) and C4 (three reader
-routes, the lookup, the table); see [§ What Wave 3 measured](#what-wave-3-measured).
-**Wave 4 landed 2026-08-13** on branch `c5-classification-chrome`, which stacks on Wave 3 and is
-also unmerged — C5 (the chrome, guide chapter 10, `docs/ia-map.md`, the `/app/design` specimens and
-the `update-corpus.sh` wiring); see [§ What Wave 4 measured](#what-wave-4-measured). **The
-workstream is complete** but for one step it could not take from a worktree: the two branches want
-merging into `main`, and the backfill on the deployed box is owed
-(`docs/deploy-status.md`).
+`c4-classification-reader` and merged 2026-08-13 ([PR #46](https://github.com/aih/uscode-redesign/pull/46))
+— C3 (storage protocol, seven API routes) and C4 (three reader routes, the lookup, the table); see
+[§ What Wave 3 measured](#what-wave-3-measured). **Wave 4 landed 2026-08-13** on branch
+`c5-classification-chrome` ([PR #47](https://github.com/aih/uscode-redesign/pull/47)) — C5 (the
+chrome, guide chapter 10, `docs/ia-map.md`, the `/app/design` specimens and the
+`update-corpus.sh` wiring); see [§ What Wave 4 measured](#what-wave-4-measured). **The workstream
+is complete.** The deployed box holds all 144,837 rows and serves them once a deploy carries the
+reader (`docs/deploy-status.md`).
 
 The OLRC Classification Tables record which provision of each new Public Law was classified to
 which US Code section (118-35 §101(3) → 18 USC 3551 note). The site holds nothing of this today.
@@ -443,8 +443,8 @@ Where this section and an earlier one disagree, this one is the later measuremen
    loader — it runs `66354dd` with migration `0044883c483c` at head — so the backfill ran there
    directly: **33 documents, 33 loaded, 0 failed, 144,858 rows in 110.0 s**, which is 144,837
    entries and 21 ECCT rows, the development corpus's totals. The API and reader routes are not
-   deployed at all, since C3, C4 and C5 are unmerged, so `/app/classification` and
-   `/api/v1/classifications/tables` answer 404 there until they are.
+   deployed at all — Wave 3 merged the same day this ran, so the running image predates it — and
+   `/app/classification` and `/api/v1/classifications/tables` answer 404 there until a deploy.
    `classification_source_checks` is empty: the loader writes no check row, and the daily cron
    writes the first one within a day of the deploy.
 6. **`footnav.mjs` cited the wrong ADR in three places** — ADR-0062 for the footer grouping, which

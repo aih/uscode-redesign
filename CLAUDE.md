@@ -394,22 +394,21 @@ ADR-0064**, described above, which completes the spec.
 **Workstream B is complete.** B5, B6 and B11 landed together (ADR-0065, ADR-0066); state and
 standing decisions are in `claude-code/WORKSTREAM-B-STATE.md`.
 
-**The classification tables are built and unmerged** (`docs/classification-spec.md`, ADR-0067).
+**The classification tables are built** (`docs/classification-spec.md`, ADR-0067).
 OLRC's tables record which provision of which Public Law was classified to which Code section.
-Waves 1 and 2 are **merged** (PRs #44 and #45) — the parser, the four tables
+Waves 1, 2 and 3 are **merged** (PRs #44, #45, #46) — the parser, the four tables
 (`classification_files`, `classification_entries`, `ecct_entries`,
 `classification_source_checks`, migrations `3c8d9ab6d527` and `0044883c483c`), the fetch, the
-loader, the poll and the `classification` / `classification-check` subcommands. **Waves 3 and 4
-are not**: `c4-classification-reader` carries the storage protocol, seven API routes under
-`/api/v1/classifications` and three reader routes under `/app/classification`, and
-`c5-classification-chrome` stacks on it with the chrome links, guide chapter 10, the
-`/app/design` specimens, `docs/ia-map.md`'s three rows and the `update-corpus.sh` poll wiring —
-both branches land in one merge, because each session was harness-pinned to a worktree.
+loader, the poll, the `classification` / `classification-check` subcommands, the storage protocol,
+seven API routes under `/api/v1/classifications` and three reader routes under
+`/app/classification`. **Wave 4 is PR #47** on `c5-classification-chrome`: the chrome links, guide
+chapter 10, the `/app/design` specimens, `docs/ia-map.md`'s three rows and the `update-corpus.sh`
+poll wiring.
 **The whole corpus is loaded from the live source in both places** — the development box and the
 deployed one: **144,837 rows across 31 Public Law order tables plus 21 ECCT rows, 33 documents, 0
 failed, ~110 seconds from cold** (`docs/verification/classification-*.json`, one artifact per
-document). Until the merge, the deployed box holds those rows and answers 404 for every route that
-would show them (`docs/deploy-status.md`). **The first full-corpus parse found four
+document). The deployed box holds those rows and answers 404 for every route that would show them
+until the next deploy carries Wave 3's reader (`docs/deploy-status.md`). **The first full-corpus parse found four
 defects in the 28 vintages Wave 1 never measured** — a Sec. column one character left of its own
 header in two files, a Stat. page numbered with a letter (`113 Stat. 1501A-594`), a row OLRC has
 corrected carrying an asterisk that shifts every later column, and a page butted straight against

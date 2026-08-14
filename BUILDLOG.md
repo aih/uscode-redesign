@@ -2633,10 +2633,10 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - **No demo scene.** `docs/demo/scenes.json` and the committed `.vtt` are generated from the
     guide's `demo: true` scenarios, and adding one makes both stale until `make demo-video` reruns.
     The five new scenarios are tests, not scenes.
-- **Produced:** branch `c5-classification-chrome`, six commits `bbc8130..109ddde` on top of
-  `c4-classification-reader` (`1ee12d4`). **Unmerged, and stacked**: this session was
-  harness-pinned to a worktree again, exactly as Wave 3 was, so it branched off Wave 3's tip rather
-  than merging it first. Both branches land together.
+- **Produced:** branch `c5-classification-chrome`, PR #47, six commits `dabfdc2..34365ce` plus this
+  entry. This session was harness-pinned to a worktree again, exactly as Wave 3 was, so it branched
+  off Wave 3's unmerged tip (`1ee12d4`); Wave 3 merged as PR #46 while the work was in flight and
+  the branch was rebased onto `cd3a98b`, which is that merge.
   - `SiteHeader.astro`, `SiteFooter.astro`, `lib/palette.ts` — one destination each, with
     `chrome.spec.ts`'s ordered row list, its footer href list, its Browse count and a
     `palette.test.ts` row moving in the same commit.
@@ -2670,8 +2670,9 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     classification --quiet`): **33 documents linked, 33 loaded, 0 unchanged, 0 skipped, 0 failed;
     144,858 rows in 110.0 s** — 144,837 entries, 21 ECCT, 33 files, the development corpus's
     totals. Re-check with the count query in `docs/deploy-status.md`.
-- **Open:** **the two branches are unmerged**, and until they are the box holds 144,837 rows it
-  cannot serve — `/app/classification` and `/api/v1/classifications/tables` answer 404 there.
+- **Open:** **the box holds 144,837 rows it cannot serve** until a deploy carries Wave 3's reader —
+  the running image predates it, so `/app/classification` and `/api/v1/classifications/tables`
+  answer 404 there.
   `classification_source_checks` is empty on the box: the loader writes no check row, and the new
   `update-corpus.sh` writes the first one on the daily cron after the deploy, so the index page
   reads "have never been checked from here" until then. The `/app/design` script budget is 15%

@@ -7,7 +7,7 @@ Live state of the demo deployment and what is still owed. Design lives in
 settled and the interesting parts have moved into deploy.md.
 
 **Last updated:** 2026-08-13 — the classification rows are loaded on the box (144,837 of them) and
-the pages that serve them are waiting on a merge; see [Still owed](#still-owed). Before that,
+the pages that serve them are waiting on a deploy; see [Still owed](#still-owed). Before that,
 2026-08-06 — the documentation audit reconciled the contradictions this file had
 accumulated as a running narrative. The sections below are written in the order the work happened,
 so an earlier passage may state a position a later one supersedes; where that happens the earlier
@@ -456,9 +456,9 @@ docker compose -f docker-compose.prod.yml exec -T api uv run python -m ingest cl
 same class Wave 2 recorded: a Sec. cell running into a letter-numbered Statutes at Large page, in
 vintages with no statviewer anchor to key on.
 
-What is left is a merge and a deploy. `/api/v1/classifications/tables` and `/app/classification`
-answer 404 on the box, because C3 and C4 are on `c4-classification-reader` and C5 on
-`c5-classification-chrome`, neither merged. Once `deploy.yml` ships them:
+What is left is a deploy. `/api/v1/classifications/tables` and `/app/classification` answer 404 on
+the box: the running image predates Wave 3, which merged as PR #46 the same day, and Wave 4 is
+PR #47. Once `deploy.yml` ships them:
 
 1. Check `/app/classification` renders the registry and reports 144,837 rows.
 2. `classification_source_checks` holds 0 rows — the loader does not write one, `classification-check`
