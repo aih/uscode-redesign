@@ -6,7 +6,9 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-08-06 — the documentation audit reconciled the contradictions this file had
+**Last updated:** 2026-08-13 — the classification rows are loaded on the box (144,837 of them) and
+the pages that serve them are waiting on a merge; see [Still owed](#still-owed). Before that,
+2026-08-06 — the documentation audit reconciled the contradictions this file had
 accumulated as a running narrative. The sections below are written in the order the work happened,
 so an earlier passage may state a position a later one supersedes; where that happens the earlier
 passage now names the later one. The state of record is:
@@ -58,8 +60,9 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-**Nothing is blocking.** The demo video (ADR-0038) is live; everything else in this section was
-already done.
+**One thing is waiting on a merge:** the classification tables, in [Still owed](#still-owed).
+Nothing in this section is blocking — the demo video (ADR-0038) is live and everything else here
+was already done.
 
 - **The demo video is live**, at
   [`/app/demo`](https://uscode.linkedlegislation.org/app/demo). `s3://uscode-mirror-dreamproit/usc/demo/`
@@ -439,7 +442,31 @@ that mean something is actually wrong — with `count_mismatches` printed rather
 
 ## Still owed
 
-Everything this list used to hold is done. `ingest verify` passes on the box (3,153 title-versions
+**The classification rows are on the box; the pages that serve them are not.** Run 2026-08-13
+through SSM against the running `api` container, which already carried the loader (the box is at
+`66354dd`, with migration `0044883c483c` at head):
+
+```
+docker compose -f docker-compose.prod.yml exec -T api uv run python -m ingest classification --quiet
+```
+
+**33 documents linked, 33 loaded, 0 unchanged, 0 skipped, 0 failed; 144,858 rows written in
+110.0 s** — 144,837 `classification_entries` across 31 public law order tables, 21 `ecct_entries`,
+33 `classification_files`. The same totals the development corpus holds, and the warnings are the
+same class Wave 2 recorded: a Sec. cell running into a letter-numbered Statutes at Large page, in
+vintages with no statviewer anchor to key on.
+
+What is left is a merge and a deploy. `/api/v1/classifications/tables` and `/app/classification`
+answer 404 on the box, because C3 and C4 are on `c4-classification-reader` and C5 on
+`c5-classification-chrome`, neither merged. Once `deploy.yml` ships them:
+
+1. Check `/app/classification` renders the registry and reports 144,837 rows.
+2. `classification_source_checks` holds 0 rows — the loader does not write one, `classification-check`
+   does. The index page says so in as many words ("have never been checked from here") until the
+   first poll. The daily cron writes one within a day of the deploy, since the new
+   `deploy/update-corpus.sh` runs the check before anything else.
+
+Everything else this list used to hold is done. `ingest verify` passes on the box (3,153 title-versions
 across 381 release points and 58 titles; 91.0% dedupe; the six count mismatches are exactly the
 ADR-0021 ones CLAUDE.md documents — `113-296not287/54`, `114-329/10`, `115-8/10`, `117-80/19`,
 `117-110not103/19`, `117-111not103/19`; report at `docs/verification/database.json` **on the box**,
@@ -448,7 +475,7 @@ against the live host — the table at the top of this file *is* their result. `
 green on `workflow_run` a dozen times, which is the automated path proving itself. `update-corpus.yml`
 ran green on `workflow_dispatch`.
 
-**Nothing is outstanding.** The last two items this list carried are both closed:
+**Nothing else is outstanding.** The last two items this list carried are both closed:
 
 - **Alarm delivery is confirmed working** — the mail arrives (see above).
 - **The `usc/db/` lifecycle rules were created in the S3 console on 2026-08-03**, by an account

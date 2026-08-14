@@ -9,12 +9,13 @@ and C2a (schema, migration `3c8d9ab6d527`); see
 migration `0044883c483c`), with the whole corpus loaded once from the live source; see
 [§ What Wave 2 measured](#what-wave-2-measured). **Wave 3 landed 2026-08-11** on branch
 `c4-classification-reader` (unmerged) — C3 (storage protocol, seven API routes) and C4 (three reader
-routes, the lookup, the table); see [§ What Wave 3 measured](#what-wave-3-measured). The API and the
-pages are live; the three routes are reachable only by typed URL, because C5 owns the chrome. **C5
-is next** — menus, the guide chapter, `docs/ia-map.md`, `/app/design` specimens, the
-`update-corpus.sh` wiring and the backfill on the box. An orchestrating session starts at
-[§ Waves](#waves-parallel-agent-dispatch) and dispatches the phase prompts at the end of this file.
-Update this status line as waves land.
+routes, the lookup, the table); see [§ What Wave 3 measured](#what-wave-3-measured).
+**Wave 4 landed 2026-08-13** on branch `c5-classification-chrome`, which stacks on Wave 3 and is
+also unmerged — C5 (the chrome, guide chapter 10, `docs/ia-map.md`, the `/app/design` specimens and
+the `update-corpus.sh` wiring); see [§ What Wave 4 measured](#what-wave-4-measured). **The
+workstream is complete** but for one step it could not take from a worktree: the two branches want
+merging into `main`, and the backfill on the deployed box is owed
+(`docs/deploy-status.md`).
 
 The OLRC Classification Tables record which provision of each new Public Law was classified to
 which US Code section (118-35 §101(3) → 18 USC 3551 note). The site holds nothing of this today.
@@ -412,6 +413,42 @@ Where this section and an earlier one disagree, this one is the later measuremen
    `(page, view)` alone, so 3 px growing to 146 px would have passed unrecorded. Remeasuring is
    voluntary. Unlike ADR-0039's `waiveSeverity`, which weakened the gate's rule, widening this
    ledger is the documented process — but the ledger cannot tell a fixed page from a worsening one.
+
+## What Wave 4 measured
+
+Where this section and an earlier one disagree, this one is the later measurement.
+
+1. **`/app/design` can render the lookup in full, and the no-data property still holds.** The
+   island fetches on input and nothing on that page types into it, so `design.spec.ts`'s request
+   recorder sees no `/api/` call with the specimen on the page. The cost is bytes rather than
+   requests: the island is **4,383** of them, and `/app/design`'s inline-script ceiling goes
+   **34,000 → 39,000** against a measured 38,383. It is the page that renders every island, so it
+   pays for each one twice — once as a component and once as the chrome around it.
+2. **§4's 404-vs-empty distinction has three renderings, and the middle one is the common case.**
+   **40 of the 119th Congress's first 102 public laws** are covered by a table and classified
+   nothing, so "covered, no rows" is not an edge case to be described in passing. The three are: a
+   covered law with no rows (the session table says it classified nothing matching the filter), a
+   law past every covered range (the lookup finds nothing; the API 404s naming the law), and a
+   congress and session with no published table (a reader 404). Guide chapter 10 states all three.
+3. **The guide chapter costs 7 accessibility scans and no violations.** The matrix is **322**
+   rather than 315, because `docs/a11y/routes.json`'s `guide-chapters` entry expands from disk, and
+   the totals are unchanged: 8 route/rule pairs over 2,623 nodes, every one of them
+   `docs/a11y/known-violations.json`'s.
+4. **The chrome's cost is one row and 57px, none of it in the sticky stack.** The sheet gains a
+   53.44px row at every width below 64em and the header is still 104px with a 225.13px stack
+   (`make mobilebar`), because the panel is absolutely positioned. The footer's link block goes
+   **675 → 732px at 320 and 375** and is unchanged from 420 up, where it has columns to spend the
+   row on (`make footnav`).
+5. **The deployed box now holds the rows and cannot yet serve them.** Its image already carried the
+   loader — it runs `66354dd` with migration `0044883c483c` at head — so the backfill ran there
+   directly: **33 documents, 33 loaded, 0 failed, 144,858 rows in 110.0 s**, which is 144,837
+   entries and 21 ECCT rows, the development corpus's totals. The API and reader routes are not
+   deployed at all, since C3, C4 and C5 are unmerged, so `/app/classification` and
+   `/api/v1/classifications/tables` answer 404 there until they are.
+   `classification_source_checks` is empty: the loader writes no check row, and the daily cron
+   writes the first one within a day of the deploy.
+6. **`footnav.mjs` cited the wrong ADR in three places** — ADR-0062 for the footer grouping, which
+   is ADR-0063. The committed artifact had been corrected by hand, so every regeneration undid it.
 
 ## Waves — parallel agent dispatch
 
