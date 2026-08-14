@@ -174,6 +174,10 @@ The classification tables are polled separately from the Code's text: they are a
 page on the same site, republished as new laws are classified. The index page says when this site
 last looked and how many tables had changed at that check.
 
+Three states get a warning instead: no check has ever run here, the last check failed, or the last
+check succeeded longer ago than the daily schedule intends. The tables shown are the ones this site
+holds; a warning means OLRC may have published a newer one since anybody asked.
+
 ## Limitations
 
 - **The tables begin at the 104th Congress.** A section last touched before 1996 has no rows here.

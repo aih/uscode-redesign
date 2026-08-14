@@ -2773,11 +2773,21 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   between zero and one token against a refill of one a second (ADR-0066), so the navigation after
   it has under a second to arrive. `gotoShed` spends and re-navigates until the navigation itself
   is shed, five attempts.
-- **Produced:** three commits on `classification-lookup-scope`: the redirect fix, this entry, the
-  shed helper. The classification e2e test gains one line — the final URL carries no `scope` — so
+- **Also fixed:** the freshness warning on `/app/classification`, which read "uscode.house.gov's
+  classification tables have never been checked from here, and it failed. Nothing below is known to
+  be out of date, and nothing below is known to be current either." Two defects in one sentence:
+  `ClassificationCheckOut` reports "no check has ever run" as `ok: false`, so the page's `ok`
+  branch called a check that never happened a failure; and the trailing clause stated the same
+  thing twice in the negative. `classificationNote` in `lib/currency.ts` now answers it in the
+  shape `currencyNote` already used for the corpus poll — never checked, the last check failed
+  (with the error), a check older than the schedule intends, and the quiet case — and the page
+  renders the note rather than composing the sentence itself. Guide chapter 10 names the three
+  warning states; `docs/deploy-status.md`'s expected first-deploy string is updated.
+- **Produced:** four commits on `classification-lookup-scope`: the redirect fix, this entry, the
+  shed helper, the freshness note. The classification e2e test gains one line — the final URL carries no `scope` — so
   the redirect itself is asserted rather than only tolerated.
 - **Verified:** `make test-e2e` **605 passed, 2 skipped** locally against the compose stack and
   the full local corpus, the four `ratelimit` tests among them; `classification.spec.ts` 12/12;
-  `make test-web` **375**. The three redirect shapes by hand:
+  `make test-web` **381** (+6 `classificationNote` cases). The three redirect shapes by hand:
   `?scope=&title=18&section=3551` → `302` to `/app/classification?title=18&section=3551`,
   `?scope=` → `302` to `/app/classification`, `?scope=118-2&q=35` → `200`.
