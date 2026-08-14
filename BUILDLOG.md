@@ -2718,3 +2718,27 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Open:** the a11y route matrix gained no state for the session page's lookup — the component
   and its open-listbox state are already scanned on `/app/classification`; the deployed box still
   serves the pre-Wave-3 image, so none of this is visible there until the next deploy.
+
+## 073 — 2026-08-14 — Session 51: fix the scoped classification no-script e2e assertion
+
+- **Tool/model:** GitHub Copilot Coding Agent.
+- **Asked:** Fix the failing GitHub Actions job `make test-e2e (Playwright)` for PR #48 by
+  inspecting the Actions logs, finding the root cause, and landing the smallest correct fix.
+- **Decided:**
+  - The failure was in `frontend/tests/e2e/classification.spec.ts`, not in the reader route: the
+    no-script lookup test still assumed the index form would navigate to
+    `/app/classification?q=118-42` exactly.
+  - Session 50 added the optional table-scope `<select name="scope">` to that same form
+    (ADR-0068), so a plain submission may now carry an empty `scope` parameter while still being
+    the same page and the same query. The test should assert the stable fact — pathname plus
+    `q=118-42` — rather than the whole serialized query string.
+- **Produced:** one test change in `frontend/tests/e2e/classification.spec.ts`.
+- **Verified:**
+  - GitHub Actions job `94799323500` failed only at
+    `tests/e2e/classification.spec.ts:68` with `page.waitForURL` timing out while waiting for
+    `/app/classification?q=118-42`.
+  - Targeted local rerun passed:
+    `SITE=http://localhost:4321 npx playwright test tests/e2e/classification.spec.ts -g "is a plain GET form with scripting off"` → 1 passed.
+  - Supporting local setup re-used the committed offline fixture path:
+    `docker compose up -d --wait db`, `DATABASE_URL=$(grep '^DATABASE_URL=' .env.example) uv run make ci-data`,
+    local API on :8001, and Astro on :4321.

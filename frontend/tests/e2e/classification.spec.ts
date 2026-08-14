@@ -75,7 +75,10 @@ test.describe("the classification lookup", () => {
 
     await page.locator("[data-classlookup-input]").fill("118-42");
     await page.locator(".classlookup__go").click();
-    await page.waitForURL(/\/app\/classification\?q=118-42/, { timeout: 5000 });
+    await page.waitForURL(
+      (url) => url.pathname === "/app/classification" && url.searchParams.get("q") === "118-42",
+      { timeout: 5000 },
+    );
     // The same parse, rendered as links rather than as a listbox.
     await expect(page.locator(".classfind__link").first()).toBeVisible();
     await expect(page.locator(".classfind__link").first()).toHaveAttribute(
