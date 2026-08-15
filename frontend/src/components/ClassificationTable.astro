@@ -29,9 +29,60 @@ interface Props {
   /** The Statutes at Large volume the whole file is in, where it has one. The
    *  104th spans two volumes and has none, so its rows carry their own. */
   statVolume?: number | null;
+  /** The order in force, direction included. With `sortHref`, the two columns
+   *  the server can order by become controls (ADR-0071). Without both, the
+   *  headings are plain text — the ECCT and the design page's specimen are
+   *  tables of the same shape that nothing sorts. */
+  sort?: string | null;
+  sortHref?: ((sort: string) => string) | null;
+  /** Which keys this view can be ordered by, where that is fewer than both: a
+   *  view already filtered to one section is every row with the same citation,
+   *  and a Code order over it orders nothing. */
+  sortKeys?: string[];
 }
 
-const { entries, caption, statVolume = null } = Astro.props;
+const {
+  entries,
+  caption,
+  statVolume = null,
+  sort = null,
+  sortHref = null,
+  sortKeys = ["code", "pl"],
+} = Astro.props;
+
+/**
+ * The two columns the ordering is defined over, and what the heading does.
+ *
+ * `aria-sort` belongs on the header cell and names the direction *in force*, so
+ * it is set on the sorted column alone — `none` on the others, and nothing at
+ * all when the table is not sortable, because a table that announces sortable
+ * columns it has no control for is worse than one that says nothing.
+ *
+ * Only these two: the Description, Sec. and Stat. page columns hold the
+ * source's own free text — `nt [tbl]`, `2(6), (7)`, `1501A-594` — and an
+ * alphabetical order over any of them would be an order over a notation rather
+ * than over anything a reader is looking for.
+ */
+const COLUMN_KEYS: Record<string, string> = { "U.S. Code": "code", "Pub. L.": "pl" };
+const sortable: Record<string, string> = Object.fromEntries(
+  Object.entries(COLUMN_KEYS).filter(([, key]) => sortKeys.includes(key)),
+);
+const activeKey = sort == null ? null : sort.startsWith("code") ? "code" : "pl";
+const descending = sort?.endsWith("-desc") ?? false;
+
+function ariaSort(key: string | undefined): "ascending" | "descending" | "none" | undefined {
+  if (!key || sort == null || sortHref == null) return undefined;
+  if (key !== activeKey) return "none";
+  return descending ? "descending" : "ascending";
+}
+
+/** Clicking the sorted column reverses it; clicking the other starts it in its
+ *  own ascending direction. The same rule the sort bar follows, because they
+ *  are two controls over one setting. */
+function headingHref(key: string): string {
+  const target = key === activeKey ? (descending ? key : `${key}-desc`) : key;
+  return sortHref!(target);
+}
 
 /** `18 U.S.C. § 3551`, or `Title 42` for a row naming no section.
  *
@@ -92,11 +143,37 @@ function statPageHref(entry: ClassificationEntry, label: string): string | null 
     <caption>{caption}</caption>
     <thead>
       <tr>
-        <th scope="col">U.S. Code</th>
-        <th scope="col">Description</th>
-        <th scope="col">Pub. L.</th>
-        <th scope="col">Sec.</th>
-        <th scope="col">Stat. page</th>
+        {
+          ["U.S. Code", "Description", "Pub. L.", "Sec.", "Stat. page"].map((column) => {
+            const key = sortable[column];
+            const sorted = key != null && key === activeKey && sortHref != null;
+            return (
+              <th scope="col" aria-sort={ariaSort(key)}>
+                {key != null && sortHref != null ? (
+                  <a
+                    class={`classtable__sortlink${sorted ? " classtable__sortlink--on" : ""}`}
+                    href={headingHref(key)}
+                    data-sort-column={key}
+                  >
+                    {column}
+                    <span class="classtable__arrow" aria-hidden="true">
+                      {sorted ? (descending ? "▼" : "▲") : "↕"}
+                    </span>
+                    <span class="usa-sr-only">
+                      {sorted
+                        ? descending
+                          ? ", sorted descending. Sort ascending"
+                          : ", sorted ascending. Sort descending"
+                        : ", sort by this column"}
+                    </span>
+                  </a>
+                ) : (
+                  column
+                )}
+              </th>
+            );
+          })
+        }
       </tr>
     </thead>
     <tbody>

@@ -41,6 +41,8 @@ import ClassificationLookup from "../../components/ClassificationLookup.astro";
 import ClassificationMatches from "../../components/ClassificationMatches.astro";
 import ClassificationTable from "../../components/ClassificationTable.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
+import Pager from "../../components/Pager.astro";
+import SortBar from "../../components/SortBar.astro";
 import {
   ApiError,
   CLASSIFICATION_PAGE_SIZE,
@@ -65,8 +67,9 @@ import {
   classificationHref,
   classificationScopeValue,
   normalizeSectionKey,
+  pageOffset,
   parseClassificationScope,
-  readOffset,
+  readSort,
 } from "../../lib/url";
 
 /** Strip `scope=` when the form submitted an empty value (the "Every table"
@@ -123,14 +126,50 @@ const suggestions: ClassificationSuggestion[] = query
   : [];
 
 /** Which page of the by-code view. Only that view is paged — the registry
- *  under it is 33 rows and whole. */
-const sectionOffset = readOffset(Astro.url.searchParams.get("offset"));
+ *  under it is 33 rows and whole. `?page=` is the pager's jump box (ADR-0071);
+ *  `?offset=` is what its links write and what wins. */
+const sectionOffset = pageOffset(Astro.url.searchParams, CLASSIFICATION_PAGE_SIZE);
+
+/**
+ * The order of the by-code view. Its default is newest public law first, which
+ * is how a section's history reads — a different default from the session
+ * page's, over the same four orders and the same control (ADR-0071).
+ */
+const sectionSort = readSort(Astro.url.searchParams.get("sort"), "pl-desc");
+
+/** The two directions of each key, said in this view's terms: these rows span
+ *  every table, so `pl` ascending is the oldest law rather than "as published".
+ *
+ *  `code` is offered on a title's rows and not on a single section's: with the
+ *  section fixed, every row shares a citation and ordering by it orders
+ *  nothing. */
+const SECTION_SORT_OPTIONS = [
+  {
+    key: "pl",
+    label: "Public law order",
+    ascending: "oldest first",
+    descending: "newest first",
+  },
+  {
+    key: "code",
+    label: "U.S. Code order",
+    ascending: "title, then section",
+    descending: "highest section first",
+  },
+];
+const sectionSortOptions = byCode?.sectionFilter
+  ? SECTION_SORT_OPTIONS.filter((option) => option.key === "pl")
+  : SECTION_SORT_OPTIONS;
 
 /** The by-code view never fails this page: the registry below it is the
  *  answer to a different question and is still worth showing. */
 let sectionRows: ClassificationEntryPage | null = null;
 if (byCode && !failure) {
-  const paging = { limit: CLASSIFICATION_PAGE_SIZE, offset: sectionOffset };
+  const paging = {
+    limit: CLASSIFICATION_PAGE_SIZE,
+    offset: sectionOffset,
+    sort: sectionSort,
+  };
   sectionRows = byCode.sectionFilter
     ? await fetchClassificationsForSection(
         byCode.titleFilter,
@@ -183,25 +222,39 @@ if (byCode?.sectionFilter && !failure) {
  *  nothing without one. */
 const sectionFilters = byCode
   ? [
-      { name: "Title", label: byCode.titleFilter, href: classificationHref() },
+      {
+        name: "Title",
+        label: byCode.titleFilter,
+        href: classificationHref(),
+      },
       ...(byCode.sectionFilter
         ? [
             {
               name: "Section",
               label: byCode.sectionFilter,
-              href: classificationHref(null, null, { title: byCode.titleFilter }),
+              href: classificationHref(null, null, {
+                title: byCode.titleFilter,
+                sort: sectionSort,
+                sortDefault: "pl-desc",
+              }),
             },
           ]
         : []),
     ]
   : [];
 
-/** The same view at another page, keeping the filters. */
-function sectionPageHref(nextOffset: number): string {
+/** The same view at another page or in another order, keeping the filters.
+ *  One builder for both, so an order survives a page turn and a page turn does
+ *  not lose the order. */
+function sectionViewHref(opts: { offset?: number | null; sort?: string } = {}): string {
   return classificationHref(null, null, {
     title: byCode?.titleFilter,
     section: byCode?.sectionFilter,
-    offset: nextOffset,
+    sort: opts.sort ?? sectionSort,
+    sortDefault: "pl-desc",
+    // A page of one ordering is not that page of another, so a sort change
+    // starts again at the first — the rule the session page's own links follow.
+    offset: opts.sort ? null : (opts.offset ?? null),
   });
 }
 
@@ -356,45 +409,58 @@ function ordinal(n: number): string {
             {sectionPastEnd && (
               <p>
                 That is past the last of {sectionTotal.toLocaleString()} rows.{" "}
-                <a href={sectionPageHref(0)}>Back to the first page</a>.
+                <a href={sectionViewHref({ offset: 0 })}>Back to the first page</a>.
               </p>
+            )}
+
+            {sectionTotal > 0 && (
+              <SortBar
+                options={sectionSortOptions}
+                sort={sectionSort}
+                href={(option) => sectionViewHref({ sort: option })}
+                label="Sort classification rows"
+                idPrefix="classsection-sort"
+              />
             )}
 
             {sectionItems.length > 0 && (
               <>
                 <p class="doc-meta">
-                  Newest public law first, across every table. Showing{" "}
-                  {sectionFrom.toLocaleString()}–{sectionTo.toLocaleString()} of{" "}
+                  {sectionSort === "pl-desc"
+                    ? "Newest public law first, across every table."
+                    : "Across every table."}{" "}
+                  Showing {sectionFrom.toLocaleString()}–{sectionTo.toLocaleString()} of{" "}
                   {sectionTotal.toLocaleString()}.
                 </p>
                 <ClassificationTable
                   entries={sectionItems}
                   caption={`Classified to ${sectionCitation}, rows ${sectionFrom.toLocaleString()}–${sectionTo.toLocaleString()}`}
+                  sort={sectionSort}
+                  sortHref={(option) => sectionViewHref({ sort: option })}
+                  sortKeys={sectionSortOptions.map((option) => option.key)}
                 />
               </>
             )}
 
-            {!sectionPastEnd &&
-              (sectionOffset > 0 || sectionTotal > sectionOffset + CLASSIFICATION_PAGE_SIZE) && (
-                <nav class="searchpager" aria-label="Classification rows pages">
-                  {sectionOffset > 0 && (
-                    <a
-                      class="usa-button usa-button--outline"
-                      href={sectionPageHref(Math.max(0, sectionOffset - CLASSIFICATION_PAGE_SIZE))}
-                    >
-                      ← Previous
-                    </a>
-                  )}
-                  {sectionTotal > sectionOffset + CLASSIFICATION_PAGE_SIZE && (
-                    <a
-                      class="usa-button usa-button--outline"
-                      href={sectionPageHref(sectionOffset + CLASSIFICATION_PAGE_SIZE)}
-                    >
-                      Next →
-                    </a>
-                  )}
-                </nav>
-              )}
+            {!sectionPastEnd && (
+              <Pager
+                total={sectionTotal}
+                offset={sectionOffset}
+                limit={CLASSIFICATION_PAGE_SIZE}
+                shown={sectionItems.length}
+                href={(next: number) => sectionViewHref({ offset: next })}
+                label="Classification rows pages"
+                idPrefix="classsection-pager"
+                jump={{
+                  action: classificationHref(),
+                  params: {
+                    title: byCode?.titleFilter,
+                    section: byCode?.sectionFilter,
+                    sort: sectionSort === "pl-desc" ? null : sectionSort,
+                  },
+                }}
+              />
+            )}
           </section>
         )}
 

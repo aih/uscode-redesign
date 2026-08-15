@@ -18,15 +18,21 @@
 import Base from "../layouts/Base.astro";
 import ErrorPage from "../components/ErrorPage.astro";
 import NoResults from "../components/NoResults.astro";
+import Pager from "../components/Pager.astro";
 import SearchFacets from "../components/SearchFacets.astro";
 import SearchResult from "../components/SearchResult.astro";
 import { ApiError, fetchSearch, releaseParams } from "../lib/api";
 import { CITES_KEYWORD } from "../lib/query";
 import type { SearchResponse } from "../lib/types";
-import { gotoHref, searchHref, syntaxHref } from "../lib/url";
+import { APP, gotoHref, pageOffset, searchHref, syntaxHref } from "../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
-const offset = Math.max(0, Number(Astro.url.searchParams.get("offset") ?? "0") || 0);
+/** One number, not the three hardcoded copies this page used to keep. It has to
+ *  match what the API was asked for, since the pager does the arithmetic. */
+const PAGE_SIZE = 20;
+/** `?offset=` is what the pager's links write; `?page=` is what its jump box
+ *  submits (ADR-0071). */
+const offset = pageOffset(Astro.url.searchParams, PAGE_SIZE);
 const params = releaseParams(Astro.url);
 /** Set when the query arrived as `cites <citation>`. */
 const asCites = Astro.url.searchParams.get("cites") === "1";
@@ -44,10 +50,6 @@ const SORT_LABELS: Record<string, string> = {
   citation: "Citation order",
   recent: "Recently amended",
 };
-
-/** One number, not the three hardcoded copies this page used to keep. It has to
- *  match what the API was asked for, since the pager does the arithmetic. */
-const PAGE_SIZE = 20;
 
 let data: SearchResponse | null = null;
 let failure: { status: number; detail: string } | null = null;
@@ -204,20 +206,28 @@ const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
           ))}
         </ul>
 
-        {(offset > 0 || total > offset + PAGE_SIZE) && (
-          <nav class="searchpager" aria-label="Search results pages">
-            {offset > 0 && (
-              <a class="usa-button usa-button--outline" href={pageHref(Math.max(0, offset - PAGE_SIZE))}>
-                ← Previous
-              </a>
-            )}
-            {total > offset + PAGE_SIZE && (
-              <a class="usa-button usa-button--outline" href={pageHref(offset + PAGE_SIZE)}>
-                Next →
-              </a>
-            )}
-          </nav>
-        )}
+        <Pager
+          total={total}
+          offset={offset}
+          limit={PAGE_SIZE}
+          shown={results.length}
+          showRange
+          href={pageHref}
+          label="Search results pages"
+          idPrefix="search-pager"
+          jump={{
+            action: `${APP}/search`,
+            // Not the offset: `?offset=` beats `?page=`, so carrying it into the
+            // jump form would pin the reader to the page they are leaving.
+            params: {
+              q: query,
+              release: params.release,
+              date: params.date,
+              cites: asCites ? "1" : null,
+              sort: sort === "relevance" ? null : sort,
+            },
+          }}
+        />
       </>
     )
   }
