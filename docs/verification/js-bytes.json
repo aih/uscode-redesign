@@ -4,7 +4,7 @@
   "excluded": "CopyColumn's <script type=\"application/json\" data-copy-targets> — its size is the section's provision list rather than code, so it varies per URL and is measured nowhere.",
   "client_bundles": "None. `astro build` emits no client JavaScript for this site; dist/client/_astro holds only CSS, because every island is is:inline and Astro never bundles those.",
   "validated_against": "The rendered page — see docs/adr/0046 for the comparison against a live /app/us/usc/… response.",
-  "total_bytes": 467310,
+  "total_bytes": 467309,
   "routes": [
     {
       "route": "/app/",
@@ -320,7 +320,7 @@
     {
       "route": "/app/us/usc",
       "page": "pages/us/usc/[...identifier].astro",
-      "bytes": 43656,
+      "bytes": 43655,
       "scripts": 13,
       "components": [
         "ApparatusDisclosure.astro",

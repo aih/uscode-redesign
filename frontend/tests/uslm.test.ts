@@ -169,16 +169,26 @@ describe("references (ADR-0015 decision 3)", () => {
 describe("preview hooks (ADR-0024)", () => {
   const internal = `<section ${NS}><p><ref href="/us/usc/t16/s1">section 1</ref></p></section>`;
 
-  it("marks an internal reference with the identifier the card should fetch", () => {
+  it("marks an internal reference with the URL the card should fetch", () => {
     const html = render(parseFragment(internal), {
       target: null,
       release: "119-99",
       labels: {},
     });
 
-    // The identifier, not the href: the island never has to un-prefix `/app`.
     expect(html).toContain('data-cite="/us/usc/t16/s1"');
-    expect(html).toContain('data-cite-release="119-99"');
+    // Built by `previewHref` (architecture rule 5), release riding along so the
+    // preview is read at the same release point as the page quoting it.
+    expect(html).toContain('data-preview="/app/preview/us/usc/t16/s1?release=119-99"');
+  });
+
+  it("percent-encodes the preview URL for a section number with an EN DASH", () => {
+    // Gotcha 17: 5,697 sections contain U+2013. The island fetches the stamped
+    // URL verbatim, so the encoding has to happen here, at render time.
+    const xml = `<section ${NS}><p><ref href="/us/usc/t16/s45a–1">section 45a–1</ref></p></section>`;
+    const html = render(parseFragment(xml), { target: null, release: null, labels: {} });
+
+    expect(html).toContain('data-preview="/app/preview/us/usc/t16/s45a%E2%80%931"');
   });
 
   it("keeps title= alongside it", () => {
@@ -211,7 +221,8 @@ describe("preview hooks (ADR-0024)", () => {
     });
 
     expect(html).toContain('data-cite="/us/usc/t16/s1"');
-    expect(html).not.toContain("data-cite-release");
+    expect(html).toContain('data-preview="/app/preview/us/usc/t16/s1"');
+    expect(html).not.toContain("release=");
   });
 
   it("never marks a govinfo link — there is nothing here to preview", () => {

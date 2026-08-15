@@ -194,9 +194,12 @@ const FAILURES = {
         }
       }
 
-      async function load(identifier, release) {
-        const key = `${identifier}|${release ?? ""}`;
-        if (cache.has(key)) return cache.get(key);
+      // The URL arrives on the reference as `data-preview`, built server-side
+      // by `previewHref` (`url.ts`): this script is inline and can import
+      // nothing, and a URL composed here would be a reader href built outside
+      // `url.ts` (architecture rule 5).
+      async function load(url) {
+        if (cache.has(url)) return cache.get(url);
 
         // Cancel whatever the last hover started: the pointer has moved on and
         // that answer is no longer wanted.
@@ -204,8 +207,6 @@ const FAILURES = {
         const controller = new AbortController();
         inFlight = controller;
 
-        const url =
-          `/app/preview${identifier}` + (release ? `?release=${encodeURIComponent(release)}` : "");
         const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) {
           // 429 in particular: the preview endpoint is rate-limited per caller
@@ -215,7 +216,7 @@ const FAILURES = {
           throw failure;
         }
         const html = await response.text();
-        cache.set(key, html);
+        cache.set(url, html);
         return html;
       }
 
@@ -244,13 +245,12 @@ const FAILURES = {
       }
 
       async function show(link) {
-        const identifier = link.dataset.cite;
-        if (!identifier) return;
-        const release = link.dataset.citeRelease || null;
+        const url = link.dataset.preview;
+        if (!url) return;
 
         let html;
         try {
-          html = await load(identifier, release);
+          html = await load(url);
         } catch (error) {
           // An aborted request is this island superseding itself — the pointer
           // moved on and that answer is no longer wanted. Everything else is a

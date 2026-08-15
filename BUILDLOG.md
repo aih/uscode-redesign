@@ -2925,3 +2925,28 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   unsuffixed `ecct.html`). `make test-web` green including the guide ratchet; the
   `classification-ecct` Playwright scenario passed against this worktree's dev server, new expect
   included.
+
+## 078 — 2026-08-14 — Session 56: the preview URL moves back through url.ts
+
+- **Tool/model:** Claude Code, Fable 5. One session, sequential.
+- **Asked:** A PR for the remaining clean-up items.
+- **Decided:** Clear the recorded `previewHref` debt — `CitePreview.astro`'s inline script built
+  `` `/app/preview${identifier}` `` in browser JavaScript, a reader href outside `url.ts` against
+  architecture rule 5, while `previewHref` sat uncalled with a docstring claiming it had replaced
+  exactly that. The script is `is:inline` and can import nothing, so the URL is now stamped on
+  each internal reference as `data-preview` at render time (`uslm.ts`, through `previewHref`) and
+  the island fetches it verbatim, keyed on the URL itself. `data-cite-release` is dropped — the
+  release rides in the URL's query — and `data-cite` stays as the island's selector and the
+  tests' hook. The stamped URL is percent-encoded, which the inline build never was (gotcha 17's
+  EN DASH survived only because `fetch` encodes a path itself). Also: `.vscode/` joins
+  `.gitignore`, and the lockfile absorbs the `peer: true` flags a newer npm stamps.
+- **Produced:** `frontend/src/lib/uslm.ts` (the `data-preview` stamp), `CitePreview.astro`
+  (`load(url)`, cache keyed by URL), `previewHref`'s docstring in `lib/url.ts`, two reworked and
+  one new assertion in `tests/uslm.test.ts` (the EN DASH encoding among them), the CLAUDE.md debt
+  removed, `.gitignore`, `frontend/package-lock.json`.
+- **Verified:** `make test-web` **386** (was 385; +1 for the EN DASH test). All 16 of
+  `tests/e2e/preview.spec.ts` passed against this worktree's dev server — the three WCAG 1.4.13
+  clauses, the single-fetch cache, both failure cards and the touch path among them.
+- **Open:** `docs/menu-redesign-screenshots/` (8 PNGs from the ADR-0058–0064 menu work) sits
+  untracked and unreferenced; committed nowhere pending a call on whether it is documentation or
+  scratch.
