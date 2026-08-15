@@ -30,11 +30,26 @@ somewhere in this project:
 from __future__ import annotations
 
 import re
+import typing
 
 import pytest
 
+from storage import CLASSIFICATION_SORTS
 from storage.postgres import title_sort_key
 from tests.conftest import _unavailable
+
+
+def _section_key(section_norm: str) -> tuple:
+    """A section number's own order — `45f` after `45a`, `100` after `11`.
+
+    Written out here rather than imported from the implementation: a test that
+    borrowed the comparator it is checking could not notice that comparator
+    changing.
+    """
+    return tuple(
+        int(part) if part.isdigit() else part
+        for part in re.split(r"(\d+)", section_norm)
+    )
 
 #: The documents `make ci-classification-data` loads, which are the ones every
 #: assertion below is written against.
@@ -300,6 +315,93 @@ def test_code_order_pages_the_same_set_it_counts(api):
     ]
 
 
+# ----------------------------------------------------- the four orders (0071)
+
+
+def test_the_route_takes_the_sort_vocabulary_storage_declares(api):
+    """The `Literal` in the route and `CLASSIFICATION_SORTS` are one list.
+
+    The type has to be written out for OpenAPI to read it, so this is what stops
+    the two copies drifting: a sort added to storage and not to the route is a
+    422 on a URL the storage layer would have answered.
+    """
+    from api.classification import ClassificationSort
+
+    assert set(typing.get_args(ClassificationSort)) == set(CLASSIFICATION_SORTS)
+    for sort in CLASSIFICATION_SORTS:
+        body = api.get(
+            f"/api/v1/classifications/tables/118/2/entries?sort={sort}&limit=3"
+        ).json()
+        assert body["sort"] == sort
+        assert body["items"]
+    assert (
+        api.get("/api/v1/classifications/tables/118/2/entries?sort=sideways").status_code
+        == 422
+    )
+
+
+def test_a_descending_order_is_the_ascending_one_backwards(api):
+    """Both directions of both keys, over one document.
+
+    Reversal rather than similarity: a descending sort written as its own
+    comparator can disagree with the ascending one about ties, and then a page
+    turned back is not the page it came from.
+    """
+    for key in ("pl", "code"):
+        up = _every_row(
+            api, f"/api/v1/classifications/tables/110/1/entries?sort={key}"
+        )
+        down = _every_row(
+            api, f"/api/v1/classifications/tables/110/1/entries?sort={key}-desc"
+        )
+        assert [row["row_seq"] for row in down] == [
+            row["row_seq"] for row in reversed(up)
+        ]
+
+
+def test_the_by_code_views_take_a_sort_and_report_it(api):
+    """A title's rows in the Code's order — the reading `?sort=code` adds.
+
+    The default stays newest law first, which is what a section's history reads
+    as; nothing here asserts a total, since the slices and the full corpus hold
+    different numbers of these rows.
+    """
+    default = api.get("/api/v1/classifications/code/42?limit=5").json()
+    assert default["sort"] == "pl-desc"
+
+    # Scoped to one congress: title 42 carries 19,476 rows in the full corpus,
+    # and paging every one of them through a Python-side sort is a slow test
+    # that asserts nothing the bounded set does not.
+    rows = _every_row(api, "/api/v1/classifications/code/42?sort=code&congress=118")
+    sections = [row["section_norm"] for row in rows]
+    assert sections == sorted(sections, key=_section_key)
+    assert {row["title_num"] for row in rows} == {"42"}
+
+    oldest_first = _rows(api, "/api/v1/classifications/code/42?sort=pl&limit=50")
+    laws = [(row["pl_congress"], row["pl_num"]) for row in oldest_first]
+    assert laws == sorted(laws)
+
+    section_rows = api.get(
+        "/api/v1/classifications/code/42/254c-2?sort=pl&limit=50"
+    ).json()
+    assert section_rows["sort"] == "pl"
+    ascending = [
+        (row["pl_congress"], row["pl_num"]) for row in section_rows["items"]
+    ]
+    assert ascending == sorted(ascending)
+
+
+def test_a_public_laws_rows_can_be_read_in_code_order(api):
+    body = api.get("/api/v1/classifications/pl/118/84?sort=code&limit=100").json()
+    assert body["sort"] == "code"
+    assert body["items"]
+    keys = [
+        (title_sort_key(row["title_num"]), _section_key(row["section_norm"]))
+        for row in body["items"]
+    ]
+    assert keys == sorted(keys)
+
+
 # ------------------------------------------------------------- 3. a public law
 
 
@@ -544,7 +646,10 @@ def test_an_identifier_nothing_classifies_to_is_an_empty_page(api):
         "total": 0,
         "limit": 200,
         "offset": 0,
-        "sort": None,
+        # Every listing route reports the order in force, empty page included
+        # (ADR-0071) — a pager and a sort control are built from this field, and
+        # a null would leave both guessing at the default.
+        "sort": "pl-desc",
         "file": None,
     }
 

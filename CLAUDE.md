@@ -336,7 +336,7 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **791** Python tests; `make test-web` = **385** frontend tests; `make test-e2e` = **611**
+`make test` = **795** Python tests; `make test-web` = **399** frontend tests; `make test-e2e` = **620**
 Playwright tests, 322 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -344,7 +344,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(69 ADRs, numbered to 0070 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(70 ADRs, numbered to 0071 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -418,6 +418,27 @@ table-scopable (ADR-0068)**: `suggest` takes `congress`+`session`, under which a
 means a law of that congress and a citation's first answer counts that section's rows in the scoped
 table; each session page carries the box scoped to itself (finding a row there was otherwise up to
 118 page turns), and the index's box offers the scope as a `<select>` (`?scope=118-2`).
+**Every table of rows sorts both ways and pages by number (ADR-0071)**: one vocabulary —
+`pl`, `pl-desc`, `code`, `code-desc` — on every classification listing route and reported in every
+response, with two defaults (a session page is the document as published, a by-code view is a
+history) each omitted from its own URL, so every URL that worked before still names the same view. A
+descending order is the ascending list **reversed** rather than a second comparator, because these
+rows have ties. The sort bar's option in force is a link that reverses it and the headings of the
+**U.S. Code** and **Pub. L.** columns are the same control (`aria-sort`); the other three hold the
+source's own notation and order nothing. `Pager.astro` is one control for every paged list —
+search results and both classification views — with page N of M, the two ends always reachable, a
+window of two either side and a **Go to page** form where the numbers cannot reach every page, which
+is why **`?page=` exists beside `?offset=`** (`?offset=` stays canonical and wins). The arithmetic is
+`lib/pager.ts` and is tested in Vitest at the corpus's own sizes, because **the CI fixture corpus's
+largest classification table is 84 rows** — two pages — and no browser test can reach a window, a gap
+or a jump box; `/app/design` renders a 235-page specimen so the axe matrix and `make shots` can. Two
+traps, both ADR-0042's shape: **`:root[data-theme="dark"] a` is 0-2-1** and beat
+`.sortbar__option--on`'s single class the moment that option became a link, painting the pill's text
+in the dark link blue on a light blue fill; and **USWDS paints `th[aria-sort]` a fixed `#97d4ea`**,
+applying it to `aria-sort="none"` as well, in the light theme only. A third is left open:
+**`a { color: var(--link) }` is declared inside the dark block alone**, so an ordinary link in the
+light theme is the browser's `#0000EE` outside the statutory text.
+
 **A title is a query and a section's public laws are always an offer (ADR-0070)**: `15 usc` and
 `title 15` — `citeparse`'s `kind="title"`, which the endpoint used to drop — lead to every row
 classified to that title (`/app/classification?title=15`, over the new
@@ -429,8 +450,8 @@ Congress, and the section view links the notes at `#section-notes` — resolved 
 `/api/v1/citation`, because an identifier assembled from the table's hyphen 404s for the 3,398 the
 corpus spells with an EN DASH. Sizes: **title 10 carries 23,093 of the 144,837 rows, title 42
 19,476, title 15 4,495**, against a longest section history of 412. What remains unbuilt by choice:
-a section page shows no classification rows, so the link runs one way; the title view offers no
-`sort=code`; and the poll cannot see a change to the ECCT alone.
+a section page shows no classification rows, so the link runs one way; and the poll cannot see a
+change to the ECCT alone. (The title view's `sort=code` is built — ADR-0071.)
 
 **Next: (1) Day 7 hardening; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the

@@ -819,9 +819,10 @@ class ClassificationPageOut(BaseModel):
     offset: int
     sort: str | None = Field(
         default=None,
-        description="The ordering in force: `pl` (the source's own order) or "
-        "`code` (title through the Code's ordering, then section). Present on the "
-        "session-page route alone.",
+        description="The ordering in force, one of `pl`, `pl-desc`, `code` and "
+        "`code-desc` — public law order or the Code's own, either direction "
+        "(ADR-0071). Present on every route that takes a `sort`, which is every "
+        "listing route; null only where a caller did not go through one.",
     )
     file: ClassificationFileOut | None = Field(
         default=None,

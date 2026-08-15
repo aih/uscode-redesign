@@ -4705,11 +4705,112 @@ dialog.palette {
   padding-left: 0.75rem;
 }
 
-.searchpager {
+/* --------------------------------------------------------------- the pager
+ *
+ * One control for every paged list on the site (ADR-0071): search results, a
+ * classification table, a title's or a section's classification rows.
+ *
+ * Every colour is a declared token — `--edge` for the boundaries, `--link` and
+ * `--danger-ink` for the page in force, `--muted` for the two ends when they
+ * are inert — so `contrast.json` measures the whole control in both themes and
+ * nothing here is a colour the audit cannot see (ADR-0042).
+ *
+ * Everything wraps. A row of 9 page numbers plus two buttons is the easiest
+ * thing on these pages to push sideways at 320 CSS px, which `make shots`
+ * fails the build for (WCAG 1.4.10). */
+
+.pager {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.pager__status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.pager__list {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-top: 2rem;
+  align-items: center;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The two steps sit at the ends of the row and take the whole width of a phone
+ * before the numbers do, so they keep a little air around them. */
+.pager__step:first-child {
+  margin-right: 0.35rem;
+}
+
+.pager__step:last-child {
+  margin-left: 0.35rem;
+}
+
+.pager__page {
+  display: inline-block;
+  /* Wide enough that `1` and `235` are the same shape of target, and past the
+   * 24px WCAG 2.5.8 asks of a pointer target at this font size. */
+  min-width: 2.25rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  text-align: center;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.pager__page--on {
+  background: var(--link);
+  /* The badge ink token, for `.sortbar__option--on`'s reason: text painted on a
+   * filled colour cannot inherit `--ink`, which inverts with the theme while
+   * the fill does not (ADR-0042). */
+  color: var(--danger-ink);
+  border-color: var(--link);
+}
+
+.pager__gap {
+  padding: 0 0.15rem;
+  color: var(--muted);
+}
+
+/* Previous on page one, Next on the last: kept in place and inert, so the row
+ * does not change shape under a reader moving through it. `aria-disabled`
+ * rather than a `<button disabled>` because there is nothing to submit — it is
+ * a link that has nowhere to go. */
+.pager__disabled {
+  color: var(--muted);
+  box-shadow: inset 0 0 0 2px var(--edge);
+  background: transparent;
+  cursor: default;
+}
+
+.pager__jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.pager__jump-label {
+  color: var(--muted);
+}
+
+.pager__jump-input {
+  width: 6rem;
+  margin: 0;
+  height: auto;
+}
+
+.pager__jump-go {
+  margin: 0;
 }
 
 /* ------------------------------------------- sort control and facets
@@ -4749,7 +4850,25 @@ dialog.palette {
   text-decoration: none;
 }
 
-.sortbar__option--on {
+/* The direction of the order in force, written beside its arrow — "newest
+ * first", "as published". The arrow alone is a glyph, and a glyph is not a
+ * word (ADR-0071). */
+.sortbar__arrow {
+  margin-left: 0.35rem;
+}
+
+.sortbar__direction {
+  margin-left: 0.25rem;
+  font-size: 0.85em;
+}
+
+/* Three classes, not one (ADR-0071). The option in force is now a *link* — it
+ * reverses the order it names — and `:root[data-theme="dark"] a` is 0-2-1, so a
+ * single class lost to it and the pill's text took the dark link blue on a
+ * light blue fill: invisible, in exactly the way `contrast.json` cannot see,
+ * since the pair it measures is the one this rule declares. The wordmark and
+ * the navbar needed the same count (ADR-0064). */
+.sortbar .sortbar__list .sortbar__option--on {
   background: var(--link);
   /* The badge ink token, for the same reason it exists: text painted on a
    * filled colour cannot inherit `--ink`, which inverts with the theme while
@@ -5001,6 +5120,57 @@ dialog.palette {
 .classtable__note {
   color: var(--muted);
   font-weight: 400;
+}
+
+/* A column heading that is also the control for ordering by that column
+ * (ADR-0071). A link rather than a button: it goes to a URL, the ordering is
+ * done by the server, and the address of a sorted table is worth having.
+ *
+ * `↕` marks a column that can be sorted and is not; `▲`/`▼` the one in force.
+ * Neither is the accessible name — the heading carries `aria-sort` and the link
+ * a visually hidden phrase saying what activating it does. */
+/* USWDS paints `th[aria-sort]` in `$theme-table-sorted-background-color`, a
+ * fixed #97d4ea it applies to `none` as well as to the two real directions — so
+ * merely declaring the attribute turned two headings pale blue in the light
+ * theme and left them unchanged in the dark one, where the theme block repaints
+ * `th`. A colour that is not a token, in one theme only, is ADR-0042's trap
+ * exactly. The cell keeps the header background it always had; which column is
+ * sorted is said by `aria-sort`, by the arrow and by the underline below. */
+.classtable thead th[aria-sort] {
+  background-color: var(--panel);
+}
+
+.classtable__sortlink {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  /* The brand link colour explicitly: a bare `<a>` takes the browser's own blue
+   * in the light theme, since `a { color: var(--link) }` is declared inside the
+   * dark block alone. `--link on --panel` is a measured pair in both themes. */
+  color: var(--link);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.classtable__sortlink--on {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.classtable__sortlink:hover,
+.classtable__sortlink:focus {
+  text-decoration: underline;
+}
+
+.classtable__arrow {
+  font-size: 0.8em;
+  /* The unsorted marker is quieter than the one in force, without being a
+   * second colour: `--muted` is a declared pair on both the page and a panel. */
+  color: var(--muted);
+}
+
+.classtable__sortlink--on .classtable__arrow {
+  color: inherit;
 }
 
 /* --------------------------------------------------------- filter pills

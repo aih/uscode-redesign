@@ -128,6 +128,25 @@ test.describe("the by-section view", () => {
     }
   });
 
+  test("offers Code order for a title and not for one section", async ({ page }) => {
+    // With the section fixed every row carries the same citation, so ordering
+    // by it orders nothing — the option is offered where it means something
+    // (ADR-0071).
+    await page.goto(BUSY, { waitUntil: "load" });
+    await expect(page.locator(".sortbar__option")).toHaveCount(1);
+    await expect(page.locator(".sortbar__option--on")).toContainText("newest first");
+    await expect(page.locator('.classtable th[aria-sort]')).toHaveCount(1);
+
+    await page.goto("/app/classification?title=18", { waitUntil: "load" });
+    await expect(page.locator(".sortbar__option")).toHaveCount(2);
+    await page.getByRole("link", { name: "U.S. Code order" }).click();
+    await page.waitForURL(/sort=code/, { timeout: 5000 });
+    await expect(page.locator(".classsection .classtable")).toBeVisible();
+    await expect(page.locator('.classtable th[aria-sort="ascending"]')).toContainText(
+      "U.S. Code",
+    );
+  });
+
   test("dismissing the section pill widens the view to the whole title", async ({ page }) => {
     // The two filters are ordered rather than symmetric (ADR-0070): a title
     // without a section is a view, a section without a title is nothing.
@@ -144,7 +163,7 @@ test.describe("the by-section view", () => {
     await page.goto(`${BUSY}&offset=999999`, { waitUntil: "load" });
     await expect(page.getByText(/past the last of/)).toBeVisible();
     expect(await page.locator(".classsection tbody tr").count()).toBe(0);
-    expect(await page.locator(".searchpager").count()).toBe(0);
+    expect(await page.locator(".pager").count()).toBe(0);
   });
 });
 
@@ -161,7 +180,7 @@ test.describe("a mistyped URL still shows the table", () => {
     await page.goto("/app/classification/118/2?offset=999999", { waitUntil: "load" });
     await expect(page.getByText(/past the last of/)).toBeVisible();
     await expect(page.locator("body")).not.toContainText("Showing 1,000,000");
-    expect(await page.locator(".searchpager").count()).toBe(0);
+    expect(await page.locator(".pager").count()).toBe(0);
   });
 
   test("a session with no table is one heading, not two", async ({ page }) => {
@@ -208,6 +227,79 @@ test.describe("a classification table", () => {
     await page.waitForURL(/sort=code/, { timeout: 5000 });
     expect(page.url()).toContain("pl=118-42");
     expect(page.url()).not.toContain("offset=");
+  });
+
+  test("turns an order round from the sort bar and from the column heading", async ({
+    page,
+  }) => {
+    // Four orders from two controls (ADR-0071): the option in force is a link
+    // that reverses it, and the sorted column heading is the same control.
+    await page.goto(TABLE, { waitUntil: "load" });
+    const inForce = page.locator(".sortbar__option--on");
+    await expect(inForce).toContainText("Public law order");
+    await expect(inForce).toContainText("as published");
+
+    await inForce.click();
+    await page.waitForURL(/sort=pl-desc/, { timeout: 5000 });
+    await expect(page.locator(".sortbar__option--on")).toContainText("reversed");
+
+    await page.locator('[data-sort-column="code"]').click();
+    await page.waitForURL(/sort=code/, { timeout: 5000 });
+    // The other key starts in its own ascending direction rather than carrying
+    // this one's across.
+    expect(page.url()).not.toContain("code-desc");
+    const sorted = page.locator('.classtable th[aria-sort="ascending"]');
+    await expect(sorted).toHaveCount(1);
+    await expect(sorted).toContainText("U.S. Code");
+    await expect(page.locator('.classtable th[aria-sort="none"]')).toHaveCount(1);
+
+    await page.locator('[data-sort-column="code"]').click();
+    await page.waitForURL(/sort=code-desc/, { timeout: 5000 });
+    await expect(page.locator('.classtable th[aria-sort="descending"]')).toHaveCount(1);
+  });
+
+  test("reads the rows in the order the URL asks for", async ({ page }) => {
+    // The assertion is the two orders being reverses of each other, because the
+    // CI corpus and the full one hold different rows and only their relation is
+    // stable.
+    const cites = async (sort: string) => {
+      await page.goto(`${TABLE}?sort=${sort}`, { waitUntil: "load" });
+      return page.$$eval(".classtable tbody th", (cells) =>
+        cells.map((cell) => cell.textContent?.trim() ?? ""),
+      );
+    };
+    const up = await cites("code");
+    const down = await cites("code-desc");
+    expect(up.length).toBeGreaterThan(1);
+    // Only the first page of each, so the two lists are the ends of one
+    // ordering rather than the same list backwards.
+    expect(down[0]).not.toBe(up[0]);
+  });
+
+  test("numbers its pages, and the first page has no previous", async ({ page }) => {
+    await page.goto(TABLE, { waitUntil: "load" });
+    const pager = page.locator(".pager").first();
+    await expect(pager.locator(".pager__status")).toContainText(/Page 1 of \d+/);
+    await expect(pager.locator(".pager__page--on")).toHaveText("1");
+    // Present and inert rather than missing, so the row keeps its shape.
+    await expect(pager.locator(".pager__disabled").first()).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await pager.getByRole("link", { name: /^Page 2 / }).click();
+    await page.waitForURL(/offset=50/, { timeout: 5000 });
+    await expect(page.locator(".pager__page--on").first()).toHaveText("2");
+  });
+
+  test("keeps the order across a page turn", async ({ page }) => {
+    await page.goto(`${TABLE}?sort=code`, { waitUntil: "load" });
+    const next = page.getByRole("link", { name: /Next/ });
+    if (await next.count()) {
+      await next.first().click();
+      await page.waitForURL(/offset=/, { timeout: 5000 });
+      expect(page.url()).toContain("sort=code");
+    }
   });
 
   test("dismisses one filter and keeps the rest", async ({ page }) => {

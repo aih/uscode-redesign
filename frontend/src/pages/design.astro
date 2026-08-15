@@ -54,6 +54,7 @@ import CommandPalette from "../components/CommandPalette.astro";
 import CopyColumn from "../components/CopyColumn.astro";
 import NoResults from "../components/NoResults.astro";
 import Neighbors from "../components/Neighbors.astro";
+import Pager from "../components/Pager.astro";
 import PrintHeader from "../components/PrintHeader.astro";
 import ReleaseContext from "../components/ReleaseContext.astro";
 import ReleasePicker from "../components/ReleasePicker.astro";
@@ -61,6 +62,7 @@ import SearchFacets from "../components/SearchFacets.astro";
 import SearchResult from "../components/SearchResult.astro";
 import SectionBar from "../components/SectionBar.astro";
 import SectionContents from "../components/SectionContents.astro";
+import SortBar from "../components/SortBar.astro";
 import ShortcutsDialog from "../components/ShortcutsDialog.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import Timeline from "../components/Timeline.astro";
@@ -77,7 +79,7 @@ import type {
   SearchResultItem,
   VersionEntry,
 } from "../lib/types";
-import { appHref } from "../lib/url";
+import { APP, appHref } from "../lib/url";
 import { copyableIdentifiers, outline, parseFragment, readingBlocks, render } from "../lib/uslm";
 
 /** Fixed markup with no per-reader content and no release point to pin it to. */
@@ -394,6 +396,30 @@ const APPENDIX: Citation = {
     "/us/usc/t5a/s3 to show.",
 };
 
+/** Where this page's own sort and page specimens point.
+ *
+ * At itself, and with a fragment, so operating a specimen control demonstrates
+ * it without leaving the page or reaching any data — the property every other
+ * specimen here has. */
+const DESIGN_PATH = `${APP}/design`;
+
+/** The two orders a classification view offers, with the words this page's
+ *  specimen uses for their directions (ADR-0071). */
+const SPECIMEN_SORTS = [
+  {
+    key: "pl",
+    label: "Public law order",
+    ascending: "oldest first",
+    descending: "newest first",
+  },
+  {
+    key: "code",
+    label: "U.S. Code order",
+    ascending: "title, then section",
+    descending: "highest section first",
+  },
+];
+
 /** Four classification rows, one per state a cell can be in (ADR-0067).
  *
  * A classification row is the one specimen on this page whose *unlinked*
@@ -568,6 +594,7 @@ const TYPE_ROLES = [
     <p class="apidocs__contents-item"><a href="#print">Print</a></p>
     <p class="apidocs__contents-item"><a href="#search">Search results</a></p>
     <p class="apidocs__contents-item"><a href="#classification">Classification rows</a></p>
+    <p class="apidocs__contents-item"><a href="#paging">Sorting and paging</a></p>
     <p class="apidocs__contents-item"><a href="#messages">Messages</a></p>
   </nav>
 
@@ -1072,6 +1099,82 @@ const TYPE_ROLES = [
       entries={CLASSIFICATION_ROWS}
       caption="Classification rows, specimen"
       statVolume={0}
+    />
+  </div>
+
+  <p class="spec__label">The same table, sortable</p>
+
+  <p>
+    Where the server can order by a column, its heading is the control for doing so (ADR-0071).
+    The heading carries <code>aria-sort</code>, the arrow marks the direction in force, and the
+    two columns without one are the ones whose cells hold the source's own notation rather than
+    anything a reader is looking for.
+  </p>
+
+  <div class="spec">
+    <ClassificationTable
+      entries={CLASSIFICATION_ROWS}
+      caption="Classification rows in U.S. Code order, specimen"
+      statVolume={0}
+      sort="code"
+      sortHref={(option: string) => `${DESIGN_PATH}?sort=${option}#paging`}
+    />
+  </div>
+
+  {/* ------------------------------------------------------------- the pager */}
+  <h2 class="toc-group" id="paging">Sorting and paging</h2>
+
+  <p>
+    Two controls over one setting: the sort bar names each order a list can be read in, and the
+    option in force is itself a link that reverses it. The direction is written out beside its
+    arrow, because a glyph is not a word.
+  </p>
+
+  <div class="spec">
+    <SortBar
+      options={SPECIMEN_SORTS}
+      sort="pl-desc"
+      href={(option: string) => `${DESIGN_PATH}?sort=${option}#paging`}
+      idPrefix="design-sortbar"
+    />
+  </div>
+
+  <p class="spec__label">The pager</p>
+
+  <p>
+    Every paged list on the site uses this one control. The numbers below are the 104th
+    Congress's table — 11,737 rows at 50 to a page, which is 235 pages — because that is the
+    size the control was built for and the size no test corpus reaches. The two ends are always
+    present, so the last page is one click from the first; the box appears only where the
+    numbers cannot reach every page.
+  </p>
+
+  <div class="spec">
+    <Pager
+      total={11_737}
+      offset={5_000}
+      limit={50}
+      shown={50}
+      showRange
+      href={(next: number) => `${DESIGN_PATH}?offset=${next}#paging`}
+      label="Pager, specimen"
+      idPrefix="design-pager"
+      jump={{ action: DESIGN_PATH }}
+    />
+  </div>
+
+  <p class="spec__label">A list two pages long</p>
+
+  <div class="spec">
+    <Pager
+      total={84}
+      offset={0}
+      limit={50}
+      shown={50}
+      href={(next: number) => `${DESIGN_PATH}?offset=${next}#paging`}
+      label="Pager at two pages, specimen"
+      idPrefix="design-pager-short"
+      jump={{ action: DESIGN_PATH }}
     />
   </div>
 

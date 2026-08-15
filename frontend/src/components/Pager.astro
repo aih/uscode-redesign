@@ -1,0 +1,193 @@
+---
+/**
+ * A paged list's controls: which page this is, the pages either side of it, the
+ * two ends, and a box to name any page directly (ADR-0071).
+ *
+ * What this replaces is Previous and Next alone. That is enough to *reach* every
+ * row and no more: the 104th's whole-congress table is 11,737 rows, which at 50
+ * to a page is 235 pages, and the only route to page 200 was 199 clicks. It also
+ * never said how much there was — a Next button is the same button on page 2 of
+ * 3 and page 2 of 235.
+ *
+ * Three things, in the order they answer a question a reader has:
+ *
+ *   1. **Where am I.** "Page 3 of 235" and the row range, both counted from what
+ *      the server actually returned rather than from the offset asked for.
+ *   2. **One step, or one jump.** Previous and Next stay first and last in the
+ *      list, since a step is the common move; the numbers between them are a
+ *      window around the current page with the two ends always present, so the
+ *      last page is one click from the first.
+ *   3. **Any page.** Past a handful of pages the window cannot show them all, so
+ *      a `page` box reaches one by number. It is a GET form carrying the view's
+ *      other parameters as hidden fields, which is why the pages that use it
+ *      read `?page=` as well as `?offset=` (`pageOffset` in `lib/url.ts`).
+ *
+ * No script. Every control is a link or a form submission, so the whole thing
+ * works with JavaScript off and each page is an address that can be shared —
+ * the same property the sort control and the filters have.
+ *
+ * The caller owns the URLs: `href(offset)` builds one page's address with that
+ * view's filters and order on it, exactly as its Previous and Next links did.
+ */
+import { pagerModel } from "../lib/pager";
+
+interface Props {
+  /** Rows the filters matched — not rows on this page. */
+  total: number;
+  /** The row this page starts at, as the server understood it. */
+  offset: number;
+  /** Rows per page. */
+  limit: number;
+  /** Rows actually returned, which bounds the range this page claims to show. */
+  shown: number;
+  /**
+   * Print the row range beside the page number.
+   *
+   * Off by default because the classification views already carry a line of
+   * their own saying which rows these are, and the same fact twice on one
+   * screen reads as two facts.
+   */
+  showRange?: boolean;
+  /** One page's address, filters and order included. */
+  href: (offset: number) => string;
+  /** Names this `<nav>` — there can be more than one paged list on a page. */
+  label: string;
+  /**
+   * Where the jump form submits, and what it must carry with it. The form is
+   * rendered only when this is given and there are more pages than the window
+   * shows; without it the numbers and the steps are the whole control.
+   */
+  jump?: { action: string; params?: Record<string, string | null | undefined> };
+  /** Distinguishes this pager's form field from another's on the same page. */
+  idPrefix?: string;
+}
+
+const {
+  total,
+  offset,
+  limit,
+  shown,
+  showRange = false,
+  href,
+  label,
+  jump,
+  idPrefix = "pager",
+} = Astro.props as Props;
+
+/** The arithmetic is `lib/pager.ts`, tested without a browser: this component
+ *  draws what comes back and works nothing out for itself. */
+const { pages, current, from, to, numbers, truncated } = pagerModel({
+  total,
+  offset,
+  limit,
+  shown,
+});
+
+const offsetOf = (page: number) => (page - 1) * limit;
+/** The jump box earns its space only where the numbers cannot reach every page.
+ *  Below that it would be a second way to do what one click already does. */
+const showJump = jump != null && truncated;
+const hidden = Object.entries(jump?.params ?? {}).filter(
+  ([, value]) => value != null && value !== "",
+) as [string, string][];
+
+/** `rel="prev"`/`rel="next"` on the numbered links too, so the relationship is
+ *  in the markup wherever it holds rather than only on the two steps. */
+const rel = (page: number): string | undefined =>
+  page === current - 1 ? "prev" : page === current + 1 ? "next" : undefined;
+---
+
+{
+  pages > 1 && (
+    <nav class="pager" aria-label={label}>
+      <p class="pager__status">
+        Page {current.toLocaleString()} of {pages.toLocaleString()}
+        {showRange && shown > 0 && (
+          <>
+            {" "}
+            · rows {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()}
+          </>
+        )}
+      </p>
+
+      <ul class="pager__list">
+        <li class="pager__step">
+          {current > 1 ? (
+            <a class="usa-button usa-button--outline" href={href(offsetOf(current - 1))} rel="prev">
+              ← Previous
+            </a>
+          ) : (
+            /* Present and disabled rather than absent: the row of controls
+               keeps its shape as a reader moves through it, and a control that
+               vanishes at one end is a control they have to look for. */
+            <span class="usa-button usa-button--outline pager__disabled" aria-disabled="true">
+              ← Previous
+            </span>
+          )}
+        </li>
+
+        {numbers.map((page) =>
+          page == null ? (
+            <li class="pager__gap" aria-hidden="true">
+              …
+            </li>
+          ) : page === current ? (
+            <li>
+              <span class="pager__page pager__page--on" aria-current="page">
+                {page.toLocaleString()}
+              </span>
+            </li>
+          ) : (
+            <li>
+              <a
+                class="pager__page"
+                href={href(offsetOf(page))}
+                rel={rel(page)}
+                aria-label={`Page ${page.toLocaleString()} of ${pages.toLocaleString()}`}
+              >
+                {page.toLocaleString()}
+              </a>
+            </li>
+          ),
+        )}
+
+        <li class="pager__step">
+          {current < pages ? (
+            <a class="usa-button usa-button--outline" href={href(offsetOf(current + 1))} rel="next">
+              Next →
+            </a>
+          ) : (
+            <span class="usa-button usa-button--outline pager__disabled" aria-disabled="true">
+              Next →
+            </span>
+          )}
+        </li>
+      </ul>
+
+      {showJump && (
+        <form class="pager__jump" method="get" action={jump!.action}>
+          {hidden.map(([name, value]) => (
+            <input type="hidden" name={name} value={value} />
+          ))}
+          <label class="pager__jump-label" for={`${idPrefix}-page`}>
+            Go to page
+          </label>
+          <input
+            class="usa-input pager__jump-input"
+            id={`${idPrefix}-page`}
+            name="page"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            max={pages}
+            step="1"
+            value={current}
+          />
+          <button class="usa-button usa-button--outline pager__jump-go" type="submit">
+            Go
+          </button>
+        </form>
+      )}
+    </nav>
+  )
+}

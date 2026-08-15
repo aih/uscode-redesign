@@ -334,6 +334,30 @@ export function readOffset(raw: string | null | undefined): number {
   return Math.floor(parsed);
 }
 
+/**
+ * Which row a page starts at, from `?offset=` or from `?page=`.
+ *
+ * `?offset=` is what every link on a paged view writes, and it stays the
+ * canonical form: it is the API's own parameter and it survives a page size
+ * changing. `?page=` exists for the pager's jump box, where a person types the
+ * page they want and nobody should have to multiply. `?offset=` wins when both
+ * are present, because it is the one a link wrote.
+ *
+ * A page number is 1-based and anything unreadable is the first page — the same
+ * rule `readOffset` and `?sort=` follow, so a mistyped URL still shows the
+ * table.
+ */
+export function pageOffset(
+  params: URLSearchParams,
+  limit: number,
+): number {
+  const offset = params.get("offset");
+  if (offset != null && offset !== "") return readOffset(offset);
+  const page = Number(params.get("page") ?? "");
+  if (!Number.isFinite(page) || page <= 1) return 0;
+  return (Math.floor(page) - 1) * limit;
+}
+
 export interface ClassificationFilters {
   /** `118-33` — one public law. */
   pl?: string | null;
@@ -342,12 +366,63 @@ export interface ClassificationFilters {
   title?: string | null;
   section?: string | null;
   sort?: string | null;
+  /** The order this view is in when the URL says nothing — `pl` on a session
+   *  page (the document as OLRC published it), `pl-desc` on a by-code view (a
+   *  history, newest first). The default is omitted from the URL, so one view
+   *  has one address. */
+  sortDefault?: string;
   offset?: number | null;
 }
 
-/** The order a session table is read in. `pl` is the source's own order and is
- *  the default, so it is left out of the URL. */
-export const CLASSIFICATION_SORTS = ["pl", "code"] as const;
+/**
+ * Every order a table of classification rows can be read in (ADR-0071), and the
+ * same four `storage.CLASSIFICATION_SORTS` declares.
+ *
+ * A sort is a key and a direction: `pl` is public law order — the source's own
+ * row order inside one document — and `code` is the Code's own, title then
+ * section. `-desc` reverses either. The direction lives in the value rather
+ * than in a second parameter so that one view is still one URL.
+ */
+export const CLASSIFICATION_SORTS = ["pl", "pl-desc", "code", "code-desc"] as const;
+
+export type ClassificationSort = (typeof CLASSIFICATION_SORTS)[number];
+
+/** The two keys, each of which a reader can turn round. */
+export const CLASSIFICATION_SORT_KEYS = ["pl", "code"] as const;
+
+export type ClassificationSortKey = (typeof CLASSIFICATION_SORT_KEYS)[number];
+
+/** `code-desc` → `code`. */
+export function sortKey(sort: string): ClassificationSortKey {
+  return sort.startsWith("code") ? "code" : "pl";
+}
+
+/** Is this the reversed direction of its key? */
+export function sortDescending(sort: string): boolean {
+  return sort.endsWith("-desc");
+}
+
+/**
+ * What clicking a column heading, or the order already in force, leads to.
+ *
+ * Clicking the key that is already on reverses it; clicking the other key
+ * starts it in its own ascending direction rather than carrying the current
+ * direction across. Public law order and Code order descend into different
+ * things, and a reader choosing "U.S. Code" is asking for the Code's order, not
+ * for the reverse of it.
+ */
+export function nextSort(current: string, key: ClassificationSortKey): ClassificationSort {
+  if (sortKey(current) !== key) return key;
+  return (sortDescending(current) ? key : `${key}-desc`) as ClassificationSort;
+}
+
+/** A `?sort=` from a URL, or the view's default when it names no order this
+ *  reader can be shown. */
+export function readSort(raw: string | null | undefined, fallback: string): string {
+  return (CLASSIFICATION_SORTS as readonly string[]).includes(raw ?? "")
+    ? (raw as string)
+    : fallback;
+}
 
 /**
  * `/app/classification`, `/app/classification/118/2`, and either with filters.
@@ -371,7 +446,7 @@ export function classificationHref(
   if (opts.plSection) params.set("pl_section", opts.plSection);
   if (opts.title) params.set("title", opts.title);
   if (opts.section) params.set("section", normalizeSectionKey(opts.section));
-  if (opts.sort && opts.sort !== "pl") params.set("sort", opts.sort);
+  if (opts.sort && opts.sort !== (opts.sortDefault ?? "pl")) params.set("sort", opts.sort);
   if (opts.offset) params.set("offset", String(opts.offset));
   const query = params.toString();
   return query ? `${base}?${query}` : base;

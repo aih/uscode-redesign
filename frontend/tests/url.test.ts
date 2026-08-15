@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   APP,
+  CLASSIFICATION_SORTS,
   ancestorIdentifiers,
   apiDiffHref,
   apiHref,
@@ -13,7 +14,11 @@ import {
   classificationSuggestHref,
   parseClassificationScope,
   compareTitles,
+  nextSort,
   readOffset,
+  readSort,
+  sortDescending,
+  sortKey,
   citationHref,
   diffHref,
   govinfoPlawHref,
@@ -346,6 +351,25 @@ describe("classification hrefs", () => {
     );
   });
 
+  it("omits whichever order this view's default is (ADR-0071)", () => {
+    // The two views have different defaults over one vocabulary: a session page
+    // is the document as published, a by-code view is a history. Each writes the
+    // order only when it is not the one the URL would already mean.
+    expect(classificationHref(118, "2", { sort: "pl-desc" })).toBe(
+      "/app/classification/118/2?sort=pl-desc",
+    );
+    expect(
+      classificationHref(null, null, {
+        title: "42",
+        sort: "pl-desc",
+        sortDefault: "pl-desc",
+      }),
+    ).toBe("/app/classification?title=42");
+    expect(
+      classificationHref(null, null, { title: "42", sort: "code", sortDefault: "pl-desc" }),
+    ).toBe("/app/classification?title=42&sort=code");
+  });
+
   it("carries the filters under the API's own parameter names", () => {
     expect(classificationHref(118, "2", { pl: "118-42", plSection: "793", title: "7" })).toBe(
       "/app/classification/118/2?pl=118-42&pl_section=793&title=7",
@@ -455,6 +479,34 @@ describe("readOffset", () => {
     expect(readOffset(undefined)).toBe(0);
     expect(readOffset("Infinity")).toBe(0);
     expect(readOffset("NaN")).toBe(0);
+  });
+});
+
+describe("the four orders a table can be read in (ADR-0071)", () => {
+  it("reads a key and a direction out of one value", () => {
+    expect(CLASSIFICATION_SORTS).toEqual(["pl", "pl-desc", "code", "code-desc"]);
+    expect(sortKey("code-desc")).toBe("code");
+    expect(sortKey("pl")).toBe("pl");
+    expect(sortDescending("pl-desc")).toBe(true);
+    expect(sortDescending("code")).toBe(false);
+  });
+
+  it("reverses the key in force and starts another one ascending", () => {
+    // Clicking the order you are already in turns it round; clicking the other
+    // asks for that order, not for the reverse of this one.
+    expect(nextSort("pl", "pl")).toBe("pl-desc");
+    expect(nextSort("pl-desc", "pl")).toBe("pl");
+    expect(nextSort("code-desc", "pl")).toBe("pl");
+    expect(nextSort("pl-desc", "code")).toBe("code");
+  });
+
+  it("falls back to the view's own default rather than erroring", () => {
+    expect(readSort("code-desc", "pl")).toBe("code-desc");
+    expect(readSort("sideways", "pl")).toBe("pl");
+    expect(readSort(null, "pl-desc")).toBe("pl-desc");
+    // The API's own name for the old two-value vocabulary still resolves, so a
+    // bookmarked `?sort=code` outlives this change.
+    expect(readSort("code", "pl-desc")).toBe("code");
   });
 });
 

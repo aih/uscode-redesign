@@ -12,7 +12,13 @@ no session and no SQL (CLAUDE.md architecture rule 1, docs/adr/0017).
 `title_sort_key` is the contract for ordering it, and `_section_sort_key` is the
 same rule one level down for the section number. So that sort reads the matching
 rows' keys into this process, orders them, and pages the sorted list — see
-`entries_for_file`.
+`_code_ordered_page`.
+
+Every listing method takes the one sort vocabulary `CLASSIFICATION_SORTS`
+declares: `pl`/`pl-desc` in SQL, `code`/`code-desc` through that Python key
+(ADR-0071). A descending code order is the ascending list reversed rather than a
+second comparator, so the two directions cannot disagree about where a row with
+an unreadable key belongs.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from db.models import ClassificationFile as ClassificationFileRow
 from db.models import ClassificationSourceCheck
 from db.models import EcctEntry as EcctEntryRow
 from storage.classification import (
+    CLASSIFICATION_SORTS,
     ClassificationCheckInfo,
     ClassificationEntryRef,
     ClassificationFileInfo,
@@ -233,14 +240,27 @@ class PostgresClassification:
                 ClassificationEntryRow.section_norm == normalize_section_input(section)
             )
 
-        if sort == "code":
-            return self._code_ordered_page(where, congress, session, limit, offset)
+        if sort not in CLASSIFICATION_SORTS:
+            sort = "pl"
+        if sort.startswith("code"):
+            return self._code_ordered_page(
+                where, limit, offset, descending=sort.endswith("-desc")
+            )
 
+        # Inside one file the source's own row order *is* public law order, so
+        # `pl` is `row_seq` and `pl-desc` is the file read backwards — no
+        # tiebreak is needed and none is possible, `(file_id, row_seq)` being
+        # unique.
+        order = (
+            ClassificationEntryRow.row_seq.desc()
+            if sort == "pl-desc"
+            else ClassificationEntryRow.row_seq
+        )
         total = self._count(where)
         rows = self._session.scalars(
             select(ClassificationEntryRow)
             .where(*where)
-            .order_by(ClassificationEntryRow.row_seq)
+            .order_by(order)
             .limit(limit)
             .offset(offset)
         ).all()
@@ -254,10 +274,10 @@ class PostgresClassification:
     def _code_ordered_page(
         self,
         where: list,
-        congress: int,
-        session: int,
         limit: int,
         offset: int,
+        *,
+        descending: bool = False,
     ) -> ClassificationPage:
         """`sort=code`, paged.
 
@@ -265,39 +285,65 @@ class PostgresClassification:
         cannot: `title_num` is a string, `title_sort_key` is the contract for
         ordering it (gotcha 16), and reproducing that key as a SQL expression
         would be a second copy of it in a second language. So the ordering runs
-        here — over the *keys* alone, one small tuple per matching row (11,737
-        for the largest file, the 104th) — and the page is fetched by the ids
-        that survive the slice, at the cost of a second query.
+        here — over the *keys* alone, one small tuple per matching row — and the
+        page is fetched by the ids that survive the slice, at the cost of a
+        second query.
+
+        The set is bounded by what the caller filtered to: 11,737 keys for the
+        largest single file (the 104th's), and 23,093 for the largest by-code
+        view (title 10, across every table). The file row is joined here whether
+        or not the filter names one file, because a cross-table page's rows each
+        need the congress and session of the document they came from — which is
+        the session page that row lives on.
         """
         keys = self._session.execute(
             select(
                 ClassificationEntryRow.id,
                 ClassificationEntryRow.title_num,
                 ClassificationEntryRow.section_norm,
+                ClassificationFileRow.congress,
+                ClassificationFileRow.session,
                 ClassificationEntryRow.row_seq,
-            ).where(*where)
+            )
+            .join(
+                ClassificationFileRow,
+                ClassificationFileRow.id == ClassificationEntryRow.file_id,
+            )
+            .where(*where)
         ).all()
         keys.sort(
             key=lambda row: (
                 title_sort_key(row.title_num),
                 _section_sort_key(row.section_norm),
+                row.congress,
+                row.session,
                 row.row_seq,
             )
         )
+        if descending:
+            # The reverse of the one ordering, rather than a second comparator
+            # written the other way round: two comparators can disagree, and a
+            # page turned in one direction has to be the page turned back.
+            keys.reverse()
         wanted = [row.id for row in keys[offset : offset + limit]]
         by_id = {
-            row.id: row
-            for row in self._session.scalars(
-                select(ClassificationEntryRow).where(
-                    ClassificationEntryRow.id.in_(wanted)
+            entry.id: (entry, congress, session)
+            for entry, congress, session in self._session.execute(
+                select(
+                    ClassificationEntryRow,
+                    ClassificationFileRow.congress,
+                    ClassificationFileRow.session,
                 )
-            )
+                .join(
+                    ClassificationFileRow,
+                    ClassificationFileRow.id == ClassificationEntryRow.file_id,
+                )
+                .where(ClassificationEntryRow.id.in_(wanted))
+            ).all()
         }
         return ClassificationPage(
             items=tuple(
-                _entry_ref(by_id[entry_id], congress, session)
-                for entry_id in wanted
-                if entry_id in by_id
+                _entry_ref(*by_id[entry_id]) for entry_id in wanted if entry_id in by_id
             ),
             total=len(keys),
             limit=limit,
@@ -310,6 +356,7 @@ class PostgresClassification:
         congress: int,
         law_num: int,
         section: str | None = None,
+        sort: str = "pl",
         limit: int = 100,
         offset: int = 0,
     ) -> ClassificationPage:
@@ -326,12 +373,7 @@ class PostgresClassification:
                     _escape_like(section) + "%", escape="\\"
                 )
             )
-        order = (
-            ClassificationFileRow.congress,
-            ClassificationFileRow.session,
-            ClassificationEntryRow.row_seq,
-        )
-        return self._joined_page(where, order, limit, offset)
+        return self._sorted_page(where, sort, limit, offset)
 
     def entries_for_section(
         self,
@@ -340,6 +382,7 @@ class PostgresClassification:
         section: str,
         congress: int | None = None,
         exact: bool = True,
+        sort: str = "pl-desc",
         limit: int = 100,
         offset: int = 0,
     ) -> ClassificationPage:
@@ -355,37 +398,72 @@ class PostgresClassification:
             )
         if congress is not None:
             where.append(ClassificationEntryRow.pl_congress == congress)
-        return self._joined_page(where, self._history_order(), limit, offset)
+        return self._sorted_page(where, sort, limit, offset)
 
     def entries_for_title(
         self,
         *,
         title_num: str,
         congress: int | None = None,
+        sort: str = "pl-desc",
         limit: int = 100,
         offset: int = 0,
     ) -> ClassificationPage:
         where = [ClassificationEntryRow.title_num == title_num.strip().lower()]
         if congress is not None:
             where.append(ClassificationEntryRow.pl_congress == congress)
-        return self._joined_page(where, self._history_order(), limit, offset)
+        return self._sorted_page(where, sort, limit, offset)
 
     def entries_for_identifier(
-        self, identifier: str, *, limit: int = 200, offset: int = 0
+        self, identifier: str, *, sort: str = "pl-desc", limit: int = 200, offset: int = 0
     ) -> ClassificationPage:
         where = [
             ClassificationEntryRow.usc_identifier.in_(identifier_variants(identifier))
         ]
-        return self._joined_page(where, self._history_order(), limit, offset)
+        return self._sorted_page(where, sort, limit, offset)
+
+    def _sorted_page(
+        self, where: list, sort: str, limit: int, offset: int
+    ) -> ClassificationPage:
+        """A cross-document page in whichever of the four orders was asked for.
+
+        An unknown value is the view's own default rather than an error: the
+        route validates what a caller sends, and a stored URL that outlives a
+        sort name should still show the rows.
+        """
+        if sort not in CLASSIFICATION_SORTS:
+            sort = "pl-desc"
+        if sort.startswith("code"):
+            return self._code_ordered_page(
+                where, limit, offset, descending=sort.endswith("-desc")
+            )
+        return self._joined_page(
+            where, self._pl_order(descending=sort == "pl-desc"), limit, offset
+        )
 
     @staticmethod
-    def _history_order() -> tuple:
-        """Newest law first — the order a section's classification history reads
-        in. Rows whose Pub. L. cell did not parse sort last rather than first,
-        which is what a descending sort would otherwise do with a NULL."""
+    def _pl_order(*, descending: bool) -> tuple:
+        """Public law order across documents, in either direction.
+
+        Descending is the order a section's classification history reads in —
+        newest law first. Rows whose Pub. L. cell did not parse sort last in
+        both directions rather than first, which is what a descending sort would
+        otherwise do with a NULL; the file and its row order break the tie, so
+        one page is the same page on every request.
+        """
+        if descending:
+            return (
+                nulls_last(ClassificationEntryRow.pl_congress.desc()),
+                nulls_last(ClassificationEntryRow.pl_num.desc()),
+                ClassificationFileRow.congress.desc(),
+                ClassificationFileRow.session.desc(),
+                ClassificationEntryRow.row_seq,
+            )
         return (
-            nulls_last(ClassificationEntryRow.pl_congress.desc()),
-            nulls_last(ClassificationEntryRow.pl_num.desc()),
+            nulls_last(ClassificationEntryRow.pl_congress),
+            nulls_last(ClassificationEntryRow.pl_num),
+            ClassificationFileRow.congress,
+            ClassificationFileRow.session,
             ClassificationEntryRow.row_seq,
         )
 

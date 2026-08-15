@@ -137,6 +137,20 @@ _PL_SHORTHAND_BARE = re.compile(
 SESSION_ALL = 0
 """What the registry holds for a whole-congress table, spelled `all` in a URL."""
 
+ClassificationSort = Literal["pl", "pl-desc", "code", "code-desc"]
+"""`storage.CLASSIFICATION_SORTS` as a type FastAPI can validate a query against.
+
+Spelled out rather than built from the tuple because `Literal[*values]` is a
+runtime construction OpenAPI generation cannot read; `test_classification_api`
+asserts the two lists are the same, so they cannot drift apart in silence."""
+
+SORT_DESCRIPTION = (
+    "`pl` is public law order — the source's own row order inside one document, "
+    "the oldest law first across documents. `code` is the Code's order: title "
+    "first (`5, 5a, 6, … 10`, never as text), then section number. `-desc` "
+    "reverses either."
+)
+
 READER_NOTES_ANCHOR = "#section-notes"
 """The anchor ADR-0055 gives a section's notes. OLRC prints a provision's
 classification history there, which is why the lookup's first suggestion for a
@@ -245,11 +259,7 @@ def classification_entries(
             examples=["2"],
         ),
     ],
-    sort: Literal["pl", "code"] = Query(
-        default="pl",
-        description="`pl` is the source's own order. `code` is the Code's order — "
-        "title first (`5, 5a, 6, … 10`, never as text), then section number.",
-    ),
+    sort: ClassificationSort = Query(default="pl", description=SORT_DESCRIPTION),
     pl: str | None = Query(
         default=None,
         description="Only rows classifying this public law. `118-33`, or a bare "
@@ -326,10 +336,14 @@ def classifications_for_law(
         description="Only provisions of the law whose Sec. cell starts with this.",
         examples=["101"],
     ),
+    sort: ClassificationSort = Query(default="pl", description=SORT_DESCRIPTION),
     limit: int = Query(default=100, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> ClassificationPageOut:
     """The law's rows in source order, with the document that covers it.
+
+    `sort=code` reads the same rows as "what this law did to the Code, title by
+    title", which is the other question a law's page answers.
 
     **404 and an empty page mean different things here.** A 404 says no
     classification table covers this public law — the table for its session has
@@ -342,6 +356,7 @@ def classifications_for_law(
             congress=congress,
             law_num=law_num,
             section=section,
+            sort=sort,
             limit=limit,
             offset=offset,
         )
@@ -349,7 +364,7 @@ def classifications_for_law(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     file = classification.file_covering_law(congress=congress, law_num=law_num)
-    return ClassificationPageOut.of(page, file=file)
+    return ClassificationPageOut.of(page, sort=sort, file=file)
 
 
 # ----------------------------------------------------------------- 4. code title
@@ -374,6 +389,7 @@ def classifications_for_title(
     congress: int | None = Query(
         default=None, description="Only rows from laws of this congress."
     ),
+    sort: ClassificationSort = Query(default="pl-desc", description=SORT_DESCRIPTION),
     limit: int = Query(default=100, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> ClassificationPageOut:
@@ -384,14 +400,22 @@ def classifications_for_title(
     of the 144,837 loaded rows and title 42 19,476, where the longest single
     section history is 412.
 
+    `sort=code` is the reading this view exists for as much as the default one:
+    every section of the title in the Code's own order, with what each law did
+    to it — which is the title's table of changes rather than its timeline.
+
     A title nothing was ever classified to is an empty page rather than a 404,
     for `classifications_for_section`'s reason: the tables cover 1996 onward, so
     silence is ordinary.
     """
     page = classification.entries_for_title(
-        title_num=title_num, congress=congress, limit=limit, offset=offset
+        title_num=title_num,
+        congress=congress,
+        sort=sort,
+        limit=limit,
+        offset=offset,
     )
-    return ClassificationPageOut.of(page)
+    return ClassificationPageOut.of(page, sort=sort)
 
 
 # --------------------------------------------------------------- 5. code section
@@ -423,21 +447,24 @@ def classifications_for_section(
         description="False matches any section number starting with what was "
         "given — `45` then also reaches `45a` and `45f`.",
     ),
+    sort: ClassificationSort = Query(default="pl-desc", description=SORT_DESCRIPTION),
     limit: int = Query(default=100, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> ClassificationPageOut:
-    """Newest public law first, which is the order a section's classification
-    history reads in. A section nothing was ever classified to is an empty page,
-    not a 404: the tables cover 1996 onward, so silence here is ordinary."""
+    """Newest public law first by default, which is the order a section's
+    classification history reads in. `sort=pl` turns it round into the order the
+    amendments were made in. A section nothing was ever classified to is an empty
+    page, not a 404: the tables cover 1996 onward, so silence here is ordinary."""
     page = classification.entries_for_section(
         title_num=title_num,
         section=section,
         congress=congress,
         exact=exact,
+        sort=sort,
         limit=limit,
         offset=offset,
     )
-    return ClassificationPageOut.of(page)
+    return ClassificationPageOut.of(page, sort=sort)
 
 
 # ---------------------------------------------------------------- 6. identifier
@@ -453,6 +480,7 @@ def classifications_for_section(
 def classifications_for_identifier(
     identifier: str,
     classification: ClassificationDep,
+    sort: ClassificationSort = Query(default="pl-desc", description=SORT_DESCRIPTION),
     limit: int = Query(default=IDENTIFIER_LIMIT, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
 ) -> ClassificationPageOut:
@@ -467,8 +495,10 @@ def classifications_for_identifier(
     rows past the first page are the oldest classifications.
     """
     path = normalize_identifier(f"us/usc/{identifier}")
-    page = classification.entries_for_identifier(path, limit=limit, offset=offset)
-    return ClassificationPageOut.of(page)
+    page = classification.entries_for_identifier(
+        path, sort=sort, limit=limit, offset=offset
+    )
+    return ClassificationPageOut.of(page, sort=sort)
 
 
 # ------------------------------------------------------------------- 7. suggest

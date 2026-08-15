@@ -6,7 +6,7 @@ summary: Which provision of which public law became which section of the Code, f
 covers:
   routes:
     ["/app/classification", "/app/classification/[congress]", "/app/classification/ecct"]
-  adrs: [67, 68, 70]
+  adrs: [67, 68, 70, 71]
 ---
 
 A public law is not written in the Code's numbering. The Office of the Law Revision Counsel decides
@@ -94,10 +94,57 @@ Five columns, in the source's own order:
 - **Sec.** — the law's own section designator.
 - **Stat. page** — linked to the OLRC's statviewer where the volume and the page are both known.
 
-**Order** switches between public law order, which is the source's, and U.S. Code order, which sorts
-by title and section. Rows come 50 at a time. Filters are shown as pills above the table and each
-one can be dismissed on its own. The address bar holds the filters, the order and the page, so a
-view is citable by its URL.
+### Ordering a table
+
+**Order**, above the table, switches between public law order — the source's own — and U.S. Code
+order, which sorts by title and then by section number. The order in force carries an arrow and the
+direction in words; selecting it again reverses it, so there are four orders in all.
+
+The headings of the **U.S. Code** and **Pub. L.** columns do the same thing: selecting one orders
+by that column, and selecting it again turns it round. The other three columns hold the source's own
+notation and are not ordered by.
+
+```scenario
+id: classification-sort
+title: Read one table in Code order instead of public law order
+steps:
+  - goto: /app/classification/118/2
+  - click: '[data-sort="code"]'
+  - expect: { url: "sort=code" }
+  - expect: { selector: ".classtable", contains: "U.S.C." }
+```
+
+```scenario
+id: classification-sort-reverse
+title: Turn an order round from the column heading
+steps:
+  - goto: /app/classification/118/2?sort=code
+  - click: '[data-sort-column="code"]'
+  - expect: { url: "sort=code-desc" }
+  - expect: { selector: '.classtable th[aria-sort="descending"]', contains: "U.S. Code" }
+```
+
+### Moving through a table
+
+Rows come 50 at a time. Under them is the page you are on, how many pages there are, **Previous**
+and **Next**, and the page numbers either side of you with the first and the last always among
+them. The 104th Congress's table is 235 pages, so where the numbers cannot reach every page a
+**Go to page** box takes one directly.
+
+Filters are shown as pills above the table and each one can be dismissed on its own. The address
+bar holds the filters, the order and the page, so a view is citable by its URL, and changing the
+order starts again at the first page.
+
+```scenario
+id: classification-pager
+title: Move through a table by page number
+steps:
+  - goto: /app/classification/118/2
+  - expect: { selector: ".pager__status", contains: "Page 1 of" }
+  - click: .pager__list a[rel="next"]
+  - expect: { url: "offset=50" }
+  - expect: { selector: ".pager__page--on", contains: "2" }
+```
 
 The lookup box is on the table's page as well, scoped to that table. A bare law number — `35`, or
 `35 101` for one of its provisions — means a law of that congress, and choosing a match filters the
@@ -114,21 +161,11 @@ steps:
   - expect: { url: "pl=118-35" }
 ```
 
-```scenario
-id: classification-sort
-title: Read one table in Code order instead of public law order
-steps:
-  - goto: /app/classification/118/2
-  - click: .sortbar__list a
-  - expect: { url: "sort=code" }
-  - expect: { selector: ".classtable", contains: "U.S.C." }
-```
-
 ## Every row for one section, and for one title
 
 A Code citation in the lookup box leads to every row ever classified to that section, across every
-table, newest public law first. The two filters are shown as pills, and the view is paged like any
-other.
+table, newest public law first. **Order** turns that round to oldest first. The two filters are
+shown as pills, and the view is paged like any other.
 
 ```scenario
 id: classification-by-section
@@ -140,7 +177,9 @@ steps:
 ```
 
 The same view without a section — `/app/classification?title=42` — is every row classified anywhere
-in that title. Dismissing the section pill leaves the title one in place and shows it.
+in that title. Dismissing the section pill leaves the title one in place and shows it. A title's
+rows can also be read in U.S. Code order, section by section; a single section's cannot, since every
+row of that view carries the same citation.
 
 ```scenario
 id: classification-by-title
@@ -149,6 +188,16 @@ steps:
   - goto: /app/classification?title=42
   - expect: { selector: "#classsection-heading", contains: "Title 42" }
   - expect: { selector: ".classtable", contains: "42 U.S.C." }
+```
+
+```scenario
+id: classification-title-code-order
+title: Read a title's rows in U.S. Code order
+steps:
+  - goto: /app/classification?title=42
+  - click: '[data-sort="code"]'
+  - expect: { url: "sort=code" }
+  - expect: { selector: '.classtable th[aria-sort="ascending"]', contains: "U.S. Code" }
 ```
 
 Both views name where the tables stop. A section that is in the Code carries a link to its notes in

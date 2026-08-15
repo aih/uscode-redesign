@@ -5,7 +5,7 @@ order: 5
 summary: One box that takes a citation or a phrase, works out which you meant, searches strictly unless you ask it not to, and lets you scope, filter and order what comes back.
 covers:
   routes: ["/app/goto", "/app/search", "/app/search/syntax"]
-  adrs: [23, 28, 31, 49, 62]
+  adrs: [23, 28, 31, 49, 62, 71]
 ---
 
 There is one box in the header and it answers two kinds of question. Type a citation and it goes
@@ -226,6 +226,27 @@ steps:
   - goto: /app/search?q=conservation+title%3A16
   - click: .sortbar__list a
   - expect: { url: "sort=" }
+```
+
+### Moving through the results
+
+Results come 20 to a page. Below them is the page number you are on, the number of pages there
+are, and the rows this page covers. **Previous** and **Next** move one page; the numbers beside
+them move any number of pages, and the first and last are always among them. Where there are more
+pages than the numbers show, a **Go to page** box takes one directly.
+
+Each page is its own address, and it keeps the search, the order, the filters and the release
+point or date the search was made at.
+
+```scenario
+id: search-pager
+title: Jump to a page of results
+steps:
+  - goto: /app/search?q=conservation
+  - expect: { selector: ".pager__status", contains: "Page 1 of" }
+  - click: .pager__list a[rel="next"]
+  - expect: { url: "offset=20" }
+  - expect: { selector: ".pager__page--on", contains: "2" }
 ```
 
 ### How relevance is decided

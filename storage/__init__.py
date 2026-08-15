@@ -18,6 +18,7 @@ from storage.accounts import (
     WatchlistRef,
 )
 from storage.classification import (
+    CLASSIFICATION_SORTS,
     CLASSIFICATION_SOURCE_URL,
     ClassificationCheckInfo,
     ClassificationEntryRef,
@@ -56,6 +57,7 @@ from storage.repository import (
 )
 
 __all__ = [
+    "CLASSIFICATION_SORTS",
     "CLASSIFICATION_SOURCE_URL",
     "SOURCE_CHECK_STALE_AFTER",
     "SOURCE_URL",

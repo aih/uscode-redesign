@@ -13,6 +13,12 @@
  * API's query parameters. The largest session file is ~9,700 rows and the
  * 104th's is 11,737, so the page has to be a page.
  *
+ * Four orders, from two controls (ADR-0071): the sort bar names the two keys and
+ * the sorted column heading is the same control in the table itself, each
+ * reversing the order it is already in. 11,737 rows is 235 pages of 50, so the
+ * pager numbers them and takes a page number directly — `?page=` is read here
+ * as well as `?offset=` for the jump form's sake.
+ *
  * The lookup box is here as well as on the index, scoped to this table: its
  * form posts back to this page, `?q=` is the no-script path, and the suggest
  * request carries this congress and session — a bare law number then means a
@@ -28,6 +34,8 @@ import ClassificationLookup from "../../../components/ClassificationLookup.astro
 import ClassificationMatches from "../../../components/ClassificationMatches.astro";
 import ClassificationTable from "../../../components/ClassificationTable.astro";
 import ErrorPage from "../../../components/ErrorPage.astro";
+import Pager from "../../../components/Pager.astro";
+import SortBar from "../../../components/SortBar.astro";
 import {
   ApiError,
   CLASSIFICATION_PAGE_SIZE,
@@ -36,11 +44,11 @@ import {
 } from "../../../lib/api";
 import type { ClassificationEntryPage } from "../../../lib/types";
 import {
-  CLASSIFICATION_SORTS,
   classificationEcctHref,
   classificationHref,
   normalizeSectionKey,
-  readOffset,
+  pageOffset,
+  readSort,
   sessionNumber,
 } from "../../../lib/url";
 
@@ -67,12 +75,11 @@ const section = rawSection ? normalizeSectionKey(rawSection) : null;
 
 /** An unrecognized `?sort=` is the source's own order rather than a 400 —
  *  a mistyped URL should still show the table. */
-const requestedSort = params.get("sort");
-const sort = (CLASSIFICATION_SORTS as readonly string[]).includes(requestedSort ?? "")
-  ? (requestedSort as string)
-  : "pl";
+const sort = readSort(params.get("sort"), "pl");
 
-const offset = readOffset(params.get("offset"));
+/** `?offset=` is what every link writes; `?page=` is what the pager's jump box
+ *  submits, and it means the same thing one multiplication later. */
+const offset = pageOffset(params, CLASSIFICATION_PAGE_SIZE);
 
 /** The lookup's no-script path, answered by the same endpoint the island
  *  calls — scoped to this table, so a bare law number resolves here. */
@@ -81,10 +88,23 @@ const suggestions = query
   ? await fetchClassificationSuggestions(query, { congress, session: sessionParam })
   : [];
 
-const SORT_LABELS: Record<string, string> = {
-  pl: "Public law order",
-  code: "U.S. Code order",
-};
+/** The two keys, and what each direction means *for a document*: ascending is
+ *  the file as OLRC published it rather than "oldest first", because inside one
+ *  session table the source's row order is the public law order. */
+const SORT_OPTIONS = [
+  {
+    key: "pl",
+    label: "Public law order",
+    ascending: "as published",
+    descending: "reversed",
+  },
+  {
+    key: "code",
+    label: "U.S. Code order",
+    ascending: "title, then section",
+    descending: "highest title first",
+  },
+];
 
 let page: ClassificationEntryPage | null = null;
 let failure: { status: number; detail: string } | null = null;
@@ -253,26 +273,12 @@ const shownTo = offset + items.length;
 
         {total > 0 && (
           <>
-            <nav class="sortbar" aria-label="Sort rows">
-              <span class="sortbar__label" id="sortbar-label">
-                Order
-              </span>
-              <ul class="sortbar__list" aria-labelledby="sortbar-label">
-                {CLASSIFICATION_SORTS.map((option) => (
-                  <li>
-                    {option === sort ? (
-                      <span class="sortbar__option sortbar__option--on" aria-current="true">
-                        {SORT_LABELS[option]}
-                      </span>
-                    ) : (
-                      <a class="sortbar__option" href={href({ sort: option })}>
-                        {SORT_LABELS[option]}
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </nav>
+            <SortBar
+              options={SORT_OPTIONS}
+              sort={sort}
+              href={(option) => href({ sort: option })}
+              label="Sort rows"
+            />
 
             {items.length > 0 && (
               <>
@@ -285,6 +291,8 @@ const shownTo = offset + items.length;
                   entries={items}
                   caption={`${heading}, rows ${shownFrom.toLocaleString()}–${shownTo.toLocaleString()}`}
                   statVolume={file?.stat_volume ?? null}
+                  sort={sort}
+                  sortHref={(option) => href({ sort: option })}
                 />
               </>
             )}
@@ -304,25 +312,29 @@ const shownTo = offset + items.length;
             <p>This table holds no rows.</p>
           ))}
 
-        {!pastEnd && (offset > 0 || total > offset + CLASSIFICATION_PAGE_SIZE) && (
-          <nav class="searchpager" aria-label="Table pages">
-            {offset > 0 && (
-              <a
-                class="usa-button usa-button--outline"
-                href={href({ offset: Math.max(0, offset - CLASSIFICATION_PAGE_SIZE) })}
-              >
-                ← Previous
-              </a>
-            )}
-            {total > offset + CLASSIFICATION_PAGE_SIZE && (
-              <a
-                class="usa-button usa-button--outline"
-                href={href({ offset: offset + CLASSIFICATION_PAGE_SIZE })}
-              >
-                Next →
-              </a>
-            )}
-          </nav>
+        {!pastEnd && (
+          <Pager
+            total={total}
+            offset={offset}
+            limit={CLASSIFICATION_PAGE_SIZE}
+            shown={items.length}
+            href={(next: number) => href({ offset: next })}
+            label="Table pages"
+            idPrefix="classtable-pager"
+            jump={{
+              action: classificationHref(congress, sessionParam),
+              // Everything but the page: `?offset=` wins over `?page=` where
+              // both are present, so carrying the current offset through the
+              // jump form would pin the reader to the page they are on.
+              params: {
+                pl,
+                pl_section: plSection,
+                title,
+                section,
+                sort: sort === "pl" ? null : sort,
+              },
+            }}
+          />
         )}
 
         <details class="classkey">

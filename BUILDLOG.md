@@ -2950,3 +2950,52 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Open:** `docs/menu-redesign-screenshots/` (8 PNGs from the ADR-0058–0064 menu work) sits
   untracked and unreferenced; committed nowhere pending a call on whether it is documentation or
   scratch.
+
+## 079 — 2026-08-15 — Session 57: four orders from two controls, and a pager that numbers its pages
+
+- **Tool/model:** Claude Code, Opus 5. One session, sequential.
+- **Asked:** Review the classification user flow; sort by U.S. Code on the individual session pages
+  and elsewhere as needed, with other sorting options where they fit; and page the tables so a
+  reader is not moving one page at a time — Next and Previous alone — starting with the
+  classification tables and extending it wherever else it belongs.
+- **Decided:** [ADR-0071](docs/adr/0071-sortable-tables-and-a-numbered-pager.md). The review found
+  the session page's `?sort=` already offered `pl` and `code` and could reverse neither, and that
+  the two by-code views (ADR-0070) offered no order at all — `sort=code` for a title was already
+  recorded as owed. So: one vocabulary, `pl`/`pl-desc`/`code`/`code-desc`, on every listing route
+  and reported in every response; two defaults, because a session page is a document as published
+  (`pl`) and a by-code view is a history (`pl-desc`); each view omits its own default, so every URL
+  that worked before still names the same view. A descending order is the ascending list reversed
+  rather than a second comparator, since these rows have ties — 1,533 derive no identifier, 2 no
+  public law — and two comparators can disagree about where those go. The sort bar's option in
+  force became a **link** that reverses the order, and the headings of the two columns the server
+  can order by are the same control, carrying `aria-sort`; the other three columns hold the
+  source's own notation and order nothing. `Pager.astro` replaces Previous-and-Next everywhere:
+  page N of M, the two ends always reachable, a window of two either side, and a **Go to page**
+  form where the numbers cannot reach every page — which is why `?page=` now exists beside
+  `?offset=`, with `?offset=` still canonical and still winning.
+- **Produced:** `storage/classification.py` (`CLASSIFICATION_SORTS`, `sort` on four protocol
+  methods), `storage/postgres_classification.py` (`_sorted_page`, `_pl_order`, a generalized
+  `_code_ordered_page` that joins the file row so a cross-table page can be Code-ordered),
+  `api/classification.py` (`ClassificationSort` on five routes), `api/schemas.py`;
+  `frontend/src/components/Pager.astro`, `SortBar.astro`, `frontend/src/lib/pager.ts`,
+  `ClassificationTable.astro`'s sortable headings, both classification pages, `search.astro`,
+  `lib/url.ts` (`pageOffset`, `nextSort`, `readSort`, `sortKey`, `sortDescending`, `sortDefault`),
+  `lib/api.ts`, `site.scss` (`.pager`, the sort arrow, the header link), `/app/design`'s new
+  *Sorting and paging* section with a 235-page specimen, guide chapters 05 and 10 (four new
+  scenarios, one rewritten), `docs/ia-map.md`'s three rows.
+- **Verified:** `make test` **795** (was 791) with the four new API tests — the route's `Literal`
+  against `CLASSIFICATION_SORTS`, both directions of both keys as exact reverses, the by-code
+  views' orders, and a law's rows in Code order. `make test-web` **399** (was 386), 13 of them
+  `tests/pager.test.ts`, which is where the arithmetic is tested at the sizes the corpus has: the
+  CI fixture corpus's largest table is 84 rows, so no browser test can reach a window, a gap or a
+  jump box. `npx playwright test tests/e2e/classification.spec.ts` **18 passed** against this
+  session's dev stack, five of them new; the guide's own scenarios passed except the twelve that
+  need an OpenSearch cluster this box has none of. axe-core over `/app/classification/118/2`,
+  `?pl=118-42&sort=code`, both by-code views and `/app/design`, both themes, `wcag2a`/`wcag2aa`/
+  `wcag21a`/`wcag21aa`: **clean**, and 0px of horizontal overflow at 320, 375 and 1280.
+- **Open:** Two colour defects this work rendered into view are fixed and recorded in ADR-0071; a
+  third is not. **`a { color: var(--link) }` is declared inside `site.scss`'s dark block alone**, so
+  an ordinary link in the light theme is the browser's `#0000EE` rather than the brand indigo
+  everywhere outside the statutory text — measured on `/app/`, `/app/search` and
+  `/app/classification`. `contrast.json` measures `--link on --page` and cannot see it, and axe
+  passes it. The new sortable heading sets the token explicitly; the site-wide fix is its own task.
