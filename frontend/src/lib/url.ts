@@ -102,10 +102,11 @@ export function apiDiffHref(identifier: string, from: string, to: string): strin
 /** `/app/preview/…` — the hover preview of a cited provision (ADR-0024).
  *
  * An Astro *endpoint*, not a page: it returns the rendered fragment so no USLM
- * renderer reaches the browser. It goes through `encodePath` for the same
- * reason everything else here does, and that is not theoretical — `CitePreview`
- * used to build this string inline, so hovering a citation in any of the 5,697
- * sections whose number contains U+2013 requested a malformed URL. */
+ * renderer reaches the browser. `uslm.ts` stamps this URL on every internal
+ * reference as `data-preview`, and `CitePreview`'s inline script — which can
+ * import nothing — fetches it verbatim. It goes through `encodePath` for the
+ * same reason everything else here does: 5,697 sections have a number
+ * containing U+2013. */
 export function previewHref(identifier: string, release?: string | null): string {
   return `${APP}/preview${encodePath(identifier)}${query({ release })}`;
 }

@@ -15,7 +15,7 @@ import { DOMParser } from "@xmldom/xmldom";
 
 import type { Labels } from "./types";
 import { resolveRef } from "./refs";
-import { citationHref } from "./url";
+import { citationHref, previewHref } from "./url";
 
 /** The handful of members this module actually calls on an xmldom node —
  * narrower than xmldom's own types, so a real `Element`/`Text` satisfies it
@@ -526,21 +526,24 @@ function renderRef(el: UslmElement, opts: RenderOptions): string {
   const rel = external
     ? ' target="_blank" rel="noopener" data-newtab class="usa-link usa-link--external"'
     : ' target="_blank" rel="noopener" data-newtab';
-  // `data-cite` is the hover-preview island's only hook, and it carries the
-  // *identifier* rather than the href so the island never has to un-prefix
-  // `/app` to build a preview URL. Internal references only: there is nothing
-  // to preview at govinfo, and an unresolvable ref is not a link at all.
+  // `data-cite` marks a reference the hover-preview island handles;
+  // `data-preview` is the URL the island fetches, built by `previewHref`
+  // (`url.ts`, architecture rule 5) so the identifier is percent-encoded here
+  // rather than composed in the island's inline script, which can import
+  // nothing. Internal references only: there is nothing to preview at govinfo,
+  // and an unresolvable ref is not a link at all.
   //
   // `title` stays. It is what a reader with no JavaScript gets, what a screen
   // reader announces (the card is `aria-hidden` — see `CitePreview.astro`), and
   // what shows on a touch device, where the card never opens by design.
-  // The release rides along so a preview is read at the same release point as
-  // the page quoting it. Without it, a section being read at 119-99 would show
-  // its cross references as they stand today — quietly mixing two vintages of
-  // the law, which is the one thing this whole project exists to avoid.
+  // The release rides along in the preview URL so a preview is read at the same
+  // release point as the page quoting it. Without it, a section being read at
+  // 119-99 would show its cross references as they stand today — quietly mixing
+  // two vintages of the law, which is the one thing this whole project exists
+  // to avoid.
   const cite = resolved.identifier
     ? ` data-cite="${escapeAttr(resolved.identifier)}"` +
-      (opts.release ? ` data-cite-release="${escapeAttr(opts.release)}"` : "")
+      ` data-preview="${escapeAttr(previewHref(resolved.identifier, opts.release))}"`
     : "";
   // What the print stylesheet prints after the link text (ADR-0054). A
   // reference is the one thing on a printed page that stops working, and
