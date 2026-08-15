@@ -5,7 +5,8 @@
  *
  * ## It parses nothing
  *
- * `118-33`, `118-33 101` and `16 usc 3831` are all read server-side, by
+ * `118-33`, `118-33 101`, `16 usc 3831` and `title 16` are all read
+ * server-side, by
  * `/api/v1/classifications/suggest`. `citeparse.py` is the only thing on this
  * site that decides whether a string is a citation (ADR-0023), and a TypeScript
  * copy of it here would be a second parser disagreeing with the first. The
@@ -105,11 +106,11 @@ const scopeId = `${idPrefix}-scope`;
 const action = scope
   ? classificationHref(scope.congress, scope.session)
   : classificationHref();
-const label = scope ? "Find a row in this table" : "Find a public law or a Code section";
-const placeholder = scope ? "35, 35 101, or 16 usc 3831" : "118-33, 118-33 101, or 16 usc 3831";
+const label = scope ? "Find a row in this table" : "Find a public law, a title or a Code section";
+const placeholder = scope ? "35, 35 101, 16 usc 3831, or 16 usc" : "118-33, 118-33 101, 16 usc 3831, or title 16";
 const hint = scope
-  ? "A bare number means a public law of this congress. A law leads to its rows in this table; a Code citation to the rows classified to that section here, or its notes in the reader."
-  : "A public law goes to its rows in the session table; a Code citation goes to that section's notes in the reader.";
+  ? "A bare number means a public law of this congress. A law leads to its rows in this table; a Code citation to the rows classified to that section here, or its notes in the reader; a title with no section to every row this table classified to it."
+  : "A public law goes to its rows in the session table. A Code citation offers the section's notes in the reader and the public laws the tables record against it; a title with no section — 15 usc, title 15 — every row classified to that title.";
 ---
 
 <form

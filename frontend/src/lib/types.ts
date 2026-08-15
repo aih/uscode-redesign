@@ -436,8 +436,9 @@ export interface EcctPage {
 /**
  * One thing the lookup box can offer for what was typed.
  *
- * `kind` is an open set — `pl`, `section-notes`, `section-classifications` so
- * far. The API decides what a query means; this reader renders the answer.
+ * `kind` is an open set — `pl`, `section-notes`, `section-classifications`,
+ * `section-in-table`, `title-classifications`, `title-in-table` so far. The API
+ * decides what a query means; this reader renders the answer.
  *
  * `href` is a path relative to the reader's base, percent-encoded and ready to
  * use. The structured fields beside it carry the same answer in pieces, and

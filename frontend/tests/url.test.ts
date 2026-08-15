@@ -513,6 +513,28 @@ describe("where a lookup suggestion leads", () => {
     ).toBe("/app/classification?title=16&section=45f");
   });
 
+  it("takes a scoped title suggestion to that table, filtered by title alone", () => {
+    expect(
+      classificationSuggestionHref({
+        kind: "title-in-table",
+        href: "/classification/118/2?title=42",
+        congress: 118,
+        session_label: "2",
+        title_num: "42",
+      }),
+    ).toBe("/app/classification/118/2?title=42");
+  });
+
+  it("takes a title suggestion to every row classified to it", () => {
+    expect(
+      classificationSuggestionHref({
+        kind: "title-classifications",
+        href: "/classification?title=15",
+        title_num: "15",
+      }),
+    ).toBe("/app/classification?title=15");
+  });
+
   it("falls back to the path it was given for a kind it does not know", () => {
     expect(
       classificationSuggestionHref({ kind: "something-new", href: "/classification/119/2" }),

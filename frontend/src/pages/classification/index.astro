@@ -18,10 +18,23 @@
  * about the wrong thing (ADR-0067 decision 4).
  *
  * `?title=` and `?section=` are the third thing this route does. A lookup that
- * reads a US Code citation offers "Classification entries for § …", and what
+ * reads a US Code citation offers "Public laws that affected § …", and what
  * that leads to is every row ever classified to that section, across every
  * table — which is this page with the two filters on. It is not a route of its
  * own because it is one query answered in the place the query is typed.
+ *
+ * `?title=` **without** a section is the same view a title wide: every row
+ * classified anywhere in title 15, which is what `15 usc` and `title 15` ask
+ * for. A section number still names nothing without its title, so the pair is
+ * ordered rather than symmetric — dropping the title drops both.
+ *
+ * The section view also says what it cannot show. The tables begin at the 104th
+ * Congress, and the section's notes in the reader carry OLRC's own
+ * classification history further back than that, so the view links them. The
+ * link is built from a `/api/v1/citation` lookup rather than from the title and
+ * section in hand, because the corpus spells a section number with an EN DASH
+ * and typed input carries a hyphen (gotcha 17) — and because a section that is
+ * not in the Code should be offered no link at all.
  */
 import Base from "../../layouts/Base.astro";
 import ClassificationLookup from "../../components/ClassificationLookup.astro";
@@ -34,9 +47,12 @@ import {
   fetchClassificationSuggestions,
   fetchClassificationTables,
   fetchClassificationsForSection,
+  fetchClassificationsForTitle,
+  lookupCitation,
 } from "../../lib/api";
 import { classificationNote } from "../../lib/currency";
 import { resultCitation } from "../../lib/cite";
+import { NOTES_ANCHOR } from "../../lib/uslm";
 import type {
   ClassificationEntryPage,
   ClassificationFile,
@@ -44,6 +60,7 @@ import type {
   ClassificationTables,
 } from "../../lib/types";
 import {
+  appHref,
   classificationEcctHref,
   classificationHref,
   classificationScopeValue,
@@ -78,8 +95,9 @@ const scope = parseClassificationScope(Astro.url.searchParams.get("scope"));
 const titleFilter = Astro.url.searchParams.get("title")?.trim().toLowerCase() || null;
 const rawSection = Astro.url.searchParams.get("section")?.trim() || null;
 const sectionFilter = rawSection ? normalizeSectionKey(rawSection) : null;
-/** Both halves or neither: a section number names nothing without its title. */
-const bySection = titleFilter && sectionFilter ? { titleFilter, sectionFilter } : null;
+/** A title, and a section within it when one was named. A section number names
+ *  nothing without its title, so the section alone is ignored. */
+const byCode = titleFilter ? { titleFilter, sectionFilter } : null;
 
 let data: ClassificationTables | null = null;
 let failure: { status: number; detail: string } | null = null;
@@ -104,38 +122,85 @@ const suggestions: ClassificationSuggestion[] = query
   ? await fetchClassificationSuggestions(query, scope)
   : [];
 
-/** Which page of the by-section view. Only that view is paged — the registry
+/** Which page of the by-code view. Only that view is paged — the registry
  *  under it is 33 rows and whole. */
 const sectionOffset = readOffset(Astro.url.searchParams.get("offset"));
 
-/** The by-section view never fails this page: the registry below it is the
+/** The by-code view never fails this page: the registry below it is the
  *  answer to a different question and is still worth showing. */
 let sectionRows: ClassificationEntryPage | null = null;
-if (bySection && !failure) {
-  sectionRows = await fetchClassificationsForSection(bySection.titleFilter, bySection.sectionFilter, {
-    limit: CLASSIFICATION_PAGE_SIZE,
-    offset: sectionOffset,
-  }).catch(() => null);
+if (byCode && !failure) {
+  const paging = { limit: CLASSIFICATION_PAGE_SIZE, offset: sectionOffset };
+  sectionRows = byCode.sectionFilter
+    ? await fetchClassificationsForSection(
+        byCode.titleFilter,
+        byCode.sectionFilter,
+        paging,
+      ).catch(() => null)
+    : await fetchClassificationsForTitle(byCode.titleFilter, paging).catch(() => null);
 }
-const sectionCitation = bySection
-  ? resultCitation(bySection.titleFilter, `§ ${bySection.sectionFilter}`, "section")
+const sectionCitation = byCode
+  ? resultCitation(
+      byCode.titleFilter,
+      byCode.sectionFilter ? `§ ${byCode.sectionFilter}` : null,
+      "section",
+    )
   : null;
 
-/** The two filters in force, each with the same view minus itself — the same
- *  pills the session page renders. A section number names nothing without its
- *  title, so dropping either one drops both and returns the plain index. */
-const sectionFilters = bySection
+/** Where the reader prints what the tables cannot: OLRC's own classification
+ *  history, in the section's notes, which reach back past the 104th Congress.
+ *
+ *  Resolved rather than assembled — `/api/v1/citation` answers with the
+ *  spelling the corpus holds (an EN DASH where the tables write a hyphen) and
+ *  with whether the section is in the Code at all. A section that is not gets
+ *  no link. */
+let notesTarget: { href: string; citation: string; heading: string | null } | null = null;
+if (byCode?.sectionFilter && !failure) {
+  const resolved = await lookupCitation(
+    `${byCode.titleFilter} usc ${byCode.sectionFilter}`,
+  ).catch(() => null);
+  if (resolved?.exists) {
+    notesTarget = {
+      href: `${appHref(resolved.section_identifier)}#${NOTES_ANCHOR}`,
+      // `num` is the source's own — `§ 45f.`, section symbol and trailing
+      // period included. The symbol is why it is passed through rather than
+      // rebuilt from the number typed; the period is dropped, because this
+      // citation sits inside a sentence rather than at the head of a row.
+      citation:
+        resultCitation(
+          resolved.title_num,
+          resolved.num?.replace(/\.$/u, "") ?? `§ ${byCode.sectionFilter}`,
+          "section",
+        ) ?? resolved.section_identifier,
+      heading: resolved.heading,
+    };
+  }
+}
+
+/** The filters in force, each with the same view minus itself — the same pills
+ *  the session page renders. Dropping the section keeps the title, which is a
+ *  view of its own; dropping the title drops both, since a section number names
+ *  nothing without one. */
+const sectionFilters = byCode
   ? [
-      { name: "Title", label: bySection.titleFilter, href: classificationHref() },
-      { name: "Section", label: bySection.sectionFilter, href: classificationHref() },
+      { name: "Title", label: byCode.titleFilter, href: classificationHref() },
+      ...(byCode.sectionFilter
+        ? [
+            {
+              name: "Section",
+              label: byCode.sectionFilter,
+              href: classificationHref(null, null, { title: byCode.titleFilter }),
+            },
+          ]
+        : []),
     ]
   : [];
 
-/** The same view at another page, keeping both filters. */
+/** The same view at another page, keeping the filters. */
 function sectionPageHref(nextOffset: number): string {
   return classificationHref(null, null, {
-    title: bySection?.titleFilter,
-    section: bySection?.sectionFilter,
+    title: byCode?.titleFilter,
+    section: byCode?.sectionFilter,
     offset: nextOffset,
   });
 }
@@ -225,7 +290,7 @@ function ordinal(n: number): string {
 
         {query && <ClassificationMatches query={query} suggestions={suggestions} />}
 
-        {bySection && (
+        {byCode && (
           <section class="classsection" aria-labelledby="classsection-heading">
             <div class="filterpills">
               <span class="filterpills__label" id="classsection-pills">
@@ -261,12 +326,32 @@ function ordinal(n: number): string {
                   } classified to ${sectionCitation}`}
             </h2>
 
-            {sectionTotal === 0 && (
-              <p class="doc-meta">
-                The tables cover 1996 onward, so a section last touched before then has no rows
-                here.
-              </p>
-            )}
+            {/* What this view cannot show, said where the gap is: the tables
+                begin at the 104th Congress and the notes do not. Rendered
+                whether or not there are rows — an empty table is exactly when
+                the reader needs the other route, and it is the only sentence
+                that explains an empty one. */}
+            <p class="doc-meta classsection__notes">
+              The classification tables begin at the 104th Congress (1996).{" "}
+              {!byCode.sectionFilter ? (
+                <>
+                  {/* One line: a break before the full stop survives the
+                      compiler and the sentence ends " ." */}
+                  <a href={appHref(`/us/usc/t${byCode.titleFilter}`)}>{sectionCitation} in the reader</a>.
+                </>
+              ) : notesTarget ? (
+                <>
+                  OLRC's notes for {notesTarget.citation} reach further back —{" "}
+                  <a href={notesTarget.href}>read them in the reader</a>
+                  {notesTarget.heading && <> ({notesTarget.heading})</>}.
+                </>
+              ) : (
+                <>
+                  A section's notes in the reader reach further back; this one is not in the Code
+                  as it now stands.
+                </>
+              )}
+            </p>
 
             {sectionPastEnd && (
               <p>

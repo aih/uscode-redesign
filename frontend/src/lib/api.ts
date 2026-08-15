@@ -286,6 +286,24 @@ export async function fetchClassificationsForSection(
   );
 }
 
+/**
+ * Everything ever classified to one Code title, newest public law first — what
+ * `15 usc` and `title 15` ask for. Paged for the same reason the section route
+ * is and harder: title 10 carries 23,093 of the 144,837 loaded rows.
+ *
+ * `congress` narrows it to the laws of one congress, which is what the scoped
+ * lookup's session-table answer uses the session page for instead.
+ */
+export async function fetchClassificationsForTitle(
+  titleNum: string,
+  opts: { limit?: number; offset?: number; congress?: number } = {},
+): Promise<ClassificationEntryPage> {
+  const { limit = CLASSIFICATION_PAGE_SIZE, offset = 0, congress } = opts;
+  return getJson<ClassificationEntryPage>(
+    `${API}/classifications/code/${encodeURIComponent(titleNum)}${qs({ limit, offset, congress })}`,
+  );
+}
+
 /** The whole Editorial Classification Change Table — 21 rows across two files. */
 export async function fetchEcct(): Promise<EcctPage> {
   return getJson<EcctPage>(`${API}/classifications/ecct`);
