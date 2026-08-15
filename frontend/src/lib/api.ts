@@ -247,9 +247,9 @@ export interface ClassificationEntryQuery {
  *
  * Nothing is sorted or sliced here: `?sort=code` orders by title through
  * `title_sort_key`, which is server-side by gotcha 16. `sort` must already be
- * one of the two the API accepts — it is a `Literal` there and an unrecognized
- * value is a 422, while the *page* falls back silently, so the normalization
- * happens before the call.
+ * one of the four the API accepts (`CLASSIFICATION_SORTS`) — it is a `Literal`
+ * there and an unrecognized value is a 422, while the *page* falls back
+ * silently, so the normalization happens before the call.
  *
  * `session` takes the label (`1`, `2`, `all`) rather than the number: the route
  * accepts either and the label is what the URL already carries.
@@ -278,11 +278,11 @@ export async function fetchClassificationEntries(
 export async function fetchClassificationsForSection(
   titleNum: string,
   section: string,
-  opts: { limit?: number; offset?: number } = {},
+  opts: { limit?: number; offset?: number; sort?: string | null } = {},
 ): Promise<ClassificationEntryPage> {
-  const { limit = CLASSIFICATION_PAGE_SIZE, offset = 0 } = opts;
+  const { limit = CLASSIFICATION_PAGE_SIZE, offset = 0, sort } = opts;
   return getJson<ClassificationEntryPage>(
-    `${API}/classifications/code/${encodeURIComponent(titleNum)}/${encodeURIComponent(section)}${qs({ limit, offset })}`,
+    `${API}/classifications/code/${encodeURIComponent(titleNum)}/${encodeURIComponent(section)}${qs({ limit, offset, sort })}`,
   );
 }
 
@@ -296,11 +296,11 @@ export async function fetchClassificationsForSection(
  */
 export async function fetchClassificationsForTitle(
   titleNum: string,
-  opts: { limit?: number; offset?: number; congress?: number } = {},
+  opts: { limit?: number; offset?: number; congress?: number; sort?: string | null } = {},
 ): Promise<ClassificationEntryPage> {
-  const { limit = CLASSIFICATION_PAGE_SIZE, offset = 0, congress } = opts;
+  const { limit = CLASSIFICATION_PAGE_SIZE, offset = 0, congress, sort } = opts;
   return getJson<ClassificationEntryPage>(
-    `${API}/classifications/code/${encodeURIComponent(titleNum)}${qs({ limit, offset, congress })}`,
+    `${API}/classifications/code/${encodeURIComponent(titleNum)}${qs({ limit, offset, congress, sort })}`,
   );
 }
 

@@ -1,0 +1,87 @@
+---
+/**
+ * The order a table is in, and the orders it could be in (ADR-0071).
+ *
+ * One control for both halves of the classification flow — a session table and
+ * a by-code view — because they show the same five columns and a reader who has
+ * learned the control in one place should find it in the other.
+ *
+ * A sort is a key and a direction. The keys are the options; the one in force
+ * carries an arrow and is itself a link, which reverses it. That is what makes
+ * four orders reachable from two controls, and it is also why the option that is
+ * on is not `aria-current` alone: an inert marker cannot be operated, and
+ * reversing the order is exactly what a reader wants from the option they are
+ * already on.
+ *
+ * The arrow is `▲`/`▼` in an `aria-hidden` span with the direction written out
+ * beside it, because a glyph is not a word and a screen reader saying "black
+ * up-pointing triangle" says nothing about the order of the rows.
+ */
+interface SortOption {
+  /** `pl` or `code` — the key, never the direction. */
+  key: string;
+  label: string;
+  /** What the two directions of this key mean, in this view's own terms:
+   *  "oldest first"/"newest first" for a history, "as published"/"reversed" for
+   *  a document. */
+  ascending: string;
+  descending: string;
+}
+
+interface Props {
+  options: SortOption[];
+  /** The sort in force, direction included. */
+  sort: string;
+  /** One order's address, this view's filters included. */
+  href: (sort: string) => string;
+  label?: string;
+  idPrefix?: string;
+}
+
+const {
+  options,
+  sort,
+  href,
+  label = "Sort rows",
+  idPrefix = "sortbar",
+} = Astro.props as Props;
+
+const activeKey = sort.startsWith("code") ? "code" : "pl";
+const descending = sort.endsWith("-desc");
+const labelId = `${idPrefix}-label`;
+---
+
+<nav class="sortbar" aria-label={label}>
+  <span class="sortbar__label" id={labelId}>Order</span>
+  <ul class="sortbar__list" aria-labelledby={labelId}>
+    {
+      options.map((option) => {
+        const on = option.key === activeKey;
+        const direction = on && descending ? option.descending : option.ascending;
+        // The option in force flips; the others start in their own ascending
+        // direction rather than carrying this one's across.
+        const target = on ? (descending ? option.key : `${option.key}-desc`) : option.key;
+        return (
+          <li>
+            <a
+              class={`sortbar__option${on ? " sortbar__option--on" : ""}`}
+              href={href(target)}
+              data-sort={target}
+              aria-current={on ? "true" : undefined}
+            >
+              {option.label}
+              {on && (
+                <>
+                  <span class="sortbar__arrow" aria-hidden="true">
+                    {descending ? "▼" : "▲"}
+                  </span>
+                  <span class="sortbar__direction">{direction}</span>
+                </>
+              )}
+            </a>
+          </li>
+        );
+      })
+    }
+  </ul>
+</nav>
