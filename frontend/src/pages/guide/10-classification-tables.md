@@ -174,6 +174,17 @@ moved it. The [Editorial Classification Change Table](/app/classification/ecct) 
 the former classification, the new one, the provision affected, and the provision that prompted the
 change.
 
+The table lists changes in classification of earlier laws made in the course of classifying new
+laws from the 119th Congress. Its rows combine OLRC's
+[Session 1](https://uscode.house.gov/classification/ecct_119-1.html) and
+[Session 2](https://uscode.house.gov/classification/ecct.html) files, and the page quotes OLRC's
+own description, which also says where other classification changes are accounted for (Table III,
+on completion of a main edition or supplement) and what a prompting provision is.
+
+This table is separate from the
+[editorial reclassification projects](https://uscode.house.gov/editorialreclassification/reclassification.html)
+the OLRC undertakes to reorganize areas of the Code.
+
 No cell in that table links into the reader. A former classification is by definition an address the
 provision has left, and the table supplies no identifier to link to.
 
@@ -183,6 +194,7 @@ title: The editorial table says where a provision moved from and to
 steps:
   - goto: /app/classification/ecct
   - expect: { selector: ".classtable", contains: "Former classification" }
+  - expect: { selector: ".olrc-quote", contains: "Table III" }
 ```
 
 ## A law with no rows, and a law with no table

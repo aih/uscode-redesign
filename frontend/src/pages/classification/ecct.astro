@@ -7,6 +7,13 @@
  * moved editorially rather than by a public law, and this is the table that says
  * where from and where to. It is 21 rows, so it is one page with no paging.
  *
+ * The rows combine OLRC's two 119th-Congress files — `ecct_119-1.html`
+ * (Session 1, 20 rows) and the unsuffixed `ecct.html` (the current session,
+ * Session 2, 1 row). The page says so in prose and quotes OLRC's own
+ * description, which is 119th-specific and hand-written here: the registry's
+ * ECCT rows carry congress 0/session 0 when loaded `--from-file` (CI), so the
+ * sourcing cannot be composed from data without mislabelling the fixture.
+ *
  * All four columns are text. The two "Provision" columns are full public law
  * citation strings, verbatim from the source; the two classification columns
  * carry no `usc_identifier`, and this reader does not compose one — see `cell`.
@@ -75,9 +82,62 @@ function cell(
     !failure && (
       <>
         <p class="lede">
-          Provisions reclassified editorially rather than by a public law. A classification table
-          row marked <code>ed chg</code> or <code>nt ed chg</code> points here.{" "}
+          Changes in classification of earlier laws, made in the course of classifying new laws
+          from the 119th Congress. A classification table row marked <code>ed chg</code> or{" "}
+          <code>nt ed chg</code> points here.{" "}
           <a href={classificationHref()}>All classification tables</a>.
+        </p>
+
+        <p>
+          The rows combine OLRC's{" "}
+          <a
+            class="usa-link usa-link--external"
+            rel="noopener"
+            href="https://uscode.house.gov/classification/ecct_119-1.html"
+          >
+            Session 1
+          </a>{" "}
+          and{" "}
+          <a
+            class="usa-link usa-link--external"
+            rel="noopener"
+            href="https://uscode.house.gov/classification/ecct.html"
+          >
+            Session 2
+          </a>{" "}
+          tables for the 119th Congress. OLRC's description, from those pages:
+        </p>
+
+        <blockquote class="olrc-quote">
+          <p>
+            This table lists changes in classification of earlier laws made in the course of
+            classifying new laws from the 119th Congress, [1st and] 2nd Session.
+          </p>
+          <p>
+            Other changes in classification of earlier laws are made in the course of integrating
+            the new laws into a main edition or supplement of the Code, and those changes will be
+            accounted for in Table III (Statutes At Large) upon completion of the main edition or
+            supplement.
+          </p>
+          <p>
+            Column 4 lists the statutory provision prompting the change in classification. For
+            example, a provision set to terminate on a specific date may be amended to remove the
+            termination date, thus making the provision permanent. Such an amendment may prompt an
+            editorial reclassification of the provision from a note to a section.
+          </p>
+        </blockquote>
+
+        <p>
+          This table is separate from the{" "}
+          <a
+            class="usa-link usa-link--external"
+            rel="noopener"
+            href="https://uscode.house.gov/editorialreclassification/reclassification.html"
+          >
+            editorial reclassification projects
+          </a>{" "}
+          the OLRC undertakes to reorganize areas of the Code, which have their own page on the
+          OLRC site.
         </p>
 
         {items.length === 0 ? (

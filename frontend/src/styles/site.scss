@@ -4960,6 +4960,24 @@ dialog.palette {
   font-variant-numeric: tabular-nums;
 }
 
+/* OLRC's own description of the ECCT, quoted on /app/classification/ecct. The
+ * page is `wide` for the table's sake; the quote is prose and keeps the reading
+ * measure. The border is decorative, so `--rule` rather than `--edge`. */
+.olrc-quote {
+  margin: 1rem 0 1.5rem;
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 3px solid var(--rule);
+  max-width: var(--measure);
+}
+
+.olrc-quote p {
+  margin: 0 0 0.75rem;
+}
+
+.olrc-quote p:last-child {
+  margin-bottom: 0;
+}
+
 .classtable {
   font-size: 0.9rem;
 }

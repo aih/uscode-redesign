@@ -2899,3 +2899,29 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   is the by-section view's minus a pill plus one linked line, and that line is scanned on the
   existing `classification-by-section` route. Section pages still show no classification rows;
   the by-identifier route that would feed them is unchanged.
+
+## 077 — 2026-08-14 — Session 55: the ECCT says where it comes from
+
+- **Tool/model:** Claude Code, Fable 5. One session, sequential.
+- **Asked:** The Editorial Classification Change Table page did not explain its source, purpose or
+  content. Describe it as changes prompted by classifications in the 119th Congress, note that it
+  combines OLRC's Session 1 (`ecct_119-1.html`) and Session 2 (`ecct.html`) tables, quote OLRC's
+  own description, and distinguish it from the OLRC's editorial reclassification projects, linking
+  their page.
+- **Decided:** The sourcing is hand-written prose, not composed from data: rows loaded
+  `--from-file` (CI) carry congress 0/session 0, so a data-driven line would print "0th Congress"
+  over the fixture, and OLRC's quoted description is 119th-specific either way. The quote is a
+  `<blockquote class="olrc-quote">` — left border on `--rule` (decorative, no new contrast pair),
+  capped at `--measure` on a page that is `wide` for the table's sake. Recorded in the page's
+  frontmatter docstring; no ADR.
+- **Produced:** `frontend/src/pages/classification/ecct.astro` (lede reworded, source paragraph
+  with both file links, the three-paragraph OLRC quote, the reclassification-projects paragraph),
+  `.olrc-quote` in `site.scss`, guide chapter 10's Editorial changes section (same facts, and the
+  `classification-ecct` scenario gains an expect that `.olrc-quote` contains "Table III"). Branch
+  `ecct-provenance`, rebased over PR #51's merge — the guide chapter edits landed in different
+  sections and applied cleanly.
+- **Verified:** The two sessions' row split is in the committed artifacts —
+  `docs/verification/classification-ecct-119-1.json` (20 rows) and `-119-2.json` (1 row, from the
+  unsuffixed `ecct.html`). `make test-web` green including the guide ratchet; the
+  `classification-ecct` Playwright scenario passed against this worktree's dev server, new expect
+  included.
