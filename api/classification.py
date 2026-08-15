@@ -352,7 +352,49 @@ def classifications_for_law(
     return ClassificationPageOut.of(page, file=file)
 
 
-# --------------------------------------------------------------- 4. code section
+# ----------------------------------------------------------------- 4. code title
+
+
+@router.get(
+    "/classifications/code/{title_num}",
+    response_model=ClassificationPageOut,
+    responses={429: {"model": ErrorOut}},
+    summary="Everything ever classified to one Code title",
+    dependencies=[Depends(_limit_classification)],
+)
+def classifications_for_title(
+    classification: ClassificationDep,
+    title_num: Annotated[
+        str,
+        Path(
+            description="A title number — a string, `5a` included (gotcha 16).",
+            examples=["15"],
+        ),
+    ],
+    congress: int | None = Query(
+        default=None, description="Only rows from laws of this congress."
+    ),
+    limit: int = Query(default=100, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+) -> ClassificationPageOut:
+    """Every row classified to any section of one title, newest public law first.
+
+    The question a reader asks by typing a title and no section — `15 usc`,
+    `title 15`. It is a large answer and always paged: title 10 carries 23,093
+    of the 144,837 loaded rows and title 42 19,476, where the longest single
+    section history is 412.
+
+    A title nothing was ever classified to is an empty page rather than a 404,
+    for `classifications_for_section`'s reason: the tables cover 1996 onward, so
+    silence is ordinary.
+    """
+    page = classification.entries_for_title(
+        title_num=title_num, congress=congress, limit=limit, offset=offset
+    )
+    return ClassificationPageOut.of(page)
+
+
+# --------------------------------------------------------------- 5. code section
 
 
 @router.get(
@@ -398,7 +440,7 @@ def classifications_for_section(
     return ClassificationPageOut.of(page)
 
 
-# ---------------------------------------------------------------- 5. identifier
+# ---------------------------------------------------------------- 6. identifier
 
 
 @router.get(
@@ -429,7 +471,7 @@ def classifications_for_identifier(
     return ClassificationPageOut.of(page)
 
 
-# ------------------------------------------------------------------- 6. suggest
+# ------------------------------------------------------------------- 7. suggest
 
 
 @router.get(
@@ -472,14 +514,20 @@ def classification_suggest(
     `/api/v1/citation` uses — there is one citation parser in this project and it
     is in Python. When the section exists in the corpus, the first suggestion
     leads to its notes, where OLRC prints the provision's own classification
-    history. When classification rows mention it, the second leads to those.
-    Either may appear without the other.
+    history. The second leads to the public laws the tables record against that
+    section, offered whenever either the section or a row exists, so the choice
+    between the two readings is the same one every time. Either may appear
+    without the other.
+
+    A **title with no section** — `15 usc`, `title 15` — leads to every row
+    classified to that title, newest public law first, and to the rows in the
+    scoped table first when there is a scope.
 
     **`congress` and `session` together scope the lookup to one table.** A bare
     law number — `33`, `33 101` — then means that law of the scoped congress, and
-    a citation gains a first suggestion counting the rows classified to it *in
-    that table*, ahead of the corpus-wide answers. A scope naming no held table
-    scopes nothing; the corpus-wide answers are unchanged either way.
+    a citation or a title gains a first suggestion counting the rows classified
+    to it *in that table*, ahead of the corpus-wide answers. A scope naming no
+    held table scopes nothing; the corpus-wide answers are unchanged either way.
 
     An empty `suggestions` is the answer for a string that is neither, and for a
     law or a section nothing is held about.
@@ -560,7 +608,11 @@ def _citation_suggestions(
     *,
     scope: ClassificationFileInfo | None = None,
 ) -> list[ClassificationSuggestionOut]:
-    if parsed is None or parsed.kind != "section" or parsed.section_num is None:
+    if parsed is None:
+        return []
+    if parsed.kind == "title":
+        return _title_suggestions(classification, parsed, scope=scope)
+    if parsed.kind != "section" or parsed.section_num is None:
         return []
 
     suggestions: list[ClassificationSuggestionOut] = []
@@ -614,17 +666,88 @@ def _citation_suggestions(
     page = classification.entries_for_section(
         title_num=parsed.title_num, section=section, limit=1
     )
-    if page.total:
+    # Offered when the section resolves as well as when rows exist, so the two
+    # readings of a citation — the notes, and the public laws the tables record
+    # against it — are always the same pair of choices. A section with no rows
+    # is a real answer and the page that shows it says why (the tables start at
+    # the 104th Congress) and links the notes, which reach further back.
+    if page.total or entry is not None:
         suggestions.append(
             ClassificationSuggestionOut(
                 kind="section-classifications",
-                label=f"Classification entries for {parsed.title_num} U.S.C. § {parsed.section_num}",
-                detail=f"{page.total} row{'' if page.total == 1 else 's'}",
+                label=(
+                    f"Public laws that affected {parsed.title_num} "
+                    f"U.S.C. § {parsed.section_num}"
+                ),
+                detail=(
+                    f"{page.total} row{'' if page.total == 1 else 's'} in the "
+                    "classification tables"
+                    if page.total
+                    else "No rows — the tables begin at the 104th Congress"
+                ),
                 href=_app_path(
                     "/classification", {"title": parsed.title_num, "section": section}
                 ),
                 title_num=parsed.title_num,
                 section=section,
+                count=page.total,
+            )
+        )
+    return suggestions
+
+
+def _title_suggestions(
+    classification: ClassificationRepository,
+    parsed: ParsedCitation,
+    *,
+    scope: ClassificationFileInfo | None = None,
+) -> list[ClassificationSuggestionOut]:
+    """`15 usc`, `title 15` — a title with no section named.
+
+    Two answers, the narrower one first when the request is scoped to a table:
+    every row that table classified to the title, and every row any table did.
+    A title no table has ever classified anything to gets neither.
+    """
+    title_num = parsed.title_num
+    suggestions: list[ClassificationSuggestionOut] = []
+
+    if scope is not None:
+        in_table = classification.entries_for_file(
+            congress=scope.congress,
+            session=scope.session,
+            title_num=title_num,
+            limit=1,
+        )
+        if in_table.total:
+            suggestions.append(
+                ClassificationSuggestionOut(
+                    kind="title-in-table",
+                    label=f"Title {title_num} — rows in this table",
+                    detail=f"{in_table.total} row{'' if in_table.total == 1 else 's'}",
+                    href=_app_path(
+                        f"/classification/{scope.congress}/{scope.session_label}",
+                        {"title": title_num},
+                    ),
+                    congress=scope.congress,
+                    session=scope.session,
+                    session_label=scope.session_label,
+                    title_num=title_num,
+                    count=in_table.total,
+                )
+            )
+
+    page = classification.entries_for_title(title_num=title_num, limit=1)
+    if page.total:
+        suggestions.append(
+            ClassificationSuggestionOut(
+                kind="title-classifications",
+                label=f"Title {title_num} — every classification row",
+                detail=(
+                    f"{page.total:,} row{'' if page.total == 1 else 's'} across "
+                    "every table"
+                ),
+                href=_app_path("/classification", {"title": title_num}),
+                title_num=title_num,
                 count=page.total,
             )
         )
@@ -650,7 +773,7 @@ def _resolve_section(repository: Repository, variants: tuple[str, ...]):
     return None, None
 
 
-# ---------------------------------------------------------------------- 7. ECCT
+# ---------------------------------------------------------------------- 8. ECCT
 
 
 @router.get(

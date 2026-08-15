@@ -108,7 +108,12 @@ test.describe("the by-section view", () => {
     expect(count).toBeGreaterThan(0);
     expect(count).toBeLessThanOrEqual(50);
 
-    const meta = await page.locator(".classsection .doc-meta").first().innerText();
+    // Named by its text rather than by position: the first `.doc-meta` in this
+    // view is the line saying the tables begin at the 104th Congress (ADR-0070).
+    const meta = await page
+      .locator(".classsection .doc-meta", { hasText: "Showing" })
+      .first()
+      .innerText();
     expect(meta).toMatch(/Showing 1–\d+ of \d+/);
 
     // `textContent`, not `innerText`: `.toc-group` is uppercased by CSS, and
@@ -121,6 +126,18 @@ test.describe("the by-section view", () => {
       expect(page.url()).toContain("title=18");
       expect(page.url()).toContain("section=3551");
     }
+  });
+
+  test("dismissing the section pill widens the view to the whole title", async ({ page }) => {
+    // The two filters are ordered rather than symmetric (ADR-0070): a title
+    // without a section is a view, a section without a title is nothing.
+    await page.goto(BUSY, { waitUntil: "load" });
+    await page.getByLabel(/Remove the section filter/).click();
+
+    await page.waitForURL(/title=18/, { timeout: 5000 });
+    expect(page.url()).not.toContain("section=");
+    await expect(page.locator("#classsection-heading")).toContainText("Title 18");
+    await expect(page.getByLabel(/Remove the title filter/)).toBeVisible();
   });
 
   test("says so when the offset is past the end", async ({ page }) => {

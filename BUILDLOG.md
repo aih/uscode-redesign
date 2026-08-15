@@ -2852,3 +2852,50 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   row — the daily cron's — replaces it outright. Guide chapter 10 and `docs/deploy-status.md`'s
   first-deploy expectation updated; the old wording survives only as the frontend's fallback
   against an older API. `make test` 778 (+2), `make test-web` 383 (+2).
+
+## 076 — 2026-08-14 — Session 54: a title in the classification lookup, and a section's public laws
+
+- **Tool/model:** Claude Code, Opus 5. One session, sequential.
+- **Asked:** Make `15 usc` / `title 15` (case-independent, no section) return every change to that
+  title in the selected session or across every table; for a specific section, let the reader
+  choose between the section's notes (the current behaviour) and a table of the public laws that
+  affected it, with that table saying the notes go back further — the tables only reach the 104th
+  Congress — and linking them.
+- **Reviewed:** `citeparse` already parses both forms as `kind="title"`; `_citation_suggestions`
+  returned early for anything that was not a section, so the endpoint dropped them. The section
+  pair existed but the classification half was emitted only when a row existed, so the choice
+  appeared or vanished with data the reader cannot see in advance. `/app/classification` required
+  `?title=` **and** `?section=` together.
+- **Decided:** ADR-0070.
+  - `title-classifications` (every table) and, under ADR-0068's scope, `title-in-table` first.
+  - `?title=` alone is a view; the by-section view becomes a by-code view. Dismissing the section
+    pill leaves the title, dismissing the title drops both.
+  - A new route `GET /api/v1/classifications/code/{title_num}` over a new
+    `ClassificationRepository.entries_for_title` — not a nullable `section` on the by-section
+    route, because the sets are counted and paged independently.
+  - `section-classifications` is offered whenever the section resolves **or** a row exists, its
+    label naming what it leads to ("Public laws that affected 16 U.S.C. § 201") and its detail
+    carrying the count or the coverage limit.
+  - Both by-code views state the 104th-Congress limit; the section view links `#section-notes`,
+    resolved through `/api/v1/citation` rather than assembled — the tables write a hyphen where
+    the corpus writes an EN DASH (gotcha 17), and a section not in the Code gets no link.
+- **Produced:** `docs/adr/0070`, `entries_for_title` in `storage/classification.py` +
+  `storage/postgres_classification.py`, the route and `_title_suggestions` in
+  `api/classification.py`, `fetchClassificationsForTitle` in `lib/api.ts`, two suggestion kinds in
+  `classificationSuggestionHref`, the by-code view in `classification/index.astro`, hint text in
+  `ClassificationLookup`/`ClassificationMatches`, guide chapter 10 (the four-row query table, the
+  by-title section, two new scenarios), `docs/classification-spec.md` §4/§5 and its status,
+  `docs/ia-map.md`'s three classification rows (line references recomputed).
+- **Verified:** `make test` **791** (was 778; 6 title-route, 5 title-suggest, 1 for the
+  always-offered section pair, 1 paging). `make test-web` **385** (was 383; the two new
+  suggestion-kind hrefs). Playwright against this worktree's dev server on the full local corpus:
+  `tests/e2e/classification.spec.ts` 13 passed — including the new pill-widening test — and
+  `guide.spec.ts -g classification` 9 passed, the three new scenarios among them; `make test-e2e`
+  becomes **611**. Live: `suggest?q=title 15` → 4,495 rows across every table; scoped to 118/2 it
+  leads with 17 rows in that table; `16 usc 201` (in the Code, no rows anywhere) returns both the
+  notes and the empty-rows answer, and `/app/classification?title=16&section=201` renders
+  "Nothing was classified to 16 U.S.C. § 201" over a link to its notes.
+- **Open:** the title view offers no `sort=code`, and no a11y route was added for it — its markup
+  is the by-section view's minus a pill plus one linked line, and that line is scanned on the
+  existing `classification-by-section` route. Section pages still show no classification rows;
+  the by-identifier route that would feed them is unchanged.

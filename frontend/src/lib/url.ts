@@ -429,9 +429,13 @@ export function classificationSuggestHref(
  * suggestion is the corpus's EN DASH, which `appHref` percent-encodes and a
  * pasted string would not.
  *
- * The four kinds the API defines today, and an unknown one falls back to the
+ * The six kinds the API defines today, and an unknown one falls back to the
  * path it was given: a suggestion this reader does not recognise should still
  * go somewhere rather than nowhere.
+ *
+ * `title-in-table` and `title-classifications` carry a title and no section,
+ * which is the whole of what makes them a different destination from the two
+ * section kinds beside them.
  */
 export function classificationSuggestionHref(suggestion: {
   kind: string;
@@ -470,6 +474,19 @@ export function classificationSuggestionHref(suggestion: {
       title: suggestion.title_num,
       section: suggestion.section,
     });
+  }
+  if (
+    suggestion.kind === "title-in-table" &&
+    suggestion.congress != null &&
+    suggestion.session_label &&
+    suggestion.title_num
+  ) {
+    return classificationHref(suggestion.congress, suggestion.session_label, {
+      title: suggestion.title_num,
+    });
+  }
+  if (suggestion.kind === "title-classifications" && suggestion.title_num) {
+    return classificationHref(null, null, { title: suggestion.title_num });
   }
   return `${APP}${suggestion.href}`;
 }
