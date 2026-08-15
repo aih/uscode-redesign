@@ -925,7 +925,9 @@ class ClassificationSuggestionOut(BaseModel):
         "classification history is printed. `section-classifications` — the "
         "classification rows for that section, across every table. "
         "`section-in-table` — the rows for that section in the one table the "
-        "request was scoped to.",
+        "request was scoped to. `title-classifications` — every row classified "
+        "to a title, across every table. `title-in-table` — the rows for that "
+        "title in the one table the request was scoped to.",
         examples=["pl"],
     )
     label: str = Field(examples=["Public Law 119-70"])

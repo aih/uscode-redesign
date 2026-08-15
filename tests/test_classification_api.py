@@ -430,6 +430,61 @@ def test_stat_page_labels_carry_a_page_that_is_not_a_number(api):
     assert all(row["stat_pages"] == [] for row in lettered)
 
 
+# ------------------------------------------------------------ 4b. a whole title
+
+
+def test_the_title_route_answers_for_a_title_with_no_section(api):
+    rows = _rows(api, "/api/v1/classifications/code/42?limit=500")
+
+    assert rows
+    assert {row["title_num"] for row in rows} == {"42"}
+
+
+def test_the_title_route_holds_more_than_any_one_section_of_it(api):
+    """The title is the union of its sections, so it cannot be smaller than the
+    busiest one — and a title route that quietly filtered by something else
+    would show here."""
+    title = api.get("/api/v1/classifications/code/42?limit=1").json()
+    section = api.get("/api/v1/classifications/code/42/254c-2?limit=1").json()
+
+    assert section["total"] > 0
+    assert title["total"] > section["total"]
+
+
+def test_the_title_route_reads_newest_law_first(api):
+    laws = [
+        (row["pl_congress"], row["pl_num"])
+        for row in _rows(api, "/api/v1/classifications/code/42?limit=500")
+        if row["pl_congress"] is not None
+    ]
+
+    assert len(laws) >= 3
+    assert laws == sorted(laws, reverse=True)
+
+
+def test_the_title_route_narrows_to_one_congress(api):
+    rows = _rows(api, "/api/v1/classifications/code/42?congress=110&limit=500")
+
+    assert rows
+    assert {row["pl_congress"] for row in rows} == {110}
+
+
+def test_the_title_route_pages_without_changing_the_total(api):
+    first = api.get("/api/v1/classifications/code/42?limit=2").json()
+    second = api.get("/api/v1/classifications/code/42?limit=2&offset=2").json()
+
+    assert first["total"] == second["total"]
+    assert first["items"] != second["items"]
+    assert second["offset"] == 2
+
+
+def test_a_title_nothing_was_classified_to_is_an_empty_page(api):
+    response = api.get("/api/v1/classifications/code/99")
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 0
+
+
 # ------------------------------------------------------------- 5. an identifier
 
 
@@ -559,6 +614,61 @@ def test_suggest_offers_the_classification_rows_for_a_section(api):
     assert rows[0]["section"] == "254c-2"
     assert rows[0]["count"] > 0
     assert rows[0]["href"] == "/classification?title=42&section=254c-2"
+
+
+def test_suggest_offers_the_rows_for_a_section_that_has_none(api):
+    """The two readings of a citation are the same pair of choices every time.
+
+    16 U.S.C. § 201 is in the Code and no table has a row for it — a section
+    last amended before the 104th Congress, which is the case the destination
+    page exists to explain and to link the notes from. Offering the choice only
+    when rows exist would make the empty answer unreachable.
+    """
+    body = api.get("/api/v1/classifications/suggest?q=16 USC 201").json()
+    rows = [s for s in body["suggestions"] if s["kind"] == "section-classifications"]
+
+    assert [s["kind"] for s in body["suggestions"]] == [
+        "section-notes",
+        "section-classifications",
+    ]
+    assert rows[0]["count"] == 0
+    assert rows[0]["href"] == "/classification?title=16&section=201"
+
+
+@pytest.mark.parametrize("query", ["42 usc", "42 U.S.C.", "title 42", "TITLE 42"])
+def test_suggest_reads_a_title_with_no_section(api, query):
+    body = api.get("/api/v1/classifications/suggest", params={"q": query}).json()
+    [suggestion] = [
+        s for s in body["suggestions"] if s["kind"] == "title-classifications"
+    ]
+
+    assert suggestion["title_num"] == "42"
+    assert suggestion["section"] is None
+    assert suggestion["count"] > 0
+    assert suggestion["href"] == "/classification?title=42"
+
+
+def test_suggest_scoped_title_counts_the_rows_in_that_table_first(api):
+    body = api.get(
+        "/api/v1/classifications/suggest",
+        params={"q": "42 usc", "congress": 118, "session": "2"},
+    ).json()
+    kinds = [s["kind"] for s in body["suggestions"]]
+    assert kinds.index("title-in-table") < kinds.index("title-classifications")
+
+    [scoped] = [s for s in body["suggestions"] if s["kind"] == "title-in-table"]
+    assert scoped["congress"] == 118
+    assert scoped["session_label"] == "2"
+    assert scoped["title_num"] == "42"
+    assert scoped["count"] > 0
+    assert scoped["href"] == "/classification/118/2?title=42"
+
+
+def test_suggest_a_title_no_table_has_classified_to_offers_nothing(api):
+    """Title 99 is not a title of the Code, and the answer is an empty list
+    rather than a link to a view with no rows in it."""
+    body = api.get("/api/v1/classifications/suggest?q=title 99").json()
+    assert body["suggestions"] == []
 
 
 def test_suggest_answers_nothing_for_a_string_that_is_neither(api):

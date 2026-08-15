@@ -357,6 +357,19 @@ class PostgresClassification:
             where.append(ClassificationEntryRow.pl_congress == congress)
         return self._joined_page(where, self._history_order(), limit, offset)
 
+    def entries_for_title(
+        self,
+        *,
+        title_num: str,
+        congress: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> ClassificationPage:
+        where = [ClassificationEntryRow.title_num == title_num.strip().lower()]
+        if congress is not None:
+            where.append(ClassificationEntryRow.pl_congress == congress)
+        return self._joined_page(where, self._history_order(), limit, offset)
+
     def entries_for_identifier(
         self, identifier: str, *, limit: int = 200, offset: int = 0
     ) -> ClassificationPage:

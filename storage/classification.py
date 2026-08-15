@@ -393,6 +393,26 @@ class ClassificationRepository(Protocol):
         """
         ...
 
+    def entries_for_title(
+        self,
+        *,
+        title_num: str,
+        congress: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> ClassificationPage:
+        """Everything ever classified to one Code title, newest law first.
+
+        The same question `entries_for_section` answers with the section left
+        off, and a set of a different size: title 10 carries 23,093 of the
+        144,837 loaded rows and title 42 19,476, where the longest single
+        section history is `/us/usc/t10/s113`'s 412.
+
+        `title_num` is matched as the table spells it — a string, lowercased
+        (`'5a'`), never an integer (gotcha 16).
+        """
+        ...
+
     def entries_for_identifier(
         self, identifier: str, *, limit: int = 200, offset: int = 0
     ) -> ClassificationPage:
