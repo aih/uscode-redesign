@@ -2,11 +2,11 @@
 layout: ../../layouts/GuideLayout.astro
 title: Classification tables
 order: 10
-summary: Which provision of which public law became which section of the Code, from the 104th Congress onward, with a lookup for a law or a citation.
+summary: Which provision of which public law became which section of the Code, from the 104th Congress onward, with a lookup for a law, a title or a citation.
 covers:
   routes:
     ["/app/classification", "/app/classification/[congress]", "/app/classification/ecct"]
-  adrs: [67, 68]
+  adrs: [67, 68, 70]
 ---
 
 A public law is not written in the Code's numbering. The Office of the Law Revision Counsel decides
@@ -25,18 +25,23 @@ steps:
   - expect: { selector: ".classindex", contains: "Congress" }
 ```
 
-## Looking up a law or a section
+## Looking up a law, a title or a section
 
-The box at the top of the page takes three kinds of query:
+The box at the top of the page takes four kinds of query:
 
 | Type | Example | Where it goes |
 |---|---|---|
 | A public law | `118-42` | Its rows in the table for that congress and session |
 | A provision of one | `118-42 421` | The same table, narrowed to that provision |
-| A Code citation | `16 usc 3831` | Two answers: the section's notes in the reader, and every classification row for it |
+| A Code citation | `16 usc 3831` | Two answers: the section's notes in the reader, and every public law the tables record against it |
+| A title, with no section | `15 usc`, `title 15` | Every row classified to that title, across every table |
 
-The notes on a section page are where the OLRC prints that provision's own classification history,
-in its own words. The classification rows are this site's index of the tables.
+A citation offers both answers whether or not the tables hold a row for the section. The notes on a
+section page are where the OLRC prints that provision's own classification history, in its own
+words, and they reach back past the 104th Congress; the classification rows are this site's index
+of the tables, and they do not.
+
+Capitalisation and spacing do not matter: `TITLE 15`, `15 U.S.C.` and `15 usc` are one query.
 
 Suggestions appear as you type. <kbd>↓</kbd> and <kbd>↑</kbd> move through them, <kbd>Enter</kbd>
 opens the one you are on, and <kbd>Esc</kbd> closes the list without moving the keyboard. With
@@ -55,8 +60,8 @@ steps:
 ```
 
 **Every table**, beside the box, is a scope. Choosing one table narrows the lookup to it: a bare
-law number — `35` — then means that law of the chosen congress, and a citation gains a first
-answer counting the rows classified to that section in that table.
+law number — `35` — then means that law of the chosen congress, and a citation or a title gains a
+first answer counting the rows classified to it in that table.
 
 ```scenario
 id: classification-scoped-lookup
@@ -119,7 +124,7 @@ steps:
   - expect: { selector: ".classtable", contains: "U.S.C." }
 ```
 
-## Every row for one section
+## Every row for one section, and for one title
 
 A Code citation in the lookup box leads to every row ever classified to that section, across every
 table, newest public law first. The two filters are shown as pills, and the view is paged like any
@@ -132,6 +137,31 @@ steps:
   - goto: /app/classification?title=18&section=3551
   - expect: { selector: "#classsection-heading", contains: "18 U.S.C." }
   - expect: { selector: ".classtable", contains: "118-35" }
+```
+
+The same view without a section — `/app/classification?title=42` — is every row classified anywhere
+in that title. Dismissing the section pill leaves the title one in place and shows it.
+
+```scenario
+id: classification-by-title
+title: Every row classified to one title
+steps:
+  - goto: /app/classification?title=42
+  - expect: { selector: "#classsection-heading", contains: "Title 42" }
+  - expect: { selector: ".classtable", contains: "42 U.S.C." }
+```
+
+Both views name where the tables stop. A section that is in the Code carries a link to its notes in
+the reader, which reach back past the 104th Congress; a section with no rows at all carries the
+same link, and that is the answer for a provision last amended before 1996.
+
+```scenario
+id: classification-notes-link
+title: A section with no rows still says where its history is
+steps:
+  - goto: /app/classification?title=16&section=201
+  - expect: { selector: "#classsection-heading", contains: "Nothing was classified" }
+  - expect: { selector: ".classsection__notes a", contains: "read them in the reader" }
 ```
 
 Section pages in the reader do not carry these rows. The link runs one way, from a classification

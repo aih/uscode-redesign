@@ -17,6 +17,11 @@ chrome, guide chapter 10, `docs/ia-map.md`, the `/app/design` specimens and the
 is complete.** The deployed box holds all 144,837 rows and serves them once a deploy carries the
 reader (`docs/deploy-status.md`).
 
+**Since then:** the table scope on the lookup (ADR-0068, [PR #48](https://github.com/aih/uscode-redesign/pull/48)),
+and a title query plus a section's public-law history as a standing pair of answers (ADR-0070) —
+`15 usc` and `title 15` reach every row classified to a title, and a citation always offers both
+the section's notes and the rows the tables hold against it.
+
 The OLRC Classification Tables record which provision of each new Public Law was classified to
 which US Code section (118-35 §101(3) → 18 USC 3551 note). The site holds nothing of this today.
 This spec covers scraping the tables and the Editorial Classification Change Table (ECCT),
@@ -226,6 +231,9 @@ Two module-level limiters with docstrings justifying the numbers: `_limit_classi
 4. `GET /classifications/code/{title_num}/{section}` — input normalized (lowercase, en-dash →
    hyphen; CLAUDE.md gotcha 17); `?congress=`, `?exact=false` for prefix matching; ordered
    `pl_congress DESC, pl_num DESC, row_seq` (newest law first — section-history order).
+4a. `GET /classifications/code/{title_num}` — the same, a title wide and with no section named
+   (ADR-0070). `?congress=`, the same ordering, paged: title 10 carries 23,093 of the 144,837
+   rows.
 5. `GET /classifications/us/usc/{identifier:path}` — rows by `usc_identifier`, bounded
    `limit=200`. This is the future section-panel endpoint; it ships now.
 6. `GET /classifications/suggest?q=` — the lookup's autocomplete. Typed suggestions:
@@ -242,6 +250,11 @@ Two module-level limiters with docstrings justifying the numbers: `_limit_classi
      read nothing — and a citation gains a leading `{kind:'section-in-table'}` suggestion
      counting that section's rows in the scoped table. A scope naming no held table scopes
      nothing.
+   - A title with no section (`15 usc`, `title 15`, `citeparse`'s `kind="title"`) →
+     `{kind:'title-classifications'}` for every row classified to it across every table, led by
+     `{kind:'title-in-table'}` under a scope (ADR-0070). The section pair is offered whenever
+     **either** the section resolves or a row exists, so the choice between the notes and the
+     rows does not appear and vanish with the data.
 7. `GET /classifications/ecct` — the whole table; `?congress=`/`?session=` once more sessions
    exist.
 
@@ -256,6 +269,10 @@ Routes (Astro `base: "/app"`), all fetching through `lib/api.ts` (`getJson`, `Ap
 
 - `src/pages/classification/index.astro` — `/app/classification`: the lookup box, the current
   session's summary and freshness, the congress/session index with covered ranges, the ECCT link.
+  `?title=` alone is every row classified to that title; `?title=`+`?section=` narrows it to one
+  section and links that section's notes in the reader, which reach back past the 104th Congress
+  (ADR-0070). Dismissing the section pill leaves the title view; dismissing the title pill drops
+  both, since a section number names nothing without its title.
 - `src/pages/classification/[congress]/[session].astro` — the table. `session ∈ 1|2|all` (`all`
   = the 104th's whole-congress file). Sort control on the `search.astro` `sortbar` pattern
   (unrecognized `?sort=` falls back silently; offset drops on sort change; hrefs rebuilt through
