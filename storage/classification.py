@@ -49,6 +49,27 @@ _DASHES = {"–": "-", "‑": "-", "—": "-"}
 
 EN_DASH = "–"
 
+CLASSIFICATION_SORTS = ("pl", "pl-desc", "code", "code-desc")
+"""Every order a table of classification rows can be read in (ADR-0071).
+
+One vocabulary for all of these listings, because they show the same five
+columns and a reader who has learned an order on a session page should find it
+by the same name on a title's rows:
+
+  * **`pl`** — public law order, ascending. Inside one document that is the
+    source's own row order, which is what OLRC published it in; across
+    documents it is the oldest law first.
+  * **`pl-desc`** — the reverse: newest law first, which is the order a
+    section's classification history reads in.
+  * **`code`** — the Code's own order, title through `title_sort_key` and then
+    the section number through `_section_sort_key` (gotcha 16).
+  * **`code-desc`** — that list reversed.
+
+What differs between the views is only which of them is the *default*: a
+session page is the document OLRC published, so `pl`; a by-code view is a
+history, so `pl-desc`.
+"""
+
 
 class ClassificationError(Exception):
     """Base for the errors this interface raises rather than returning None."""
@@ -353,9 +374,10 @@ class ClassificationRepository(Protocol):
     ) -> ClassificationPage:
         """One session page's rows, filtered and paged.
 
-        `sort='pl'` is the source's own order (`row_seq`). `sort='code'` is the
-        Code's order — title through `title_sort_key`, then `section_norm`
-        (gotcha 16).
+        `sort` is one of `CLASSIFICATION_SORTS` and defaults to the source's own
+        order. A value outside that vocabulary is the default rather than an
+        error — the route validates what a caller sends, and a stored URL that
+        outlives a sort name should still show the table.
         """
         ...
 
@@ -365,10 +387,11 @@ class ClassificationRepository(Protocol):
         congress: int,
         law_num: int,
         section: str | None = None,
+        sort: str = "pl",
         limit: int = 100,
         offset: int = 0,
     ) -> ClassificationPage:
-        """Everything one public law classified, in source order.
+        """Everything one public law classified, in source order by default.
 
         Raises `UnknownPublicLawError` when no document covers the law, which is
         the answer that differs from an empty page.
@@ -382,11 +405,12 @@ class ClassificationRepository(Protocol):
         section: str,
         congress: int | None = None,
         exact: bool = True,
+        sort: str = "pl-desc",
         limit: int = 100,
         offset: int = 0,
     ) -> ClassificationPage:
-        """Everything ever classified to one Code section, newest law first —
-        which is the order a section's classification history reads in.
+        """Everything ever classified to one Code section, newest law first by
+        default — which is the order a section's classification history reads in.
 
         `section` is matched against `section_norm`, so the caller normalizes
         with `normalize_section_input` first.
@@ -398,10 +422,12 @@ class ClassificationRepository(Protocol):
         *,
         title_num: str,
         congress: int | None = None,
+        sort: str = "pl-desc",
         limit: int = 100,
         offset: int = 0,
     ) -> ClassificationPage:
-        """Everything ever classified to one Code title, newest law first.
+        """Everything ever classified to one Code title, newest law first by
+        default.
 
         The same question `entries_for_section` answers with the section left
         off, and a set of a different size: title 10 carries 23,093 of the
@@ -414,7 +440,12 @@ class ClassificationRepository(Protocol):
         ...
 
     def entries_for_identifier(
-        self, identifier: str, *, limit: int = 200, offset: int = 0
+        self,
+        identifier: str,
+        *,
+        sort: str = "pl-desc",
+        limit: int = 200,
+        offset: int = 0,
     ) -> ClassificationPage:
         """Rows whose derived `usc_identifier` is this one, newest law first.
 
