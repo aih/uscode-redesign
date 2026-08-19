@@ -6,7 +6,7 @@ summary: Which provision of which public law became which section of the Code, f
 covers:
   routes:
     ["/app/classification", "/app/classification/[congress]", "/app/classification/ecct"]
-  adrs: [67, 68, 70, 71]
+  adrs: [67, 68, 70, 71, 72]
 ---
 
 A public law is not written in the Code's numbering. The Office of the Law Revision Counsel decides
@@ -59,20 +59,19 @@ steps:
   - expect: { url: "pl=118-42" }
 ```
 
-**Every table**, beside the box, is a scope. Choosing one table narrows the lookup to it: a bare
-law number — `35` — then means that law of the chosen congress, and a citation or a title gains a
-first answer counting the rows classified to it in that table.
+**Or go to one table**, under the box, loads a table. Anything typed in the box goes with it and is
+answered there: choosing the 118th Congress's second session with `16 usc` in the box lands on that
+table, filtered to title 16.
 
 ```scenario
 id: classification-scoped-lookup
-title: Narrow the lookup to one table
+title: Choose a table, and arrive on it filtered
 steps:
   - goto: /app/classification
+  - fill: { selector: "#classlookup-q", value: "16 usc" }
   - select: { selector: "#classlookup-scope", value: "118-2" }
-  - fill: { selector: "#classlookup-q", value: "42 usc 254c-2" }
-  - expect: { selector: ".classlookup__option", contains: "rows in this table" }
-  - click: .classlookup__option
-  - expect: { url: "classification/118/2?title=42" }
+  - expect: { url: "classification/118/2?title=16" }
+  - expect: { selector: ".filterpills", contains: "16" }
 ```
 
 ## Reading one table
@@ -84,7 +83,8 @@ covering the whole congress, at `/app/classification/104/all`.
 Five columns, in the source's own order:
 
 - **U.S. Code** — the citation the provision was classified to, linked to the section in the reader
-  where the table gives enough to address one.
+  where the table gives enough to address one. Hovering one shows the section's text in a card, the
+  same preview a cross reference in the statute gives; clicking opens the section.
 - **Description** — what was done. A blank cell means the section or note was amended, and is shown
   as *Amended*; every other value is the source's own token. `tr to 42/290ee-10` names the other
   end of a transfer, `ed chg` and `nt ed chg` point at the editorial table below, and a quoted
@@ -146,9 +146,11 @@ steps:
   - expect: { selector: ".pager__page--on", contains: "2" }
 ```
 
-The lookup box is on the table's page as well, scoped to that table. A bare law number — `35`, or
-`35 101` for one of its provisions — means a law of that congress, and choosing a match filters the
-table to it instead of paging.
+The lookup box is on the table's page as well, scoped to that table, and what it finds there is
+applied to the table as a filter. A bare law number — `35`, or `35 101` for one of its provisions —
+means a law of that congress; `16 usc` filters to the rows classified to title 16; `42 usc 254c-2`
+to the rows for one section. A query the table cannot be filtered by — a section's notes in the
+reader, or every row classified to a section across every table — is listed under the box instead.
 
 ```scenario
 id: classification-table-lookup
@@ -156,9 +158,18 @@ title: Find a row in a table without paging through it
 steps:
   - goto: /app/classification/118/2
   - fill: { selector: "#classlookup-q", value: "35" }
-  - expect: { selector: ".classlookup__option", visible: true }
-  - click: .classlookup__option
+  - click: .classlookup__go
   - expect: { url: "pl=118-35" }
+  - expect: { selector: ".filterpills", contains: "118-35" }
+```
+
+```scenario
+id: classification-table-preview
+title: Read a classified section without leaving the table
+steps:
+  - goto: /app/classification/118/2
+  - hover: .classtable__cite a
+  - expect: { selector: "#cite-preview", visible: true }
 ```
 
 ## Every row for one section, and for one title

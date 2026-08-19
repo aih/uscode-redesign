@@ -336,7 +336,7 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **795** Python tests; `make test-web` = **399** frontend tests; `make test-e2e` = **620**
+`make test` = **795** Python tests; `make test-web` = **404** frontend tests; `make test-e2e` = **627**
 Playwright tests, 322 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -448,7 +448,16 @@ tables hold against it whenever either the section or a row exists, since the em
 one a provision last amended before 1996 has. Both by-code views say the tables begin at the 104th
 Congress, and the section view links the notes at `#section-notes` — resolved through
 `/api/v1/citation`, because an identifier assembled from the table's hyphen 404s for the 3,398 the
-corpus spells with an EN DASH. Sizes: **title 10 carries 23,093 of the 144,837 rows, title 42
+corpus spells with an EN DASH. **Choosing a table loads it, and the box on a table filters it (ADR-0072,
+amending ADR-0068)**: the index's `<select>` is a chooser rather than a suggest scope — `?scope=`
+is a 302 to that table carrying whatever is typed — and a `?q=` submitted on a session page that
+names rows in a table is applied as a filter rather than listed above it
+(`classificationTableFilterHref`; the three kinds that do not name rows in a table are still
+listed). The U.S. Code column previews on hover, which is why both routes' JS budget went
+24,000 → 36,000. Two traps: **a GET form posts its own fields and nothing else**, so `?sort=code`
+was dropped on every submission until the order became a hidden field; and **Firefox fires
+`change` on every arrow key in a `<select>`**, so the chooser submits for a pointer only and the
+keyboard commits with `Enter`. Sizes: **title 10 carries 23,093 of the 144,837 rows, title 42
 19,476, title 15 4,495**, against a longest section history of 412. What remains unbuilt by choice:
 a section page shows no classification rows, so the link runs one way; and the poll cannot see a
 change to the ECCT alone. (The title view's `sort=code` is built — ADR-0071.)
@@ -472,7 +481,7 @@ convention every reader who knows those keys has; it is what the guide documents
 **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 2,623 nodes**, down from 41 pairs, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 2,903 nodes**, down from 41 pairs, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by

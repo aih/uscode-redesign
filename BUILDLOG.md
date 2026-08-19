@@ -2999,3 +2999,49 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   everywhere outside the statutory text — measured on `/app/`, `/app/search` and
   `/app/classification`. `contrast.json` measures `--link on --page` and cannot see it, and axe
   passes it. The new sortable heading sets the token explicitly; the site-wide fix is its own task.
+
+## 080 — 2026-08-18 — Session 58: the classification lookup as a way into a table
+
+- **Tool/model:** Claude Code, Opus 5. One session, sequential.
+- **Asked:** Four fixes to the classification lookup — a chosen session should load that session's
+  classifications and the query should then filter it; the U.S. Code column should preview on
+  hover as links elsewhere on the site do; the scoped hint should say a law filters by that law;
+  and the field should not butt against the **Look up** button.
+- **Decided:** ADR-0072, amending ADR-0068. The index's `<select>` stops being a suggest scope and
+  becomes a table chooser: `?scope=118-2` is a 302 to that table, carrying whatever is typed as
+  `?q=`, so the query is answered on the page whose box is already scoped to it. The island
+  submits the form on `change` rather than navigating, and only for a pointer — Firefox fires
+  `change` on every arrow key, so a keyboard stepping through 32 options would load each table it
+  stepped past; `Enter` and the button are the keyboard's commit. On a session page a submitted
+  `?q=` naming rows in a table is **applied** as a filter (`classificationTableFilterHref`: `pl`,
+  `section-in-table`, `title-in-table`; the other three kinds answer `null` and are still listed).
+  The order rides as a hidden field, because a GET form posts its own fields and nothing else and
+  `?sort=code` was being dropped on submit. The U.S. Code column's links carry `data-cite` and
+  `data-preview` and both pages render `CitePreview`. The select moves to its own row under the
+  field: its longest option measures 287px, it was capped at 256 and clipped, and the field beside
+  it was 198px at 700px against a 340px placeholder.
+- **Produced:** `docs/adr/0072-choosing-a-table-loads-it-and-the-box-filters-it.md`;
+  `lib/url.ts` (`classificationTableFilterHref`, `q` on `ClassificationFilters`);
+  `ClassificationLookup.astro` (the chooser, the `hidden` prop, both hints, the select's own row);
+  `ClassificationTable.astro` (`data-cite`/`data-preview`); `classification/index.astro` (the
+  redirect, the empty `q` stripped with the empty scope); `classification/[congress]/[session].astro`
+  (the applied filter, the hidden sort); `styles/site.scss` (`.classlookup__jump`, gap 0.5 → 0.75rem);
+  `pages/design.astro` prose; guide chapter 10 (three scenarios, one new); `docs/ia-map.md`;
+  `docs/js-budgets.json`.
+- **Verified:** `make test-web` **404** (was 399; +5 in `url.test.ts`) and `make test-e2e` **627**
+  (was 620; +6 in `classification.spec.ts`, +1 guide scenario) — the whole desktop project green
+  against `make dev-all`, 621 passed and 2 skipped. `make test-a11y` re-run: 322 scans, the same
+  **8 route/rule pairs across the same 4 routes**, none of them a classification route. The node
+  total moves 2,623 → 2,903, all of it inside the vendored ReDoc and Swagger bundles and `/docs`
+  — the `readyWhen` race ADR-0039 already records, not a change to what this branch touches.
+  Separately, 20 axe scans over `/app/classification`, `/app/classification/118/2` and the
+  filtered table, both themes at 320 and 1280 including the open listbox — clean. The lookup
+  measured at 320/375/600/700/900/1280 on both pages: the field holds its placeholder and the gap
+  to the button is 12px wherever they share a line (input 198 → 459px at 700, 448 → 747 at 1280).
+- **Cost recorded:** `docs/js-budgets.json` raises both classification routes 24,000 → 36,000 —
+  11.4 KB of `CitePreview` inline script on two routes that carried none, for a card only a
+  pointer with hover opens.
+- **Rebased onto #54**, which landed the four orders and the numbered pager while this was in
+  flight and had already taken ADR-0071; this one is **ADR-0072**. The overlap is the session
+  page's `sort`, which is now one of four values read by `readSort` and still carried through
+  `classificationTableFilterHref` and the form's hidden field.
