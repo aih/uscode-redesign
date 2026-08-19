@@ -9,7 +9,8 @@
 # up from scratch arrives with its schedule instead of arriving without one and
 # looking fine for as long as nobody checks.
 #
-# Two jobs, and the daily one is the reason this file exists (ADR-0036):
+# Three jobs. The daily one is the reason this file was written (ADR-0036);
+# the every-minute one is the reason it was edited (ADR-0073):
 #
 #   * DAILY, the source check. Polls uscode.house.gov's release-points page,
 #     records the attempt in `source_checks`, and runs the full download-and-load
@@ -18,6 +19,17 @@
 #     site asks — the source publishes release points a few dozen times a year,
 #     and pulling a static page more often than that would be rude for no gain.
 #   * WEEKLY, purge_login_failures — the login-throttle table's only reaper.
+#   * EVERY MINUTE, the watchdog. It probes the site through the proxy,
+#     publishes USCode/SiteUp, and restarts the HTTP services after three
+#     consecutive failures. On 2026-08-19 the site served nothing for about ten
+#     hours: the api container's healthcheck had a failing streak of 2,710 and
+#     every CloudWatch alarm read OK, because the alarms watch the box — CPU,
+#     disk, network — and the box was fine. Nothing was watching whether the
+#     site answered.
+#
+#     Every minute is not aggressive for a probe that costs two local HTTP
+#     requests, and the threshold rather than the period is what keeps it from
+#     acting on noise.
 #
 # The database dump used to be a third job, nightly. It is not here any more and
 # that is not an omission: the US Code changes a few dozen times a year, so a
@@ -62,6 +74,11 @@ PATH=/usr/local/bin:/usr/bin:/bin
 
 # Weekly: expire the login-throttle rows. Nothing else calls this.
 23 5 * * 0 root cd ${REPO_DIR} && docker compose -f docker-compose.prod.yml exec -T db psql -U uscode -d uscode -c "select purge_login_failures()" >> ${DATA_ROOT}/logs/purge.log 2>&1
+
+# Every minute: is the site answering, and if not, make it answer (ADR-0073).
+# It writes its own log and takes the deploy lock before restarting anything,
+# so this line stays quiet — a probe that succeeds prints nothing.
+* * * * * root cd ${REPO_DIR} && sudo -u ec2-user bash deploy/watchdog.sh >/dev/null 2>&1
 EOF
 
 chmod 0644 "$CRON_FILE"

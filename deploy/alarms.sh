@@ -107,6 +107,41 @@ aws cloudwatch put-metric-alarm \
     --treat-missing-data breaching \
     --region "$REGION"
 
+# The site is down (ADR-0073). Every other alarm in this file watches the box,
+# and on 2026-08-19 the box was fine: load average 0.73, disk 44%, no status
+# check failed, CPU credits healthy. The site served nothing for about ten
+# hours and all six alarms read OK the whole time, because none of them asks
+# the only question a reader cares about.
+#
+# deploy/watchdog.sh publishes USCode/SiteUp every minute — 1 when both /health
+# and a reader page answer 200 through the proxy, 0 otherwise. This alarm is
+# what turns that into mail.
+#
+#   * `Minimum` over five one-minute periods, so a single failed probe during a
+#     deploy's proxy recreate does not page anybody, and five consecutive
+#     minutes of a site that is not answering does.
+#   * `--treat-missing-data breaching`, for the same reason as the source check
+#     above and more sharply: a box wedged badly enough that cron cannot run
+#     publishes no metric at all, and that is the worst case rather than a
+#     quiet one. It is also why the watchdog publishes before it tries to
+#     repair anything.
+echo "==> alarm uscode-site-down"
+aws cloudwatch put-metric-alarm \
+    --alarm-name uscode-site-down \
+    --alarm-description "The site is not answering — /health or the reader has failed for five consecutive minutes, or the box has stopped reporting at all" \
+    --namespace USCode \
+    --metric-name SiteUp \
+    --statistic Minimum \
+    --period 60 \
+    --evaluation-periods 5 \
+    --threshold 1 \
+    --comparison-operator LessThanThreshold \
+    --dimensions "$DIM" \
+    --alarm-actions "$TOPIC_ARN" \
+    --ok-actions "$TOPIC_ARN" \
+    --treat-missing-data breaching \
+    --region "$REGION"
+
 # Disk needs the CloudWatch agent (it publishes CWAgent/disk_used_percent);
 # without the agent installed this alarm sits in INSUFFICIENT_DATA, which
 # treat-missing-data notBreaching keeps quiet rather than noisy.

@@ -103,9 +103,55 @@
 			ROBOTS 200
 	}
 
+	# robots.txt is advisory, and on 2026-08-19 that stopped being enough
+	# (ADR-0073). Meta's `meta-externalagent` fetched /robots.txt 21 times in 24
+	# hours, read `Disallow: /`, and crawled anyway: 7,155 of the 7,172 requests
+	# in one hour, spread over ~60 addresses in 57.141.0.0/24 so that no single
+	# one looks like a flood. It had found the `?release=` axis, which is the same
+	# ~25-million-page permutation space ADR-0037 measured ClaudeBot and GPTBot
+	# walking — the difference being that those two stopped when asked.
+	#
+	# So this is the enforcement of a policy already stated rather than a new one:
+	# the robots.txt above says `Disallow: /` to every agent, and this block is
+	# what that sentence means for an agent that does not honour it. A declared
+	# crawler gets 403 here, at the proxy, without reaching either backend or the
+	# database — which is the property that matters, since what took the site down
+	# was not bandwidth but fifteen Postgres connections held open by requests
+	# nobody was waiting for.
+	#
+	# Matching is on the User-Agent because that is what a crawler volunteers. It
+	# is trivially forgeable, and forging it is not defended against here: an
+	# agent that lies about being a crawler is indistinguishable from a reader,
+	# and the timeouts and pool bounds behind this (ADR-0073) are what hold in
+	# that case. This list catches the honest ones, which — measured twice now —
+	# is all of the traffic that has actually knocked this site over.
+	#
+	# The generic markers are second, and deliberately not first: `bot`, `crawler`
+	# and `spider` in a User-Agent catch the next crawler without an edit here,
+	# and the named list is what makes the common cases greppable. Neither
+	# matches curl, uvicorn's healthcheck, or a script written against /api/v1 —
+	# programmatic use of the API is the point of the API, and only self-declared
+	# crawling is refused.
+	@crawlers header_regexp User-Agent "(?i)(meta-externalagent|meta-webindexer|facebookexternalhit|claudebot|claude-web|gptbot|oai-searchbot|chatgpt-user|perplexitybot|perplexity-user|google-extended|googleother|applebot|amazonbot|bytespider|ccbot|cohere-ai|diffbot|imagesift|omgili|dataforseo|semrush|ahrefs|mj12|dotbot|petalbot|yandex|timpibot|webzio|scrapy|bot[/ ]|[ /(]bot\b|crawler|spider)"
+	handle @crawlers {
+		header Content-Type "text/plain; charset=utf-8"
+		respond "This site is closed to automated crawling. See /robots.txt." 403
+	}
+
+	# The transport timeouts are the proxy's half of ADR-0073's backpressure.
+	# Without them Caddy waits indefinitely for a backend that has stopped
+	# answering, so a wedged upstream becomes a growing pile of held client
+	# connections here as well — the outage spreading to the one component that
+	# was still working. `response_header_timeout` is generous enough for the
+	# slowest legitimate render and short enough that a hang is reported as a
+	# 502 rather than absorbed.
 	handle /app* {
 		reverse_proxy frontend:4321 {
 			header_up X-Forwarded-For {remote_host}
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+			}
 		}
 	}
 
@@ -114,6 +160,10 @@
 	handle {
 		reverse_proxy api:8001 {
 			header_up X-Forwarded-For {remote_host}
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+			}
 		}
 	}
 

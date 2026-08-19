@@ -39,6 +39,7 @@ from api.settings import settings
 from api.watchlists import default_watchlist, watchlists
 from citation import router as citation_router
 from params import NO_STORE, PRIVATE_PREFIXES
+from storage import RepositoryUnavailableError
 
 DESCRIPTION = """
 Any provision of the US Code, at any release point, addressed by a URL that mirrors
@@ -219,6 +220,27 @@ def favicon() -> FileResponse:
 def favicon_ico() -> Response:
     """Browsers ask for this without being told to. Answer, rather than 404."""
     return Response(status_code=301, headers={"Location": FAVICON})
+
+
+@app.exception_handler(RepositoryUnavailableError)
+def repository_unavailable(request: Request, exc: RepositoryUnavailableError) -> Response:
+    """Every connection is busy — that is a 503, not a 500 (ADR-0073).
+
+    The distinction is the difference between "this site is broken" and "this
+    site is at capacity, come back", and only the second is true here. It also
+    keeps a caller's retry sensible: a 500 invites a bug report, a 503 with
+    `Retry-After` invites the thing that actually helps.
+
+    `db_pool_timeout` is two seconds precisely so this answer arrives while
+    somebody is still waiting for it. Before 2026-08-19 the wait was thirty,
+    which is longer than the proxy in front holds a request open — so the
+    request that eventually failed had nobody left to fail to.
+    """
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "The site is busy. Please retry in a moment."},
+        headers={"Retry-After": "5", "Cache-Control": NO_STORE},
+    )
 
 
 @app.exception_handler(HTTPException)

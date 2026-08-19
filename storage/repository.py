@@ -36,6 +36,17 @@ class RepositoryError(Exception):
     """Base for the errors a repository raises rather than returning None."""
 
 
+class RepositoryUnavailableError(RepositoryError):
+    """The store cannot answer right now — it is at capacity, not broken.
+
+    Raised when every connection is in use and the wait for one expired
+    (ADR-0073). It is a distinct error because the honest answer to it is 503
+    and a retry, where every other `RepositoryError` here describes something
+    about the request. An implementation over XCiteDB would raise this for its
+    own equivalent; nothing outside `storage/` names the database library's.
+    """
+
+
 class ReleaseNotFoundError(RepositoryError):
     """No release point matches the requested label or date."""
 

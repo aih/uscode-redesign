@@ -3045,3 +3045,28 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   flight and had already taken ADR-0071; this one is **ADR-0072**. The overlap is the session
   page's `sort`, which is now one of four values read by `readSort` and still carried through
   `classificationTableFilterHref` and the form's hidden field.
+
+## 081 — 2026-08-19 — Session 59: the site was down, and every alarm said it was fine
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Review the deployment — the site appears to be down at `https://uscode.linkedlegislation.org/`. Fix it, and make the deployment more robust to whatever caused the failure.
+- **Found:**
+  - The site had served nothing for about ten hours. TCP connected, so it read as a hang: every request timed out at 25 seconds with zero bytes.
+  - The box was healthy the whole time — load average 0.73 on 2 vCPUs, root 44%, data volume 37%, 2 GB free with swap barely touched, api container 2.1% CPU, Postgres 0.0%. **All six CloudWatch alarms read `OK` throughout**, because every one of them watches the machine.
+  - The api container's Docker healthcheck had a **failing streak of 2,710** — about ten hours at one probe per thirteen seconds. A Docker healthcheck's only effect is the word `unhealthy` in `docker ps`; nothing acts on it.
+  - Its log was one repeated exception: `QueuePool limit of size 5 overflow 10 reached, connection timed out, timeout 30.00` — SQLAlchemy's untouched defaults.
+  - `pg_stat_activity`: **fifteen backends `idle in transaction`**, every one waiting on `ClientRead`, oldest 8m43s. The whole pool, held by requests whose clients had gone. One backend `active`.
+  - The traffic was Meta's `meta-externalagent` walking the `?release=` axis: **7,155 of 7,172 requests in the hour**, over ~60 addresses in `57.141.0.0/24` at ~2 requests per minute each. It had fetched `/robots.txt` **21 times in 24 hours**, been served `Disallow: /`, and carried on.
+  - The pages were never slow. Measured after recovery against the same URLs it was requesting: 0.42s, 0.74s, 1.01s, 0.33s. The outage used no resources.
+- **Decided (ADR-0073):**
+  - **`Disallow: /` is enforced at the proxy** for declared crawlers — 403 in `deploy/Caddyfile` before either backend or the database. Enforcement of ADR-0037's stated policy rather than a new one. ADR-0029's per-caller limits were the wrong tool and would not have fired: at two requests a minute across sixty addresses, no per-IP bucket fills. The aggregate was the problem and no single caller was.
+  - **API sessions are bounded** — `statement_timeout` 20s and `idle_in_transaction_session_timeout` 30s, via `set_config(..., true)` from an `after_begin` listener on a sessionmaker belonging to `storage/`. Two boundaries forced that shape: **ingest must stay unbounded** (it shares `db/base.py` in its own process and holds one transaction across minutes of parsing), and **laziness is worth keeping** — the first draft applied the bounds at session construction, which made every early-rejected request need a database, and `tests/test_rate_limit.py` caught it.
+  - **The pool sheds rather than queues** — 10+20, `pool_pre_ping`, 30-minute recycle, and `pool_timeout` **30s → 2s**. `pool_pre_ping` stops being optional once Postgres is terminating backends. Plus `--limit-concurrency 64` on uvicorn and `dial_timeout`/`response_header_timeout` on both Caddy upstreams.
+  - **`deploy/watchdog.sh`**, every minute from cron: probes `/health` and a reader page through the proxy over the real hostname, publishes `USCode/SiteUp`, restarts the HTTP services after three consecutive failures — deploy lock first, ten-minute cooldown. The `uscode-site-down` alarm is `Minimum` over five one-minute periods with **`--treat-missing-data breaching`**, since a box too wedged to run cron publishes nothing; which is also why the watchdog publishes before it attempts any repair.
+- **Produced:** `docs/adr/0073-bounded-sessions-a-watchdog-and-a-crawler-that-does-not-stop.md`; `deploy/watchdog.sh`; changes to `db/config.py`, `db/base.py`, `storage/session.py`, `deploy/Caddyfile`, `deploy/alarms.sh`, `deploy/install-crons.sh`, `docker-compose.prod.yml`; `tests/test_session_bounds.py`; guide chapter 08 gains the 503 and the crawler block. PR #56.
+- **Verified:**
+  - Live, after the fix: `/health` 200, reader 200 in 0.48s, `/api/v1/search` 200, `/app/classification` 200; a `meta-externalagent` User-Agent 403 from outside; `robots.txt` unchanged.
+  - Crawler traffic **7,155/hour → ~60/hour, all 403**. `pg_stat_activity` went from fifteen `idle in transaction` to **none**; api container `healthy`.
+  - `make test` 801 tests green (795 + 6 new); `make test-web` 404 green including the guide ratchet; `caddy validate` on the new Caddyfile reports `Valid configuration`.
+  - Against a live Postgres: the bounds are in force (`20s`/`30s`), ingest's `SessionLocal` is unbounded (`0`/`0`), the bounds do not follow a connection back into the pool, and both timeouts actually fire.
+  - The watchdog and its cron are installed on the box and `uscode-site-down` reached `OK` on a real datapoint (`1.0` at 22:32 UTC) — the cron, the metric and the alarm proven end to end rather than assumed. Re-check with `AWS_PROFILE=uscode-admin aws cloudwatch describe-alarms --alarm-names uscode-site-down --region us-east-1`.

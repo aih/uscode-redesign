@@ -143,11 +143,25 @@ services:
       - ${DATA_ROOT:-/var/lib/uscode}/demo:/app/static/demo:ro
     restart: unless-stopped
     # No --reload: the image is what runs.
+    #
+    # `--limit-concurrency` is backpressure, and it is here because of
+    # 2026-08-19 (ADR-0073). Without it uvicorn accepts every request that
+    # arrives and lets them queue on the database pool, so a burst does not
+    # degrade — it accumulates, each waiting request holding a worker while its
+    # client times out. Past this many in flight, new requests get an immediate
+    # 503 instead of a slot in a queue nobody is being served from. A 503 is a
+    # site that is up and busy; a request that hangs for thirty seconds is a
+    # site that is down.
+    #
+    # 64 is above anything this box has served to readers (measured: reader
+    # pages answer in 0.2-1.0s, so 64 in flight is far past saturation) and
+    # below the point where the queue becomes the problem.
     command:
       [
         "uv", "run", "python", "-m", "uvicorn",
         "main:app", "--host", "0.0.0.0", "--port", "8001",
         "--proxy-headers", "--forwarded-allow-ips", "*",
+        "--limit-concurrency", "64", "--timeout-keep-alive", "15",
       ]
     # No curl in python:3.12-slim; urllib is stdlib.
     healthcheck:
