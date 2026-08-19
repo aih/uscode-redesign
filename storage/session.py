@@ -11,6 +11,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from sqlalchemy import event, text
+from sqlalchemy.exc import TimeoutError as PoolTimeout
 from sqlalchemy.orm import Session, sessionmaker
 
 from db.base import engine
@@ -20,7 +21,7 @@ from storage.classification import ClassificationRepository
 from storage.postgres import PostgresRepository
 from storage.postgres_accounts import PostgresAccounts
 from storage.postgres_classification import PostgresClassification
-from storage.repository import Repository
+from storage.repository import Repository, RepositoryUnavailableError
 
 # A sessionmaker of storage's own, over `db.base`'s engine. It exists to carry
 # the listener below and nothing else: `db.base.SessionLocal` is what ingest
@@ -69,7 +70,14 @@ def bounded_session() -> Iterator[Session]:
     long rather than a transaction that stops running at all.
     """
     with ApiSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except PoolTimeout as exc:
+            # Translated here because `storage/` is the only layer allowed to
+            # know SQLAlchemy (PLAN §2, tests/test_architecture.py). The pool
+            # times out on the first query rather than on construction, so this
+            # arrives thrown into the yield from the handler that asked.
+            raise RepositoryUnavailableError(str(exc)) from exc
 
 
 def get_repository() -> Iterator[Repository]:

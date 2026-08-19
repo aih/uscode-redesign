@@ -120,3 +120,89 @@ def test_the_pool_sheds_rather_than_queues(database: None) -> None:
     """
     assert settings.db_pool_timeout <= 5
     assert engine.pool._timeout <= 5
+
+
+def test_a_pool_timeout_becomes_a_storage_error(database: None) -> None:
+    """Storage owns SQLAlchemy, so the surfaces never name its exceptions.
+
+    `tests/test_architecture.py` enforces the import rule; this asserts the
+    translation that makes obeying it possible.
+    """
+    from sqlalchemy.exc import TimeoutError as PoolTimeout
+
+    from storage import RepositoryUnavailableError
+
+    manager = bounded_session()
+    manager.__enter__()
+    with pytest.raises(RepositoryUnavailableError):
+        manager.__exit__(PoolTimeout, PoolTimeout("QueuePool limit of size 10 overflow 20 reached"), None)
+
+
+def test_pool_exhaustion_answers_503_rather_than_500() -> None:
+    """Busy is not broken (ADR-0073).
+
+    Unhandled, this is a 500 — which tells a caller the site is faulty when what
+    is true is that it is full, and carries no `Retry-After`, so the caller's
+    only guide is how long it feels like waiting.
+    """
+    from fastapi.testclient import TestClient
+
+    from main import app
+    from storage import RepositoryUnavailableError, get_repository
+
+    def exhausted() -> None:
+        raise RepositoryUnavailableError("QueuePool limit of size 10 overflow 20 reached")
+
+    app.dependency_overrides[get_repository] = exhausted
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/api/v1/us/usc/t16/s45f")
+    finally:
+        del app.dependency_overrides[get_repository]
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "5"
+    assert "busy" in response.json()["detail"].lower()
+
+
+def test_the_translation_reaches_the_handler_through_fastapi() -> None:
+    """The join between the two tests above, asserted rather than assumed.
+
+    The pool times out on the first query, which is inside the handler — so the
+    exception has to travel *back* into the dependency's `yield`, be translated
+    there, and then continue out to the app's exception handler. That FastAPI
+    propagates an endpoint's exception into a yield-dependency, and routes what
+    that dependency re-raises to `app.exception_handler`, is behaviour of the
+    framework rather than of this code, and a version bump could take it away
+    silently — leaving the 503 a 500 with every test above still green.
+    """
+    from contextlib import contextmanager
+
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy.exc import TimeoutError as PoolTimeout
+
+    from main import repository_unavailable
+    from storage import RepositoryUnavailableError
+
+    @contextmanager
+    def bounded():
+        try:
+            yield "session"
+        except PoolTimeout as exc:
+            raise RepositoryUnavailableError(str(exc)) from exc
+
+    def dependency():
+        with bounded() as session:
+            yield session
+
+    app = FastAPI()
+    app.add_exception_handler(RepositoryUnavailableError, repository_unavailable)
+
+    @app.get("/boom")
+    def boom(session: str = Depends(dependency)) -> None:
+        raise PoolTimeout("QueuePool limit of size 10 overflow 20 reached")
+
+    response = TestClient(app, raise_server_exceptions=False).get("/boom")
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "5"

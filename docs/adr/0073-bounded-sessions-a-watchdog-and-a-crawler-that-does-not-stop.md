@@ -103,6 +103,10 @@ served fails while someone is still waiting for it. `pool_pre_ping` stops being 
 Postgres is terminating backends, since a terminated backend otherwise leaves a dead connection for
 the next request to discover.
 
+Pool exhaustion answers **503 with `Retry-After`** rather than 500. Unhandled, SQLAlchemy's
+`TimeoutError` is a 500, which says the site is faulty when what is true is that it is full — and a
+500 carries no `Retry-After`, so a caller's only guide is how long it feels like waiting.
+
 `--limit-concurrency 64` on uvicorn is the same decision one layer out — past 64 requests in flight,
 new ones get an immediate 503 rather than a place in a queue. Caddy gains `dial_timeout` and
 `response_header_timeout` on both upstreams, so a wedged backend does not become a growing pile of
