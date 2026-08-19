@@ -95,6 +95,88 @@ test.describe("the classification lookup", () => {
   });
 });
 
+test.describe("choosing a table", () => {
+  test("loads it, carrying whatever was typed", async ({ page }) => {
+    await page.goto(INDEX, { waitUntil: "load" });
+    await page.locator("[data-classlookup-input]").fill("16 usc");
+    await page.locator("[data-classlookup-scope]").selectOption("118-2");
+
+    // Two hops: the index turns the scope into the table's own URL, and the
+    // table applies the query it arrived with.
+    await page.waitForURL(/\/app\/classification\/118\/2\?title=16/, { timeout: 8000 });
+    await expect(page.locator(".filterpills__value")).toHaveText(["16"]);
+  });
+
+  test("does not navigate on an arrow key", async ({ page }) => {
+    // A native select fires `change` on every arrow press in Firefox, so a
+    // keyboard stepping through the options would load each table it stepped
+    // past. Enter and the Look up button are the keyboard's commit.
+    await page.goto(INDEX, { waitUntil: "load" });
+    const select = page.locator("[data-classlookup-scope]");
+    await select.focus();
+    await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(500);
+    expect(new URL(page.url()).pathname).toBe("/app/classification");
+  });
+});
+
+test.describe("a query submitted on a table", () => {
+  test("filters the table rather than listing what it matched", async ({ page }) => {
+    await page.goto(TABLE, { waitUntil: "load" });
+    await page.locator("[data-classlookup-input]").fill("16 usc");
+    await page.locator(".classlookup__go").click();
+
+    await page.waitForURL(/\/app\/classification\/118\/2\?title=16/, { timeout: 8000 });
+    await expect(page.locator(".filterpills__value")).toHaveText(["16"]);
+    expect(await page.locator(".classtable tbody tr").count()).toBeGreaterThan(0);
+    // The match list is for what a table cannot be filtered by; this was.
+    expect(await page.locator(".classfind").count()).toBe(0);
+  });
+
+  test("keeps the order the reader is already in", async ({ page }) => {
+    await page.goto(`${TABLE}?sort=code`, { waitUntil: "load" });
+    await page.locator("[data-classlookup-input]").fill("16 usc");
+    await page.locator(".classlookup__go").click();
+    await page.waitForURL(/title=16/, { timeout: 8000 });
+    expect(page.url()).toContain("sort=code");
+  });
+
+  test("lists what no table can be filtered by", async ({ page }) => {
+    // 16 U.S.C. § 45f is in the fixture corpus and in no fixture table row, so
+    // both answers are corpus-wide: the section's notes, and every row against
+    // it across every table.
+    await page.goto(`${TABLE}?q=16+usc+45f`, { waitUntil: "load" });
+    expect(new URL(page.url()).searchParams.get("q")).toBe("16 usc 45f");
+    await expect(page.locator(".classfind__link").first()).toBeVisible();
+    expect(await page.locator(".filterpills").count()).toBe(0);
+  });
+});
+
+test.describe("the U.S. Code column", () => {
+  test("previews the section on hover and opens it on click", async ({ page }) => {
+    await page.goto(TABLE, { waitUntil: "load" });
+    const cite = page.locator(".classtable__cite a[data-cite]").first();
+    await expect(cite).toHaveAttribute("data-preview", /^\/app\/preview\/us\/usc\//);
+
+    await cite.hover();
+    const card = page.locator("#cite-preview");
+    await expect(card).toBeVisible({ timeout: 5000 });
+    await expect(card).not.toBeEmpty();
+
+    // Escape closes it without following the link — the reader is still in the
+    // table (ADR-0041).
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+    expect(new URL(page.url()).pathname).toBe("/app/classification/118/2");
+
+    const href = await cite.getAttribute("href");
+    await cite.click();
+    await page.waitForURL(new RegExp(href!.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")), {
+      timeout: 8000,
+    });
+  });
+});
+
 test.describe("the by-section view", () => {
   // `/classifications/code/…` defaults to 100 rows. The busiest sections are
   // past that — 42 U.S.C. § 1396a has 353 — so an unpaged view showed a total

@@ -37,6 +37,7 @@
  * not in the Code should be offered no link at all.
  */
 import Base from "../../layouts/Base.astro";
+import CitePreview from "../../components/CitePreview.astro";
 import ClassificationLookup from "../../components/ClassificationLookup.astro";
 import ClassificationMatches from "../../components/ClassificationMatches.astro";
 import ClassificationTable from "../../components/ClassificationTable.astro";
@@ -84,6 +85,10 @@ import {
 if (Astro.url.searchParams.get("scope") === "") {
   const rest = new URLSearchParams(Astro.url.searchParams);
   rest.delete("scope");
+  // An empty `q` goes with it. The field posts its value too, so choosing
+  // "Every table" with nothing typed would otherwise leave `?q=` behind — a
+  // second URL for the page's own default view.
+  if (!rest.get("q")?.trim()) rest.delete("q");
   const remaining = rest.toString();
   return Astro.redirect(
     remaining ? `${classificationHref()}?${remaining}` : classificationHref(),
@@ -92,9 +97,21 @@ if (Astro.url.searchParams.get("scope") === "") {
 }
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
-/** `?scope=118-2` narrows the lookup to one table — the select's no-script
- *  round trip. A value naming no table scopes nothing. */
+/** `?scope=118-2` names a table, and choosing a table loads it (ADR-0072).
+ *  A value naming no table scopes nothing. */
 const scope = parseClassificationScope(Astro.url.searchParams.get("scope"));
+
+/** The select posts here — from the island on a pointer's `change`, from the
+ *  Look up button otherwise — and this is where that becomes the table's own
+ *  page. Whatever was typed rides along as `?q=`, so a query begun before the
+ *  table was chosen is answered there, against the box scoped to it. The empty
+ *  value the select always posts is stripped by the redirect above. */
+if (scope) {
+  return Astro.redirect(
+    classificationHref(scope.congress, scope.session, { q: query || null }),
+    302,
+  );
+}
 const titleFilter = Astro.url.searchParams.get("title")?.trim().toLowerCase() || null;
 const rawSection = Astro.url.searchParams.get("section")?.trim() || null;
 const sectionFilter = rawSection ? normalizeSectionKey(rawSection) : null;
@@ -121,8 +138,10 @@ try {
   }
 }
 
+/** Unscoped: a scope has already redirected to the table it named, so what is
+ *  answered here is always the corpus-wide reading of the query. */
 const suggestions: ClassificationSuggestion[] = query
-  ? await fetchClassificationSuggestions(query, scope)
+  ? await fetchClassificationSuggestions(query)
   : [];
 
 /** Which page of the by-code view. Only that view is paged — the registry
@@ -295,13 +314,13 @@ function sessionName(file: ClassificationFile): string {
   return file.session === 0 ? "Whole congress" : `Session ${file.session}`;
 }
 
-/** The scope select's options — one per table, in the registry's own order
- *  (newest first). */
+/** The table select's options — one per table, in the registry's own order
+ *  (newest first). Choosing one loads it; nothing is ever selected here, since
+ *  a chosen table has already redirected away from this page. */
 const scopeOptions = files.map((file) => ({
   value: classificationScopeValue(file.congress, file.session_label),
   label: `${ordinal(file.congress)} Congress, ${sessionName(file).toLowerCase()}`,
 }));
-const scopeValue = scope ? classificationScopeValue(scope.congress, scope.session) : "";
 
 function usDate(iso: string | null): string {
   if (!iso) return "—";
@@ -339,7 +358,7 @@ function ordinal(n: number): string {
           {totalRows.toLocaleString()} rows across {files.length} tables are held here.
         </p>
 
-        <ClassificationLookup value={query} scopeOptions={scopeOptions} scopeValue={scopeValue} />
+        <ClassificationLookup value={query} scopeOptions={scopeOptions} />
 
         {query && <ClassificationMatches query={query} suggestions={suggestions} />}
 
@@ -534,6 +553,12 @@ function ordinal(n: number): string {
             </tbody>
           </table>
         </div>
+
+        {/* The U.S. Code column is a set of references, and a reference on
+            this site previews on hover (ADR-0024). Rendered inside the
+            success branch: with no table on screen there is nothing to
+            preview, and the card would be an empty dialog on an error page. */}
+        <CitePreview />
 
         <h2 class="toc-group">Editorial Classification Change Table</h2>
         <p>
