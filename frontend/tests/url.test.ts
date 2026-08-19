@@ -10,6 +10,7 @@ import {
   classificationEcctHref,
   classificationScopeValue,
   classificationSuggestionHref,
+  classificationTableFilterHref,
   classificationHref,
   classificationSuggestHref,
   parseClassificationScope,
@@ -385,6 +386,14 @@ describe("classification hrefs", () => {
     );
   });
 
+  it("carries a typed query so a table chosen mid-query answers it", () => {
+    expect(classificationHref(118, "2", { q: "14 usc" })).toBe(
+      "/app/classification/118/2?q=14+usc",
+    );
+    // Not a filter, and absent when there is nothing typed.
+    expect(classificationHref(118, "2", { q: null })).toBe("/app/classification/118/2");
+  });
+
   it("has one address for the ECCT", () => {
     expect(classificationEcctHref()).toBe("/app/classification/ecct");
   });
@@ -591,6 +600,76 @@ describe("where a lookup suggestion leads", () => {
     expect(
       classificationSuggestionHref({ kind: "something-new", href: "/classification/119/2" }),
     ).toBe("/app/classification/119/2");
+  });
+});
+
+describe("what a suggestion filters a table by", () => {
+  // The session page applies a submitted query instead of listing it
+  // (ADR-0072). Three of the six kinds name rows inside a table; the other
+  // three are answers no table can be filtered by.
+  it("filters by a public law, in the table covering it", () => {
+    expect(
+      classificationTableFilterHref({
+        kind: "pl",
+        congress: 118,
+        session_label: "2",
+        pl: "118-42",
+        pl_section: "793",
+      }),
+    ).toBe("/app/classification/118/2?pl=118-42&pl_section=793");
+  });
+
+  it("filters by a title, and by a section within one", () => {
+    expect(
+      classificationTableFilterHref({
+        kind: "title-in-table",
+        congress: 118,
+        session_label: "2",
+        title_num: "14",
+      }),
+    ).toBe("/app/classification/118/2?title=14");
+    expect(
+      classificationTableFilterHref({
+        kind: "section-in-table",
+        congress: 118,
+        session_label: "2",
+        title_num: "42",
+        section: "254c-2",
+      }),
+    ).toBe("/app/classification/118/2?title=42&section=254c-2");
+  });
+
+  it("keeps the order the reader is already reading in", () => {
+    expect(
+      classificationTableFilterHref(
+        { kind: "title-in-table", congress: 118, session_label: "2", title_num: "14" },
+        "code",
+      ),
+    ).toBe("/app/classification/118/2?title=14&sort=code");
+  });
+
+  it("filters nothing for an answer that is not inside a table", () => {
+    expect(
+      classificationTableFilterHref({
+        kind: "section-notes",
+        identifier: "/us/usc/t16/s45f",
+        fragment: "#section-notes",
+      }),
+    ).toBeNull();
+    expect(
+      classificationTableFilterHref({ kind: "title-classifications", title_num: "15" }),
+    ).toBeNull();
+    expect(
+      classificationTableFilterHref({
+        kind: "section-classifications",
+        title_num: "16",
+        section: "45f",
+      }),
+    ).toBeNull();
+    // A kind this reader does not know is not guessed at either.
+    expect(
+      classificationTableFilterHref({ kind: "something-new", congress: 119, session_label: "2" }),
+    ).toBeNull();
   });
 });
 
