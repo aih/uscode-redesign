@@ -70,9 +70,21 @@
  * `scope` fixes the box to one session table: the form posts to that table's
  * page, the suggest request carries `congress`/`session`, and the endpoint then
  * reads a bare law number as that congress's law and counts a citation's rows
- * in that table. `scopeOptions` is the user-selectable form of the same thing —
- * a `<select name="scope">` the index page reads back through
- * `parseClassificationScope`. The two are not passed together.
+ * in that table. What the box then finds is applied to the table rather than
+ * listed beside it — the session page redirects a `?q=` that names rows in its
+ * own table to the filtered view (ADR-0072).
+ *
+ * `scopeOptions` is the index page's `<select name="scope">`, and it chooses a
+ * table rather than narrowing the lookup: the page it posts to reads the value
+ * through `parseClassificationScope` and redirects to that table, carrying
+ * whatever was typed. So the two paths reach one place — the table's own page,
+ * with its own scoped box — and the select needs no scoped suggestions of its
+ * own. The two props are not passed together.
+ *
+ * The select submits on `change` for a pointer and not for a keyboard: a native
+ * select fires `change` on every arrow key in Firefox, so stepping through the
+ * options would load the first table stepped past. A keyboard commits with
+ * `Enter`, which submits the form it is in, or with the **Look up** button.
  */
 import { APP, classificationHref, classificationSuggestHref } from "../lib/url";
 
@@ -84,10 +96,14 @@ interface Props {
   /** Fix the lookup to one table — the session page's box. `session` is the
    *  URL's spelling: `1`, `2` or `all`. */
   scope?: { congress: number; session: string } | null;
-  /** Offer a table scope as a `<select>` — the index page's box. */
+  /** Offer every table as a `<select>` — the index page's box. Choosing one
+   *  loads that table. */
   scopeOptions?: { value: string; label: string }[];
-  /** The selected option, round-tripped from a no-script `?scope=`. */
-  scopeValue?: string;
+  /** Query parameters the submission has to carry through. A GET form posts its
+   *  own fields and nothing else, so the ordering a reader is already in is
+   *  lost on submit unless it is a field — `?sort=code` was, and came back as
+   *  public law order. */
+  hidden?: Record<string, string>;
 }
 
 const {
@@ -95,7 +111,7 @@ const {
   idPrefix = "classlookup",
   scope = null,
   scopeOptions = [],
-  scopeValue = "",
+  hidden = {},
 } = Astro.props;
 const inputId = `${idPrefix}-q`;
 const listId = `${idPrefix}-list`;
@@ -109,8 +125,8 @@ const action = scope
 const label = scope ? "Find a row in this table" : "Find a public law, a title or a Code section";
 const placeholder = scope ? "35, 35 101, 16 usc 3831, or 16 usc" : "118-33, 118-33 101, 16 usc 3831, or title 16";
 const hint = scope
-  ? "A bare number means a public law of this congress. A law leads to its rows in this table; a Code citation to the rows classified to that section here, or its notes in the reader; a title with no section to every row this table classified to it."
-  : "A public law goes to its rows in the session table. A Code citation offers the section's notes in the reader and the public laws the tables record against it; a title with no section — 15 usc, title 15 — every row classified to that title.";
+  ? "A law (e.g. 117-82) filters by that law in this table; a bare number means a law of this congress. A Code citation filters to the rows classified to that section here, or leads to its notes in the reader; a title with no section — 14 usc, title 14 — filters to every row this table classified to it."
+  : "A law (e.g. 117-82) goes to its rows in the session table covering it. A Code citation offers the section's notes in the reader and the public laws the tables record against it; a title with no section — 15 usc, title 15 — every row classified to that title. Choosing a table loads it, and the box there filters it.";
 ---
 
 <form
@@ -124,54 +140,64 @@ const hint = scope
   data-app={APP}
   data-list={listId}
 >
+  {Object.entries(hidden).map(([name, value]) => <input type="hidden" name={name} value={value} />)}
+
   <label class="classlookup__label" id={`${inputId}-label`} for={inputId}>
     {label}
   </label>
-  <div class="classlookup__row">
-    {
-      scopeOptions.length > 0 && (
-        <>
-          <label class="usa-sr-only" for={scopeId}>
-            Limit the lookup to one table
-          </label>
-          <select
-            class="usa-select classlookup__scope"
-            id={scopeId}
-            name="scope"
-            data-classlookup-scope
-          >
-            <option value="">Every table</option>
-            {scopeOptions.map((option) => (
-              <option value={option.value} selected={option.value === scopeValue}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </>
-      )
-    }
-    <input
-      class="usa-input classlookup__input"
-      id={inputId}
-      type="search"
-      name="q"
-      value={value}
-      placeholder={placeholder}
-      autocomplete="off"
-      spellcheck="false"
-      enterkeyhint="go"
-      aria-describedby={hintId}
-      data-classlookup-input
-    />
-    <button class="usa-button classlookup__go" type="submit">Look up</button>
+  {/* The field and its listbox in one positioned box, so the list opens
+      directly under the field rather than under everything below it. */}
+  <div class="classlookup__field">
+    <div class="classlookup__row">
+      <input
+        class="usa-input classlookup__input"
+        id={inputId}
+        type="search"
+        name="q"
+        value={value}
+        placeholder={placeholder}
+        autocomplete="off"
+        spellcheck="false"
+        enterkeyhint="go"
+        aria-describedby={hintId}
+        data-classlookup-input
+      />
+      <button class="usa-button classlookup__go" type="submit">Look up</button>
+    </div>
+
+    {/* Empty and hidden until a request answers. The script gives it its listbox
+        role at the same time, so nothing announces a list that is not there. */}
+    <ul class="classlookup__list" id={listId} hidden data-classlookup-list />
   </div>
+
   <p class="classlookup__hint" id={hintId}>
     {hint}
   </p>
 
-  {/* Empty and hidden until a request answers. The script gives it its listbox
-      role at the same time, so nothing announces a list that is not there. */}
-  <ul class="classlookup__list" id={listId} hidden data-classlookup-list></ul>
+  {/* Its own row, below the field rather than beside it. The select is a
+      chooser rather than part of the query — and its longest option measures
+      287px, which sharing a row with the field cost the field at every width
+      between 600 and 1000. */}
+  {
+    scopeOptions.length > 0 && (
+      <div class="classlookup__jump">
+        <label class="classlookup__jumplabel" for={scopeId}>
+          Or go to one table
+        </label>
+        <select
+          class="usa-select classlookup__scope"
+          id={scopeId}
+          name="scope"
+          data-classlookup-scope
+        >
+          <option value="">Every table</option>
+          {scopeOptions.map((option) => (
+            <option value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+    )
+  }
 
   <p class="usa-sr-only" id={statusId} role="status" data-classlookup-status></p>
 </form>
@@ -255,20 +281,6 @@ const hint = scope
           items.length === 0 ? "No matches" : items.length + " suggestions available";
       }
 
-      /* The select's value is `118-2` — split at its last dash, since the
-         session half is `1`, `2` or `all` and never carries one. */
-      function scopeParams() {
-        if (!scope || !scope.value) return "";
-        const split = scope.value.lastIndexOf("-");
-        if (split < 1) return "";
-        return (
-          "&congress=" +
-          encodeURIComponent(scope.value.slice(0, split)) +
-          "&session=" +
-          encodeURIComponent(scope.value.slice(split + 1))
-        );
-      }
-
       function ask() {
         const query = input.value.trim();
         if (query.length < 2) {
@@ -277,7 +289,7 @@ const hint = scope
         }
         pending?.abort();
         pending = new AbortController();
-        fetch(endpoint + encodeURIComponent(query) + scopeParams(), {
+        fetch(endpoint + encodeURIComponent(query), {
           headers: { accept: "application/json" },
           signal: pending.signal,
         })
@@ -293,10 +305,26 @@ const hint = scope
         timer = setTimeout(ask, 200);
       });
 
-      /* A new scope re-answers the query already typed. */
+      /* Choosing a table loads it. The form is submitted rather than
+         navigated to, so the pointer path and the no-script path are one
+         request to one page — which is the page that writes the URL
+         (`url.ts`, architecture rule 5).
+
+         Only for a pointer: Firefox fires `change` on every arrow key, so a
+         keyboard stepping through the options would load each table it
+         stepped past. A keyboard commits with `Enter`, which submits this
+         form, or with the Look up button. */
+      let byKeyboard = false;
+      scope?.addEventListener("keydown", () => {
+        byKeyboard = true;
+      });
+      scope?.addEventListener("pointerdown", () => {
+        byKeyboard = false;
+      });
       scope?.addEventListener("change", () => {
         clearTimeout(timer);
-        ask();
+        close();
+        if (!byKeyboard) box.requestSubmit();
       });
 
       input.addEventListener("keydown", (event) => {

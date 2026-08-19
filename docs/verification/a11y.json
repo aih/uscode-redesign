@@ -10,7 +10,7 @@
   "routesWithViolations": 4,
   "totals": {
     "violations": 8,
-    "nodes": 2623,
+    "nodes": 2903,
     "critical": 1,
     "serious": 7,
     "moderate": 0,
@@ -23,7 +23,7 @@
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 1645,
+          "nodes": 1904,
           "firstTarget": "div[data-role=\"redoc-description\"] > p:nth-child(1) > code",
           "help": "Elements must meet minimum color contrast ratio thresholds",
           "seenAt": [
@@ -76,7 +76,7 @@
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 574,
+          "nodes": 581,
           "firstTarget": "small:nth-child(1) > pre",
           "help": "Elements must meet minimum color contrast ratio thresholds",
           "seenAt": [
@@ -92,7 +92,7 @@
         {
           "id": "nested-interactive",
           "impact": "serious",
-          "nodes": 259,
+          "nodes": 266,
           "firstTarget": "#operations-api-list_releases_api_v1_releases_get > .opblock-summary-get.opblock-summary > .opblock-summary-control",
           "help": "Interactive controls must not be nested",
           "seenAt": [
@@ -144,14 +144,17 @@
         {
           "id": "scrollable-region-focusable",
           "impact": "serious",
-          "nodes": 116,
-          "firstTarget": "#get-api-v1-releases > .table-scroll",
+          "nodes": 123,
+          "firstTarget": "#get-api-v1-classifications-us-usc-identifier > .table-scroll",
           "help": "Scrollable region must have keyboard access",
           "seenAt": [
+            "/app/docs at 1280px in dark",
+            "/app/docs at 1280px in light",
             "/app/docs at 320px in dark",
             "/app/docs at 320px in light",
             "/app/docs at 375px in dark",
-            "/app/docs at 375px in light"
+            "/app/docs at 375px in light",
+            "/app/docs with forced-colors: active"
           ]
         }
       ]

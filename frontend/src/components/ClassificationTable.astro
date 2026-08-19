@@ -13,12 +13,20 @@
  * with nothing behind it is an em dash, and a citation with no identifier is
  * text — never a link into the reader that would 404.
  *
+ * A citation that resolves to an identifier is a hover preview as well as a
+ * link, on the terms every other reference on this site is (ADR-0024,
+ * ADR-0041): `data-cite` marks it for `CitePreview`'s one delegated listener
+ * and `data-preview` is the fragment URL that island fetches, built by
+ * `previewHref` because the island is inline and can import nothing. The page
+ * rendering this table has to render `CitePreview` too, or the attributes are
+ * inert. Clicking still opens the section, which is what the link always did.
+ *
  * The table sits in the `uslm-tablewrap` scroll region: five columns do not fit
  * 320 CSS px, and a table that pushes the page sideways is a WCAG 1.4.10 Reflow
  * failure `make shots` refuses (ADR-0039). The wrapper takes `tabindex="0"` and
  * a region role so a keyboard can reach the scroll.
  */
-import { appHref, govinfoPlawHref, statViewerHref } from "../lib/url";
+import { appHref, govinfoPlawHref, previewHref, statViewerHref } from "../lib/url";
 import { resultCitation } from "../lib/cite";
 import type { ClassificationEntry } from "../lib/types";
 
@@ -190,7 +198,13 @@ function statPageHref(entry: ClassificationEntry, label: string): string | null 
                     —
                   </span>
                 ) : entry.usc_identifier ? (
-                  <a href={appHref(entry.usc_identifier)}>{cite}</a>
+                  <a
+                    href={appHref(entry.usc_identifier)}
+                    data-cite={entry.usc_identifier}
+                    data-preview={previewHref(entry.usc_identifier)}
+                  >
+                    {cite}
+                  </a>
                 ) : (
                   cite
                 )}

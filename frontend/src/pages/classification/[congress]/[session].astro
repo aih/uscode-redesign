@@ -20,16 +20,23 @@
  * as well as `?offset=` for the jump form's sake.
  *
  * The lookup box is here as well as on the index, scoped to this table: its
- * form posts back to this page, `?q=` is the no-script path, and the suggest
- * request carries this congress and session — a bare law number then means a
- * law of this congress, and a citation's first answer is the rows in this
- * table. Finding one row otherwise means paging through as many as 118 pages.
+ * form posts back to this page and the suggest request carries this congress
+ * and session, so a bare law number means a law of this congress and a citation
+ * is counted against this table's rows. Finding one row otherwise means paging
+ * through as many as 118 pages.
+ *
+ * A submitted `?q=` that names rows in a table is **applied as a filter** and
+ * redirected to (ADR-0072) — `14 usc` here is this table's title-14 rows, and
+ * the pills above the table say so. Only what no table can be filtered by — a
+ * section's notes in the reader, the corpus-wide by-code views — is listed
+ * beside the box instead.
  *
  * An empty result is not an error. A table that covers a law and classified
  * nothing to the title you filtered by answers 200 with no rows, and that reads
  * differently on screen from "no table covers this congress", which is a 404.
  */
 import Base from "../../../layouts/Base.astro";
+import CitePreview from "../../../components/CitePreview.astro";
 import ClassificationLookup from "../../../components/ClassificationLookup.astro";
 import ClassificationMatches from "../../../components/ClassificationMatches.astro";
 import ClassificationTable from "../../../components/ClassificationTable.astro";
@@ -46,6 +53,7 @@ import type { ClassificationEntryPage } from "../../../lib/types";
 import {
   classificationEcctHref,
   classificationHref,
+  classificationTableFilterHref,
   normalizeSectionKey,
   pageOffset,
   readSort,
@@ -81,12 +89,24 @@ const sort = readSort(params.get("sort"), "pl");
  *  submits, and it means the same thing one multiplication later. */
 const offset = pageOffset(params, CLASSIFICATION_PAGE_SIZE);
 
-/** The lookup's no-script path, answered by the same endpoint the island
- *  calls — scoped to this table, so a bare law number resolves here. */
+/** The lookup's submitted query, answered by the same endpoint the island
+ *  calls — scoped to this table, so a bare law number resolves here.
+ *
+ *  What the box finds is applied rather than listed (ADR-0072): when a
+ *  suggestion names rows inside a session table — this law's, this title's,
+ *  this section's — the query becomes that filter and the reader arrives at the
+ *  rows. `14 usc` typed here is the title-14 rows of this table. A query that
+ *  names nothing in a table — a section's notes in the reader, the corpus-wide
+ *  by-code views — is still offered as a list below the box, which is the only
+ *  answer there is for it. */
 const query = (params.get("q") ?? "").trim();
 const suggestions = query
   ? await fetchClassificationSuggestions(query, { congress, session: sessionParam })
   : [];
+const applied = suggestions
+  .map((suggestion) => classificationTableFilterHref(suggestion, sort))
+  .find((href): href is string => href != null);
+if (applied) return Astro.redirect(applied, 302);
 
 /** The two keys, and what each direction means *for a document*: ascending is
  *  the file as OLRC published it rather than "oldest first", because inside one
@@ -226,7 +246,15 @@ const shownTo = offset + items.length;
           </p>
         )}
 
-        <ClassificationLookup value={query} scope={{ congress, session: sessionParam }} />
+        {/* The order rides along as a hidden field: a GET form posts its own
+            fields and nothing else, so a query submitted while reading in Code
+            order came back in public law order. `pl` is the default and spells
+            itself by its absence. */}
+        <ClassificationLookup
+          value={query}
+          scope={{ congress, session: sessionParam }}
+          hidden={sort === "pl" ? {} : { sort }}
+        />
 
         {query && <ClassificationMatches query={query} suggestions={suggestions} />}
 
@@ -336,6 +364,10 @@ const shownTo = offset + items.length;
             }}
           />
         )}
+
+        {/* The U.S. Code column is a set of references, and a reference on
+            this site previews on hover (ADR-0024). */}
+        <CitePreview />
 
         <details class="classkey">
           <summary class="classkey__summary">What the Description column says</summary>

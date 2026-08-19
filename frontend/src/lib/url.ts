@@ -359,6 +359,10 @@ export function pageOffset(
 }
 
 export interface ClassificationFilters {
+  /** What was typed in the lookup box. Not a filter — the page it lands on
+   *  answers it — but it rides in the same query string, so a table chosen
+   *  while a query is half-typed arrives with the query still in hand. */
+  q?: string | null;
   /** `118-33` — one public law. */
   pl?: string | null;
   /** `101` — a prefix of the law's own section designator. */
@@ -442,6 +446,7 @@ export function classificationHref(
       ? `${APP}/classification/${congress}/${session}`
       : `${APP}/classification`;
   const params = new URLSearchParams();
+  if (opts.q) params.set("q", opts.q);
   if (opts.pl) params.set("pl", opts.pl);
   if (opts.plSection) params.set("pl_section", opts.plSection);
   if (opts.title) params.set("title", opts.title);
@@ -565,6 +570,56 @@ export function classificationSuggestionHref(suggestion: {
     return classificationHref(null, null, { title: suggestion.title_num });
   }
   return `${APP}${suggestion.href}`;
+}
+
+/**
+ * Where a suggestion filters one table, or `null` when it names something else.
+ *
+ * Three of the six kinds land inside a session table: a public law lands in the
+ * table covering it, and `section-in-table` and `title-in-table` land in the
+ * table the lookup was scoped to. The other three — the section's notes in the
+ * reader, and the two corpus-wide by-code views — are not a filter on any one
+ * table and answer `null` here.
+ *
+ * The session page uses this to apply what was typed instead of listing it: a
+ * query submitted from the box on a table becomes that table with the filter
+ * on. `sort` is carried through so applying a filter does not reorder the rows
+ * the reader is already reading.
+ */
+export function classificationTableFilterHref(
+  suggestion: {
+    kind: string;
+    congress?: number | null;
+    session_label?: string | null;
+    pl?: string | null;
+    pl_section?: string | null;
+    title_num?: string | null;
+    section?: string | null;
+    identifier?: string | null;
+    fragment?: string | null;
+  },
+  sort?: string | null,
+): string | null {
+  const { congress, session_label: session } = suggestion;
+  if (congress == null || !session) return null;
+  if (suggestion.kind === "pl") {
+    return classificationHref(congress, session, {
+      pl: suggestion.pl,
+      plSection: suggestion.pl_section,
+      sort,
+    });
+  }
+  if (suggestion.kind === "section-in-table" && suggestion.title_num) {
+    return classificationHref(congress, session, {
+      title: suggestion.title_num,
+      section: suggestion.section,
+      sort,
+    });
+  }
+  if (suggestion.kind === "title-in-table" && suggestion.title_num) {
+    return classificationHref(congress, session, { title: suggestion.title_num, sort });
+  }
+  return null;
 }
 
 /** govinfo's page for a public law. Predictable from (congress, number), which
