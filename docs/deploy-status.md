@@ -6,8 +6,10 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-08-13 — the classification rows are loaded on the box (144,837 of them) and
-the pages that serve them are waiting on a deploy; see [Still owed](#still-owed). Before that,
+**Last updated:** 2026-08-19 — the site was down for about ten hours and every alarm read `OK`;
+see [The outage](#the-outage-2026-08-19-adr-0073). Before that, 2026-08-13 — the classification rows
+are loaded on the box (144,837 of them) and the pages that serve them were waiting on a deploy; that
+deploy has since happened and `/app/classification` answers 200. Before that,
 2026-08-06 — the documentation audit reconciled the contradictions this file had
 accumulated as a running narrative. The sections below are written in the order the work happened,
 so an earlier passage may state a position a later one supersedes; where that happens the earlier
@@ -18,6 +20,9 @@ passage now names the later one. The state of record is:
 - PRs #17 and #18 are merged; the streaming fix is in the running image, not copied into a
   container.
 - The 160- and 9-document shortfalls against the database counts are ADR-0021, not a failed run.
+- The site is watched by something that asks whether it answers (ADR-0073). Before 2026-08-19 nothing
+  did, and the gap was measured rather than theorised: ten hours of total outage under six green
+  alarms.
 
 Before that: the crawl that had the box pinned, and the daily check proving itself unattended
 (2026-08-03).
@@ -122,6 +127,75 @@ aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
 It was in alarm after a quiet day, and the instance is not undersized: **it was serving a crawl**
 (see below). Expect it to clear as the crawlers back off; if it does not, that is when the
 undersizing reading becomes the right one.
+
+## The outage (2026-08-19, ADR-0073)
+
+**The site served nothing for about ten hours and every alarm read `OK`.** Roughly 12:00 to 22:15
+UTC. TCP connections were accepted, so it presented as a hang rather than a refusal: every request
+timed out after 25 seconds having received zero bytes.
+
+The box was healthy throughout, which is why nothing fired:
+
+| | |
+|---|---|
+| load average | 0.73 on 2 vCPUs |
+| root / data volume | 44% / 37% |
+| memory | 2 GB free, 6 GB swap barely touched |
+| api container CPU | 2.1% |
+| Postgres CPU | 0.0% |
+| CloudWatch alarms in ALARM | **0 of 6** |
+
+What was actually wrong, in three measurements:
+
+- The api container's Docker healthcheck had a **failing streak of 2,710** — ten hours at one probe
+  every thirteen seconds. A Docker healthcheck's only effect is the word `unhealthy` in `docker ps`.
+- Its log repeated one exception: `QueuePool limit of size 5 overflow 10 reached, connection timed
+  out, timeout 30.00` — SQLAlchemy's untouched defaults.
+- `pg_stat_activity` held **fifteen backends `idle in transaction`**, every one on `ClientRead`, the
+  oldest 8m43s. The whole pool, held by requests whose clients were long gone. FastAPI closes a
+  dependency's session after the response is sent, so a response that is never sent is a session
+  that is never closed — and Postgres holds that state forever. **It does not recover when the load
+  eases**, which is why ten hours of it followed a busy few minutes.
+
+The traffic was **Meta's `meta-externalagent`** walking the `?release=` axis: 7,155 of 7,172
+requests in the hour, spread over ~60 addresses in `57.141.0.0/24` at about two requests per minute
+each. It had fetched `/robots.txt` **21 times in 24 hours**, been served `Disallow: /`, and crawled
+anyway. ADR-0037's crawl again, by an agent that does not stop when asked — and the per-address rate
+means ADR-0029's per-caller limits would never have fired.
+
+**The pages were never slow.** Measured after recovery against the same URLs it was requesting:
+0.42s, 0.74s, 1.01s, 0.33s. This outage consumed no resource anything was watching.
+
+### What changed
+
+| | |
+|---|---|
+| `deploy/Caddyfile` | declared crawlers get 403 before either backend or the database |
+| `storage/session.py` | `statement_timeout` 20s, `idle_in_transaction_session_timeout` 30s, per transaction |
+| `db/base.py` | pool 10+20, `pool_pre_ping`, and `pool_timeout` **30s → 2s** so it sheds rather than queues |
+| `docker-compose.prod.yml` | `--limit-concurrency 64` — past that, an immediate 503 |
+| `deploy/Caddyfile` | `dial_timeout` / `response_header_timeout` on both upstreams |
+| `deploy/watchdog.sh` | every minute: probe, publish `USCode/SiteUp`, restart after three failures |
+| `deploy/alarms.sh` | `uscode-site-down`, `treat-missing-data breaching` |
+
+After the fix: crawler traffic **7,155/hour → ~60/hour, all 403**; `idle in transaction` **15 → 0**;
+api container `healthy`; reader pages 200 in under half a second.
+
+Check the watchdog and its alarm:
+
+```bash
+# on the box — a successful probe writes nothing, so an empty log is the good case
+tail /var/lib/uscode/logs/watchdog.log
+sudo -u ec2-user env PROBE_ONLY=1 bash deploy/watchdog.sh; echo "exit=$?"
+
+AWS_PROFILE=uscode-admin aws cloudwatch describe-alarms \
+  --alarm-names uscode-site-down --region us-east-1 \
+  --query 'MetricAlarms[0].{State:StateValue,Reason:StateReason}'
+```
+
+**The watchdog can restart a container someone is mid-way through debugging.** It takes the deploy
+lock, so it will not fight a deploy, and nothing else holds it off — run with `PROBE_ONLY=1` or
+comment the cron line in `/etc/cron.d/uscode` while investigating.
 
 ## The crawl (ADR-0037)
 
@@ -456,9 +530,9 @@ docker compose -f docker-compose.prod.yml exec -T api uv run python -m ingest cl
 same class Wave 2 recorded: a Sec. cell running into a letter-numbered Statutes at Large page, in
 vintages with no statviewer anchor to key on.
 
-What is left is a deploy. `/api/v1/classifications/tables` and `/app/classification` answer 404 on
-the box: the running image predates Wave 3, which merged as PR #46 the same day, and Wave 4 is
-PR #47. Once `deploy.yml` ships them:
+**That deploy has since happened.** `/app/classification` and `/api/v1/classifications/tables`
+answer 200 on the box, confirmed 2026-08-19. The two checks below were the ones to make when it
+landed, and are kept as the way to re-check:
 
 1. Check `/app/classification` renders the registry and reports 144,837 rows.
 2. `classification_source_checks` holds 0 rows — the loader does not write one, `classification-check`

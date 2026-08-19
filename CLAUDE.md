@@ -344,7 +344,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(70 ADRs, numbered to 0071 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(72 ADRs, numbered to 0073 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -358,7 +358,30 @@ it; blunt on purpose while the site is a demo, after two AI crawlers walking the
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A
 Caddyfile change only reaches the running proxy because `deploy-on-box.sh` **force-recreates** it:
 the file is a single-file bind mount, which binds an inode, so `caddy reload` would reload the
-pre-`git checkout` file and exit 0. **Live state and what is still owed are in
+pre-`git checkout` file and exit 0. **The site went down for ten hours under six green alarms, and now something asks whether it
+answers** (ADR-0073). Meta's `meta-externalagent` walked the `?release=` axis — 7,155 of 7,172
+requests in an hour over ~60 addresses in `57.141.0.0/24`, having fetched `/robots.txt` 21 times in
+24 hours and read `Disallow: /` — and the pages it asked for were never slow (0.3–1.0s). What made
+it an outage is that **all fifteen pooled connections ended up `idle in transaction` on
+`ClientRead`**: FastAPI closes a dependency's session after the response is sent, so a response that
+is never sent is a session that is never closed, and Postgres holds that state forever — so it did
+**not** recover when the load eased. Every alarm was a resource tripwire and the outage used no
+resource (load average 0.73, 2.1% api CPU, 0.0% Postgres); the api container's own healthcheck had a
+failing streak of **2,710** and a Docker healthcheck's only effect is a word in `docker ps`. Now:
+declared crawlers get **403 at the proxy** (enforcement of ADR-0037's policy, not a new one — and
+ADR-0029's per-caller limits would never have fired at two requests a minute per address);
+`storage/session.py` sets `statement_timeout` 20s and `idle_in_transaction_session_timeout` 30s
+**per transaction**, via an `after_begin` listener on a sessionmaker of storage's own, because
+**ingest shares `db/base.py` in its own process and must stay unbounded** and because **applying the
+bounds at session construction makes every early-rejected request need a database**
+(`tests/test_rate_limit.py` caught that); the pool is 10+20 with `pool_pre_ping` and
+`pool_timeout` **30s → 2s**, so it sheds rather than queues; uvicorn carries `--limit-concurrency 64`
+and Caddy `dial_timeout`/`response_header_timeout` on both upstreams. **`deploy/watchdog.sh`** runs
+every minute, probes both surfaces through the proxy, publishes `USCode/SiteUp` and restarts the HTTP
+services after three failures — deploy lock first, ten-minute cooldown — and `uscode-site-down`
+treats **missing data as breaching**, since a box too wedged to run cron publishes nothing.
+
+**Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.
 
 **The search ranking is measured rather than asserted** (ADR-0049). `docs/verification/search-judgements.json`
@@ -462,10 +485,12 @@ keyboard commits with `Enter`. Sizes: **title 10 carries 23,093 of the 144,837 r
 a section page shows no classification rows, so the link runs one way; and the poll cannot see a
 change to the ECCT alone. (The title view's `sort=code` is built — ADR-0071.)
 
-**Next: (1) Day 7 hardening; (2) `docs/verification/loadtest.json` has never been regenerated
+**Next: (1) Day 7 hardening — part of it landed as ADR-0073 under an outage, and what it did not
+cover is the load test below; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
 reader off the endpoint, ADR-0066 made the endpoint 150-2,000x cheaper, and the reader's own limiter
-changed; (3) the remaining accessibility tasks A4, A9 and A10.**
+changed — and it now also predates ADR-0073's pool, concurrency cap and proxy timeouts, which are
+exactly what a load test would measure; (3) the remaining accessibility tasks A4, A9 and A10.**
 
 Open debts: **the source's `indentUp0/1/2/3`, `indentDown1/2`, `indentTo54pts`,
 `indentTo65ptsHang`, `indent0And43pts` and `rightIndent1` classes are styled by nothing** — 8,733
