@@ -89,3 +89,21 @@ already know it is there. The controls sit at 45% opacity always.
   so at inline-execution time none of its targets are parsed — which it shipped with for one
   build, silently doing nothing with no error anywhere. `frontend/tests/e2e/copy.spec.ts` exists
   mostly to catch that class of failure.
+
+## Addendum (2026-08-19): the bar and the gutter are opened by different conditions
+
+The island revealed the bar only after injecting at least one gutter button (`if (injected === 0)
+return`), so a section with no identified subdivision showed no copy control at all — not even the
+"Whole section" button this ADR put in the bar precisely because the section has nowhere to sit in
+the gutter. The button was built, wired and holding a correct citation; it was inside an element
+that was never un-hidden.
+
+That is not an edge: 2,791 of the 5,028 sections in `samples/uslm2/USLM2/usc16.xml` and 32 of the
+39 in `usc01.xml` carry no identified `LEVEL_TAGS` descendant, so the majority of section pages
+offered no way to copy anything.
+
+Now `.copycol` is revealed whenever there is a target, and `has-copy` — the class that opens the
+1.75rem gutter — is added only when a button was injected into it. A section with no subdivisions
+gets the bar and keeps the full reading measure. `frontend/tests/e2e/copy.spec.ts` covers the
+shape at `/app/us/usc/t16/s21`, where the assertions are the two conditions apart: the whole-section
+button visible, `.copybtn` and `.section-body.has-copy` both absent.
