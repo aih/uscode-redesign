@@ -5,7 +5,7 @@ order: 1
 summary: A reader for the United States Code where every provision has an address, at every point in time it has existed.
 covers:
   routes: ["/app/", "/app/about", "/app/demo"]
-  adrs: [37, 38, 65, 69]
+  adrs: [37, 38, 65, 69, 73]
 ---
 
 This is a conceptual redesign of the [Office of the Law Revision Counsel](https://uscode.house.gov/)'s
@@ -74,13 +74,41 @@ steps:
   - expect: { selector: ".toc", contains: "Title 16" }
 ```
 
-## Inactive features and indexing
+## Inactive features
 
 Two features described in this guide are currently inactive: **accounts** and **bulk downloads**.
 Their controls are still visible on the page to explain their intended functionality — see
 [Accounts and watchlists](/app/guide/07-accounts).
 
-The site also serves a `robots.txt` disallowing search engine crawlers.
+## Automated access
+
+`robots.txt` is `Disallow: /` for every agent: the site asks not to be crawled or indexed at all.
+
+The address space is large. Every section can be requested at each of 382 release points, which is
+about 25 million reader pages, and every provision also answers to a guid, of which there are
+96,185,732. A crawler following those links does not run out of pages to fetch.
+
+An agent that identifies itself as a crawler receives `403` on every path, `robots.txt` included,
+on the reader and the API alike. The match is on the User-Agent, so a client that does not announce
+itself as a crawler is unaffected.
+
+Two crawlers have been blocked this way after ignoring `robots.txt`:
+
+| Agent | What it did |
+|---|---|
+| `meta-externalagent` (Meta) | Requested `robots.txt` 21 times in 24 hours and crawled the `?release=` axis anyway — 7,155 requests in one hour, from about 60 addresses |
+| `ClaudeBot`, `GPTBot` | Crawled the same axis before any `robots.txt` existed; both stopped when one was published |
+
+Scripted use of the API is unaffected. [The API](/app/guide/08-api) documents the per-caller rate
+limits that apply there.
+
+```scenario
+id: robots-disallows-everything
+title: robots.txt asks every agent not to crawl the site
+steps:
+  - goto: /robots.txt
+  - expect: { selector: "body", contains: "Disallow: /" }
+```
 
 ## The corpus as a dataset
 
