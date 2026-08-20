@@ -3074,10 +3074,12 @@ main[id] {
  * A control beside every provision, and one toggle saying what "copy" means
  * (`CopyColumn.astro`).
  *
- * The gutter is opened by `.has-copy`, which the island adds only once it has
- * actually injected something — so a reader with scripting off, or a page where
- * no provision carries an identifier, keeps the full reading measure rather
- * than a 2rem strip reserved for controls that never arrive.
+ * The bar and the gutter are opened by different conditions. `.copycol` is
+ * revealed wherever there is a section to copy; the gutter is opened by
+ * `.has-copy`, which the island adds only once it has actually injected a
+ * button into it. A section with no identified subdivisions — more than half of
+ * them — gets the bar and keeps the full reading measure, and a reader with
+ * scripting off gets neither.
  *
  * The buttons are positioned against each provision rather than against a
  * single fixed column. That looks like the harder option and is the easier one:
