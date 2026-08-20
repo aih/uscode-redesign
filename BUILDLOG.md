@@ -3070,3 +3070,19 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `make test` 801 tests green (795 + 6 new); `make test-web` 404 green including the guide ratchet; `caddy validate` on the new Caddyfile reports `Valid configuration`.
   - Against a live Postgres: the bounds are in force (`20s`/`30s`), ingest's `SessionLocal` is unbounded (`0`/`0`), the bounds do not follow a connection back into the pool, and both timeouts actually fire.
   - The watchdog and its cron are installed on the box and `uscode-site-down` reached `OK` on a real datapoint (`1.0` at 22:32 UTC) — the cron, the metric and the alarm proven end to end rather than assumed. Re-check with `AWS_PROFILE=uscode-admin aws cloudwatch describe-alarms --alarm-names uscode-site-down --region us-east-1`.
+
+## 082 — 2026-08-19 — Session 60: the copy control on a section that has only one provision
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** Provide a copy button for sections that only have one provision, like `/app/us/usc/t3/s303?release=119-73`.
+- **Found:**
+  - The bar was already being rendered into those pages, with a wired **Whole section** button holding the right citation and URL. `CopyColumn.astro`'s island revealed it only after injecting at least one *gutter* icon — `if (injected === 0) return`, before `root.hidden = false` — and a section with no identified subdivision has exactly one target, itself, which `targets.slice(1)` skips. `[hidden] { display: none !important }` (`site.scss:1340`) did the rest.
+  - The shape is the majority, not an edge: **2,791 of 5,028 sections in `samples/uslm2/USLM2/usc16.xml` (55.5%), 2,803 of 5,095 in `samples/uslm1/usc16.xml`, 32 of 39 in `usc01.xml`** carry no identified `LEVEL_TAGS` descendant.
+- **Decided (ADR-0033 addendum):** the bar and the gutter are opened by different conditions — `.copycol` whenever there is a target, `has-copy` only when a button was injected into the gutter. A section with no subdivisions gets the bar and keeps the full reading measure. No new ADR: this restores what ADR-0033 already decided ("the section itself gets a named button in the bar rather than a gutter icon"), and chapter 06 already claims ADR 33 for the guide ratchet.
+  - The added comment was written short and the rationale left in the frontmatter docstring: an `is:inline` island's comments ship on every route. The change is **+33 bytes** per route (`/app/design` 39,336 → 39,369 against a 39,500 ceiling), which is why the first draft's three-line comment turned `jsbudget.test.ts` red.
+- **Produced:** `frontend/src/components/CopyColumn.astro` (island tail, docstring), `frontend/src/styles/site.scss` (the copy-column comment block), `frontend/tests/e2e/copy.spec.ts` (a flat-section test), guide chapter 06 (the case, plus a `copy-a-section-with-no-subdivisions` scenario), `docs/adr/0033-copy-column-four-modes.md` (addendum), `docs/verification/js-bytes.json`, `claude-code/DOC-AUDIT-TASKS.md` item 8 marked fixed.
+- **Verified:**
+  - `make test` 815 passed / 2 skipped; `make test-web` 404 passed; full Playwright suite **628 passed / 2 skipped**, including the new `copy.spec.ts` case and the new guide scenario.
+  - `npx playwright test a11y.spec.ts` — 322 scans, **8 violation/route pairs over 2,903 nodes**, the committed baseline unchanged.
+  - `/app/us/usc/t16/s21` measured in a browser at 1280, 375 and 320: bar visible, `Whole section` present, `.copybtn` count 0, `.section-body.has-copy` absent, `padding-left: 0px`, horizontal overflow 0. `/app/us/usc/t16/s45f` unchanged — gutter icons and `has-copy` as before.
+  - Re-check the fixture counts with the section walk over `samples/`: a `<section>` with an `@identifier` and no descendant that is both a `LEVEL_TAGS` element and identified.
