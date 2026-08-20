@@ -72,27 +72,27 @@ crawling is refused.
 | 2026-08-03 | ClaudeBot, GPTBot | 43,068 requests in one hour against ~48 from human browsers, 85% carrying `?release=`. No `robots.txt` existed; both stopped within minutes of one being published. |
 | 2026-08-19 | `meta-externalagent` (Meta) | 7,155 of 7,172 requests in one hour, from ~60 addresses in `57.141.0.0/24`. It had fetched `robots.txt` 21 times in 24 hours and crawled anyway. |
 
-The second one took the site down for about ten hours, and the interesting part is that it used no
-resource anything was watching: load average 0.73, the API container at 2.1% CPU, Postgres at 0.0%,
-and all six CloudWatch alarms reading `OK` throughout. The pages it requested answered in 0.3–1.0
-seconds. What failed was that all fifteen pooled database connections ended up held by transactions
-left open for requests whose clients had gone — a state Postgres holds indefinitely, so the site did
-not recover when the crawl eased.
+The second one took the site down for about ten hours. It consumed no resource that was being
+watched: load average 0.73, the API container at 2.1% CPU, Postgres at 0.0%, and all six CloudWatch
+alarms reading `OK` throughout. The pages it requested answered in 0.3–1.0 seconds. What failed was
+that all fifteen pooled database connections ended up held by transactions left open for requests
+whose clients had gone — a state Postgres holds indefinitely, so the site did not recover when the
+crawl eased.
 
-Being blunt about crawlers is therefore only half of it; the other half is that the site should
-survive one that lies about being a crawler:
+A User-Agent block only reaches an agent that declares itself, so the bounds below are what hold
+for one that does not:
 
 - API sessions carry a `statement_timeout` and an `idle_in_transaction_session_timeout`, so no
-  request can hold a connection indefinitely. Ingest is deliberately exempt — its bulk loads hold
-  one transaction across minutes of parsing.
+  request can hold a connection indefinitely. Ingest is exempt: its bulk loads hold one transaction
+  across minutes of parsing.
 - The connection pool is sized 10 with 20 of overflow, and waits **two** seconds rather than thirty
   for a free connection, so requests shed while someone is still waiting for them. Pool exhaustion
-  answers `503` with `Retry-After`, not `500`: busy is not broken.
+  answers `503` with `Retry-After` rather than `500`.
 - uvicorn caps in-flight requests, and the proxy has dial and response-header timeouts on both
   upstreams.
 - `deploy/watchdog.sh` probes both surfaces every minute, publishes `USCode/SiteUp`, and restarts
   the HTTP services after three consecutive failures. The `uscode-site-down` alarm treats missing
-  data as breaching, because a box too wedged to run cron publishes nothing at all.
+  data as breaching, since a box too wedged to run cron publishes nothing at all.
 
 ## The corpus as a dataset
 

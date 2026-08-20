@@ -82,15 +82,15 @@ Their controls are still visible on the page to explain their intended functiona
 
 ## Automated access
 
-`robots.txt` is `Disallow: /` for every agent, so the site asks not to be crawled or indexed at
-all. The reason it is that blunt is the size of the address space: every section can be requested
-at every one of 382 release points, which is about 25 million reader pages, and every provision
-also answers to a guid — 96,185,732 of them. A crawler that follows those links does not run out
-of pages to fetch.
+`robots.txt` is `Disallow: /` for every agent: the site asks not to be crawled or indexed at all.
 
-An agent that identifies itself as a crawler receives `403` on every path, `robots.txt` included.
-This applies to the reader and the API alike, and it is matched on the User-Agent, so a client that
-does not announce itself as a crawler is not affected.
+The address space is large. Every section can be requested at each of 382 release points, which is
+about 25 million reader pages, and every provision also answers to a guid, of which there are
+96,185,732. A crawler following those links does not run out of pages to fetch.
+
+An agent that identifies itself as a crawler receives `403` on every path, `robots.txt` included,
+on the reader and the API alike. The match is on the User-Agent, so a client that does not announce
+itself as a crawler is unaffected.
 
 Two crawlers have been blocked this way after ignoring `robots.txt`:
 
@@ -99,8 +99,8 @@ Two crawlers have been blocked this way after ignoring `robots.txt`:
 | `meta-externalagent` (Meta) | Requested `robots.txt` 21 times in 24 hours and crawled the `?release=` axis anyway — 7,155 requests in one hour, from about 60 addresses |
 | `ClaudeBot`, `GPTBot` | Crawled the same axis before any `robots.txt` existed; both stopped when one was published |
 
-Scripted and programmatic use of the API is not what this refuses — see
-[The API](/app/guide/08-api), which documents the per-caller rate limits that apply there.
+Scripted use of the API is unaffected. [The API](/app/guide/08-api) documents the per-caller rate
+limits that apply there.
 
 ```scenario
 id: robots-disallows-everything
