@@ -154,10 +154,16 @@ def test_meta_of_the_current_release_point():
 
 def test_parsing_32_mb_stays_memory_bounded():
     """Gotcha 6: Title 42 is multiples of this file. If the streaming prune ever
-    regressed to holding the tree, peak RSS would grow with file size.
+    regressed to holding the tree, peak RSS would grow with file size — a whole
+    tree of this file is ~275 MB against the ~35 MB the stream costs.
 
-    Measured in a clean subprocess: `ru_maxrss` is a high-water mark, so anything
-    an earlier test allocated in this process would mask a regression.
+    Measured in a subprocess, because a high-water mark in this one would carry
+    whatever an earlier test allocated. The subprocess is only clean on Darwin:
+    Linux does not reset `ru_maxrss` at `execve`, so a child forked from pytest
+    starts at pytest's own high-water mark (measured on ubuntu-latest: 413 MB
+    reported before the child had allocated anything, from a 400 MB parent).
+    `VmHWM` belongs to the address space `execve` replaced, so on Linux it is
+    the only figure that is the child's own.
     """
     result = subprocess.run(
         [sys.executable, "-c", _PEAK_RSS_PROBE, str(require(USLM1_USC16))],
@@ -177,10 +183,21 @@ def test_parsing_32_mb_stays_memory_bounded():
 _PEAK_RSS_PROBE = """
 import resource, sys
 from ingest import iter_sections
+
+
+def peak_bytes():
+    if sys.platform == "linux":
+        # ru_maxrss survives execve here and would report the parent's peak.
+        with open("/proc/self/status") as handle:
+            for line in handle:
+                if line.startswith("VmHWM:"):
+                    return int(line.split()[1]) * 1024
+        raise RuntimeError("no VmHWM in /proc/self/status")
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss  # bytes on macOS
+
+
 count = sum(1 for _ in iter_sections(sys.argv[1]))
-peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-# ru_maxrss is bytes on macOS, kilobytes on Linux.
-print(count, peak if sys.platform == "darwin" else peak * 1024)
+print(count, peak_bytes())
 """
 
 
