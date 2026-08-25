@@ -3086,3 +3086,17 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `npx playwright test a11y.spec.ts` — 322 scans, **8 violation/route pairs over 2,903 nodes**, the committed baseline unchanged.
   - `/app/us/usc/t16/s21` measured in a browser at 1280, 375 and 320: bar visible, `Whole section` present, `.copybtn` count 0, `.section-body.has-copy` absent, `padding-left: 0px`, horizontal overflow 0. `/app/us/usc/t16/s45f` unchanged — gutter icons and `has-copy` as before.
   - Re-check the fixture counts with the section walk over `samples/`: a `<section>` with an `@identifier` and no descendant that is both a `LEVEL_TAGS` element and identified.
+
+## 083 — 2026-08-25 — Session 61: the memory bound was measuring pytest
+
+- **Tool/model:** Claude Code, Opus 5.
+- **Asked:** CI's `make test-slow` fails — `test_parsing_32_mb_stays_memory_bounded` reports "peak RSS 556 MB for a 32 MB file — streaming regressed".
+- **Found:**
+  - The nightly `slow` job (scheduled only) has failed on that assertion at **551–556 MB** in every run back to 2026-07-31, the oldest still listed, drifting about 1 MB as the code grew. No commit regressed it.
+  - The same probe on macOS peaks at **46 MB**, and a deliberate whole-tree parse of the same file costs **274 MB** — so 556 MB is twice what holding the tree would cost. `_prune` was never the subject.
+  - Measured on ubuntu-latest: the parse peaks at **35 MB**, and peak RSS is flat across a 0.3 MB, a 0.9 MB, a 23 MB, a 30 MB and a 33 MB input. A figure that does not move with the input is not being allocated by the parse.
+  - `ru_maxrss` is not reset by `execve` on Linux. A child forked from a 400 MB parent reported **413 MB before it had allocated anything**, while its own `VmHWM` read 10 MB; after parsing all 5,095 sections, `ru_maxrss` still said 413 MB and `VmHWM` said 35 MB. Darwin resets it: the same child there starts at 16 MB. The subprocess the docstring called clean was reporting pytest's high-water mark, and pytest had just parsed the full samples.
+- **Decided:** the probe reads `VmHWM` from `/proc/self/status` on Linux and keeps `ru_maxrss` on Darwin. `VmHWM` belongs to the address space `execve` created, so it is the child's own on the platform where the rusage figure is not. The 150 MB bound is unchanged and now has 35 MB (Linux) / 46 MB (macOS) of headroom under it against ~275 MB for a held tree.
+- **Decided (CI):** the slow suite stays off the per-push path, and gains two ways in besides the nightly cron — `workflow_dispatch`, and a `scope` job that runs it when the diff touches `ingest/`, `samples/`, `tests/fixtures/` or its own test, so a parser change is measured before it merges. A **scheduled** run that fails now files an issue labelled `nightly` and comments on that issue while it stays open; a red nightly nobody sees is what let this one stand for a month.
+- **Produced:** `tests/test_uslm_full_corpus.py`, `.github/workflows/ci.yml`.
+- **Verified:** `make test-slow` green on macOS (13 passed, 2 skipped) and, on a temporary branch running the same target on ubuntu-latest, green there (13 passed, 2 skipped) where it had failed for a month. Re-check on Linux with `python -c` reading `VmHWM` around a parse, or by reading the next scheduled run of the `slow` job.
