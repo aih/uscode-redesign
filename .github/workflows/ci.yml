@@ -19,6 +19,7 @@ on:
   schedule:
     # The full-sample parser tests parse the 32 MB usc16.xml; nightly, not per push.
     - cron: "17 6 * * *"
+  workflow_dispatch: {}
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -222,9 +223,46 @@ jobs:
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
+  # What the slow suite covers. It is off the per-push path by design — it
+  # parses the 32 MB usc16.xml — but a parser change should be measured before
+  # it merges rather than at 06:17 the next morning.
+  scope:
+    name: what the diff touches
+    runs-on: ubuntu-latest
+    outputs:
+      parser: ${{ steps.diff.outputs.parser }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            range="HEAD~1 HEAD"      # a push to main: the push itself
+          else
+            range="origin/main...HEAD"   # a branch or a PR: the diff from main
+          fi
+          files=$(git diff --name-only $range)
+          echo "$files"
+          pattern='^(ingest/|samples/|tests/fixtures/|tests/test_uslm_full_corpus\.py)'
+          if echo "$files" | grep -qE "$pattern"; then
+            echo "parser=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "parser=false" >> "$GITHUB_OUTPUT"
+          fi
+
   slow:
     name: make test-slow (full samples)
-    if: github.event_name == 'schedule'
+    needs: scope
+    # Nightly, on demand, and on a diff that reaches the parsers or their
+    # fixtures. Not on every push: it is ~15 s of tests behind a minute of
+    # setup, against a suite that is already three required jobs.
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      needs.scope.outputs.parser == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -237,3 +275,36 @@ jobs:
       - run: uv sync --frozen
 
       - run: make test-slow
+
+  # A scheduled run has no author watching it: test_parsing_32_mb_stays_memory_bounded
+  # failed here every night for a month with nobody the wiser. A red nightly
+  # therefore files an issue, and a later one comments on the issue already open.
+  nightly-report:
+    name: report a failed nightly
+    needs: [python, web, e2e, compose, slow]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+
+    permissions:
+      issues: write
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      TITLE: Scheduled CI is failing
+
+    steps:
+      - name: open or update the issue
+        run: |
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label nightly --json number --jq '.[0].number // empty')
+          body=$(printf '%s\n\n%s\n' \
+            "Scheduled run of $GITHUB_WORKFLOW failed on \`$GITHUB_SHA\`." "$RUN_URL")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh label create nightly --repo "$GITHUB_REPOSITORY" \
+              --description "A scheduled CI run failed" --color B60205 2>/dev/null || true
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+              --label nightly --body "$body"
+          fi
