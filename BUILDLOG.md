@@ -3070,3 +3070,17 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `make test` 801 tests green (795 + 6 new); `make test-web` 404 green including the guide ratchet; `caddy validate` on the new Caddyfile reports `Valid configuration`.
   - Against a live Postgres: the bounds are in force (`20s`/`30s`), ingest's `SessionLocal` is unbounded (`0`/`0`), the bounds do not follow a connection back into the pool, and both timeouts actually fire.
   - The watchdog and its cron are installed on the box and `uscode-site-down` reached `OK` on a real datapoint (`1.0` at 22:32 UTC) — the cron, the metric and the alarm proven end to end rather than assumed. Re-check with `AWS_PROFILE=uscode-admin aws cloudwatch describe-alarms --alarm-names uscode-site-down --region us-east-1`.
+
+## 084 — 2026-08-30 — Session 62: most of the version history is not the law changing
+
+(Entries 082–083 are on the unmerged `fix/slow-suite-memory-probe` branch; this entry follows them.)
+
+- **Tool/model:** Claude Code, Fable 5. Planning session — no implementation.
+- **Asked:** Design storage and UI for distinguishing version changes driven by actual statutes from id/XML-structure/metadata changes: per-transition change kind, confirmed against the classification tables; the reader defaulting to text-affecting versions with the full history as a compact alternative (later an account preference). Save the design and a multi-agent implementation plan.
+- **Decided:** All in `docs/version-semantics-spec.md` — the deliverable. Headlines: the dedupe key (ADR-0007) is untouched; a `section_version_changes` table annotates transitions (`text`/`notes`/`structure`/`initial`) with `text_hash`/`notes_hash` columns added to `section_versions`; attribution matches classification rows by `usc_identifier` against the delta of incorporated-law sets **honoring `excluded_laws`** (label-interval matching misses every `not`-law incorporation); no FK into `classification_entries` (its rows are reinserted wholesale); the reader renders all entries and CSS-filters on `data-view` from `?view=all`, so both views are one cacheable document shape and a later account preference is a pre-paint stamp. Four phases V1–V4, waves 1: V1, 2: V2 ∥ V4, 3: V3; ADR-0074/0075 assigned to the implementing phases.
+- **Produced:** `docs/version-semantics-spec.md` on branch `plan/version-semantics`; this entry.
+- **Verified (measurement, full local corpus, 600-section sample seed 42, 3,881 transitions):**
+  - Transition kinds: 72.7% structure-only, 18.9% notes-only, 8.4% text (whitespace-insensitive reading text, apparatus excluded). Whitespace-sensitive comparison inflates text to 11.4%; the difference is 2013–2015 converter boundary whitespace.
+  - Classification correlation with the incorporated-set window: text 50.5% matched, structure-only 0.0% (1 note row in 2,822) — the signal is clean. Every classification match was also a citation newly added to `source_credit`, and no transition had a new credit citation without a classification match (156/156 agree).
+  - The CI corpus can carry the whole chain: its only two content-differing sections (t16 s2201, s2206 — ADR-0007's measurement) are classified to Pub. L. 119-102 by the real 119-2 table; the committed fixture slice for it does not exist yet (V1 adds `tbl119pl_2nd_slice.htm`).
+  - Re-check: `python -m ingest version-changes --report` (Phase V1) reproduces corpus-wide into `docs/verification/version-changes.json`; probe scripts were session-scratch and are summarized in the spec's "What was measured".
