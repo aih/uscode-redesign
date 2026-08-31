@@ -4058,13 +4058,11 @@ dialog.palette {
   display: none;
 }
 
-/* Each entry carries both of its "unchanged through" runs and both of its diff
- * links: its own group's, and the run it holds once the hidden groups after it
- * are folded in. One is shown per view. */
+/* Each entry carries both of its "unchanged through" runs: its own group's, and
+ * the run it holds once the hidden groups after it are folded in. One is shown
+ * per view. */
 .timeline[data-view="text"] .timeline__releases--own,
-.timeline[data-view="text"] .timeline__diff--own,
-.timeline[data-view="all"] .timeline__releases--effective,
-.timeline[data-view="all"] .timeline__diff--statutory {
+.timeline[data-view="all"] .timeline__releases--effective {
   display: none;
 }
 

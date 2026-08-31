@@ -66,12 +66,16 @@ export interface TimelineRow {
    *  entry the reader cannot see. Equal to `releases` in the all view's terms
    *  and for a row the default view hides. */
   effectiveReleases: string[];
-  /** The release point to compare against in the all view: the last release of
-   *  the entry before this one, so the redline spans one transition. */
+  /**
+   * The release point to compare against: the last release of the entry before
+   * this one, so the redline spans one transition.
+   *
+   * One value serves both views. The entries the default view hides sit between
+   * a shown entry and the one above it, and they are folded into that one's
+   * run, so the end of the previous *shown* entry's effective run is the last
+   * release of the entry immediately before — the same label either way.
+   */
   from: string | null;
-  /** The same in the default view: the last release of the previous *shown*
-   *  entry's effective run. */
-  fromStatutory: string | null;
 }
 
 /**
@@ -97,22 +101,14 @@ export function timelineRows(entries: VersionEntry[]): TimelineRow[] {
       releases,
       effectiveReleases: [...releases],
       from: previous ? (previousReleases[previousReleases.length - 1] ?? null) : null,
-      fromStatutory: null,
     };
   });
 
-  // Fold each hidden run into the shown row above it, and record what a shown
-  // row compares against once those hidden rows are gone.
+  // Fold each hidden run into the shown row above it.
   let lastShown: TimelineRow | null = null;
   for (const row of rows) {
-    if (row.statutory) {
-      row.fromStatutory = lastShown
-        ? (lastShown.effectiveReleases[lastShown.effectiveReleases.length - 1] ?? null)
-        : null;
-      lastShown = row;
-      continue;
-    }
-    if (lastShown) lastShown.effectiveReleases.push(...row.releases);
+    if (row.statutory) lastShown = row;
+    else if (lastShown) lastShown.effectiveReleases.push(...row.releases);
   }
 
   return rows;

@@ -167,15 +167,17 @@ describe("timelineRows", () => {
     ]);
   });
 
-  it("compares a shown entry with the end of the previous shown entry's run", () => {
-    expect(rows[0].fromStatutory).toBeNull();
-    expect(rows[3].fromStatutory).toBe("114-139");
-    expect(rows[6].fromStatutory).toBe("119-99");
-  });
-
-  it("leaves a hidden entry no default-view comparison", () => {
-    for (const row of rows.filter((candidate) => !candidate.statutory)) {
-      expect(row.fromStatutory).toBeNull();
+  it("gives a shown entry the same comparison in both views", () => {
+    // The hidden entries between two shown ones are folded into the run of the
+    // one above, so the end of the previous shown entry's effective run is the
+    // last release of the entry immediately before — the same label either way,
+    // which is why there is one `from` and not two.
+    const shown = rows.filter((row) => row.statutory);
+    for (const [index, row] of shown.entries()) {
+      if (index === 0) continue;
+      const previousShown = shown[index - 1];
+      const run = previousShown.effectiveReleases;
+      expect(row.from).toBe(run[run.length - 1]);
     }
   });
 

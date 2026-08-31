@@ -16,7 +16,8 @@
  *
  * Each entry carries both of its "unchanged through" runs — its own group's,
  * and the run that group holds once the hidden groups after it are folded in —
- * and both of its diff links, with CSS picking one per view.
+ * with CSS showing one per view. The diff link needs no such pair: the release
+ * point before a shown entry is the same one either way (`TimelineRow.from`).
  *
  * Extracted from `versions/[...identifier].astro` so `/app/design` renders this
  * component rather than a copy of its markup.
@@ -88,15 +89,8 @@ const rows = timelineRows(entries);
             Unchanged through: {row.effectiveReleases.join(", ")}
           </p>
           {row.from && row.start && (
-            <p class="timeline__diff timeline__diff--own">
+            <p class="timeline__diff">
               <a href={diffHref(identifier, row.from, row.start)}>Diff since {row.from}</a>
-            </p>
-          )}
-          {row.fromStatutory && row.start && (
-            <p class="timeline__diff timeline__diff--statutory">
-              <a href={diffHref(identifier, row.fromStatutory, row.start)}>
-                Diff since {row.fromStatutory}
-              </a>
             </p>
           )}
         </li>

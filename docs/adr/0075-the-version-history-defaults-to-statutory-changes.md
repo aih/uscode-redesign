@@ -48,9 +48,12 @@ with different markup, which is the empty redline the control exists to avoid.
    "Unchanged through" line is the run its own group carried; in the default
    view the groups hidden after it are the same statutory text, so the line has
    to name their release points too. `frontend/src/lib/versions.ts` computes
-   both runs and both diff links per entry, and CSS shows one of each per view.
-   Rendering only the visible run would have made the default view claim a
-   provision left the Code between two amendments.
+   both runs per entry and CSS shows one per view. Rendering only the visible
+   run would have made the default view claim a provision left the Code between
+   two amendments. The diff link needs no such pair: the hidden entries are
+   folded into the run above them, so the end of the previous shown entry's
+   effective run is the last release of the entry immediately before, and one
+   `from` serves both views.
 
 3. **The switch is two links in the sort bar's vocabulary** (ADR-0071):
    **Amendments (N)** | **All recorded versions (M)**, the one in force a marked
