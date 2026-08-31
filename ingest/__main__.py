@@ -183,6 +183,13 @@ def main(argv: list[str] | None = None) -> int:
     load_all_parser.add_argument(
         "--plan-only", action="store_true", help="Print what would be loaded and exit"
     )
+    load_all_parser.add_argument(
+        "--defer-version-changes",
+        action="store_true",
+        help="Skip the per-load version-change hook (ADR-0074); follow the run "
+        "with `python -m ingest version-changes`, which computes each section "
+        "once instead of once per release point that touched it",
+    )
     load_all_parser.add_argument("--quiet", action="store_true")
 
     verify_parser2 = subparsers.add_parser(
@@ -657,7 +664,11 @@ def _cmd_load_all(args: argparse.Namespace) -> int:
 
     try:
         report = load_all_mod.run_load_all(
-            tasks, SessionLocal, limit=args.limit, on_event=None if args.quiet else print
+            tasks,
+            SessionLocal,
+            limit=args.limit,
+            on_event=None if args.quiet else print,
+            defer_version_changes=args.defer_version_changes,
         )
     except KeyboardInterrupt:
         print("\ninterrupted — re-run to resume (the database is the state)", file=sys.stderr)
@@ -785,7 +796,10 @@ def _cmd_version_changes(args: argparse.Namespace) -> int:
     XML) — and then, when `--report` is given, writes the verification
     artifact. The flags compose: `--title 16 --report` computes Title 16 and
     then reports; `--report` alone verifies everything is computed (a fast
-    skip scan) and reports.
+    skip scan) and reports. The artifact is always corpus-wide — `--title`
+    bounds the compute, never the count — and lands in the repository's
+    `docs/verification/` whatever directory the command was run from, unless
+    `--out` says otherwise.
     """
     from ingest import version_changes as version_changes_mod
 
@@ -821,6 +835,9 @@ def _cmd_version_changes(args: argparse.Namespace) -> int:
                 f"complete, skipped): {stats.changes:,} change rows, "
                 f"{stats.laws:,} law rows, {stats.hashes_computed:,} hashes back-filled"
             )
+    except version_changes_mod.UnknownTitleError as exc:
+        print(f"version-changes: {exc}", file=sys.stderr)
+        return 2
     except KeyboardInterrupt:
         print("\ninterrupted — re-run to resume (the database is the state)", file=sys.stderr)
         return 130

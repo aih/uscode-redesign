@@ -704,13 +704,21 @@ def compute_in_batches(
     What a caller that already owns a session uses for a set larger than a
     batch — the `load_release` hook. One transaction per batch, so a failure
     part-way leaves the batches before it committed rather than rolling the
-    whole title back, and no statement carries an unbounded `IN (...)`.
+    whole title back.
+
+    **Every batch is expunged after its commit.** A commit expires every
+    instance in the session's identity map, so a session that keeps the rows
+    of every batch it has written pays for all of them at every later commit:
+    measured on Title 42's 1,590-section recompute set, 89,520 change rows in
+    eight batches took 51.6s holding them and 17.4s letting them go, against
+    24.7s in one transaction.
     """
     total = ComputeStats()
     ids = list(section_ids)
     for batch in _chunked(ids, batch_size):
         total.add(compute_for_sections(session, batch, on_event=on_event))
         session.commit()
+        session.expunge_all()
     return total
 
 
@@ -731,7 +739,8 @@ def sections_needing_recompute(
     section of it — 91% of them to the version group they were already on
     (ADR-0007). Recomputing all of them costs a whole-title pass per load (27s
     for Title 42, measured), and for all but a few it rewrites the rows it just
-    deleted. A section is in the set when:
+    deleted. Measured against the newest release of each title: Title 42 8,465
+    sections → 1,590, Title 16 5,095 → 1,124. A section is in the set when:
 
       1. it gained a new version group at this release;
       2. it has a version group no change row covers — what an interrupted
@@ -743,7 +752,10 @@ def sections_needing_recompute(
          `from_version_id`). Extending the range of a group that is not the
          section's last one moves its successor's window: the recurrence case
          ADR-0074 records, where content comes back and a later release maps
-         to an earlier group.
+         to an earlier group. This is what most of the set is — 1,122 of Title
+         16's 1,124 — and it cannot be narrowed to an `UPDATE` of the
+         successor's window, because a widened range can also flip a third,
+         later transition to `concurrent`.
 
     Everything else gains a release at the top of its last group's range,
     which no window reads.
@@ -818,7 +830,8 @@ def sections_needing_recompute(
 
 
 def clear_change_rows(session: Session, section_ids: Sequence[int]) -> int:
-    """Delete every change row of `section_ids` and commit.
+    """Delete every change row of `section_ids`. Flushes, never commits — the
+    caller owns the transaction, as with `compute_for_sections`.
 
     What a failed incremental hook leaves behind, so the failure survives the
     process that printed the warning. The resume skip is a count equality
@@ -835,7 +848,7 @@ def clear_change_rows(session: Session, section_ids: Sequence[int]) -> int:
             delete(SectionVersionChange).where(SectionVersionChange.section_id.in_(chunk))
         )
         removed += result.rowcount or 0
-    session.commit()
+    session.flush()
     return removed
 
 

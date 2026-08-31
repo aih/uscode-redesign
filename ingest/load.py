@@ -34,7 +34,6 @@ from db.models import (
     Section,
     SectionReleaseMap,
     SectionVersion,
-    SectionVersionChange,
     StructureNode,
     Title,
     TitleVersion,
@@ -77,8 +76,16 @@ def load_release(
     *,
     currency_date: date | None = None,
     source_zip: Path | None = None,
+    defer_version_changes: bool = False,
 ) -> LoadStats:
-    """Parse `xml_path` and load it into Postgres under `release_label`."""
+    """Parse `xml_path` and load it into Postgres under `release_label`.
+
+    `defer_version_changes` skips the ADR-0074 hook at the bottom. What a bulk
+    run passes when it will follow with one `python -m ingest version-changes`
+    over the corpus — which computes each section once instead of once per
+    release point that touched it — and what `deploy/update-corpus.sh` already
+    runs after every load anyway.
+    """
     parser = parser_for(xml_path)
     meta = parser.parse_meta(xml_path)
     if not meta.doc_number:
@@ -123,21 +130,15 @@ def load_release(
     # overwrites the first and flags it, which is why flagging only the later
     # occurrence is enough.
     new_version_identifiers: set[str] = set()
-    # Sections whose release map gained a row this load — a new version group,
-    # or an existing group newly mapped to this release, which changes the
-    # group's release range and can move an out-of-order load's windows. These
-    # are the sections whose version-change rows are recomputed at the end
-    # (ADR-0074); a redo of an already-mapped release adds no pairs and
-    # recomputes nothing.
-    changed_section_ids: set[int] = set()
-    touched_section_ids: set[int] = set()
-    already_mapped_version_ids: set[int] = set(
-        session.scalars(
-            select(SectionReleaseMap.section_version_id).where(
-                SectionReleaseMap.release_id == release.id
-            )
-        )
-    )
+    # What this load maps where, for the version-change hook at the bottom
+    # (ADR-0074): every section it touched, the version group each one landed
+    # on (a set — the source can publish several elements under one identifier
+    # at one release, ADR-0021), and the sections that gained a new group.
+    # `version_changes.sections_needing_recompute` decides which of them can
+    # actually have different change rows; recomputing all of them is a
+    # whole-title pass per release load.
+    mapped_versions: dict[int, set[int]] = {}
+    new_version_sections: set[int] = set()
 
     # Only text from the newest release this title has reached is "in force", and
     # loads do not have to arrive in order — `load-all` walks the inventory's seq,
@@ -204,7 +205,9 @@ def load_release(
             session.flush()
             existing_versions.setdefault(section.id, {})[content_hash] = version
             new_versions += 1
-            
+            new_version_sections.add(section.id)
+
+
             versions_to_sync.append({
                 "identifier": record.identifier,
                 "num": record.num,
@@ -231,10 +234,7 @@ def load_release(
             # why sync stays cheap at 91% dedupe (ADR-0028).
             deduped += 1
 
-        touched_section_ids.add(section.id)
-        if version.id not in already_mapped_version_ids:
-            already_mapped_version_ids.add(version.id)
-            changed_section_ids.add(section.id)
+        mapped_versions.setdefault(section.id, set()).add(version.id)
 
         # Reading order and parent are this release point's, even when the text
         # deduped into a version created by an earlier one (ADR-0008).
@@ -279,36 +279,26 @@ def load_release(
     session.commit()
     _flush_search(versions_to_sync, retire_keys)
 
-    # Incremental version-change hook (ADR-0074): recompute change rows for
-    # every section whose release map gained a row — a new version group, or an
-    # existing group whose release range this load extended — plus any touched
-    # section with a version no change row covers (what an interrupted earlier
-    # load leaves behind). Runs after the load has committed; a failure here
-    # warns loudly instead of failing the load, because the load itself is
-    # complete and the rows are re-derivable by `python -m ingest
-    # version-changes --recompute`.
-    recompute_ids = set(changed_section_ids)
-    if touched_section_ids:
-        recompute_ids.update(
-            session.scalars(
-                select(SectionVersion.section_id)
-                .outerjoin(
-                    SectionVersionChange,
-                    SectionVersionChange.to_version_id == SectionVersion.id,
-                )
-                .where(
-                    SectionVersion.section_id.in_(touched_section_ids),
-                    SectionVersionChange.id.is_(None),
-                )
-                .distinct()
-            )
-        )
-    if recompute_ids:
+    # Incremental version-change hook (ADR-0074). Runs after the load has
+    # committed, over the sections whose change rows this release can actually
+    # have moved (`sections_needing_recompute` documents the four cases), in
+    # committed batches. A failure warns loudly instead of failing the load —
+    # the load itself is complete — and then *deletes* the change rows it was
+    # recomputing, so the failure outlives the warning: the resume skip is a
+    # count equality, which sees a missing row and not a stale one.
+    if not defer_version_changes and mapped_versions:
         from ingest import version_changes
 
+        recompute_ids: set[int] = set()
         try:
-            version_changes.compute_for_sections(session, sorted(recompute_ids))
-            session.commit()
+            recompute_ids = version_changes.sections_needing_recompute(
+                session,
+                title_id=title.id,
+                release_id=release_id,
+                mapped_versions=mapped_versions,
+                new_version_sections=new_version_sections,
+            )
+            version_changes.compute_in_batches(session, sorted(recompute_ids))
         except Exception as exc:
             session.rollback()
             print(
@@ -319,6 +309,18 @@ def load_release(
                 f"version-changes --title {meta.doc_number} --recompute`",
                 file=sys.stderr,
             )
+            try:
+                version_changes.clear_change_rows(session, sorted(recompute_ids))
+                session.commit()
+            except Exception as clear_exc:  # pragma: no cover - the database is gone
+                session.rollback()
+                print(
+                    "WARNING: could not clear the stale change rows either "
+                    f"({type(clear_exc).__name__}: {clear_exc}) — the next "
+                    "`version-changes` run will skip these sections as complete "
+                    "until they are recomputed by hand",
+                    file=sys.stderr,
+                )
 
     return LoadStats(
         release_label=release_label,
