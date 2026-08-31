@@ -17,7 +17,8 @@ against the local corpus.
 `AccountsRepository`/`PostgresAccounts` pair for users/sessions/watchlists (ADR-0017 — not bolted onto
 `Repository`, which stays version-resolution-only), and `storage/search.py` over OpenSearch (ADR-0028).
 `api/` serves PLAN §4's routes — identifier lookup with `?release`/`?date`/`?format`, `?id=` guid lookup,
-TOC, neighbors, versions, releases, a diff between two release points (ADR-0016), the batched
+TOC, neighbors, versions (each entry carrying ADR-0074's change annotations and law attributions),
+releases, a diff between two release points (ADR-0016), the batched
 `/api/v1/labels` (100 identifiers max, the bound the route enforces), `/api/v1/search`,
 `/api/v1/citation`, `/api/v1/status` (how current the mirror is and when it last checked, ADR-0036),
 and auth + watchlist CRUD (ADR-0017). `frontend/` is the reader — **Astro 5 +
@@ -35,12 +36,12 @@ Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 35 route entries (one expanding to
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 36 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and
 fourteen interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
 (ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
 (ADR-0058), both navbar dropdowns (ADR-0061), the command palette (ADR-0062) and the open
-classification lookup (ADR-0067) — **322 scans**,
+classification lookup (ADR-0067) — **329 scans**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -336,15 +337,15 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **815** Python tests; `make test-web` = **404** frontend tests; `make test-e2e` = **630**
-Playwright tests, 322 of which are the accessibility scan (**all three are required** — reader
+`make test` = **851** Python tests; `make test-web` = **437** frontend tests; `make test-e2e` = **648**
+Playwright tests, 330 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(72 ADRs, numbered to 0073 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(74 ADRs, numbered to 0075 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -493,12 +494,23 @@ within the transition's window, computed as the delta of incorporated-law sets h
 `excluded_laws`. The full local corpus is back-filled: **489,738 change rows over 423,800
 transitions in 7m50s — 75.1% structure / 17.1% notes / 7.8% text, text 49.2% classified, 30,250 law
 rows** (`docs/verification/version-changes.json`), every share within 2.5 points of the spec's
-600-section sample. `concurrent` fired on 39,645 transitions corpus-wide — recurring content,
+600-section sample. `concurrent` fired on 77,596 transitions corpus-wide (18.3%) — recurring content,
 ADR-0074's recorded cost, not the ~160 ADR-0021 pairs. `load_release` keeps the rows current;
-`deploy/update-corpus.sh` runs `version-changes` after a load that loaded something and
-`--reattribute` after a classification change; the deployed box owes the migration and the one-time
-backfill (`docs/deploy-status.md`). V2 (repository/API) and V3 (reader) are the spec's remaining
-phases.
+`deploy/update-corpus.sh` runs `version-changes` after a load that loaded something **or on a
+`--force` sweep**, and `--reattribute` after a classification load that actually changed a table;
+the deployed box owes the migration and the one-time backfill (`docs/deploy-status.md`).
+`SectionVersionInfo` and `VersionOut` carry the annotations additively — `change_kind`,
+`text_changed`, `notes_changed`, `status_changed`, `concurrent`, `attribution` and a `laws` list,
+all `None`/empty on a corpus with no change rows — and `versions()` orders groups by the earliest
+*mapped* release rather than `first_release_id` (ADR-0066). **`/app/versions` is two views of one
+document** (ADR-0075): every entry is in the DOM with `data-change-kind`, `?view=all` sets
+`data-view` on the list root and CSS hides the `notes` and `structure` entries in the default view,
+so the full history costs one line of chrome and no script. A text entry attributed `classified`
+carries its `Pub. L. 119–102` chips (EN DASH); an unattributed one says no classifying statute is
+recorded; a corpus with no change rows renders the all view and says the kinds are not computed.
+`previousChangedRelease` — the section header's "Compare with…" default — walks back past the
+notes-only and metadata-only groups, and falls back to its old answer without annotations. All four
+phases are merged (V1 #61, V2 #62, V4 #63, V3 #64, hardening #65).
 
 **Next: (1) Day 7 hardening — part of it landed as ADR-0073 under an outage, and what it did not
 cover is the load test below; (2) `docs/verification/loadtest.json` has never been regenerated
@@ -521,7 +533,7 @@ convention every reader who knows those keys has; it is what the guide documents
 **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 2,903 nodes**, down from 41 pairs, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 2,910 nodes**, down from 41 pairs, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by
