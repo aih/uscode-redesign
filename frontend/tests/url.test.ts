@@ -95,6 +95,15 @@ describe("versionsHref and diffHref", () => {
     expect(versionsHref("/us/usc/t16/s45f")).toBe("/app/versions/us/usc/t16/s45f");
   });
 
+  it("names the second view, and writes nothing for the default one", () => {
+    expect(versionsHref("/us/usc/t16/s45f", "all")).toBe(
+      "/app/versions/us/usc/t16/s45f?view=all",
+    );
+    // The default view keeps the address this route has always had (ADR-0075).
+    expect(versionsHref("/us/usc/t16/s45f", "text")).toBe("/app/versions/us/usc/t16/s45f");
+    expect(versionsHref("/us/usc/t16/s45f", null)).toBe("/app/versions/us/usc/t16/s45f");
+  });
+
   it("addresses the diff page with both release points", () => {
     expect(diffHref("/us/usc/t16/s45f", "119-99", "119-102not101")).toBe(
       "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101",

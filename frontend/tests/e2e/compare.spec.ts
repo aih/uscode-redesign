@@ -46,21 +46,50 @@ test.describe("the control", () => {
     expect(await stack()).toBe(closed);
   });
 
-  test("defaults to the last release point holding different text", async ({ page, request }) => {
+  test("defaults to the last release point holding different statutory text", async ({
+    page,
+    request,
+  }) => {
     await page.goto(SECTION);
     await page.locator(".compare__summary").click();
 
     const href = await page.locator(".compare__go").getAttribute("href");
     const from = new URL(href!, "http://localhost").searchParams.get("from");
 
-    // The same answer the timeline gives, computed from the other end: the last
-    // release point of the group before the one holding the text on screen.
+    // The same answer the timeline gives, computed from the other end: back
+    // through the groups whose arrival changed no statutory text (ADR-0075),
+    // then the last release point of the group before that one.
     const versions = await (
       await request.get("/api/v1/sections/us/usc/t16/s2201/versions")
     ).json();
     const groups = versions.versions;
-    const expected = groups[groups.length - 2].releases.slice(-1)[0];
+    let changed = groups.length - 1;
+    while (
+      changed > 0 &&
+      groups[changed].change_kind != null &&
+      groups[changed].change_kind !== "text" &&
+      groups[changed].change_kind !== "initial"
+    ) {
+      changed -= 1;
+    }
+    expect(changed).toBeGreaterThan(0);
+    const expected = groups[changed - 1].releases.slice(-1)[0];
     expect(from).toBe(expected);
+  });
+
+  test("names a public law for the amendment it offers", async ({ page, request }) => {
+    // The other end of the same annotation: the transition the default lands on
+    // is one the classification tables attribute to Pub. L. 119-102 (ADR-0074).
+    const versions = await (
+      await request.get("/api/v1/sections/us/usc/t16/s2201/versions")
+    ).json();
+    const newest = versions.versions[versions.versions.length - 1];
+    expect(newest.change_kind).toBe("text");
+    expect(newest.attribution).toBe("classified");
+    expect(newest.laws.map((law: { pl_num: number }) => law.pl_num)).toContain(102);
+
+    await page.goto("/app/versions/us/usc/t16/s2201");
+    await expect(page.locator(".timeline__law").last()).toContainText("Pub. L. 119–102");
   });
 
   test("the default is one click, and the comparison it reaches is not empty", async ({

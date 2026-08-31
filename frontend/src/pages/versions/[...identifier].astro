@@ -7,14 +7,31 @@
  * its own URL and a prominent link from the section page, not a footer
  * afterthought (`[...identifier].astro`'s "Version history" link, next to the
  * title).
+ *
+ * Two views (ADR-0075). The default is the statutory changes — the transitions
+ * ADR-0074 classified `text`, plus the entry the history starts at; `?view=all`
+ * is every recorded version, including the ones where only the notes or the
+ * stored XML moved. Both views are the same document: every entry is rendered
+ * and the stylesheet hides what the view does not show, so the page is
+ * cacheable per URL and carries no script.
  */
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
+import SortBar from "../../components/SortBar.astro";
 import Timeline from "../../components/Timeline.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { REVALIDATE } from "../../lib/cache";
-import { appHref, trimNum } from "../../lib/url";
-import type { Entry, Section, Versions } from "../../lib/types";
+import { cachedReleases } from "../../lib/releasecache";
+import { appHref, trimNum, versionsHref } from "../../lib/url";
+import {
+  VERSIONS_VIEW_PARAM,
+  isAnnotated,
+  readVersionsView,
+  releaseOrder,
+  timelineRows,
+  versionCounts,
+} from "../../lib/versions";
+import type { Entry, Release, Section, Versions } from "../../lib/types";
 import { isToc } from "../../lib/types";
 
 // The route's own static prefix is "versions", not "us/usc" (unlike the
@@ -43,6 +60,56 @@ const current = entries.length > 0 ? entries[entries.length - 1] : null;
 const title = current
   ? `Versions of ${trimNum(current.num)} · U.S. Code`
   : "Versions · U.S. Code";
+
+/** Which view was asked for, and whether there is a choice to offer. A corpus
+ *  whose change rows have not been computed has no default view to compute
+ *  either, so it gets the whole history and a sentence saying why. */
+const annotated = isAnnotated(entries);
+const view = annotated ? readVersionsView(Astro.url.searchParams.get(VERSIONS_VIEW_PARAM)) : "all";
+const counts = versionCounts(entries);
+
+/**
+ * Where each release point sits in the global order, for the title this section
+ * is in. Release-point labels do not sort (gotcha 4), and two things here need
+ * the order: the run of release points a default-view entry stands through,
+ * which is a concatenation of runs that interleave whenever content recurs; and
+ * whether an entry's window runs forwards at all, since `/app/diff` reads
+ * `?from=`/`?to=` in the order it is given them.
+ *
+ * `cachedReleases` is the same per-title, five-minute cache the section page's
+ * release switcher reads (ADR-0045), so this is one request per title per
+ * interval rather than one per view. Allowed to fail: without it the folded run
+ * keeps its concatenation order and comparisons fall back to ADR-0074's
+ * `concurrent` flag, which is conservative rather than exact.
+ */
+const titleNum = identifier.match(/^\/us\/usc\/t([0-9]+[a-zA-Z]?)/u)?.[1] ?? null;
+const releases = await cachedReleases(titleNum).catch((error) => {
+  console.error(`releases for ${identifier}:`, error);
+  return [] as Release[];
+});
+const order = releases.length > 0 ? releaseOrder(releases) : undefined;
+
+const rows = timelineRows(entries, order);
+/**
+ * The From/To picker's options: every recorded version, in both views.
+ *
+ * Scoping them to the view on screen took the picker off 41,707 of the 61,252
+ * sections with more than one version — a history of notes-only and
+ * metadata-only transitions has one row in the default view — and `/app/diff`
+ * is reachable from nowhere else on this page.
+ */
+const pickerStarts = rows.map((row) => row.start).filter((start): start is string => start !== null);
+/** Whether the picker lists versions the view on screen does not, which it says
+ *  above itself rather than leaving the reader to notice. */
+const pickerExceedsView = rows.some((row) => !row.statutory) && view === "text";
+
+/** The view switch, in the sort bar's vocabulary (ADR-0071). There is no
+ *  direction to reverse, so `reversible={false}`: the option in force is an
+ *  inert marked pill and the other is a link. */
+const viewOptions = [
+  { key: "text", label: `Amendments (${counts.amendments})` },
+  { key: "all", label: `All recorded versions (${counts.all})` },
+];
 
 // The breadcrumb, at the cost of a second call. `/sections/…/versions` answers
 // `{identifier, versions}` and nothing else — it has no ancestors to give — so
@@ -87,26 +154,46 @@ const currentCrumb: Entry | null = section
         </p>
 
         <p class="lede">
-          {entries.length} distinct version{entries.length === 1 ? "" : "s"} of this section's
-          text, oldest first. Each entry is a release point where the text changed. Most
-          release points leave most sections untouched.
+          {counts.all} distinct version{counts.all === 1 ? "" : "s"} of this section's stored
+          content, oldest first, over {counts.releases} release point
+          {counts.releases === 1 ? "" : "s"}.{" "}
+          {annotated
+            ? `${counts.amendments} of them changed the statutory text.`
+            : "Which of them changed the statutory text is not computed for this corpus, so every recorded version is listed."}
         </p>
 
-        <Timeline identifier={identifier} entries={entries} />
+        {annotated && (
+          <SortBar
+            options={viewOptions}
+            sort={view}
+            href={(next) => versionsHref(identifier, next)}
+            label="Which versions to show"
+            idPrefix="viewbar"
+            heading="Show"
+            reversible={false}
+          />
+        )}
+
+        <Timeline identifier={identifier} entries={entries} view={view} order={order} />
 
         {
-          entries.length > 1 && (
+          pickerStarts.length > 1 && (
             <>
               <p class="toc-group">Compare any two versions</p>
+              {pickerExceedsView && (
+                <p class="doc-meta">
+                  The list covers every recorded version, including the ones this view hides.
+                </p>
+              )}
               <form class="diff-picker" method="get" action={`/app/diff${identifier}`}>
                 <div>
                   <label class="usa-label picker__label" for="from">
                     From
                   </label>
                   <select class="usa-select picker__select" id="from" name="from">
-                    {entries.map((entry) => (
-                      <option value={entry.first_seen.label} selected={entry === entries[0]}>
-                        {entry.first_seen.label}
+                    {pickerStarts.map((start) => (
+                      <option value={start} selected={start === pickerStarts[0]}>
+                        {start}
                       </option>
                     ))}
                   </select>
@@ -116,9 +203,12 @@ const currentCrumb: Entry | null = section
                     To
                   </label>
                   <select class="usa-select picker__select" id="to" name="to">
-                    {entries.map((entry) => (
-                      <option value={entry.first_seen.label} selected={entry === current}>
-                        {entry.first_seen.label}
+                    {pickerStarts.map((start) => (
+                      <option
+                        value={start}
+                        selected={start === pickerStarts[pickerStarts.length - 1]}
+                      >
+                        {start}
                       </option>
                     ))}
                   </select>

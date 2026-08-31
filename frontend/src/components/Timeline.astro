@@ -1,6 +1,6 @@
 ---
 /**
- * The release points at which a section's text changed, oldest first.
+ * The release points at which a section's stored content changed, oldest first.
  *
  * One entry per *distinct text*, not one per release point: the Code
  * republishes every title at every release point whether or not anything in it
@@ -8,39 +8,109 @@
  * identical texts. `releases` is the run of release points that carried this
  * one.
  *
+ * Two views, one document (ADR-0075). Every entry is rendered, each `<li>`
+ * carrying `data-change-kind`; the list root carries `data-view` and the
+ * stylesheet hides the entries the view does not show. So the page is one
+ * cacheable document per URL, it costs no script, and a reader switching views
+ * is switching a `?view=` link rather than running anything.
+ *
+ * Each entry carries both of its "unchanged through" runs — its own group's,
+ * and the run that group holds once the hidden groups after it are folded in —
+ * with CSS showing one per view. The diff link needs no such pair: the release
+ * point before a shown entry is the same one either way (`TimelineRow.from`).
+ *
  * Extracted from `versions/[...identifier].astro` so `/app/design` renders this
  * component rather than a copy of its markup.
  */
 import StatusBadge from "./StatusBadge.astro";
 import type { VersionEntry } from "../lib/types";
-import { appHref, diffHref, trimNum } from "../lib/url";
+import { appHref, classificationHref, diffHref, trimNum } from "../lib/url";
+import {
+  changeSummary,
+  lawActions,
+  lawLabel,
+  lawQuery,
+  lawsLabel,
+  timelineRows,
+  type ReleaseOrder,
+  type VersionsView,
+} from "../lib/versions";
 
 interface Props {
   /** The section these versions belong to — the target of every link here. */
   identifier: string;
   entries: VersionEntry[];
+  /** Which view is in force. `text` shows the statutory changes; `all` shows
+   *  every recorded version, including a corpus with no change rows. */
+  view?: VersionsView;
+  /** Where a release-point label sits in the global order. Labels do not sort
+   *  (gotcha 4), so without this the folded run keeps its concatenation order
+   *  and a comparison is offered only where `concurrent` is clear. */
+  order?: ReleaseOrder;
 }
 
-const { identifier, entries } = Astro.props;
+const { identifier, entries, view = "text", order } = Astro.props;
+const rows = timelineRows(entries, order);
 ---
 
-<ol class="timeline">
+<ol class="timeline" data-view={view}>
   {
-    entries.map((entry, index) => {
-      const previous = index > 0 ? entries[index - 1] : null;
+    rows.map((row) => {
+      const { entry } = row;
+      const laws = entry.laws ?? [];
+      const summary = changeSummary(entry);
       return (
-        <li>
-          <a class="timeline__release" href={appHref(identifier, entry.first_seen.label)}>
-            {entry.first_seen.label}
+        <li data-change-kind={row.kind}>
+          <a class="timeline__release" href={appHref(identifier, row.start)}>
+            {row.start ?? entry.first_seen.label}
           </a>{" "}
           — {trimNum(entry.num)} {entry.heading}
           <StatusBadge status={entry.status} />
-          <p class="timeline__releases">Unchanged through: {entry.releases.join(", ")}</p>
-          {previous && (
-            <p>
-              <a href={diffHref(identifier, previous.first_seen.label, entry.first_seen.label)}>
-                Diff since {previous.first_seen.label}
-              </a>
+          {summary && <p class="timeline__kind">{summary}</p>}
+          {laws.length > 0 && (
+            <p class="timeline__laws">
+              <span class="timeline__laws-label">{lawsLabel(entry)}</span>
+              {laws.map((law) => (
+                <a
+                  class="timeline__law"
+                  href={classificationHref(null, null, { q: lawQuery(law) })}
+                >
+                  {/* The space is written, not left as whitespace between two
+                      expressions: alone inside an element that text node does
+                      not survive the Astro compiler, and the accessible name
+                      came out `Pub. L. 119–21new` (ADR-0053's `Neighbors`). */}
+                  {lawActions(law).length > 0
+                    ? `${lawLabel(law)} `
+                    : lawLabel(law)}
+                  {lawActions(law).length > 0 && (
+                    <span class="timeline__law-action">{lawActions(law).join(", ")}</span>
+                  )}
+                </a>
+              ))}
+            </p>
+          )}
+          {entry.concurrent && (
+            <p class="timeline__kind">
+              Another stored version of this section is mapped inside the release points this one
+              arrives across, so the release points listed here may not be the whole of when this
+              text was in force.
+            </p>
+          )}
+          <p class="timeline__releases timeline__releases--own">
+            Unchanged through: {row.releases.join(", ")}
+          </p>
+          <p class="timeline__releases timeline__releases--effective">
+            Unchanged through: {row.effectiveReleases.join(", ")}
+          </p>
+          {row.from && row.start && (
+            <p class="timeline__diff">
+              <a href={diffHref(identifier, row.from, row.start)}>Diff since {row.from}</a>
+            </p>
+          )}
+          {row.withheld && (
+            <p class="timeline__kind">
+              The release points this version arrives across do not run forwards, so there is no
+              redline to offer from the entry above. Pick a pair below.
             </p>
           )}
         </li>

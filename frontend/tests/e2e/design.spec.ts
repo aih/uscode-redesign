@@ -131,3 +131,107 @@ test("the page reaches no data, so it renders the same on any corpus", async ({ 
   await expect(page.locator(".section-body")).toBeVisible();
   expect(calls, "/app/design asked the API for something").toEqual([]);
 });
+
+test.describe("the version timeline's two views (ADR-0075)", () => {
+  // The fixture corpus's two release points produce only `initial` and `text`
+  // transitions, so this page is the only place CI can see a notes-only or
+  // metadata-only entry — and the only place the filtering is checkable.
+  test("the default view hides the notes-only and metadata-only entries", async ({ page }) => {
+    await page.goto(PAGE);
+    const text = page.locator('.timeline[data-view="text"]');
+    const all = page.locator('.timeline[data-view="all"]');
+
+    await expect(text.locator("li")).toHaveCount(5);
+    await expect(text.locator('li[data-change-kind="notes"]')).toBeHidden();
+    await expect(text.locator('li[data-change-kind="structure"]').first()).toBeHidden();
+    await expect(text.locator('li[data-change-kind="text"]').first()).toBeVisible();
+
+    await expect(all.locator('li[data-change-kind="notes"]')).toBeVisible();
+    await expect(all.locator('li[data-change-kind="structure"]').first()).toBeVisible();
+  });
+
+  test("a shown entry's run covers the entries the default view hides", async ({ page }) => {
+    await page.goto(PAGE);
+    const text = page.locator('.timeline[data-view="text"]');
+    const all = page.locator('.timeline[data-view="all"]');
+
+    // The oldest entry carries 119-95 and 119-96 of its own and stands through
+    // the metadata-only entry at 119-97.
+    await expect(
+      text.locator("li").first().locator(".timeline__releases:visible"),
+    ).toContainText("119-97");
+    await expect(
+      all.locator("li").first().locator(".timeline__releases:visible"),
+    ).not.toContainText("119-97");
+  });
+
+  test("an attributed amendment carries its law chips", async ({ page }) => {
+    await page.goto(PAGE);
+    // Scoped to the entry, not to the list: a hidden entry's chips are still in
+    // the DOM, and the notes-only specimen carries one.
+    const chips = page.locator(
+      '.timeline[data-view="text"] li[data-change-kind="text"] .timeline__law',
+    );
+    await expect(chips).toHaveCount(2);
+    await expect(chips.first()).toContainText("Pub. L. 119–14");
+    await expect(chips.last()).toContainText("new");
+    await expect(chips.first()).toHaveAttribute("href", /\/app\/classification\?q=/u);
+  });
+
+  test("a chip's citation and its action word are two words", async ({ page }) => {
+    // ADR-0053's `Neighbors` defect: alone inside an element, the text node
+    // between two expressions does not survive the Astro compiler, and the
+    // accessible name came out `Pub. L. 119–21new`. `toContainText("new")`
+    // passes either way, so this reads the whole string.
+    await page.goto(PAGE);
+    const chip = page
+      .locator('.timeline[data-view="text"] .timeline__law:has(.timeline__law-action)')
+      .first();
+    expect((await chip.innerText()).replace(/\s+/gu, " ").trim()).toBe("Pub. L. 119–21 new");
+  });
+
+  test("the chip list says what it is a list of", async ({ page }) => {
+    await page.goto(PAGE);
+    // ADR-0074 attributes notes-only transitions too, so a chip on one has to
+    // say it is not an amendment.
+    await expect(
+      page.locator('.timeline[data-view="text"] .timeline__laws-label').first(),
+    ).toHaveText("Amended by");
+    await expect(
+      page
+        .locator('.timeline[data-view="all"] li[data-change-kind="notes"] .timeline__laws-label')
+        .first(),
+    ).toContainText("recorded for this change");
+  });
+
+  test("an unattributed amendment says no statute is recorded", async ({ page }) => {
+    await page.goto(PAGE);
+    await expect(
+      page.locator('.timeline[data-view="text"] li').last().locator(".timeline__kind").first(),
+    ).toContainText("No classifying statute recorded");
+  });
+
+  test("a concurrent entry says so, and offers no redline", async ({ page }) => {
+    await page.goto(PAGE);
+    const entry = page.locator(
+      '.timeline[data-view="all"] li[data-change-kind="notes"]',
+    );
+    await expect(entry).toContainText("Another stored version of this section is mapped inside");
+    await expect(entry).toContainText("do not run forwards");
+    await expect(entry.locator(".timeline__diff")).toHaveCount(0);
+    // Every other entry after the first still has one.
+    await expect(page.locator('.timeline[data-view="all"] .timeline__diff')).toHaveCount(3);
+  });
+
+  test("the view switch is the sort bar with no direction to reverse", async ({ page }) => {
+    await page.goto(PAGE);
+    const bar = page.locator("#design-viewbar-label").locator("..");
+    await expect(bar.locator(".sortbar__option--on")).toHaveText("Amendments (2)");
+    // No arrow and no direction words: there is nothing to flip.
+    await expect(bar.locator(".sortbar__arrow")).toHaveCount(0);
+    await expect(bar.locator(".sortbar__direction")).toHaveCount(0);
+    // The option in force is inert; the other is a link.
+    await expect(bar.locator("a.sortbar__option--on")).toHaveCount(0);
+    await expect(bar.locator("a.sortbar__option")).toHaveCount(1);
+  });
+});

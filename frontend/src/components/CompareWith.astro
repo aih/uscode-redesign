@@ -10,8 +10,12 @@
  * The default is not "the previous release point". The Code is republished in
  * full at every one and few titles change at any (gotcha 10), so that redline
  * is usually empty; the offer is the last release point that held *different
- * text*, which `lib/compare.ts` reads off `content_first_seen`. One click, and
- * it is a link rather than a form so it is also a URL to paste.
+ * statutory text*, which `lib/compare.ts` reads off the section's version
+ * timeline — `releases`, never `content_first_seen`, which follows the stored
+ * fragment's `first_release_id` and names a later release point than its own
+ * group's earliest (ADR-0066) — and past the transitions ADR-0074 records as
+ * notes-only or metadata-only (ADR-0075). One click, and it is a link rather
+ * than a form so it is also a URL to paste.
  *
  * The "…" is the rest: a `<select>` of every older release point, as a plain
  * GET form. Same shape as `ReleasePicker` (ADR-0056) and for the same reasons —
@@ -29,8 +33,8 @@ interface Props {
   identifier: string;
   /** The release point on screen. The `to` side of every comparison here. */
   selected: string;
-  /** Label of the last release point holding different text, or null when
-   *  there is none — this text is as old as the corpus this site holds. */
+  /** Label of the last release point holding different statutory text, or null
+   *  when there is none — this text is as old as the corpus this site holds. */
   previous: string | null;
   /** Every release point older than `selected`, newest first. */
   options: Release[];
@@ -61,7 +65,7 @@ function date(release: Release): string {
               What changed since {previous}
             </a>
             <span class="compare__hint">
-              {previous} is the last release point holding different text.
+              {previous} is the last release point holding different statutory text.
             </span>
           </p>
         ) : (

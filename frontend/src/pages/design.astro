@@ -273,22 +273,117 @@ const RAIL_ENTRIES: Entry[] = [
   { identifier: "/us/usc/t0/s4", level: "section", num: "§ 4.", heading: "Fourth specimen", is_section: true },
 ];
 
+/**
+ * A timeline carrying all four `change_kind`s and both attribution states
+ * (ADR-0074, ADR-0075). The fixture corpus's two release points produce nothing
+ * but `initial` and `text`, so this page is the only place CI sees a notes-only
+ * or metadata-only entry rendered, and the only place the axe matrix and
+ * `make shots` can reach the law chips.
+ */
 const VERSIONS: VersionEntry[] = [
   {
     content_hash: "0000000000000000000000000000000000000000000000000000000000000001",
     first_seen: RP_OLD,
-    releases: ["119-99", "119-100", "119-101"],
+    releases: ["119-95", "119-96"],
     num: "§ 1.",
     heading: "Specimen provision",
     status: null,
+    change_kind: "initial",
+    text_changed: false,
+    notes_changed: false,
+    status_changed: false,
+    concurrent: false,
+    attribution: "none",
+    laws: [],
   },
   {
     content_hash: "0000000000000000000000000000000000000000000000000000000000000002",
+    first_seen: RP_OLD,
+    releases: ["119-97"],
+    num: "§ 1.",
+    heading: "Specimen provision",
+    status: null,
+    change_kind: "structure",
+    text_changed: false,
+    notes_changed: false,
+    status_changed: false,
+    concurrent: false,
+    attribution: "none",
+    laws: [],
+  },
+  {
+    content_hash: "0000000000000000000000000000000000000000000000000000000000000003",
+    first_seen: RP_OLD,
+    releases: ["119-98", "119-99"],
+    num: "§ 1.",
+    heading: "Specimen provision",
+    status: null,
+    change_kind: "text",
+    text_changed: true,
+    notes_changed: true,
+    status_changed: false,
+    concurrent: false,
+    attribution: "classified",
+    laws: [
+      {
+        pl_congress: 119,
+        pl_num: 14,
+        in_classification: true,
+        is_note_classification: false,
+        in_source_credit: true,
+        classification_actions: [""],
+      },
+      {
+        pl_congress: 119,
+        pl_num: 21,
+        in_classification: true,
+        is_note_classification: false,
+        in_source_credit: true,
+        classification_actions: ["new"],
+      },
+    ],
+  },
+  {
+    content_hash: "0000000000000000000000000000000000000000000000000000000000000004",
+    first_seen: RP_OLD,
+    releases: ["119-100", "119-101"],
+    num: "§ 1.",
+    heading: "Specimen provision",
+    status: null,
+    change_kind: "notes",
+    text_changed: false,
+    notes_changed: true,
+    status_changed: false,
+    // 5,570 notes transitions are `concurrent` corpus-wide (ADR-0074). The
+    // entry carries the note that says so, and no comparison, since a window
+    // another version is mapped inside cannot be redlined from the entry above.
+    concurrent: true,
+    attribution: "none",
+    laws: [
+      {
+        pl_congress: 119,
+        pl_num: 30,
+        in_classification: true,
+        is_note_classification: true,
+        in_source_credit: false,
+        classification_actions: [""],
+      },
+    ],
+  },
+  {
+    content_hash: "0000000000000000000000000000000000000000000000000000000000000005",
     first_seen: RP_NEW,
     releases: ["119-102not101"],
     num: "§ 1.",
     heading: "Specimen provision",
     status: null,
+    change_kind: "text",
+    text_changed: true,
+    notes_changed: false,
+    status_changed: false,
+    concurrent: false,
+    attribution: "none",
+    laws: [],
   },
 ];
 
@@ -418,6 +513,13 @@ const SPECIMEN_SORTS = [
     ascending: "title, then section",
     descending: "highest section first",
   },
+];
+
+/** The version history's two views — the same control with no direction to
+ *  reverse (ADR-0075). The counts are the specimen timeline's own. */
+const SPECIMEN_VIEWS = [
+  { key: "text", label: "Amendments (2)" },
+  { key: "all", label: "All recorded versions (5)" },
 ];
 
 /** Four classification rows, one per state a cell can be in (ADR-0067).
@@ -932,13 +1034,29 @@ const TYPE_ROLES = [
   <h2 class="toc-group" id="versions">Versions and redlines</h2>
 
   <p>
-    The timeline is one entry per distinct text, not one per release point: the Code republishes
-    every title at every release point whether or not anything in it changed, so a row each
-    would be hundreds of identical rows.
+    The timeline is one entry per distinct stored content, not one per release point: the Code
+    republishes every title at every release point whether or not anything in it changed, so a
+    row each would be hundreds of identical rows.
   </p>
 
+  <p>
+    Each entry says what kind of change arrived with it — statutory text, notes, or the stored
+    XML alone — and a text change carries the public laws the classification tables attribute to
+    it, or says that none is recorded. The default view shows the amendments and folds the rest
+    into the run of release points above them; the second view shows every recorded version. Both
+    are the same document with a different <code>data-view</code> on the list.
+  </p>
+
+  <p class="spec__label">Amendments — the default view</p>
+
   <div class="spec">
-    <Timeline identifier="/us/usc/t0/s1" entries={VERSIONS} />
+    <Timeline identifier="/us/usc/t0/s1" entries={VERSIONS} view="text" />
+  </div>
+
+  <p class="spec__label">All recorded versions</p>
+
+  <div class="spec">
+    <Timeline identifier="/us/usc/t0/s1" entries={VERSIONS} view="all" />
   </div>
 
   <p class="spec__label">Redline</p>
@@ -1136,6 +1254,26 @@ const TYPE_ROLES = [
       sort="pl-desc"
       href={(option: string) => `${DESIGN_PATH}?sort=${option}#paging`}
       idPrefix="design-sortbar"
+    />
+  </div>
+
+  <p class="spec__label">A list with no direction</p>
+
+  <p>
+    The same control names the two views of a version history, where there is nothing to reverse:
+    the option in force is a marked pill rather than a link, and there is no arrow and no
+    direction beside it.
+  </p>
+
+  <div class="spec">
+    <SortBar
+      options={SPECIMEN_VIEWS}
+      sort="text"
+      href={(option: string) => `${DESIGN_PATH}?view=${option}#paging`}
+      label="Which versions to show"
+      idPrefix="design-viewbar"
+      heading="Show"
+      reversible={false}
     />
   </div>
 
