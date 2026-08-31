@@ -8,7 +8,9 @@ import {
   lawActions,
   lawLabel,
   lawQuery,
+  lawsLabel,
   readVersionsView,
+  releaseOrder,
   timelineRows,
   versionCounts,
 } from "../src/lib/versions";
@@ -58,6 +60,22 @@ const UNANNOTATED: VersionEntry[] = [
   entry(null, ["119-102not101"]),
 ];
 
+/** Release-point order for every label these fixtures use. Labels do not sort
+ *  (gotcha 4), so the numbers below are the inventory's `seq` and the gaps
+ *  between them are the release points these sections were never mapped at. */
+const ORDER = releaseOrder([
+  { label: "113-21", seq: 10 },
+  { label: "113-30", seq: 11 },
+  { label: "113-44", seq: 12 },
+  { label: "114-139", seq: 20 },
+  { label: "115-442", seq: 30 },
+  { label: "116-3", seq: 40 },
+  { label: "116-29", seq: 41 },
+  { label: "117-80", seq: 50 },
+  { label: "119-99", seq: 60 },
+  { label: "119-102not101", seq: 61 },
+]);
+
 describe("readVersionsView", () => {
   it("is the default view unless the URL says all", () => {
     expect(readVersionsView("all")).toBe("all");
@@ -94,7 +112,7 @@ describe("isAnnotated", () => {
 });
 
 describe("timelineRows", () => {
-  const rows = timelineRows(TIMELINE);
+  const rows = timelineRows(TIMELINE, ORDER);
 
   it("keeps every entry, in order, and marks which the default view shows", () => {
     expect(rows.map((row) => row.kind)).toEqual([
@@ -182,7 +200,7 @@ describe("timelineRows", () => {
   });
 
   it("shows everything, and folds nothing, without change rows", () => {
-    const plain = timelineRows(UNANNOTATED);
+    const plain = timelineRows(UNANNOTATED, ORDER);
     expect(plain.map((row) => row.kind)).toEqual(["unknown", "unknown", "unknown"]);
     expect(plain.every((row) => row.statutory)).toBe(true);
     for (const row of plain) expect(row.effectiveReleases).toEqual(row.releases);
@@ -190,6 +208,78 @@ describe("timelineRows", () => {
 
   it("has nothing to say about an empty timeline", () => {
     expect(timelineRows([])).toEqual([]);
+  });
+});
+
+describe("timelineRows and a window that runs backwards", () => {
+  /**
+   * Recurring content, the shape ADR-0074 flags `concurrent`: the third group
+   * is mapped at 116-29, *inside* the second group's own run, so the release
+   * point before it (`116-3`) is newer than the release point it starts at.
+   * `/app/diff` reads `?from=`/`?to=` in the order it is handed them, so a link
+   * built from that window renders every insertion as a deletion.
+   */
+  const RECURRING: VersionEntry[] = [
+    entry("initial", ["113-21"]),
+    entry("text", ["114-139", "116-3", "119-99"], { attribution: "classified" }),
+    entry("text", ["116-29"], { concurrent: true, attribution: "classified" }),
+  ];
+
+  it("offers no comparison where the window runs backwards", () => {
+    const rows = timelineRows(RECURRING, ORDER);
+    expect(rows[1].from).toBe("113-21");
+    expect(rows[1].withheld).toBe(false);
+    // 116-3 is seq 40 and 116-29 is seq 41 — but the *last* release of the
+    // group before is 119-99 at seq 60, which is newer than what this entry
+    // starts at.
+    expect(rows[2].from).toBeNull();
+    expect(rows[2].withheld).toBe(true);
+  });
+
+  it("never says a comparison was withheld on the oldest entry", () => {
+    const rows = timelineRows(RECURRING, ORDER);
+    expect(rows[0].from).toBeNull();
+    expect(rows[0].withheld).toBe(false);
+  });
+
+  it("falls back to the concurrent flag with no release order", () => {
+    // Conservative rather than exact: the flag is set on every backwards window
+    // and on forward ones besides, so this suppresses more than it must and
+    // never offers one that runs the wrong way.
+    const rows = timelineRows(RECURRING);
+    expect(rows[1].from).toBe("113-21");
+    expect(rows[2].from).toBeNull();
+    expect(rows[2].withheld).toBe(true);
+  });
+
+  it("sorts a folded run by release order rather than by concatenation", () => {
+    // The hidden group at 116-29 sits inside the shown group's own run, so
+    // pushing its releases on the end leaves the list out of order.
+    const interleaved: VersionEntry[] = [
+      entry("initial", ["113-21"]),
+      entry("text", ["114-139", "119-99"], { attribution: "classified" }),
+      entry("structure", ["116-29"]),
+    ];
+    expect(timelineRows(interleaved, ORDER)[1].effectiveReleases).toEqual([
+      "114-139",
+      "116-29",
+      "119-99",
+    ]);
+    // Without an order the labels stay as concatenated — they cannot be sorted,
+    // since release-point labels do not sort lexically (gotcha 4).
+    expect(timelineRows(interleaved)[1].effectiveReleases).toEqual([
+      "114-139",
+      "119-99",
+      "116-29",
+    ]);
+  });
+
+  it("leaves a label the order does not know where it is", () => {
+    const rows = timelineRows(
+      [entry("initial", ["113-21"]), entry("structure", ["118-22u1"])],
+      ORDER,
+    );
+    expect(rows[0].effectiveReleases).toEqual(["113-21", "118-22u1"]);
   });
 });
 
@@ -241,6 +331,17 @@ describe("law chips", () => {
 
   it("says each action once", () => {
     expect(lawActions({ ...law, classification_actions: ["new", "new", ""] })).toEqual(["new"]);
+  });
+
+  it("says what the chips under an entry are a list of", () => {
+    // ADR-0074 attributes notes-only and metadata-only transitions too — 7,186
+    // and 81 of them carry a law corpus-wide — so "Amended by" is true of a
+    // text entry and of nothing else.
+    expect(lawsLabel(entry("text", []))).toBe("Amended by");
+    for (const kind of ["notes", "structure", "initial"]) {
+      expect(lawsLabel(entry(kind, []))).not.toContain("Amended");
+      expect(lawsLabel(entry(kind, []))).toContain("recorded for this change");
+    }
   });
 });
 

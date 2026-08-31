@@ -354,9 +354,21 @@ const VERSIONS: VersionEntry[] = [
     text_changed: false,
     notes_changed: true,
     status_changed: false,
-    concurrent: false,
+    // 5,570 notes transitions are `concurrent` corpus-wide (ADR-0074). The
+    // entry carries the note that says so, and no comparison, since a window
+    // another version is mapped inside cannot be redlined from the entry above.
+    concurrent: true,
     attribution: "none",
-    laws: [],
+    laws: [
+      {
+        pl_congress: 119,
+        pl_num: 30,
+        in_classification: true,
+        is_note_classification: true,
+        in_source_credit: false,
+        classification_actions: [""],
+      },
+    ],
   },
   {
     content_hash: "0000000000000000000000000000000000000000000000000000000000000005",
@@ -501,6 +513,13 @@ const SPECIMEN_SORTS = [
     ascending: "title, then section",
     descending: "highest section first",
   },
+];
+
+/** The version history's two views — the same control with no direction to
+ *  reverse (ADR-0075). The counts are the specimen timeline's own. */
+const SPECIMEN_VIEWS = [
+  { key: "text", label: "Amendments (2)" },
+  { key: "all", label: "All recorded versions (5)" },
 ];
 
 /** Four classification rows, one per state a cell can be in (ADR-0067).
@@ -1235,6 +1254,26 @@ const TYPE_ROLES = [
       sort="pl-desc"
       href={(option: string) => `${DESIGN_PATH}?sort=${option}#paging`}
       idPrefix="design-sortbar"
+    />
+  </div>
+
+  <p class="spec__label">A list with no direction</p>
+
+  <p>
+    The same control names the two views of a version history, where there is nothing to reverse:
+    the option in force is a marked pill rather than a link, and there is no arrow and no
+    direction beside it.
+  </p>
+
+  <div class="spec">
+    <SortBar
+      options={SPECIMEN_VIEWS}
+      sort="text"
+      href={(option: string) => `${DESIGN_PATH}?view=${option}#paging`}
+      label="Which versions to show"
+      idPrefix="design-viewbar"
+      heading="Show"
+      reversible={false}
     />
   </div>
 

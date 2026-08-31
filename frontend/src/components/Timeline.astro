@@ -30,7 +30,9 @@ import {
   lawActions,
   lawLabel,
   lawQuery,
+  lawsLabel,
   timelineRows,
+  type ReleaseOrder,
   type VersionsView,
 } from "../lib/versions";
 
@@ -41,10 +43,14 @@ interface Props {
   /** Which view is in force. `text` shows the statutory changes; `all` shows
    *  every recorded version, including a corpus with no change rows. */
   view?: VersionsView;
+  /** Where a release-point label sits in the global order. Labels do not sort
+   *  (gotcha 4), so without this the folded run keeps its concatenation order
+   *  and a comparison is offered only where `concurrent` is clear. */
+  order?: ReleaseOrder;
 }
 
-const { identifier, entries, view = "text" } = Astro.props;
-const rows = timelineRows(entries);
+const { identifier, entries, view = "text", order } = Astro.props;
+const rows = timelineRows(entries, order);
 ---
 
 <ol class="timeline" data-view={view}>
@@ -63,12 +69,19 @@ const rows = timelineRows(entries);
           {summary && <p class="timeline__kind">{summary}</p>}
           {laws.length > 0 && (
             <p class="timeline__laws">
+              <span class="timeline__laws-label">{lawsLabel(entry)}</span>
               {laws.map((law) => (
                 <a
                   class="timeline__law"
                   href={classificationHref(null, null, { q: lawQuery(law) })}
                 >
-                  {lawLabel(law)}
+                  {/* The space is written, not left as whitespace between two
+                      expressions: alone inside an element that text node does
+                      not survive the Astro compiler, and the accessible name
+                      came out `Pub. L. 119–21new` (ADR-0053's `Neighbors`). */}
+                  {lawActions(law).length > 0
+                    ? `${lawLabel(law)} `
+                    : lawLabel(law)}
                   {lawActions(law).length > 0 && (
                     <span class="timeline__law-action">{lawActions(law).join(", ")}</span>
                   )}
@@ -78,8 +91,9 @@ const rows = timelineRows(entries);
           )}
           {entry.concurrent && (
             <p class="timeline__kind">
-              This version and the one before it are published at overlapping release points, so
-              the order here is the order they were stored in (ADR-0021).
+              Another stored version of this section is mapped inside the release points this one
+              arrives across, so the release points listed here may not be the whole of when this
+              text was in force.
             </p>
           )}
           <p class="timeline__releases timeline__releases--own">
@@ -91,6 +105,12 @@ const rows = timelineRows(entries);
           {row.from && row.start && (
             <p class="timeline__diff">
               <a href={diffHref(identifier, row.from, row.start)}>Diff since {row.from}</a>
+            </p>
+          )}
+          {row.withheld && (
+            <p class="timeline__kind">
+              The release points this version arrives across do not run forwards, so there is no
+              redline to offer from the entry above. Pick a pair below.
             </p>
           )}
         </li>

@@ -55,20 +55,63 @@ with different markup, which is the empty redline the control exists to avoid.
    effective run is the last release of the entry immediately before, and one
    `from` serves both views.
 
-3. **The switch is two links in the sort bar's vocabulary** (ADR-0071):
+   **The folded run is sorted, not concatenated.** Each group's own `releases`
+   are in order, but the groups interleave wherever content recurs — a shown
+   group at `[114-139, 119-99]` with a hidden group at `[116-29]` after it
+   concatenates to a list that runs backwards in the middle. Release-point
+   labels do not sort (gotcha 4), so this needs the inventory's `seq`, which is
+   decision 10's release list.
+
+10. **The page reads the title's release list, for order.** Two things need to
+    know where a release point sits in the global sequence and cannot recover it
+    from the label: the folded run above, and whether an entry's window runs
+    forwards at all. `cachedReleases(titleNum)` is the per-title, five-minute
+    cache the section page's release switcher already reads (ADR-0045), so this
+    is one request per title per interval, and it is allowed to fail — without
+    it the run keeps its concatenation order and comparisons fall back to
+    ADR-0074's `concurrent` flag.
+
+11. **An entry offers no redline where its window runs backwards.** `row.from`
+    is the previous group's *last* release and `row.start` this group's *first*;
+    ADR-0074's first `concurrent` clause is exactly `prev.last_seq >=
+    group.first_seq`, and `/app/diff` reads `?from=`/`?to=` in the order it is
+    handed them. So such a link renders every insertion as a deletion —
+    **39,645 of 423,800 transitions**, 58 of them a release point against
+    itself. The entry says the release points do not run forwards and points at
+    the From/To picker. The `concurrent` flag alone was rejected as the guard:
+    PR #65 widens it to any third group mapped inside the window, taking it to
+    **77,596** transitions, of which **37,951 are correctly ordered** and would
+    have lost a working comparison.
+
+3. **The switch is `SortBar` with no direction to reverse** (ADR-0071):
    **Amendments (N)** | **All recorded versions (M)**, the one in force a marked
    pill, the other a link. One line under the lede — the whole footprint the
    full history costs the default view. `N` is the amendments and not the rows
    the view lists: the default view also lists the oldest text the site holds,
    which is not an amendment, and that row says so.
 
-4. **A law is a chip, and an unattributed text change says so.** A `text` entry
-   attributed `classified` shows one chip per law, **Pub. L. 119–102** with the
-   EN DASH the tables and the Code write, carrying the source's action word when
-   it is not a plain amendment (`new`, `repealed`, `tr to`). An unattributed one
-   reads "No classifying statute recorded" — never "editorial", which would be
-   a claim ADR-0074's data does not support for the half of text transitions
-   that name no statute.
+   It is the component and not a copy of its markup. `SortBar` gains `heading`
+   and `reversible`; with `reversible={false}` the option in force is an inert
+   `<span>` and the arrow and direction words are gone, because there is no
+   order to flip and a link to the view already on screen does nothing. A second
+   hand-written copy would have drifted from the three-class `--on` rule that
+   exists because that option became a link, and `/app/design` renders this
+   specimen (ADR-0053).
+
+4. **A law is a chip, and the line above the chips says what they are a list
+   of.** An entry attributed `classified` shows one chip per law, **Pub. L.
+   119–102** with the EN DASH the tables and the Code write, carrying the
+   source's action word when it is not a plain amendment (`new`, `repealed`,
+   `tr to`). A text change with no law reads "No classifying statute recorded" —
+   never "editorial", which would be a claim ADR-0074's data does not support
+   for the half of text transitions that name no statute.
+
+   ADR-0074 attributes **every** transition, not only the text ones: **7,186
+   `notes` transitions and 81 `structure` transitions carry a law** corpus-wide.
+   A chip under "Notes updated" reads as an amendment, so the list is led by
+   **Amended by** on a `text` entry and **Public laws recorded for this change**
+   on any other. Scoping the chips to `text` entries was the alternative and was
+   rejected: it drops 7,267 real attributions to avoid writing one more line.
 
    **The chip links to the lookup, not to a session table.** The spec asked for
    the session table filtered to that law, and the session a law falls in is not
@@ -82,8 +125,12 @@ with different markup, which is the empty redline the control exists to avoid.
 5. **The displayed start of an entry is `releases[0]`.** Not `first_seen`, which
    follows the stored fragment's `first_release_id` and names a later release
    point than the group's own earliest whenever an incremental load attached one
-   (ADR-0066). The From/To picker under the timeline offers the same labels, and
-   offers only the entries the view on screen shows.
+   (ADR-0066). The From/To picker under the timeline offers the same labels, for
+   **every recorded version in both views**, and says so when the view on screen
+   shows fewer. Scoping it to the view took it off **41,707 of the 61,252
+   sections with more than one version** — a history of notes-only and
+   metadata-only transitions has one row in the default view — and `/app/diff`
+   is reachable from nowhere else on the page.
 
 6. **An unknown state degrades visibly.** When any entry answers
    `change_kind: null` — a corpus loaded but not back-filled, or back-filled
@@ -130,10 +177,17 @@ with different markup, which is the empty redline the control exists to avoid.
   therefore hidden by default (ADR-0074's recorded cost, met here for the first
   time in the reader). The reading redline cannot see such a change either
   (ADR-0026), so the two surfaces agree.
-- **`concurrent` entries are shown with a note and nothing more.** ADR-0074
-  flags 39,645 transitions whose windows are unreliable — recurring content, not
-  ADR-0021 duplicates — and the timeline says the order is the order they were
-  stored in rather than trying to repair it.
+- **`concurrent` entries carry a note and no repair.** ADR-0074 flags the
+  transitions whose windows are unreliable — recurring content, not ADR-0021
+  duplicates, and **77,596 of 423,800** once PR #65 widens the flag to any third
+  group mapped inside the window. The entry says another stored version is
+  mapped inside the release points it arrives across; the site does not try to
+  reconstruct when that text was actually in force, which would need a row per
+  era rather than per group (ADR-0074's own future work).
+- **The page costs a third API call.** `cachedReleases` is the ADR-0045 cache,
+  so it is one request per title per five minutes rather than one per view, and
+  a failure degrades to the concurrent-flag guard — but `/app/versions` made two
+  calls before this and makes three now.
 - **The default view's counts and the API's are the same numbers read twice.**
   The page computes them from the entries in hand; nothing asserts that a
   filtered count from the API would agree, because there is no filtered call.

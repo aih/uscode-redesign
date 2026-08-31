@@ -4075,8 +4075,17 @@ dialog.palette {
 .timeline__laws {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: 0.35rem;
   margin: 0.35rem 0 0;
+}
+
+/* What the chips beside it are a list of. ADR-0074 attributes notes-only and
+ * metadata-only transitions too, so "Amended by" is true of a `text` entry and
+ * of nothing else (ADR-0075). */
+.timeline__laws-label {
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 /* A law chip. `--link` on `--page` is the measured pair for a link; the border

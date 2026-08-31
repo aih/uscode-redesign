@@ -50,19 +50,21 @@ title: Switch between the amendments and every recorded version
 steps:
   - goto: /app/versions/us/usc/t16/s2201
     caption: The history opens on the amendments.
-  - click: "[data-view-option='all']"
+  - click: "[data-sort='all']"
   - expect: { url: "view=all" }
     caption: All recorded versions — the notes-only and metadata-only changes as well.
-  - expect: { selector: "[data-view-option='text']", visible: true }
+  - expect: { selector: "[data-sort='text']", visible: true }
     caption: The other option is a link back.
 ```
 
 ## What each entry says
 
-An entry that changed the statutory text carries the public laws OLRC's classification tables
-record against this section for that change, as chips: **Pub. L. 119–102**. A chip links to the
-classification lookup, which leads to the table row. Where the tables record an action other than a
-plain amendment — `new`, `repealed`, `tr to` — the chip carries that word.
+An entry carries the public laws OLRC's classification tables record against this section for that
+change, as chips: **Pub. L. 119–102**. A chip links to the classification lookup, which leads to the
+table row. Where the tables record an action other than a plain amendment — `new`, `repealed`,
+`tr to` — the chip carries that word. The line above the chips says what the list is: **Amended by**
+on an entry that changed the statutory text, **Public laws recorded for this change** on one that
+changed a note or the markup.
 
 Where the text changed and no statute is recorded against it, the entry says so. Roughly half of
 text changes are in that state: footnote markers, editorial trimming of cross references,
@@ -70,6 +72,10 @@ renumbering notices, and amendments the tables do not carry.
 
 In the all view, a notes-only entry reads "Notes updated" and a metadata-only entry reads
 "XML/metadata only".
+
+Each entry after the first links to a redline against the release point before it. Where another
+stored version is mapped inside the release points an entry arrives across, the entry says so and
+offers no redline; the From/To picker at the foot of the page still reaches one.
 
 ```scenario
 id: versions-law-attribution
@@ -85,11 +91,14 @@ steps:
 A change to whitespace alone is recorded as a metadata change, so it does not appear in the
 amendments view.
 
-Where the source published two elements under one identifier at one release point, an entry says
-that the order of the versions around it is the order they were stored in.
-
 The classification tables begin at the 104th Congress. An amendment older than that carries no
 chip.
+
+## The From/To picker
+
+At the foot of the version history, From and To choose any two of the section's recorded versions
+and open a redline between them. The list covers every recorded version in both views, and says so
+when the view on screen is showing fewer.
 
 ## Compare with…
 

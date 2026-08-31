@@ -17,18 +17,21 @@
  */
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
+import SortBar from "../../components/SortBar.astro";
 import Timeline from "../../components/Timeline.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { REVALIDATE } from "../../lib/cache";
+import { cachedReleases } from "../../lib/releasecache";
 import { appHref, trimNum, versionsHref } from "../../lib/url";
 import {
   VERSIONS_VIEW_PARAM,
   isAnnotated,
   readVersionsView,
+  releaseOrder,
   timelineRows,
   versionCounts,
 } from "../../lib/versions";
-import type { Entry, Section, Versions } from "../../lib/types";
+import type { Entry, Release, Section, Versions } from "../../lib/types";
 import { isToc } from "../../lib/types";
 
 // The route's own static prefix is "versions", not "us/usc" (unlike the
@@ -64,10 +67,49 @@ const title = current
 const annotated = isAnnotated(entries);
 const view = annotated ? readVersionsView(Astro.url.searchParams.get(VERSIONS_VIEW_PARAM)) : "all";
 const counts = versionCounts(entries);
-/** The rows the view on screen shows, for the picker below the timeline: a
- *  From/To list naming versions the reader cannot see would be a third view. */
-const shown = timelineRows(entries).filter((row) => view === "all" || row.statutory);
-const shownStarts = shown.map((row) => row.start).filter((start): start is string => start !== null);
+
+/**
+ * Where each release point sits in the global order, for the title this section
+ * is in. Release-point labels do not sort (gotcha 4), and two things here need
+ * the order: the run of release points a default-view entry stands through,
+ * which is a concatenation of runs that interleave whenever content recurs; and
+ * whether an entry's window runs forwards at all, since `/app/diff` reads
+ * `?from=`/`?to=` in the order it is given them.
+ *
+ * `cachedReleases` is the same per-title, five-minute cache the section page's
+ * release switcher reads (ADR-0045), so this is one request per title per
+ * interval rather than one per view. Allowed to fail: without it the folded run
+ * keeps its concatenation order and comparisons fall back to ADR-0074's
+ * `concurrent` flag, which is conservative rather than exact.
+ */
+const titleNum = identifier.match(/^\/us\/usc\/t([0-9]+[a-zA-Z]?)/u)?.[1] ?? null;
+const releases = await cachedReleases(titleNum).catch((error) => {
+  console.error(`releases for ${identifier}:`, error);
+  return [] as Release[];
+});
+const order = releases.length > 0 ? releaseOrder(releases) : undefined;
+
+const rows = timelineRows(entries, order);
+/**
+ * The From/To picker's options: every recorded version, in both views.
+ *
+ * Scoping them to the view on screen took the picker off 41,707 of the 61,252
+ * sections with more than one version — a history of notes-only and
+ * metadata-only transitions has one row in the default view — and `/app/diff`
+ * is reachable from nowhere else on this page.
+ */
+const pickerStarts = rows.map((row) => row.start).filter((start): start is string => start !== null);
+/** Whether the picker lists versions the view on screen does not, which it says
+ *  above itself rather than leaving the reader to notice. */
+const pickerExceedsView = rows.some((row) => !row.statutory) && view === "text";
+
+/** The view switch, in the sort bar's vocabulary (ADR-0071). There is no
+ *  direction to reverse, so `reversible={false}`: the option in force is an
+ *  inert marked pill and the other is a link. */
+const viewOptions = [
+  { key: "text", label: `Amendments (${counts.amendments})` },
+  { key: "all", label: `All recorded versions (${counts.all})` },
+];
 
 // The breadcrumb, at the cost of a second call. `/sections/…/versions` answers
 // `{identifier, versions}` and nothing else — it has no ancestors to give — so
@@ -121,67 +163,36 @@ const currentCrumb: Entry | null = section
         </p>
 
         {annotated && (
-          <nav class="sortbar" aria-label="Which versions to show">
-            <span class="sortbar__label" id="viewbar-label">
-              Show
-            </span>
-            <ul class="sortbar__list" aria-labelledby="viewbar-label">
-              <li>
-                {view === "text" ? (
-                  <span
-                    class="sortbar__option sortbar__option--on"
-                    data-view-option="text"
-                    aria-current="true"
-                  >
-                    Amendments ({counts.amendments})
-                  </span>
-                ) : (
-                  <a
-                    class="sortbar__option"
-                    data-view-option="text"
-                    href={versionsHref(identifier)}
-                  >
-                    Amendments ({counts.amendments})
-                  </a>
-                )}
-              </li>
-              <li>
-                {view === "all" ? (
-                  <span
-                    class="sortbar__option sortbar__option--on"
-                    data-view-option="all"
-                    aria-current="true"
-                  >
-                    All recorded versions ({counts.all})
-                  </span>
-                ) : (
-                  <a
-                    class="sortbar__option"
-                    data-view-option="all"
-                    href={versionsHref(identifier, "all")}
-                  >
-                    All recorded versions ({counts.all})
-                  </a>
-                )}
-              </li>
-            </ul>
-          </nav>
+          <SortBar
+            options={viewOptions}
+            sort={view}
+            href={(next) => versionsHref(identifier, next)}
+            label="Which versions to show"
+            idPrefix="viewbar"
+            heading="Show"
+            reversible={false}
+          />
         )}
 
-        <Timeline identifier={identifier} entries={entries} view={view} />
+        <Timeline identifier={identifier} entries={entries} view={view} order={order} />
 
         {
-          shownStarts.length > 1 && (
+          pickerStarts.length > 1 && (
             <>
               <p class="toc-group">Compare any two versions</p>
+              {pickerExceedsView && (
+                <p class="doc-meta">
+                  The list covers every recorded version, including the ones this view hides.
+                </p>
+              )}
               <form class="diff-picker" method="get" action={`/app/diff${identifier}`}>
                 <div>
                   <label class="usa-label picker__label" for="from">
                     From
                   </label>
                   <select class="usa-select picker__select" id="from" name="from">
-                    {shownStarts.map((start) => (
-                      <option value={start} selected={start === shownStarts[0]}>
+                    {pickerStarts.map((start) => (
+                      <option value={start} selected={start === pickerStarts[0]}>
                         {start}
                       </option>
                     ))}
@@ -192,10 +203,10 @@ const currentCrumb: Entry | null = section
                     To
                   </label>
                   <select class="usa-select picker__select" id="to" name="to">
-                    {shownStarts.map((start) => (
+                    {pickerStarts.map((start) => (
                       <option
                         value={start}
-                        selected={start === shownStarts[shownStarts.length - 1]}
+                        selected={start === pickerStarts[pickerStarts.length - 1]}
                       >
                         {start}
                       </option>

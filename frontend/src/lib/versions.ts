@@ -64,18 +64,49 @@ export interface TimelineRow {
   /** The same, extended through the groups the default view hides after it, so
    *  the "unchanged through" run of a visible entry is not cut short by an
    *  entry the reader cannot see. Equal to `releases` in the all view's terms
-   *  and for a row the default view hides. */
+   *  and for a row the default view hides. Sorted by release-point order when
+   *  `timelineRows` was given one — the folded groups interleave whenever the
+   *  content recurs, so concatenating them is not a sorted list. */
   effectiveReleases: string[];
   /**
    * The release point to compare against: the last release of the entry before
-   * this one, so the redline spans one transition.
+   * this one, so the redline spans one transition. **Null when that release
+   * point is not strictly older than `start`.**
    *
    * One value serves both views. The entries the default view hides sit between
    * a shown entry and the one above it, and they are folded into that one's
    * run, so the end of the previous *shown* entry's effective run is the last
    * release of the entry immediately before — the same label either way.
+   *
+   * The window a transition arrives across can run backwards: ADR-0074 records
+   * one shape of it as `concurrent`, where the departing group is still mapped
+   * at or after the arriving group's first release. `/app/diff` reads `?from=`
+   * and `?to=` in the order it is given them, so a link built from such a window
+   * renders every insertion as a deletion — measured at **39,645 of 423,800
+   * transitions**, 58 of them a release point against itself. No comparison is
+   * offered there; the From/To picker under the timeline still is.
    */
   from: string | null;
+  /** There is an entry before this one and no comparison is offered against it,
+   *  because the window runs backwards. The timeline says so rather than
+   *  leaving a gap where every other entry has a link. */
+  withheld: boolean;
+}
+
+/**
+ * Where a release point sits in the global order, by label.
+ *
+ * Labels do not sort (gotcha 4), so ordering needs the inventory's `seq` and
+ * cannot be recovered from the strings. A lookup that answers `undefined` for a
+ * label — an incomplete release list, or a page with none at all — leaves the
+ * order unknown, and both callers below degrade rather than guess.
+ */
+export type ReleaseOrder = (label: string) => number | undefined;
+
+/** `seq` by label, from the release list `/app/versions` fetches for the title. */
+export function releaseOrder(releases: { label: string; seq: number }[]): ReleaseOrder {
+  const seqs = new Map(releases.map((release) => [release.label, release.seq]));
+  return (label) => seqs.get(label);
 }
 
 /**
@@ -83,8 +114,14 @@ export interface TimelineRow {
  *
  * `entries` arrive oldest first, which is the order the page renders and the
  * order the repository guarantees (earliest mapped release, ADR-0066).
+ *
+ * `order` places a release-point label in the global sequence. Without it the
+ * folded run stays in concatenation order and a comparison is offered only where
+ * ADR-0074's `concurrent` flag is clear — the flag covers every backwards window
+ * and 37,951 forward ones besides, so it is the conservative answer and not the
+ * exact one.
  */
-export function timelineRows(entries: VersionEntry[]): TimelineRow[] {
+export function timelineRows(entries: VersionEntry[], order?: ReleaseOrder): TimelineRow[] {
   const annotated = isAnnotated(entries);
   const rows: TimelineRow[] = entries.map((entry, index) => {
     const releases = entry.releases ?? [];
@@ -93,14 +130,18 @@ export function timelineRows(entries: VersionEntry[]): TimelineRow[] {
     const statutory = annotated ? isStatutoryEntry(entry) : true;
     const previous = index > 0 ? entries[index - 1] : null;
     const previousReleases = previous?.releases ?? [];
+    const start = releases[0] ?? null;
+    const from = previous ? (previousReleases[previousReleases.length - 1] ?? null) : null;
+    const forward = isForward(from, start, entry, order);
     return {
       entry,
       kind: entry.change_kind ?? "unknown",
       statutory,
-      start: releases[0] ?? null,
+      start,
       releases,
       effectiveReleases: [...releases],
-      from: previous ? (previousReleases[previousReleases.length - 1] ?? null) : null,
+      from: forward ? from : null,
+      withheld: previous !== null && !forward,
     };
   });
 
@@ -111,7 +152,39 @@ export function timelineRows(entries: VersionEntry[]): TimelineRow[] {
     else if (lastShown) lastShown.effectiveReleases.push(...row.releases);
   }
 
+  if (order) {
+    for (const row of rows) sortReleases(row.effectiveReleases, order);
+  }
+
   return rows;
+}
+
+/** Whether a redline from `from` to `start` runs forwards in time. */
+function isForward(
+  from: string | null,
+  start: string | null,
+  entry: VersionEntry,
+  order?: ReleaseOrder,
+): boolean {
+  if (!from || !start) return false;
+  const before = order?.(from);
+  const after = order?.(start);
+  if (before !== undefined && after !== undefined) return before < after;
+  // No order to read. `concurrent` is the only signal left, and it is set on
+  // every backwards window, so trusting it costs some comparisons and offers
+  // none that run the wrong way.
+  return entry.concurrent !== true;
+}
+
+/** In place, by release-point order; a label the order does not know keeps its
+ *  position relative to the labels it cannot be compared with. */
+function sortReleases(releases: string[], order: ReleaseOrder): void {
+  releases.sort((a, b) => {
+    const left = order(a);
+    const right = order(b);
+    if (left === undefined || right === undefined) return 0;
+    return left - right;
+  });
 }
 
 export interface VersionCounts {
@@ -162,6 +235,20 @@ export function lawQuery(law: VersionLaw): string {
  */
 export function lawActions(law: VersionLaw): string[] {
   return [...new Set(law.classification_actions ?? [])].filter((action) => action !== "");
+}
+
+/**
+ * What the chips under an entry are a list of.
+ *
+ * ADR-0074 attributes every transition, not only the text ones: 7,186 `notes`
+ * transitions and 81 `structure` transitions carry a law corpus-wide. A chip
+ * beside "Notes updated" reads as an amendment unless the row says what it is,
+ * so the lead-in is the sentence that makes the list true for its own kind.
+ */
+export function lawsLabel(entry: VersionEntry): string {
+  return entry.change_kind === "text"
+    ? "Amended by"
+    : "Public laws recorded for this change:";
 }
 
 /**

@@ -174,10 +174,58 @@ test.describe("the version timeline's two views (ADR-0075)", () => {
     await expect(chips.first()).toHaveAttribute("href", /\/app\/classification\?q=/u);
   });
 
+  test("a chip's citation and its action word are two words", async ({ page }) => {
+    // ADR-0053's `Neighbors` defect: alone inside an element, the text node
+    // between two expressions does not survive the Astro compiler, and the
+    // accessible name came out `Pub. L. 119–21new`. `toContainText("new")`
+    // passes either way, so this reads the whole string.
+    await page.goto(PAGE);
+    const chip = page.locator('.timeline[data-view="text"] .timeline__law').last();
+    expect((await chip.innerText()).replace(/\s+/gu, " ").trim()).toBe("Pub. L. 119–21 new");
+  });
+
+  test("the chip list says what it is a list of", async ({ page }) => {
+    await page.goto(PAGE);
+    // ADR-0074 attributes notes-only transitions too, so a chip on one has to
+    // say it is not an amendment.
+    await expect(
+      page.locator('.timeline[data-view="text"] .timeline__laws-label').first(),
+    ).toHaveText("Amended by");
+    await expect(
+      page
+        .locator('.timeline[data-view="all"] li[data-change-kind="notes"] .timeline__laws-label')
+        .first(),
+    ).toContainText("recorded for this change");
+  });
+
   test("an unattributed amendment says no statute is recorded", async ({ page }) => {
     await page.goto(PAGE);
     await expect(
-      page.locator('.timeline[data-view="text"] li').last().locator(".timeline__kind"),
+      page.locator('.timeline[data-view="text"] li').last().locator(".timeline__kind").first(),
     ).toContainText("No classifying statute recorded");
+  });
+
+  test("a concurrent entry says so, and offers no redline", async ({ page }) => {
+    await page.goto(PAGE);
+    const entry = page.locator(
+      '.timeline[data-view="all"] li[data-change-kind="notes"]',
+    );
+    await expect(entry).toContainText("Another stored version of this section is mapped inside");
+    await expect(entry).toContainText("do not run forwards");
+    await expect(entry.locator(".timeline__diff")).toHaveCount(0);
+    // Every other entry after the first still has one.
+    await expect(page.locator('.timeline[data-view="all"] .timeline__diff')).toHaveCount(3);
+  });
+
+  test("the view switch is the sort bar with no direction to reverse", async ({ page }) => {
+    await page.goto(PAGE);
+    const bar = page.locator("#design-viewbar-label").locator("..");
+    await expect(bar.locator(".sortbar__option--on")).toHaveText("Amendments (2)");
+    // No arrow and no direction words: there is nothing to flip.
+    await expect(bar.locator(".sortbar__arrow")).toHaveCount(0);
+    await expect(bar.locator(".sortbar__direction")).toHaveCount(0);
+    // The option in force is inert; the other is a link.
+    await expect(bar.locator("a.sortbar__option--on")).toHaveCount(0);
+    await expect(bar.locator("a.sortbar__option")).toHaveCount(1);
   });
 });

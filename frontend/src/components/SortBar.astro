@@ -16,6 +16,13 @@
  * The arrow is `▲`/`▼` in an `aria-hidden` span with the direction written out
  * beside it, because a glyph is not a word and a screen reader saying "black
  * up-pointing triangle" says nothing about the order of the rows.
+ *
+ * The same control serves a list with no direction to reverse — the version
+ * history's two views (ADR-0075). `reversible={false}` drops the arrow and the
+ * direction words and makes the option in force an inert `<span>`: there is
+ * nothing to flip, and a link to the view already on screen is a link that does
+ * nothing. The pills, the marker and the `--on` fill stay the ones a reader has
+ * already learned.
  */
 interface SortOption {
   /** `pl` or `code` — the key, never the direction. */
@@ -23,9 +30,9 @@ interface SortOption {
   label: string;
   /** What the two directions of this key mean, in this view's own terms:
    *  "oldest first"/"newest first" for a history, "as published"/"reversed" for
-   *  a document. */
-  ascending: string;
-  descending: string;
+   *  a document. Unused, and unneeded, when `reversible` is false. */
+  ascending?: string;
+  descending?: string;
 }
 
 interface Props {
@@ -36,6 +43,10 @@ interface Props {
   href: (sort: string) => string;
   label?: string;
   idPrefix?: string;
+  /** The word before the pills. */
+  heading?: string;
+  /** Whether the option in force reverses when it is chosen again. */
+  reversible?: boolean;
 }
 
 const {
@@ -44,15 +55,20 @@ const {
   href,
   label = "Sort rows",
   idPrefix = "sortbar",
+  heading = "Order",
+  reversible = true,
 } = Astro.props as Props;
 
-const activeKey = sort.startsWith("code") ? "code" : "pl";
-const descending = sort.endsWith("-desc");
+// The classification vocabulary's two keys carry their direction in the same
+// string (`code-desc`), so the key in force is the prefix. Without a direction
+// the sort *is* the key.
+const activeKey = reversible ? (sort.startsWith("code") ? "code" : "pl") : sort;
+const descending = reversible && sort.endsWith("-desc");
 const labelId = `${idPrefix}-label`;
 ---
 
 <nav class="sortbar" aria-label={label}>
-  <span class="sortbar__label" id={labelId}>Order</span>
+  <span class="sortbar__label" id={labelId}>{heading}</span>
   <ul class="sortbar__list" aria-labelledby={labelId}>
     {
       options.map((option) => {
@@ -61,10 +77,20 @@ const labelId = `${idPrefix}-label`;
         // The option in force flips; the others start in their own ascending
         // direction rather than carrying this one's across.
         const target = on ? (descending ? option.key : `${option.key}-desc`) : option.key;
+        const classes = `sortbar__option${on ? " sortbar__option--on" : ""}`;
+        if (on && !reversible) {
+          return (
+            <li>
+              <span class={classes} data-sort={option.key} aria-current="true">
+                {option.label}
+              </span>
+            </li>
+          );
+        }
         return (
           <li>
             <a
-              class={`sortbar__option${on ? " sortbar__option--on" : ""}`}
+              class={classes}
               href={href(target)}
               data-sort={target}
               aria-current={on ? "true" : undefined}
