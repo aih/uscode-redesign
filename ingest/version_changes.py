@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import datetime
 import json
-import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -62,7 +61,8 @@ from db.models import (
     Title,
     TitleVersion,
 )
-from ingest.parser import parser_for_fragment
+from ingest.classification import PL_CITATION_RE
+from ingest.parser import parser_for_namespace
 from ingest.records import notes_hash_of, text_hash_of
 from storage.classification import identifier_variants
 
@@ -73,10 +73,9 @@ SECTION_BATCH = 200
 """Sections per transaction. Each section's fragments are parsed one at a time
 (gotcha 6); the batch only bounds how much bookkeeping a commit covers."""
 
-# `Pub. L. 92–463` — the corpus writes the citation with an EN DASH; accept the
-# hyphen too for anything that survived a round trip through a dash-folding
-# system.
-_PL_CITATION = re.compile(r"Pub\.\s*L\.\s*(\d{1,3})[–‑-](\d{1,4})")
+HASH_UPDATE_BATCH = 200
+"""Computed hashes buffered before one executemany UPDATE — the hash values,
+never the fragments, which stream one at a time."""
 
 OnEvent = Callable[[str], None] | None
 
@@ -124,11 +123,16 @@ def law_in_window(
 
 
 def credit_laws(source_credit: str | None) -> frozenset[tuple[int, int]]:
-    """The `Pub. L. C-N` citations a source credit carries, as (congress, num)."""
+    """The `Pub. L. C-N` citations a source credit carries, as (congress, num).
+
+    Read through `ingest.classification.PL_CITATION_RE` — one pattern owns the
+    citation shape, and it is dash-tolerant because the corpus writes source
+    credits with an EN DASH (gotcha 17) while the ECCT writes a hyphen.
+    """
     if not source_credit:
         return frozenset()
     return frozenset(
-        (int(c), int(n)) for c, n in _PL_CITATION.findall(source_credit)
+        (int(c), int(n)) for c, n in PL_CITATION_RE.findall(source_credit)
     )
 
 
@@ -232,34 +236,59 @@ def _squash(value: str | None) -> str:
     return "".join((value or "").split())
 
 
-def _collapse(value: str | None) -> str:
-    return " ".join((value or "").split())
-
-
 def _ensure_hashes(session: Session, version_ids: Iterable[int]) -> int:
     """Fill `text_hash`/`notes_hash` on versions that lack them.
 
-    One fragment in memory at a time: each is fetched, parsed once, hashed and
-    released before the next (gotcha 6 — Title 42 fragments run to hundreds of
-    KB and a section can hold 400 versions).
+    One fragment in memory at a time: the rows stream through a server-side
+    cursor (`yield_per`), each fragment is encoded once, parsed once — the
+    parser chosen from the parsed root's own namespace, so nothing re-reads
+    the bytes — and released before the next (gotcha 6: Title 42 fragments
+    run to hundreds of KB and a section can hold 400 versions). The computed
+    hashes are 64 bytes a row and are flushed as one executemany UPDATE per
+    `HASH_UPDATE_BATCH`.
     """
+    ids = list(version_ids)
+    if not ids:
+        return 0
     computed = 0
-    for version_id in version_ids:
-        xml = session.execute(
-            select(SectionVersion.xml).where(SectionVersion.id == version_id)
-        ).scalar_one()
-        parser = parser_for_fragment(xml)
-        root = etree.fromstring(xml.encode("utf-8"))
-        session.execute(
-            update(SectionVersion)
-            .where(SectionVersion.id == version_id)
-            .values(
-                text_hash=text_hash_of(parser.plain_text(root)),
-                notes_hash=notes_hash_of(parser.notes_text(root)),
-            )
+    updates: list[dict[str, object]] = []
+    rows = session.execute(
+        select(SectionVersion.id, SectionVersion.xml)
+        .where(SectionVersion.id.in_(ids))
+        .execution_options(yield_per=50)
+    )
+    for row in rows:
+        root = etree.fromstring(row.xml.encode("utf-8"))
+        parser = parser_for_namespace(etree.QName(root).namespace)
+        updates.append(
+            {
+                "b_id": row.id,
+                "b_text": text_hash_of(parser.plain_text(root)),
+                "b_notes": notes_hash_of(parser.notes_text(root)),
+            }
         )
         computed += 1
+        if len(updates) >= HASH_UPDATE_BATCH:
+            _flush_hash_updates(session, updates)
+    _flush_hash_updates(session, updates)
     return computed
+
+
+def _flush_hash_updates(session: Session, updates: list[dict[str, object]]) -> None:
+    if not updates:
+        return
+    from sqlalchemy import bindparam
+
+    # On the Core connection, not the ORM session: nothing holds these rows as
+    # ORM instances, and Session.execute would read an executemany UPDATE as
+    # "bulk update by primary key" and demand the key under its own name.
+    session.connection().execute(
+        update(SectionVersion.__table__)
+        .where(SectionVersion.__table__.c.id == bindparam("b_id"))
+        .values(text_hash=bindparam("b_text"), notes_hash=bindparam("b_notes")),
+        updates,
+    )
+    updates.clear()
 
 
 def _groups_for_sections(
@@ -469,9 +498,15 @@ def compute_for_sections(
                 change_kind = (
                     "text" if text_changed else "notes" if notes_changed else "structure"
                 )
-                heading_changed = _collapse(group.heading) != _collapse(prev.heading)
+                # Whitespace-removed like every other comparison here, so a
+                # converter-era boundary space inside a heading is not a
+                # heading change (ADR-0074 notes the deviation from the
+                # spec's "whitespace-collapsed" wording).
+                heading_changed = _squash(group.heading) != _squash(prev.heading)
                 status_changed = (group.status or None) != (prev.status or None)
-                concurrent = prev.last_seq > group.first_seq
+                # >= : equality means both groups are mapped at one release —
+                # the ADR-0021 several-elements-per-identifier case.
+                concurrent = prev.last_seq >= group.first_seq
                 window_from_id = prev.last_release_id
                 departing = releases[window_from_id]
                 from_credit = prev.source_credit
@@ -574,7 +609,6 @@ def run_compute(
     started = time.monotonic()
     with session_factory() as session:
         title_rows = _title_ids(session, titles)
-        releases = _release_facts(session)
 
     for title_id, title_num in title_rows:
         with session_factory() as session:
@@ -592,9 +626,10 @@ def run_compute(
         for start in range(0, len(todo), SECTION_BATCH):
             batch = todo[start : start + SECTION_BATCH]
             with session_factory() as session:
-                stats = compute_for_sections(
-                    session, batch, releases=releases, on_event=on_event
-                )
+                # The release facts are read per batch, not once per run: a
+                # run is hours long and the daily poll can seed a new release
+                # point under it, which a stale snapshot would KeyError on.
+                stats = compute_for_sections(session, batch, on_event=on_event)
                 session.commit()
             title_stats.add(stats)
         total.add(title_stats)
@@ -621,7 +656,6 @@ def run_reattribute(
     total = ComputeStats()
     with session_factory() as session:
         title_rows = _title_ids(session, titles)
-        releases = _release_facts(session)
 
     for title_id, title_num in title_rows:
         with session_factory() as session:
@@ -635,7 +669,7 @@ def run_reattribute(
         for start in range(0, len(section_ids), SECTION_BATCH):
             batch = section_ids[start : start + SECTION_BATCH]
             with session_factory() as session:
-                stats = _reattribute_sections(session, batch, releases)
+                stats = _reattribute_sections(session, batch, _release_facts(session))
                 session.commit()
             total.add(stats)
         if on_event and section_ids:
