@@ -485,6 +485,21 @@ keyboard commits with `Enter`. Sizes: **title 10 carries 23,093 of the 144,837 r
 a section page shows no classification rows, so the link runs one way; and the poll cannot see a
 change to the ECCT alone. (The title view's `sort=code` is built — ADR-0071.)
 
+**Every version transition is classified and attributed** (`docs/version-semantics-spec.md`,
+ADR-0074). `section_version_changes` holds one row per version group — `initial` / `text` / `notes`
+/ `structure`, from whitespace-insensitive hashes of the reading text and the notes — and
+`section_version_change_laws` the Public Laws the classification tables classify to the section
+within the transition's window, computed as the delta of incorporated-law sets honoring
+`excluded_laws`. The full local corpus is back-filled: **489,738 change rows over 423,800
+transitions in 7m50s — 75.1% structure / 17.1% notes / 7.8% text, text 49.2% classified, 30,250 law
+rows** (`docs/verification/version-changes.json`), every share within 2.5 points of the spec's
+600-section sample. `concurrent` fired on 39,645 transitions corpus-wide — recurring content,
+ADR-0074's recorded cost, not the ~160 ADR-0021 pairs. `load_release` keeps the rows current;
+`deploy/update-corpus.sh` runs `version-changes` after a load that loaded something and
+`--reattribute` after a classification change; the deployed box owes the migration and the one-time
+backfill (`docs/deploy-status.md`). V2 (repository/API) and V3 (reader) are the spec's remaining
+phases.
+
 **Next: (1) Day 7 hardening — part of it landed as ADR-0073 under an outage, and what it did not
 cover is the load test below; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
