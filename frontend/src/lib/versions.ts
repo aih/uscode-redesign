@@ -123,8 +123,9 @@ export interface VersionCounts {
   statutory: number;
   /** Every recorded entry. */
   all: number;
-  /** Transitions that changed the statutory text — `statutory` minus the
-   *  `initial` entry, and the number the section page prints. */
+  /** Transitions that changed the statutory text: what the default view's name
+   *  counts, and what the section page's history link prints. Below
+   *  `statutory`, which also counts the oldest entry. */
   amendments: number;
   /** Release points this section is in the Code at, across every entry. */
   releases: number;
