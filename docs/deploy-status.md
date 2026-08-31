@@ -6,7 +6,9 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-08-19 — the site was down for about ten hours and every alarm read `OK`;
+**Last updated:** 2026-08-31 — the version-change annotations (ADR-0074) owe the box a migration
+and a one-time backfill; see [Still owed](#still-owed). Before that, 2026-08-19 — the site was down
+for about ten hours and every alarm read `OK`;
 see [The outage](#the-outage-2026-08-19-adr-0073). Before that, 2026-08-13 — the classification rows
 are loaded on the box (144,837 of them) and the pages that serve them were waiting on a deploy; that
 deploy has since happened and `/app/classification` answers 200. Before that,
@@ -515,6 +517,28 @@ alert nobody reads. The gate is now `source_mismatches` and `incomplete_loads` �
 that mean something is actually wrong — with `count_mismatches` printed rather than gated on.
 
 ## Still owed
+
+**The version-change annotations (ADR-0074) need a migration and a one-time backfill on the box.**
+The next deploy applies migration `b6e1f0a2c9d4` (`deploy-on-box.sh` runs `alembic upgrade head`):
+`text_hash`/`notes_hash` on `section_versions`, plus `section_version_changes` and
+`section_version_change_laws` — all empty on the box, since it was seeded by `pg_restore` from a
+pre-ADR-0074 dump. Filling them re-parses every stored fragment for its hashes: 7m50s on the
+development machine for the corpus's 489,738 versions (`docs/verification/version-changes.json`);
+the t4g is slower, so budget tens of minutes. Once the deploy has landed, run it by hand through
+SSM:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T api \
+    uv run python -m ingest version-changes --quiet
+```
+
+Resumable — an interrupted run continues where it stopped, and `--title` bounds a run to one title.
+Run it when nothing is deploying: a deploy recreates the `api` container and kills the `exec`, the
+ADR-0035 cost the reindex met above. Until it has run, the first `update-corpus.sh` chain that loads
+anything runs the whole backfill itself — the post-load `version-changes` step skips only sections
+whose rows are complete — which the hand run keeps out of a scheduled window. `--report` on the box writes
+`docs/verification/version-changes.json` there; the repo's committed copy is the development
+corpus's, the `database.json` rule.
 
 **The classification rows are on the box; the pages that serve them are not.** Run 2026-08-13
 through SSM against the running `api` container, which already carried the loader (the box is at
