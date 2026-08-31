@@ -46,11 +46,20 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   rule: the ledger's writer is wherever the backfill runs; everyone else pulls.
 
 ## python -m ingest load-all [--title N]... [--release L]... [--limit N] [--plan-only]
+                            [--defer-version-changes]
   Bulk load of the downloaded corpus (ADR-0014), ledger-driven, in inventory seq order so
   the baseline lands before the deltas. Resume state is the DATABASE, not a second ledger:
   `title_versions.sections_loaded` is stamped last, so a crash mid-title leaves NULL and the
   pair is redone (load_release is idempotent). Each zip is extracted to a temp dir and
   deleted, so the corpus never doubles on disk. `make load-all`.
+
+  `--defer-version-changes` skips the per-load ADR-0074 hook; each load instead **deletes the
+  change rows of every section it touched**, so the plain follow-up pass sees them as uncomputed
+  rather than skipping them on its count equality. Follow the run with one
+  `python -m ingest version-changes`, which computes each section once rather than once per
+  release point that touched it. On a corpus with no change rows yet — what the flag is for —
+  the delete matches nothing and costs an index probe (0.13s for Title 42's 8,939 sections;
+  0.61s where the rows exist, against the 17.4s hook it replaces).
 
 ## python -m ingest.reindex_search [--if-changed | --recreate] [--all-versions] [--limit N] [--skip-sections]
   Rebuild the search indices from Postgres (ADR-0028). Normal loading keeps them in step
@@ -126,19 +135,35 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   section's first group — into `section_version_changes`, and attributes text changes to the
   Public Laws the classification tables record, into `section_version_change_laws` (ADR-0074).
   Back-fills `text_hash`/`notes_hash` on `section_versions` rows that lack them by re-parsing
-  the stored fragments, which is the expensive part: Title 16's 40,073 versions took ~3
-  minutes; the full corpus's 489,738 is a ~1.5–2 h single-process run, per-title with commits
-  per batch of 200 sections. Resumable — a section whose change rows already number its
-  version groups is skipped, so an interrupted run just continues; `--recompute` redoes them.
+  the stored fragments, which is the expensive part. Per-title, with commits per batch of 200
+  sections; the whole corpus's 489,738 version groups measured **7m50s** (V4, the first full
+  run — the ~1.5–2 h the spec estimated was before the streaming hash path). Resumable — a
+  section whose change rows already number its version groups is skipped, so an interrupted
+  run just continues; `--recompute` redoes them. `--title` naming no loaded title is an error
+  (exit 2), not an empty run.
 
-  `--reattribute` redoes only the attribution and law rows (what a changed classification
-  table invalidates) and parses no XML — minutes, not hours. `--report` composes with the
-  run: after computing (or reattributing) it writes docs/verification/version-changes.json
-  from the stored rows, so `--title 16 --report` computes Title 16 and then reports and
-  `--report` alone is a fast complete-check plus the artifact; `--out` redirects it. `load`
-  and `load-all` keep the rows current on their own: `load_release` recomputes change rows
-  for every section whose release map gained a row, and a failure there warns without
-  failing the load (the rows are re-derivable with `--recompute`).
+  **Attribution needs the classification tables loaded first.** A section computed while
+  `classification_entries` is empty gets `attribution = 'none'` and is then *skipped* as
+  complete. Both compute paths warn on stderr when the table is empty — this command and
+  `load`/`load-all`'s own hook, which is the path `make dev-data` takes (it loads Title 16
+  with no tables; `make ci-data` loads the tables first). `--reattribute` is the repair — it
+  redoes only the attribution and law rows (what a changed classification table invalidates)
+  and parses no XML, minutes rather than hours.
+
+  `--report` composes with the run: after computing (or reattributing) it writes
+  docs/verification/version-changes.json from the stored rows, so `--title 16 --report`
+  computes Title 16 and then reports, and `--report` alone is a fast complete-check plus the
+  artifact; `--out` redirects it. The artifact is **always corpus-wide** — `--title` bounds
+  what is computed, never what is counted — and lands in the repository's docs/verification
+  whatever directory the command ran from.
+
+  `load` and `load-all` keep the rows current on their own: `load_release` recomputes the
+  sections a release can have moved (a new version group, a version with no change row, a
+  section that moved to a different group, or one whose in-force group departs into a
+  successor), and a failure there warns, deletes the rows it was recomputing so the next run
+  sees them as incomplete, and lets the load stand. `load-all --defer-version-changes` skips
+  the hook for a bulk run — follow it with one `version-changes` pass, which computes each
+  section once instead of once per release point that touched it.
 
 ## python -m ingest load <xmlfile> --release <label> [--currency-date YYYY-MM-DD] [--source-url URL]
                                                   [--source-zip PATH]

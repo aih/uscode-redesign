@@ -40,14 +40,14 @@ parser's `plain_text()`/`notes_text()`.
 from __future__ import annotations
 
 import datetime
-import json
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Iterable, Sequence, TypeVar
 
 from lxml import etree
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import bindparam, delete, func, select, update
 from sqlalchemy.orm import Session
 
 from db.models import (
@@ -63,10 +63,10 @@ from db.models import (
 )
 from ingest.classification import PL_CITATION_RE
 from ingest.parser import parser_for_namespace
-from ingest.records import notes_hash_of, text_hash_of
+from ingest.records import notes_hash_of, squash, text_hash_of
+from ingest.verification import VERIFICATION_DIR, write_verification_json
 from storage.classification import identifier_variants
 
-VERIFICATION_DIR = Path("docs/verification")
 REPORT_NAME = "version-changes.json"
 
 SECTION_BATCH = 200
@@ -77,7 +77,19 @@ HASH_UPDATE_BATCH = 200
 """Computed hashes buffered before one executemany UPDATE — the hash values,
 never the fragments, which stream one at a time."""
 
+ID_CHUNK = 5_000
+"""Ids per `IN (...)`. Postgres refuses a statement carrying more than 65,535
+bind parameters, and the id lists here are per-title: Title 42's 136,213
+version groups are one hash backfill and would exceed it on their own."""
+
 OnEvent = Callable[[str], None] | None
+
+_T = TypeVar("_T")
+
+
+def _chunked(values: Sequence[_T], size: int = ID_CHUNK) -> Iterable[Sequence[_T]]:
+    for start in range(0, len(values), size):
+        yield values[start : start + size]
 
 
 # --------------------------------------------------------------------- windows
@@ -210,10 +222,28 @@ class _Group:
 
 @dataclass(slots=True)
 class _Law:
-    in_classification: bool = False
-    note_only: bool = True
+    """One law attributed to a transition, as the two signals found it.
+
+    Both classification flags are positive statements about what was found —
+    `note_classification` and `text_classification` — so a law nothing
+    classified is simply neither, and no consumer has to remember that a
+    default means "unknown".
+    """
+
+    note_classification: bool = False
+    text_classification: bool = False
     in_source_credit: bool = False
     actions: set[str] = field(default_factory=set)
+
+    @property
+    def in_classification(self) -> bool:
+        return self.note_classification or self.text_classification
+
+    @property
+    def is_note_classification(self) -> bool:
+        """Only note rows name this law — worth showing as such against a text
+        transition."""
+        return self.note_classification and not self.text_classification
 
 
 @dataclass(slots=True)
@@ -223,6 +253,11 @@ class ComputeStats:
     changes: int = 0
     laws: int = 0
     hashes_computed: int = 0
+    mapless_versions: int = 0
+    """Version groups no release maps, which only a manual deletion produces
+    (0 corpus-wide, measured). Counted rather than passed over: their release
+    range is invented from `first_release_id` and their neighbours' windows
+    rest on it."""
 
     def add(self, other: "ComputeStats") -> None:
         self.sections += other.sections
@@ -230,10 +265,7 @@ class ComputeStats:
         self.changes += other.changes
         self.laws += other.laws
         self.hashes_computed += other.hashes_computed
-
-
-def _squash(value: str | None) -> str:
-    return "".join((value or "").split())
+        self.mapless_versions += other.mapless_versions
 
 
 def _ensure_hashes(session: Session, version_ids: Iterable[int]) -> int:
@@ -252,24 +284,25 @@ def _ensure_hashes(session: Session, version_ids: Iterable[int]) -> int:
         return 0
     computed = 0
     updates: list[dict[str, object]] = []
-    rows = session.execute(
-        select(SectionVersion.id, SectionVersion.xml)
-        .where(SectionVersion.id.in_(ids))
-        .execution_options(yield_per=50)
-    )
-    for row in rows:
-        root = etree.fromstring(row.xml.encode("utf-8"))
-        parser = parser_for_namespace(etree.QName(root).namespace)
-        updates.append(
-            {
-                "b_id": row.id,
-                "b_text": text_hash_of(parser.plain_text(root)),
-                "b_notes": notes_hash_of(parser.notes_text(root)),
-            }
+    for chunk in _chunked(ids):
+        rows = session.execute(
+            select(SectionVersion.id, SectionVersion.xml)
+            .where(SectionVersion.id.in_(chunk))
+            .execution_options(yield_per=50)
         )
-        computed += 1
-        if len(updates) >= HASH_UPDATE_BATCH:
-            _flush_hash_updates(session, updates)
+        for row in rows:
+            root = etree.fromstring(row.xml.encode("utf-8"))
+            parser = parser_for_namespace(etree.QName(root).namespace)
+            updates.append(
+                {
+                    "b_id": row.id,
+                    "b_text": text_hash_of(parser.plain_text(root)),
+                    "b_notes": notes_hash_of(parser.notes_text(root)),
+                }
+            )
+            computed += 1
+            if len(updates) >= HASH_UPDATE_BATCH:
+                _flush_hash_updates(session, updates)
     _flush_hash_updates(session, updates)
     return computed
 
@@ -277,8 +310,6 @@ def _ensure_hashes(session: Session, version_ids: Iterable[int]) -> int:
 def _flush_hash_updates(session: Session, updates: list[dict[str, object]]) -> None:
     if not updates:
         return
-    from sqlalchemy import bindparam
-
     # On the Core connection, not the ORM session: nothing holds these rows as
     # ORM instances, and Session.execute would read an executemany UPDATE as
     # "bulk update by primary key" and demand the key under its own name.
@@ -293,47 +324,60 @@ def _flush_hash_updates(session: Session, updates: list[dict[str, object]]) -> N
 
 def _groups_for_sections(
     session: Session, section_ids: Sequence[int], releases: dict[int, ReleaseFacts]
-) -> dict[int, list[_Group]]:
-    """Every section's version groups, ordered by earliest mapped release.
+) -> tuple[dict[int, list[_Group]], int]:
+    """Every section's version groups, ordered by earliest mapped release, and
+    a count of the groups no release maps.
 
-    A version no release maps to (which a half-finished load can leave) falls
-    back to its own `first_release_id` for both ends rather than being dropped
-    — dropping it would silently shift every later transition's departure.
+    A version no release maps to (which only a manual deletion produces — 0
+    corpus-wide) falls back to its own `first_release_id` for both ends rather
+    than being dropped, since dropping it would silently shift every later
+    transition's departure. The invented range is a fact about the database
+    rather than about the Code, so it is counted and reported instead of being
+    passed over in silence.
     """
     seq_of = {facts.id: facts.seq for facts in releases.values()}
     release_at_seq = {facts.seq: facts.id for facts in releases.values()}
 
-    ranges: dict[int, tuple[int, int]] = {
-        vid: (lo, hi)
-        for vid, lo, hi in session.execute(
-            select(
-                SectionReleaseMap.section_version_id,
-                func.min(ReleasePoint.seq),
-                func.max(ReleasePoint.seq),
+    ranges: dict[int, tuple[int, int]] = {}
+    for chunk in _chunked(section_ids):
+        ranges.update(
+            (vid, (lo, hi))
+            for vid, lo, hi in session.execute(
+                select(
+                    SectionReleaseMap.section_version_id,
+                    func.min(ReleasePoint.seq),
+                    func.max(ReleasePoint.seq),
+                )
+                .join(ReleasePoint, ReleasePoint.id == SectionReleaseMap.release_id)
+                .where(SectionReleaseMap.section_version_id.in_(
+                    select(SectionVersion.id).where(SectionVersion.section_id.in_(chunk))
+                ))
+                .group_by(SectionReleaseMap.section_version_id)
             )
-            .join(ReleasePoint, ReleasePoint.id == SectionReleaseMap.release_id)
-            .where(SectionReleaseMap.section_version_id.in_(
-                select(SectionVersion.id).where(SectionVersion.section_id.in_(section_ids))
-            ))
-            .group_by(SectionReleaseMap.section_version_id)
         )
-    }
 
+    mapless = 0
     grouped: dict[int, list[_Group]] = {sid: [] for sid in section_ids}
-    for row in session.execute(
-        select(
-            SectionVersion.id,
-            SectionVersion.section_id,
-            SectionVersion.text_hash,
-            SectionVersion.notes_hash,
-            SectionVersion.heading,
-            SectionVersion.status,
-            SectionVersion.source_credit,
-            SectionVersion.first_release_id,
-        ).where(SectionVersion.section_id.in_(section_ids))
-    ):
+    version_rows = [
+        row
+        for chunk in _chunked(section_ids)
+        for row in session.execute(
+            select(
+                SectionVersion.id,
+                SectionVersion.section_id,
+                SectionVersion.text_hash,
+                SectionVersion.notes_hash,
+                SectionVersion.heading,
+                SectionVersion.status,
+                SectionVersion.source_credit,
+                SectionVersion.first_release_id,
+            ).where(SectionVersion.section_id.in_(chunk))
+        )
+    ]
+    for row in version_rows:
         span = ranges.get(row.id)
         if span is None:
+            mapless += 1
             fallback = seq_of[row.first_release_id]
             span = (fallback, fallback)
         grouped[row.section_id].append(
@@ -352,7 +396,89 @@ def _groups_for_sections(
         )
     for groups in grouped.values():
         groups.sort(key=lambda g: (g.first_seq, g.version_id))
-    return grouped
+    return grouped, mapless
+
+
+def _window_is_unreliable(
+    groups: Sequence[_Group], index: int, departing: _Group
+) -> bool:
+    """Whether the transition into `groups[index]` spans an era of some third
+    group — the `concurrent` test.
+
+    Two shapes, one meaning: the window arithmetic cannot be trusted here.
+
+      * The departing group is still mapped at or after the arriving group's
+        first release. Equality is the ADR-0021 case — the source published
+        several elements under one identifier at one release point.
+      * Some *other* group is mapped inside the window. Content that recurs
+        (a converter serialization flip-flop, or a genuine revert) maps a
+        later run of releases to an earlier group, so the interval between a
+        departure and an arrival can cover releases where a third group's text
+        was the one in force. Only the first transition of such a pair used to
+        be flagged, and the successor's window silently ran across the revert
+        era.
+    """
+    arriving = groups[index]
+    if departing.last_seq >= arriving.first_seq:
+        return True
+    lo, hi = departing.last_seq, arriving.first_seq
+    return any(
+        other.first_seq <= hi and other.last_seq >= lo
+        for position, other in enumerate(groups)
+        if position != index and other.version_id != departing.version_id
+    )
+
+
+@dataclass(slots=True)
+class _SectionContext:
+    """What both compute paths need to know about a batch of sections: which
+    classification rows name each one, and where its title's completed loads
+    fall (the departing end of a mid-corpus `initial` window)."""
+
+    classification: dict[int, list[tuple[int, int, bool, str]]]
+    title_loads: dict[int, list[tuple[int, int]]]
+    title_of: dict[int, int]
+    section_ids: list[int]
+
+    def rows(self, section_id: int) -> Sequence[tuple[int, int, bool, str]]:
+        return self.classification.get(section_id, ())
+
+    def loads(self, section_id: int) -> Sequence[tuple[int, int]]:
+        return self.title_loads[self.title_of[section_id]]
+
+    def initial_departure(
+        self, section_id: int, arriving_seq: int, releases: dict[int, ReleaseFacts]
+    ) -> ReleaseFacts | None:
+        """The release a first group's window departs from — the title's newest
+        completed load below the arrival. A section present at the title's
+        earliest loaded release gets none: an unbounded window would attribute
+        every law ever enacted."""
+        departing_id = _latest_load_before(self.loads(section_id), arriving_seq)
+        return releases[departing_id] if departing_id is not None else None
+
+
+def _section_context(session: Session, section_ids: Sequence[int]) -> _SectionContext:
+    sections = [
+        row
+        for chunk in _chunked(section_ids)
+        for row in session.execute(
+            select(Section.id, Section.identifier, Section.title_id).where(
+                Section.id.in_(chunk)
+            )
+        )
+    ]
+    title_loads: dict[int, list[tuple[int, int]]] = {}
+    for row in sections:
+        if row.title_id not in title_loads:
+            title_loads[row.title_id] = _title_load_seqs(session, row.title_id)
+    return _SectionContext(
+        classification=_classification_rows(
+            session, {row.id: row.identifier for row in sections}
+        ),
+        title_loads=title_loads,
+        title_of={row.id: row.title_id for row in sections},
+        section_ids=[row.id for row in sections],
+    )
 
 
 def _classification_rows(
@@ -367,23 +493,25 @@ def _classification_rows(
     if not variant_to_section:
         return {}
     rows: dict[int, list[tuple[int, int, bool, str]]] = {}
-    for row in session.execute(
-        select(
-            ClassificationEntry.usc_identifier,
-            ClassificationEntry.pl_congress,
-            ClassificationEntry.pl_num,
-            ClassificationEntry.is_note,
-            ClassificationEntry.action,
-        ).where(
-            ClassificationEntry.usc_identifier.in_(variant_to_section),
-            ClassificationEntry.pl_congress.is_not(None),
-            ClassificationEntry.pl_num.is_not(None),
-        )
-    ):
-        section_id = variant_to_section[row.usc_identifier]
-        rows.setdefault(section_id, []).append(
-            (row.pl_congress, row.pl_num, row.is_note, row.action or "")
-        )
+    variants = list(variant_to_section)
+    for chunk in _chunked(variants):
+        for row in session.execute(
+            select(
+                ClassificationEntry.usc_identifier,
+                ClassificationEntry.pl_congress,
+                ClassificationEntry.pl_num,
+                ClassificationEntry.is_note,
+                ClassificationEntry.action,
+            ).where(
+                ClassificationEntry.usc_identifier.in_(chunk),
+                ClassificationEntry.pl_congress.is_not(None),
+                ClassificationEntry.pl_num.is_not(None),
+            )
+        ):
+            section_id = variant_to_section[row.usc_identifier]
+            rows.setdefault(section_id, []).append(
+                (row.pl_congress, row.pl_num, row.is_note, row.action or "")
+            )
     return rows
 
 
@@ -407,9 +535,10 @@ def _attribute(
         if not law_in_window(departing, arriving, congress, num):
             continue
         law = laws.setdefault((congress, num), _Law())
-        law.in_classification = True
-        if not is_note:
-            law.note_only = False
+        if is_note:
+            law.note_classification = True
+        else:
+            law.text_classification = True
         law.actions.add(action)
 
     for congress, num in credit_laws(to_credit) - credit_laws(from_credit):
@@ -417,51 +546,71 @@ def _attribute(
             continue
         laws.setdefault((congress, num), _Law()).in_source_credit = True
 
-    classified = any(law.in_classification and not law.note_only for law in laws.values())
+    classified = any(law.text_classification for law in laws.values())
     return ("classified" if classified else "none"), laws
+
+
+def _insert_law_rows(
+    session: Session, change_id: int, laws: dict[tuple[int, int], _Law]
+) -> int:
+    """The `section_version_change_laws` rows for one transition, in law order.
+    Both compute paths write them the same way."""
+    for (congress, num), law in sorted(laws.items()):
+        session.add(
+            SectionVersionChangeLaw(
+                change_id=change_id,
+                pl_congress=congress,
+                pl_num=num,
+                in_classification=law.in_classification,
+                is_note_classification=law.is_note_classification,
+                in_source_credit=law.in_source_credit,
+                classification_actions=sorted(law.actions),
+            )
+        )
+    return len(laws)
 
 
 def compute_for_sections(
     session: Session,
     section_ids: Sequence[int],
     *,
-    releases: dict[int, ReleaseFacts] | None = None,
     on_event: OnEvent = None,
 ) -> ComputeStats:
     """Delete and re-insert change rows for `section_ids`. Flushes, never
     commits — the caller owns the transaction (the CLI commits per batch, the
-    `load_release` hook commits with the load, tests roll back)."""
+    `load_release` hook commits with the load, tests roll back).
+
+    The release facts are read here rather than passed in: a compute run is
+    long and the daily poll can seed a new release point under it, which a
+    snapshot taken once at the top would `KeyError` on.
+    """
     stats = ComputeStats()
     if not section_ids:
         return stats
-    releases = releases if releases is not None else _release_facts(session)
+    releases = _release_facts(session)
+    context = _section_context(session, section_ids)
 
-    sections = session.execute(
-        select(Section.id, Section.identifier, Section.title_id).where(
-            Section.id.in_(section_ids)
+    missing: list[int] = []
+    for chunk in _chunked(list(section_ids)):
+        missing.extend(
+            session.scalars(
+                select(SectionVersion.id).where(
+                    SectionVersion.section_id.in_(chunk),
+                    (SectionVersion.text_hash.is_(None))
+                    | (SectionVersion.notes_hash.is_(None)),
+                )
+            )
         )
-    ).all()
-    identifiers = {row.id: row.identifier for row in sections}
-    title_loads: dict[int, list[tuple[int, int]]] = {}
-    for row in sections:
-        if row.title_id not in title_loads:
-            title_loads[row.title_id] = _title_load_seqs(session, row.title_id)
-    title_of = {row.id: row.title_id for row in sections}
-
-    missing = session.scalars(
-        select(SectionVersion.id).where(
-            SectionVersion.section_id.in_(section_ids),
-            (SectionVersion.text_hash.is_(None)) | (SectionVersion.notes_hash.is_(None)),
-        )
-    ).all()
     stats.hashes_computed += _ensure_hashes(session, missing)
 
-    grouped = _groups_for_sections(session, [row.id for row in sections], releases)
-    cls_rows = _classification_rows(session, identifiers)
-
-    session.execute(
-        delete(SectionVersionChange).where(SectionVersionChange.section_id.in_(section_ids))
+    grouped, stats.mapless_versions = _groups_for_sections(
+        session, context.section_ids, releases
     )
+
+    for chunk in _chunked(list(section_ids)):
+        session.execute(
+            delete(SectionVersionChange).where(SectionVersionChange.section_id.in_(chunk))
+        )
 
     now = datetime.datetime.now(datetime.timezone.utc)
     pending: list[tuple[SectionVersionChange, dict[tuple[int, int], _Law]]] = []
@@ -469,10 +618,9 @@ def compute_for_sections(
         if not groups:
             continue
         stats.sections += 1
-        section_cls = cls_rows.get(section_id, ())
-        loads = title_loads[title_of[section_id]]
+        section_cls = context.rows(section_id)
         prev: _Group | None = None
-        for group in groups:
+        for index, group in enumerate(groups):
             arriving = releases[group.first_release_id]
             if prev is None:
                 change_kind = "initial"
@@ -485,15 +633,14 @@ def compute_for_sections(
                 # the schema ties it to `from_version_id` — and
                 # `--reattribute` re-derives the same departure from the
                 # title's load history.
-                departing = None
-                departing_id = _latest_load_before(loads, group.first_seq)
-                if departing_id is not None:
-                    departing = releases[departing_id]
+                departing = context.initial_departure(
+                    section_id, group.first_seq, releases
+                )
                 from_credit = None
             else:
                 text_changed = group.text_hash != prev.text_hash
                 notes_changed = (group.notes_hash != prev.notes_hash) or (
-                    _squash(group.source_credit) != _squash(prev.source_credit)
+                    squash(group.source_credit) != squash(prev.source_credit)
                 )
                 change_kind = (
                     "text" if text_changed else "notes" if notes_changed else "structure"
@@ -502,11 +649,9 @@ def compute_for_sections(
                 # converter-era boundary space inside a heading is not a
                 # heading change (ADR-0074 notes the deviation from the
                 # spec's "whitespace-collapsed" wording).
-                heading_changed = _squash(group.heading) != _squash(prev.heading)
+                heading_changed = squash(group.heading) != squash(prev.heading)
                 status_changed = (group.status or None) != (prev.status or None)
-                # >= : equality means both groups are mapped at one release —
-                # the ADR-0021 several-elements-per-identifier case.
-                concurrent = prev.last_seq >= group.first_seq
+                concurrent = _window_is_unreliable(groups, index, prev)
                 window_from_id = prev.last_release_id
                 departing = releases[window_from_id]
                 from_credit = prev.source_credit
@@ -536,34 +681,229 @@ def compute_for_sections(
     session.flush()
     for change, laws in pending:
         stats.changes += 1
-        for (congress, num), law in sorted(laws.items()):
-            session.add(
-                SectionVersionChangeLaw(
-                    change_id=change.id,
-                    pl_congress=congress,
-                    pl_num=num,
-                    in_classification=law.in_classification,
-                    is_note_classification=law.in_classification and law.note_only,
-                    in_source_credit=law.in_source_credit,
-                    classification_actions=sorted(law.actions),
-                )
-            )
-            stats.laws += 1
+        stats.laws += _insert_law_rows(session, change.id, laws)
     session.flush()
+    if stats.mapless_versions and on_event:
+        on_event(
+            f"WARNING: {stats.mapless_versions:,} version groups that no release "
+            "maps; their release range is taken from `first_release_id` and "
+            "their neighbours' windows rest on it"
+        )
     return stats
 
 
+def compute_in_batches(
+    session: Session,
+    section_ids: Sequence[int],
+    *,
+    batch_size: int = SECTION_BATCH,
+    on_event: OnEvent = None,
+) -> ComputeStats:
+    """`compute_for_sections` in committed batches over one session.
+
+    What a caller that already owns a session uses for a set larger than a
+    batch — the `load_release` hook. One transaction per batch, so a failure
+    part-way leaves the batches before it committed rather than rolling the
+    whole title back.
+
+    **Every batch is expunged after its commit.** A commit expires every
+    instance in the session's identity map, so a session that keeps the rows
+    of every batch it has written pays for all of them at every later commit:
+    measured on Title 42's 1,590-section recompute set, 89,520 change rows in
+    eight batches took 51.6s holding them and 17.4s letting them go, against
+    24.7s in one transaction.
+    """
+    total = ComputeStats()
+    ids = list(section_ids)
+    for batch in _chunked(ids, batch_size):
+        total.add(compute_for_sections(session, batch, on_event=on_event))
+        session.commit()
+        session.expunge_all()
+    return total
+
+
+# -------------------------------------------------------- the incremental hook
+
+
+def sections_needing_recompute(
+    session: Session,
+    *,
+    title_id: int,
+    release_id: int,
+    mapped_versions: dict[int, set[int]],
+    new_version_sections: set[int],
+) -> set[int]:
+    """Which of a load's sections can actually have different change rows.
+
+    A release point republishes every title, so a load maps nearly every
+    section of it — 91% of them to the version group they were already on
+    (ADR-0007). Recomputing all of them costs a whole-title pass per load (27s
+    for Title 42, measured), and for all but a few it rewrites the rows it just
+    deleted. Measured against the newest release of each title: Title 42 8,465
+    sections → 1,590, Title 16 5,095 → 1,124. A section is in the set when:
+
+      1. it gained a new version group at this release;
+      2. it has a version group no change row covers — what an interrupted
+         earlier load leaves, and what a corpus loaded before ADR-0074 is
+         entirely made of;
+      3. the group it maps to here is not the group it mapped to at the
+         title's previous completed load — it moved, so both windows move;
+      4. that group departs into a successor (some change row names it as
+         `from_version_id`). Extending the range of a group that is not the
+         section's last one moves its successor's window: the recurrence case
+         ADR-0074 records, where content comes back and a later release maps
+         to an earlier group. This is what most of the set is — 1,122 of Title
+         16's 1,124 — and it cannot be narrowed to an `UPDATE` of the
+         successor's window, because a widened range can also flip a third,
+         later transition to `concurrent`.
+
+    Everything else gains a release at the top of its last group's range,
+    which no window reads.
+
+    **A load that is not the title's newest returns every section of the
+    title.** Inserting a release below the top can lower a group's first
+    mapped release (which reorders the groups), and it joins the title's load
+    history, which is where a mid-corpus `initial` window departs from — for
+    sections this load never touched.
+    """
+    if not mapped_versions:
+        return set()
+    loads = _title_load_seqs(session, title_id)
+    release_seq = next((seq for seq, rid in loads if rid == release_id), None)
+    is_newest = release_seq is not None and release_seq == loads[-1][0]
+    if not is_newest:
+        return set(
+            session.scalars(select(Section.id).where(Section.title_id == title_id))
+        )
+
+    need = set(new_version_sections)
+    section_ids = list(mapped_versions)
+    version_ids = sorted({vid for group in mapped_versions.values() for vid in group})
+
+    for chunk in _chunked(section_ids):
+        need.update(
+            session.scalars(
+                select(SectionVersion.section_id)
+                .outerjoin(
+                    SectionVersionChange,
+                    SectionVersionChange.to_version_id == SectionVersion.id,
+                )
+                .where(
+                    SectionVersion.section_id.in_(chunk),
+                    SectionVersionChange.id.is_(None),
+                )
+                .distinct()
+            )
+        )
+
+    previous_id = _latest_load_before(loads, release_seq)
+    previous: dict[int, set[int]] = {}
+    if previous_id is not None:
+        for section_id, version_id in session.execute(
+            select(SectionVersion.section_id, SectionReleaseMap.section_version_id)
+            .join(
+                SectionVersion,
+                SectionVersion.id == SectionReleaseMap.section_version_id,
+            )
+            .join(Section, Section.id == SectionVersion.section_id)
+            .where(
+                Section.title_id == title_id,
+                SectionReleaseMap.release_id == previous_id,
+            )
+        ):
+            previous.setdefault(section_id, set()).add(version_id)
+    need.update(
+        section_id
+        for section_id, versions in mapped_versions.items()
+        if previous.get(section_id, set()) != versions
+    )
+
+    for chunk in _chunked(version_ids):
+        need.update(
+            session.scalars(
+                select(SectionVersionChange.section_id)
+                .where(SectionVersionChange.from_version_id.in_(chunk))
+                .distinct()
+            )
+        )
+    return need
+
+
+def clear_change_rows(session: Session, section_ids: Sequence[int]) -> int:
+    """Delete every change row of `section_ids`. Flushes, never commits — the
+    caller owns the transaction, as with `compute_for_sections`.
+
+    What a failed incremental hook leaves behind, so the failure survives the
+    process that printed the warning. The resume skip is a count equality
+    (`_complete_section_ids`), which cannot see a *stale* row — but it can see
+    a missing one, so a section with no rows is recomputed by the next
+    `version-changes` run, the next load that touches it, or the repair pass
+    `deploy/update-corpus.sh` runs after every load. Deleting rows to record a
+    failure is safe because they are derived: `--recompute` rebuilds any of
+    them from the corpus at any time.
+    """
+    removed = 0
+    for chunk in _chunked(list(section_ids)):
+        result = session.execute(
+            delete(SectionVersionChange).where(SectionVersionChange.section_id.in_(chunk))
+        )
+        removed += result.rowcount or 0
+    session.flush()
+    return removed
+
+
 # ------------------------------------------------------------------- CLI runs
+
+
+class UnknownTitleError(ValueError):
+    """`--title` named something no loaded title answers to. Raised rather than
+    silently selecting nothing: `--title 42a` is a typo, and a run that does
+    nothing and exits 0 reads exactly like a run that had nothing to do."""
 
 
 def _title_ids(session: Session, titles: Sequence[str] | None) -> list[tuple[int, str]]:
     rows = session.execute(select(Title.id, Title.num)).all()
     if titles is not None:
         wanted = set(titles)
+        unknown = sorted(wanted - {row.num for row in rows})
+        if unknown:
+            raise UnknownTitleError(
+                f"no loaded title numbered {', '.join(unknown)} "
+                "(titles are the URL form — `5a`, not `05a`)"
+            )
         rows = [row for row in rows if row.num in wanted]
     from storage.postgres import title_sort_key  # the documented sorter (gotcha 16)
 
     return sorted(((row.id, row.num) for row in rows), key=lambda r: title_sort_key(r[1]))
+
+
+def _classification_tables_are_empty(session: Session) -> bool:
+    return session.scalar(select(ClassificationEntry.id).limit(1)) is None
+
+
+def warn_if_unclassified(session: Session, context: str, on_event: OnEvent = None) -> bool:
+    """Say on stderr that attribution is running with no tables to attribute
+    from. Returns whether it warned.
+
+    Every transition computed while `classification_entries` is empty is stored
+    `attribution = 'none'`, which reads exactly like a text change no statute is
+    recorded for — and a later `version-changes` run skips those sections as
+    complete, so nothing revisits them. Both compute paths call this: the CLI
+    run, and `load_release`'s hook, which is the one `make dev-data` takes.
+    """
+    if not _classification_tables_are_empty(session):
+        return False
+    warning = (
+        f"WARNING: classification_entries is empty — {context} carries "
+        "`attribution = 'none'` throughout. Load the tables "
+        "(`python -m ingest classification`) "
+        "and then `python -m ingest version-changes --reattribute`; a plain "
+        "re-run skips these sections as complete."
+    )
+    print(warning, file=sys.stderr)
+    if on_event:
+        on_event(warning)
+    return True
 
 
 def _complete_section_ids(session: Session, title_id: int) -> set[int]:
@@ -601,14 +941,24 @@ def run_compute(
 ) -> ComputeStats:
     """Compute change rows for the whole corpus (or `titles`), resumably.
 
-    Per-title batches with a commit per `SECTION_BATCH` sections; sections
-    whose newest group already has a change row are skipped unless
-    `recompute`. Safe to interrupt — the database is the state.
+    Per-title batches with a commit per `SECTION_BATCH` sections; a section
+    whose change rows already number its version groups is skipped unless
+    `recompute` (`_complete_section_ids` — the count equality, not "the newest
+    group has a row"). Safe to interrupt: the database is the state.
+
+    **A section computed before the classification tables were loaded is one
+    of the skipped.** Its rows are complete and its attribution is `none`,
+    which is indistinguishable from a text change no statute is recorded for.
+    The run says so when the tables are empty; `--reattribute` is the repair
+    and parses no XML.
     """
     total = ComputeStats()
     started = time.monotonic()
     with session_factory() as session:
         title_rows = _title_ids(session, titles)
+        warn_if_unclassified(
+            session, "every transition this run computes", on_event=on_event
+        )
 
     for title_id, title_num in title_rows:
         with session_factory() as session:
@@ -626,12 +976,17 @@ def run_compute(
         for start in range(0, len(todo), SECTION_BATCH):
             batch = todo[start : start + SECTION_BATCH]
             with session_factory() as session:
-                # The release facts are read per batch, not once per run: a
-                # run is hours long and the daily poll can seed a new release
-                # point under it, which a stale snapshot would KeyError on.
                 stats = compute_for_sections(session, batch, on_event=on_event)
                 session.commit()
             title_stats.add(stats)
+            if on_event and start and start % (SECTION_BATCH * 10) == 0:
+                # Progress inside a title, not only after it: Title 42's 8,939
+                # sections were one silent run.
+                on_event(
+                    f"title {title_num}: {title_stats.sections:,}/{len(todo):,} "
+                    f"sections, {title_stats.changes:,} change rows "
+                    f"({time.monotonic() - started:.0f}s elapsed)"
+                )
         total.add(title_stats)
         if on_event:
             on_event(
@@ -681,73 +1036,59 @@ def _reattribute_sections(
     session: Session, section_ids: Sequence[int], releases: dict[int, ReleaseFacts]
 ) -> ComputeStats:
     stats = ComputeStats()
-    sections = session.execute(
-        select(Section.id, Section.identifier, Section.title_id).where(
-            Section.id.in_(section_ids)
-        )
-    ).all()
-    identifiers = {row.id: row.identifier for row in sections}
-    cls_rows = _classification_rows(session, identifiers)
-    title_loads: dict[int, list[tuple[int, int]]] = {}
-    for row in sections:
-        if row.title_id not in title_loads:
-            title_loads[row.title_id] = _title_load_seqs(session, row.title_id)
-    title_of = {row.id: row.title_id for row in sections}
+    context = _section_context(session, section_ids)
 
+    # Chunked like every other id list in this module: a batch of 200 sections
+    # can hold tens of thousands of version groups, and Postgres refuses a
+    # statement carrying more than 65,535 bind parameters.
     credit_of: dict[int | None, str | None] = {None: None}
-    changes = session.scalars(
-        select(SectionVersionChange).where(
-            SectionVersionChange.section_id.in_(section_ids)
+    changes = [
+        change
+        for chunk in _chunked(list(section_ids))
+        for change in session.scalars(
+            select(SectionVersionChange).where(
+                SectionVersionChange.section_id.in_(chunk)
+            )
         )
-    ).all()
-    version_ids = {c.to_version_id for c in changes} | {
-        c.from_version_id for c in changes if c.from_version_id is not None
-    }
-    if version_ids:
+    ]
+    version_ids = sorted(
+        {c.to_version_id for c in changes}
+        | {c.from_version_id for c in changes if c.from_version_id is not None}
+    )
+    for chunk in _chunked(version_ids):
         credit_of.update(
             session.execute(
                 select(SectionVersion.id, SectionVersion.source_credit).where(
-                    SectionVersion.id.in_(version_ids)
+                    SectionVersion.id.in_(chunk)
                 )
             ).all()
         )
 
-    session.execute(
-        delete(SectionVersionChangeLaw).where(
-            SectionVersionChangeLaw.change_id.in_([c.id for c in changes])
+    for chunk in _chunked([c.id for c in changes]):
+        session.execute(
+            delete(SectionVersionChangeLaw).where(
+                SectionVersionChangeLaw.change_id.in_(chunk)
+            )
         )
-    )
     for change in changes:
         stats.changes += 1
         arriving = releases[change.window_to_release_id]
         if change.window_from_release_id is not None:
             departing = releases[change.window_from_release_id]
         else:
-            loads = title_loads[title_of[change.section_id]]
-            departing_id = _latest_load_before(loads, arriving.seq)
-            departing = releases[departing_id] if departing_id is not None else None
+            departing = context.initial_departure(
+                change.section_id, arriving.seq, releases
+            )
         attribution, laws = _attribute(
-            cls_rows.get(change.section_id, ()),
+            context.rows(change.section_id),
             departing,
             arriving,
             credit_of.get(change.from_version_id),
             credit_of.get(change.to_version_id),
         )
         change.attribution = attribution
-        for (congress, num), law in sorted(laws.items()):
-            session.add(
-                SectionVersionChangeLaw(
-                    change_id=change.id,
-                    pl_congress=congress,
-                    pl_num=num,
-                    in_classification=law.in_classification,
-                    is_note_classification=law.in_classification and law.note_only,
-                    in_source_credit=law.in_source_credit,
-                    classification_actions=sorted(law.actions),
-                )
-            )
-            stats.laws += 1
-    stats.sections = len(sections)
+        stats.laws += _insert_law_rows(session, change.id, laws)
+    stats.sections = len(context.section_ids)
     session.flush()
     return stats
 
@@ -848,8 +1189,11 @@ def build_report(session: Session) -> dict:
 
 
 def write_report(session: Session, directory: Path = VERIFICATION_DIR) -> Path:
-    report = build_report(session)
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / REPORT_NAME
-    path.write_text(json.dumps(report, indent=2) + "\n")
-    return path
+    """The artifact, always corpus-wide.
+
+    `--title` bounds what a run *computes*, never what the report counts: the
+    numbers are read from the stored rows, so a report taken after a
+    single-title run describes the whole corpus as it then stands, with
+    `sections_covered` saying how much of it has been computed at all.
+    """
+    return write_verification_json(build_report(session), REPORT_NAME, directory)
