@@ -64,6 +64,7 @@ ci-classification-data:
 	rm -rf $(CLS_DIR) && mkdir -p $(CLS_DIR)
 	cp tests/fixtures/tables_slice.shtml $(CLS_DIR)/tables.shtml
 	cp tests/fixtures/priortables_slice.shtml $(CLS_DIR)/priortables.shtml
+	cp tests/fixtures/tbl119pl_2nd_slice.htm $(CLS_DIR)/tbl119pl_2nd.htm
 	cp tests/fixtures/tbl118pl_2nd_slice.htm $(CLS_DIR)/tbl118pl_2nd.htm
 	cp tests/fixtures/tbl110pl_1st_slice.htm $(CLS_DIR)/tbl110pl_1st.htm
 	cp tests/fixtures/tbl104pl_slice.htm $(CLS_DIR)/tbl104pl.htm
