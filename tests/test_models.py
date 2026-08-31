@@ -9,6 +9,8 @@ EXPECTED_TABLES = {
     "sections",
     "structure_nodes",
     "section_versions",
+    "section_version_changes",
+    "section_version_change_laws",
     "section_release_map",
     "guid_map",
     "users",

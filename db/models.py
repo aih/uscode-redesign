@@ -198,6 +198,101 @@ class SectionVersion(Base):
     status: Mapped[str | None] = mapped_column(String, nullable=True)  # repealed/omitted/transferred/reserved
     source_credit: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Facts about the content, so they sit on the content-deduped row (the
+    # placement gotcha 15 cuts the other way for: these cannot change while the
+    # text does not). Nullable so pre-existing rows are back-fillable by
+    # `python -m ingest version-changes` (ADR-0074).
+    text_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    """sha256 of the parser's `plain_text()` with all whitespace removed —
+    whitespace-insensitive reading text, apparatus excluded."""
+
+    notes_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    """sha256 of a stable serialization of `notes_text()` (topic/role/heading/
+    text per note, joined with separators), all whitespace removed."""
+
+
+class SectionVersionChange(Base):
+    """One row per version group of a section, describing its arrival (ADR-0074).
+
+    Annotates the transition from the previous stored version group to this one:
+    what kind of change it was (`text` / `notes` / `structure`, decided in that
+    priority; the section's earliest group is `initial`), over which release
+    window, and whether the classification tables record a statute for it.
+    `change_kind` and `attribution` are strings, not enums, per project
+    convention (gotcha 13's lesson).
+
+    The unique constraint on `to_version_id` is the idempotency key: recompute
+    is delete-and-reinsert per section. Ordering of groups is by the earliest
+    release each is mapped to in `section_release_map` — never by
+    `first_release_id`, which an incremental load leaves high (ADR-0066).
+    """
+
+    __tablename__ = "section_version_changes"
+    __table_args__ = (Index("ix_section_version_changes_section_id", "section_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    section_id: Mapped[int] = mapped_column(ForeignKey("sections.id"))
+    to_version_id: Mapped[int] = mapped_column(ForeignKey("section_versions.id"), unique=True)
+    from_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("section_versions.id"), nullable=True
+    )
+    window_from_release_id: Mapped[int | None] = mapped_column(
+        ForeignKey("release_points.id"), nullable=True
+    )
+    """Last release mapped to the departing group. NULL together with
+    `from_version_id` on a section's first group."""
+
+    window_to_release_id: Mapped[int] = mapped_column(ForeignKey("release_points.id"))
+    """First release mapped to the arriving group."""
+
+    change_kind: Mapped[str] = mapped_column(String)  # initial/text/notes/structure
+    text_changed: Mapped[bool] = mapped_column(Boolean)
+    notes_changed: Mapped[bool] = mapped_column(Boolean)
+    heading_changed: Mapped[bool] = mapped_column(Boolean)
+    status_changed: Mapped[bool] = mapped_column(Boolean)
+    concurrent: Mapped[bool] = mapped_column(Boolean, default=False)
+    """The two groups' release ranges overlap — the source published several
+    elements under one identifier at one release point (ADR-0021), so window
+    arithmetic is unreliable here and the UI says so."""
+
+    attribution: Mapped[str] = mapped_column(String)  # 'classified' | 'none'
+    computed_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SectionVersionChangeLaw(Base):
+    """A Public Law attributed to one version transition (ADR-0074).
+
+    Derived facts, re-derivable at any time by `version-changes --reattribute`.
+    Deliberately **no foreign key into `classification_entries`** — those rows
+    are deleted and re-inserted wholesale when their file changes, so nothing
+    may FK into that table.
+    """
+
+    __tablename__ = "section_version_change_laws"
+    __table_args__ = (UniqueConstraint("change_id", "pl_congress", "pl_num"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    change_id: Mapped[int] = mapped_column(
+        ForeignKey("section_version_changes.id", ondelete="CASCADE")
+    )
+    pl_congress: Mapped[int] = mapped_column(Integer)
+    pl_num: Mapped[int] = mapped_column(Integer)
+    in_classification: Mapped[bool] = mapped_column(Boolean)
+    """A classification row for this law names this section."""
+
+    is_note_classification: Mapped[bool] = mapped_column(Boolean)
+    """Only note rows name it — a note-only classification against a text
+    transition is worth showing as such."""
+
+    in_source_credit: Mapped[bool] = mapped_column(Boolean)
+    """The citation newly appears in `source_credit` across the transition."""
+
+    classification_actions: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    """Distinct `action` values of the matching rows (`''` = amended, `new`,
+    `repealed`, `tr to`, …) — display vocabulary for the UI."""
+
 
 class SectionReleaseMap(Base):
     """Which version of a section a release point publishes — and where it sits.
