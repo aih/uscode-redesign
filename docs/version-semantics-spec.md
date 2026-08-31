@@ -1,8 +1,10 @@
 # Version-change semantics — implementation spec for aih/uscode-redesign
 
 **Status:** spec written 2026-08-30, from a measurement session against the full local corpus
-(session 62, BUILDLOG). Wave 1 (V1) is implemented (session 63, ADR-0074). Implementing
-sessions update this line and the [§ Status](#status) table as waves land.
+(session 62, BUILDLOG). Wave 1 (V1) is implemented (session 63, ADR-0074); V4 — the full-corpus
+backfill, `docs/verification/version-changes.json` and the `update-corpus.sh` wiring — is done
+(session 65). Implementing sessions update this line and the [§ Status](#status) table as waves
+land.
 
 The version timeline groups a section's history by `content_hash` — the XML with `@id` stripped
 (ADR-0007). Everything else in the fragment still participates in the hash, so the timeline
@@ -422,4 +424,4 @@ the next wave starts. File-boundary lists above are the non-interference contrac
 | V1 schema + computation | implemented | `c5-version-changes-v1` / PR #61 | ADR-0074. Migration `b6e1f0a2c9d4`; `ingest/version_changes.py`; `version-changes` subcommand; `load_release` hook; `tbl119pl_2nd_slice.htm` in `make ci-data`. Mid-corpus `initial` groups **are** attributed (departure re-derived from `title_versions`, stored column stays NULL). Title 16 back-filled locally (184 s, 40,073 rows): 79.5% structure / 14.2% notes / 6.3% text, text 29.8% classified — a structure-heavier, less-classified title than the corpus-wide sample predicts (V4 compares corpus-wide). **Surprise:** `concurrent` fired on 3,016 transitions, not ADR-0021 duplicates but recurring content (converter flip-flops/reverts) — recorded in ADR-0074's costs. |
 | V2 repository + API | implemented | `c5-version-changes-v2` | `SectionVersionInfo` + `VersionLawRef` carry the annotations, `None`/empty without a change row; `versions()` orders by earliest mapped release, tie-broken by version id (ADR-0066 — verified against § 45f's real case: `first_seen` 119-99, `releases[0]` 117-80); `VersionOut`/`VersionLawOut` additive. `tests/test_versions.py`. |
 | V3 reader | not started | — | |
-| V4 backfill + deploy wiring | not started | — | |
+| V4 backfill + deploy wiring | done | `c5-version-changes-v4` / PR #63 | Full corpus back-filled locally: 489,738 change rows over 423,800 transitions (the spec's own estimate exactly), 30,250 law rows — **7m50s wall**, not the ~2 h estimated, mostly V1's post-review streaming path. Corpus-wide shares **75.1% structure / 17.1% notes / 7.8% text, text 49.2% classified** — every share within 2.5 points of the sampled table above, so the sample held. **Surprise:** `concurrent` is **39,645** corpus-wide (9.4% of transitions) — V1's Title 16 finding (recurring content, not ADR-0021 duplicates) scaled with the corpus rather than staying near the predicted ~160. `update-corpus.sh` runs `version-changes` after a load that loaded something and `--reattribute` after a classification change; the box's owed migration + one-time backfill is in `docs/deploy-status.md`. |
