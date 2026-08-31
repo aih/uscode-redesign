@@ -257,8 +257,11 @@ describe("changeSummary", () => {
     expect(changeSummary(entry("structure", []))).toContain("XML/metadata only");
   });
 
-  it("says nothing about the oldest entry or an unannotated one", () => {
-    expect(changeSummary(entry("initial", []))).toBeNull();
+  it("names the oldest entry, which the default view lists beside the amendments", () => {
+    expect(changeSummary(entry("initial", []))).toContain("oldest text this site holds");
+  });
+
+  it("says nothing about an unannotated entry", () => {
     expect(changeSummary(entry(null, []))).toBeNull();
   });
 });

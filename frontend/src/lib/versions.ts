@@ -170,11 +170,16 @@ export function lawActions(law: VersionLaw): string[] {
 /**
  * The sentence under an entry saying what kind of change arrived with it.
  *
- * Null where the entry needs none: the oldest entry, and any entry of a corpus
- * with no change rows.
+ * The oldest entry gets one too: the default view lists it beside the
+ * amendments without it being one, and the count beside that view's name is the
+ * amendments alone, so the row has to say what it is.
+ *
+ * Null for an entry of a corpus with no change rows.
  */
 export function changeSummary(entry: VersionEntry): string | null {
   switch (entry.change_kind) {
+    case "initial":
+      return "The oldest text this site holds for this section.";
     case "text":
       return entry.attribution === "classified"
         ? "Statutory text changed."

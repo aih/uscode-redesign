@@ -55,7 +55,9 @@ with different markup, which is the empty redline the control exists to avoid.
 3. **The switch is two links in the sort bar's vocabulary** (ADR-0071):
    **Amendments (N)** | **All recorded versions (M)**, the one in force a marked
    pill, the other a link. One line under the lede — the whole footprint the
-   full history costs the default view.
+   full history costs the default view. `N` is the amendments and not the rows
+   the view lists: the default view also lists the oldest text the site holds,
+   which is not an amendment, and that row says so.
 
 4. **A law is a chip, and an unattributed text change says so.** A `text` entry
    attributed `classified` shows one chip per law, **Pub. L. 119–102** with the

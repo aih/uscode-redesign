@@ -34,10 +34,10 @@ changes are not amendments: a note edited, a source credit extended, an attribut
 character moved by the converter that produced the file. Across the whole corpus, 7.8% of recorded
 transitions changed the statutory text, 17.1% changed only the notes, and 75.1% changed neither.
 
-The history opens on the amendments — the transitions that changed the statutory text, plus the
-oldest text the site holds. Under the summary line there are two options:
+The history opens on the amendments — the transitions that changed the statutory text, and the
+oldest text the site holds, which is marked as such. Under the summary line there are two options:
 
-- **Amendments (N)** — the default.
+- **Amendments (N)** — the default. N counts the amendments.
 - **All recorded versions (M)** — every stored version, including notes-only and metadata-only
   changes. Its address is the same page with `?view=all`.
 
