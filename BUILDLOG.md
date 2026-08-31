@@ -2158,6 +2158,7 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
     the same two sentences. Whoever merges second owns them: this branch alone makes it 462 e2e
     tests and ADRs numbered to 0062.
 
+
 ## 065 — 2026-08-10 — Session 43: the phone gets a bar, and the sheet stops holding a second menu
 
 - **Tool/model:** Claude Code, Opus 5.
