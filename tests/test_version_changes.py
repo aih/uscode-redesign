@@ -563,15 +563,14 @@ def _column_names(url: str, table: str) -> set[str]:
         engine.dispose()
 
 
-@pytest.mark.slow
 def test_the_migration_round_trips():
     """Upgrade → downgrade → upgrade on a scratch database: the new tables and
     columns appear, disappear cleanly, and come back.
 
-    Marked slow: it runs every migration in the project three times through a
-    subprocess, which is a minute and a half against the two seconds the rest
-    of this module takes (CLAUDE.md's test speed rule). `make test-slow` and
-    `make test-all` run it."""
+    Deliberately not `@pytest.mark.slow`, though it runs every migration in the
+    project three times through a subprocess: measured at 2.4s, and CI runs
+    `make test` alone (`-m 'not slow'`), so marking it would take the only
+    migration round-trip in the suite out of every push."""
     from sqlalchemy import create_engine, text
 
     from db.config import settings
