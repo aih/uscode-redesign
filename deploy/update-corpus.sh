@@ -199,6 +199,15 @@ echo "=== $(date -u +%FT%TZ) corpus update starting (mode: ${MODE}) ==="
 # which is the weekly repair for a table OLRC edited without extending its
 # range. It is the same weekly Actions run that forces the corpus sweep.
 CLASSIFICATION_STATUS=0
+# Set when a classification load actually ran: the law attributions on the
+# version timeline (ADR-0074) are derived from classification_entries, so a
+# changed table invalidates them. `--reattribute` recomputes only the
+# attribution and law rows — minutes, no XML parsing.
+CLASSIFICATION_CHANGED=0
+# Set when a version-changes step fails. The rows are re-derivable
+# (`--recompute` / `--reattribute`), so a failure warns and the chain goes on;
+# it still exits non-zero at the bottom so the run shows up red.
+VERSION_CHANGES_STATUS=0
 run classification-check
 case "$?" in
     0)  echo "no classification table has changed" ;;
@@ -209,6 +218,8 @@ case "$?" in
         elif ! run classification --quiet; then
             echo "the classification load failed — see above"
             CLASSIFICATION_STATUS=1
+        else
+            CLASSIFICATION_CHANGED=1
         fi
         ;;
     *)
@@ -221,9 +232,21 @@ esac
 # covered-text gate and the content hash. The check above has already run and
 # recorded; this is the repair pass behind it.
 if [ "$MODE" = "force" ]; then
-    run classification --force --quiet || {
+    if run classification --force --quiet; then
+        CLASSIFICATION_CHANGED=1
+    else
         echo "the forced classification sweep failed — see above"
         CLASSIFICATION_STATUS=1
+    fi
+fi
+
+# A changed classification table invalidates the stored law attributions
+# (ADR-0074). Attribution-only recompute: touches the law rows and the
+# `attribution` column, never the content flags, and parses no XML.
+if [ "$CLASSIFICATION_CHANGED" -eq 1 ]; then
+    run version-changes --reattribute --quiet || {
+        echo "reattribution failed — the law rows are stale until the next run"
+        VERSION_CHANGES_STATUS=1
     }
 fi
 
@@ -252,11 +275,11 @@ esac
 # same reason a failed dump exits non-zero at the bottom of this script.
 if [ "$MODE" = "check-only" ]; then
     echo "=== $(date -u +%FT%TZ) check complete (check-only) ==="
-    exit "$CLASSIFICATION_STATUS"
+    exit "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))"
 fi
 if [ "$MODE" != "force" ] && [ "$CHECK_STATUS" -eq 0 ]; then
     echo "=== $(date -u +%FT%TZ) nothing to do ==="
-    exit "$CLASSIFICATION_STATUS"
+    exit "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))"
 fi
 
 # Pull BEFORE anything else, exactly as scripts/run-backfill-ec2.sh does, and
@@ -284,6 +307,18 @@ run mirror push || { echo "mirror push failed"; exit 1; }
 # not a second ledger. Search stays in step automatically inside
 # ingest/load.py (sync_sections + retire_versions) — no separate reindex step.
 run_load || { echo "load-all failed"; exit 1; }
+# The change rows and law attributions for what the load just wrote
+# (ADR-0074). load-all's own hook keeps them current and warns without failing
+# the load, so this is the repair pass behind it: sections whose rows are
+# already complete are skipped, making it a fast complete-check when the hook
+# succeeded. Runs before the dump so the dump carries the rows.
+if [ "$LOADED" -gt 0 ]; then
+    run version-changes --quiet || {
+        echo "version-changes failed — the rows are re-derivable; rerun by hand"
+        echo "or let the next load repair them"
+        VERSION_CHANGES_STATUS=1
+    }
+fi
 # Shallow recount; the summary lands in this log rather than a committed
 # report (--deep re-parses every source file and is what `make verify-deep`
 # is for, not a weekly job).
@@ -334,8 +369,9 @@ echo "=== $(date -u +%FT%TZ) corpus update complete ==="
 
 # A failed backup exits non-zero even though the corpus loaded fine, so it shows
 # up as a red weekly run rather than as a line in a log nobody reads. A failed
-# classification poll or load reads the same way.
+# classification poll or load, or a failed version-changes pass, reads the same
+# way.
 if [ "$DUMP_STATUS" -ne 0 ]; then
     exit "$DUMP_STATUS"
 fi
-exit "$CLASSIFICATION_STATUS"
+exit "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))"
