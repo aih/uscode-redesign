@@ -419,7 +419,7 @@ the next wave starts. File-boundary lists above are the non-interference contrac
 
 | phase | state | branch/PR | notes |
 |---|---|---|---|
-| V1 schema + computation | implemented | `c5-version-changes-v1` / PR TBD | ADR-0074. Migration `b6e1f0a2c9d4`; `ingest/version_changes.py`; `version-changes` subcommand; `load_release` hook; `tbl119pl_2nd_slice.htm` in `make ci-data`. Mid-corpus `initial` groups **are** attributed (departure re-derived from `title_versions`, stored column stays NULL). Title 16 back-filled locally (~3 min for 40,073 versions). |
+| V1 schema + computation | implemented | `c5-version-changes-v1` / PR TBD | ADR-0074. Migration `b6e1f0a2c9d4`; `ingest/version_changes.py`; `version-changes` subcommand; `load_release` hook; `tbl119pl_2nd_slice.htm` in `make ci-data`. Mid-corpus `initial` groups **are** attributed (departure re-derived from `title_versions`, stored column stays NULL). Title 16 back-filled locally (184 s, 40,073 rows): 79.5% structure / 14.2% notes / 6.3% text, text 29.8% classified — a structure-heavier, less-classified title than the corpus-wide sample predicts (V4 compares corpus-wide). **Surprise:** `concurrent` fired on 3,016 transitions, not ADR-0021 duplicates but recurring content (converter flip-flops/reverts) — recorded in ADR-0074's costs. |
 | V2 repository + API | not started | — | |
 | V3 reader | not started | — | |
 | V4 backfill + deploy wiring | not started | — | |

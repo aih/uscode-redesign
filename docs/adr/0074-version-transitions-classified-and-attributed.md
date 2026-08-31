@@ -134,3 +134,14 @@ V3) can default to statutory changes with the full history one click away.
 - **A section renumbered away (gotcha 3) ends its identifier's timeline**; the
   transfer is a `tr to` action chip at best. Cross-identifier continuity stays
   future work (the declined redirects table, ADR-0065).
+- **`concurrent` fires far beyond ADR-0021's duplicates.** The spec expected it
+  to flag the 160 several-elements-per-identifier pairs; Title 16's backfill
+  flagged **3,016 of 34,776 transitions**, none of them on a section with a
+  same-release duplicate. The cause is content that *recurs*: a mid-era
+  converter serialization variant (or a genuine revert) maps a handful of
+  releases to a group whose neighbour spans releases on both sides, so the
+  ranges overlap and the model — one row per stored group, which cannot
+  represent a third era of a twice-used content — reports a window running
+  backwards (`119-102not101 → 114-139`). Flagging these unreliable is the
+  design working as defined; representing recurrence properly (a row per era
+  rather than per group) would be its own ADR.
