@@ -128,22 +128,38 @@ const currentCrumb: Entry | null = section
             <ul class="sortbar__list" aria-labelledby="viewbar-label">
               <li>
                 {view === "text" ? (
-                  <span class="sortbar__option sortbar__option--on" aria-current="true">
+                  <span
+                    class="sortbar__option sortbar__option--on"
+                    data-view-option="text"
+                    aria-current="true"
+                  >
                     Amendments ({counts.statutory})
                   </span>
                 ) : (
-                  <a class="sortbar__option" href={versionsHref(identifier)}>
+                  <a
+                    class="sortbar__option"
+                    data-view-option="text"
+                    href={versionsHref(identifier)}
+                  >
                     Amendments ({counts.statutory})
                   </a>
                 )}
               </li>
               <li>
                 {view === "all" ? (
-                  <span class="sortbar__option sortbar__option--on" aria-current="true">
+                  <span
+                    class="sortbar__option sortbar__option--on"
+                    data-view-option="all"
+                    aria-current="true"
+                  >
                     All recorded versions ({counts.all})
                   </span>
                 ) : (
-                  <a class="sortbar__option" href={versionsHref(identifier, "all")}>
+                  <a
+                    class="sortbar__option"
+                    data-view-option="all"
+                    href={versionsHref(identifier, "all")}
+                  >
                     All recorded versions ({counts.all})
                   </a>
                 )}

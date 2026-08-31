@@ -131,3 +131,53 @@ test("the page reaches no data, so it renders the same on any corpus", async ({ 
   await expect(page.locator(".section-body")).toBeVisible();
   expect(calls, "/app/design asked the API for something").toEqual([]);
 });
+
+test.describe("the version timeline's two views (ADR-0075)", () => {
+  // The fixture corpus's two release points produce only `initial` and `text`
+  // transitions, so this page is the only place CI can see a notes-only or
+  // metadata-only entry — and the only place the filtering is checkable.
+  test("the default view hides the notes-only and metadata-only entries", async ({ page }) => {
+    await page.goto(PAGE);
+    const text = page.locator('.timeline[data-view="text"]');
+    const all = page.locator('.timeline[data-view="all"]');
+
+    await expect(text.locator("li")).toHaveCount(5);
+    await expect(text.locator('li[data-change-kind="notes"]')).toBeHidden();
+    await expect(text.locator('li[data-change-kind="structure"]').first()).toBeHidden();
+    await expect(text.locator('li[data-change-kind="text"]').first()).toBeVisible();
+
+    await expect(all.locator('li[data-change-kind="notes"]')).toBeVisible();
+    await expect(all.locator('li[data-change-kind="structure"]').first()).toBeVisible();
+  });
+
+  test("a shown entry's run covers the entries the default view hides", async ({ page }) => {
+    await page.goto(PAGE);
+    const text = page.locator('.timeline[data-view="text"]');
+    const all = page.locator('.timeline[data-view="all"]');
+
+    // The oldest entry carries 119-95 and 119-96 of its own and stands through
+    // the metadata-only entry at 119-97.
+    await expect(
+      text.locator("li").first().locator(".timeline__releases:visible"),
+    ).toContainText("119-97");
+    await expect(
+      all.locator("li").first().locator(".timeline__releases:visible"),
+    ).not.toContainText("119-97");
+  });
+
+  test("an attributed amendment carries its law chips", async ({ page }) => {
+    await page.goto(PAGE);
+    const chips = page.locator('.timeline[data-view="text"] .timeline__law');
+    await expect(chips).toHaveCount(2);
+    await expect(chips.first()).toContainText("Pub. L. 119–14");
+    await expect(chips.last()).toContainText("new");
+    await expect(chips.first()).toHaveAttribute("href", /\/app\/classification\?q=/u);
+  });
+
+  test("an unattributed amendment says no statute is recorded", async ({ page }) => {
+    await page.goto(PAGE);
+    await expect(
+      page.locator('.timeline[data-view="text"] li').last().locator(".timeline__kind"),
+    ).toContainText("No classifying statute recorded");
+  });
+});

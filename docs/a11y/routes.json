@@ -201,6 +201,11 @@
       "name": "version timeline"
     },
     {
+      "id": "versions-all",
+      "path": "/app/versions/us/usc/t16/s2201?view=all",
+      "name": "version timeline, every recorded version (ADR-0075)"
+    },
+    {
       "id": "diff",
       "path": "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101",
       "name": "reading-text redline"

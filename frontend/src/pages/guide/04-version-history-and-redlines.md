@@ -2,19 +2,18 @@
 layout: ../../layouts/GuideLayout.astro
 title: Version history and redlines
 order: 4
-summary: Every release point at which a section's text changed, and a readable redline between any two of them.
+summary: Every release point at which a section changed, which of those changes were amendments, and a readable redline between any two of them.
 covers:
   routes: ["/app/versions", "/app/diff"]
-  adrs: [16, 26, 66]
+  adrs: [16, 26, 66, 74, 75]
 ---
 
 ## Tracking change in the Code
 
-Every section page links to its **version history**: one entry per distinct text, oldest first,
-each showing the release point where that text first appeared and the release points where it didn't change.
-
-The Code republishes every title at every release point whether or not anything changed. The
-timeline lists only the release points at which the text of this section changed.
+Every section page links to its **version history**, and the link says how many times the section
+has been amended and over how many release points. The history lists one entry per distinct stored
+text, oldest first, each showing the release point where that text first appeared and the release
+points it stood unchanged through.
 
 ```scenario
 id: versions-timeline
@@ -28,15 +27,79 @@ steps:
     caption: Each entry says when that text first appeared, and what it stood unchanged through.
 ```
 
+## Amendments and every recorded version
+
+The site stores a new version of a section whenever its published XML changed. Most of those
+changes are not amendments: a note edited, a source credit extended, an attribute or a whitespace
+character moved by the converter that produced the file. Across the whole corpus, 7.8% of recorded
+transitions changed the statutory text, 17.1% changed only the notes, and 75.1% changed neither.
+
+The history opens on the amendments — the transitions that changed the statutory text, plus the
+oldest text the site holds. Under the summary line there are two options:
+
+- **Amendments (N)** — the default.
+- **All recorded versions (M)** — every stored version, including notes-only and metadata-only
+  changes. Its address is the same page with `?view=all`.
+
+In the default view an entry's "Unchanged through" run covers the hidden versions after it, so the
+release points it names are every release point at which the section read that way.
+
+```scenario
+id: versions-all-recorded
+title: Switch between the amendments and every recorded version
+steps:
+  - goto: /app/versions/us/usc/t16/s2201
+    caption: The history opens on the amendments.
+  - click: "[data-view-option='all']"
+  - expect: { url: "view=all" }
+    caption: All recorded versions — the notes-only and metadata-only changes as well.
+  - expect: { selector: "[data-view-option='text']", visible: true }
+    caption: The other option is a link back.
+```
+
+## What each entry says
+
+An entry that changed the statutory text carries the public laws OLRC's classification tables
+record against this section for that change, as chips: **Pub. L. 119–102**. A chip links to the
+classification lookup, which leads to the table row. Where the tables record an action other than a
+plain amendment — `new`, `repealed`, `tr to` — the chip carries that word.
+
+Where the text changed and no statute is recorded against it, the entry says so. Roughly half of
+text changes are in that state: footnote markers, editorial trimming of cross references,
+renumbering notices, and amendments the tables do not carry.
+
+In the all view, a notes-only entry reads "Notes updated" and a metadata-only entry reads
+"XML/metadata only".
+
+```scenario
+id: versions-law-attribution
+title: See which public law made an amendment
+steps:
+  - goto: /app/versions/us/usc/t16/s2201
+  - expect: { selector: ".timeline", contains: "Pub. L. 119–102" }
+    caption: The public law the classification tables record for that amendment.
+```
+
+### Limitations
+
+A change to whitespace alone is recorded as a metadata change, so it does not appear in the
+amendments view.
+
+Where the source published two elements under one identifier at one release point, an entry says
+that the order of the versions around it is the order they were stored in.
+
+The classification tables begin at the 104th Congress. An amendment older than that carries no
+chip.
+
 ## Compare with…
 
 Every section page carries a **Compare with…** control under its heading. Opening it offers one
-comparison — the last release point at which this section held different text — and a list
-of every older release point.
+comparison — the last release point at which this section held different statutory text — and a
+list of every older release point.
 
 The Code republishes every title at every release point whether or not anything changed, so the
 release point immediately before the one you are reading usually holds exactly the same section.
-The named comparison skips to the one that does not.
+The named comparison skips to the last one that read differently.
 
 ```scenario
 id: compare-from-the-section
@@ -46,7 +109,7 @@ steps:
   - click: .compare__summary
     caption: Compare with… opens under the section heading.
   - click: .compare__go
-    caption: The offer names the last release point holding different text.
+    caption: The offer names the last release point holding different statutory text.
   - expect: { selector: ".diff-verdict", visible: true }
     caption: The redline between that release point and the one you were reading.
 ```
@@ -124,6 +187,6 @@ citation that is a link in the section view is plain text here.
 **A change in whitespace alone is not shown in the reading redline.** The source view does show it.
 
 **Comparisons are rate limited.** Building one is the most compute-intensive process on the site, so a
-burst of eight is allowed and the allowance refills at one every two seconds. Past that the page
+burst of twenty is allowed and the allowance refills at one a second. Past that the page
 answers `429` with a `Retry-After` header saying how many seconds to wait, and offers a link back to
 the section you were comparing. Future versions of the site may offload diff functionality to the browser.
