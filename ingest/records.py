@@ -7,6 +7,7 @@ returned verbatim (CLAUDE.md architecture rule 2).
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 
 # Observed @status values. Not exhaustive and deliberately not an enum: Title 49
@@ -57,6 +58,35 @@ class NoteText:
     text: str
 
 
+def text_hash_of(plain_text: str) -> bytes:
+    """sha256 of `plain_text` with all whitespace removed (ADR-0074).
+
+    Whitespace-insensitive because element-boundary whitespace from the
+    2013–2015 converter otherwise reads as a text change; the recorded cost is
+    that a genuine whitespace-only statutory change classifies as
+    structure-only, which is also how the reader's redline treats it
+    (ADR-0026).
+    """
+    return hashlib.sha256("".join(plain_text.split()).encode("utf-8")).digest()
+
+
+def notes_hash_of(notes: tuple[NoteText, ...]) -> bytes:
+    """sha256 of a stable serialization of `notes_text()` (ADR-0074).
+
+    Each note's topic/role/heading/text, whitespace removed, joined with
+    field and record separators so a value cannot bleed into its neighbour.
+    """
+
+    def squash(value: str | None) -> str:
+        return "".join((value or "").split())
+
+    payload = "\x1e".join(
+        "\x1f".join((squash(n.topic), squash(n.role), squash(n.heading), squash(n.text)))
+        for n in notes
+    )
+    return hashlib.sha256(payload.encode("utf-8")).digest()
+
+
 @dataclass(frozen=True, slots=True)
 class SectionRecord:
     """One US Code section — the storage atom (ADR-0001).
@@ -94,6 +124,14 @@ class SectionRecord:
     release points. Guids regenerate at every release point by design, so the raw
     XML of an unchanged section is never byte-identical between two of them and
     hashing `xml` deduplicates nothing (ADR-0007)."""
+
+    text_hash: bytes = b""
+    """`text_hash_of(plain_text())` — the whitespace-insensitive reading-text
+    hash the version-change classifier compares (ADR-0074). Never a dedupe or
+    identity key; `content_key` keeps that job."""
+
+    notes_hash: bytes = b""
+    """`notes_hash_of(notes_text())` — same role for the notes (ADR-0074)."""
 
     source_credit: str | None = None
     notes: tuple[NoteRecord, ...] = ()

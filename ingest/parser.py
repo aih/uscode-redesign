@@ -42,6 +42,20 @@ def parser_for_fragment(xml: str) -> UslmParser:
     return parser_for(io.BytesIO(xml.encode("utf-8")))
 
 
+def parser_for_namespace(namespace: str | None) -> UslmParser:
+    """Return a parser for an already-parsed root's namespace URI.
+
+    What a caller that has the fragment's element tree in hand uses —
+    `sniff_schema` would re-read the bytes it already paid to parse. The
+    mapping stays here, beside `PARSERS`, so this file remains the only place
+    a schema generation is matched to an implementation.
+    """
+    for parser_class in PARSERS.values():
+        if parser_class.namespace == namespace:
+            return parser_class()
+    raise UnknownUslmSchemaError(f"no parser registered for namespace {namespace!r}")
+
+
 def iter_sections(source: XmlSource) -> Iterator[SectionRecord]:
     """Stream sections from `source`, schema chosen automatically."""
     return parser_for(source).iter_sections(source)

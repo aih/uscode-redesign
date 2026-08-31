@@ -18,6 +18,7 @@ Repository boundary (CLAUDE.md architecture rule 1 governs `api/`, not this).
 from __future__ import annotations
 
 import hashlib
+import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -33,6 +34,7 @@ from db.models import (
     Section,
     SectionReleaseMap,
     SectionVersion,
+    SectionVersionChange,
     StructureNode,
     Title,
     TitleVersion,
@@ -121,6 +123,21 @@ def load_release(
     # overwrites the first and flags it, which is why flagging only the later
     # occurrence is enough.
     new_version_identifiers: set[str] = set()
+    # Sections whose release map gained a row this load — a new version group,
+    # or an existing group newly mapped to this release, which changes the
+    # group's release range and can move an out-of-order load's windows. These
+    # are the sections whose version-change rows are recomputed at the end
+    # (ADR-0074); a redo of an already-mapped release adds no pairs and
+    # recomputes nothing.
+    changed_section_ids: set[int] = set()
+    touched_section_ids: set[int] = set()
+    already_mapped_version_ids: set[int] = set(
+        session.scalars(
+            select(SectionReleaseMap.section_version_id).where(
+                SectionReleaseMap.release_id == release.id
+            )
+        )
+    )
 
     # Only text from the newest release this title has reached is "in force", and
     # loads do not have to arrive in order — `load-all` walks the inventory's seq,
@@ -180,6 +197,8 @@ def load_release(
                 heading=record.heading,
                 status=record.status,
                 source_credit=record.source_credit,
+                text_hash=record.text_hash or None,
+                notes_hash=record.notes_hash or None,
             )
             session.add(version)
             session.flush()
@@ -211,6 +230,11 @@ def load_release(
             # all: the document already exists and is already current. This is
             # why sync stays cheap at 91% dedupe (ADR-0028).
             deduped += 1
+
+        touched_section_ids.add(section.id)
+        if version.id not in already_mapped_version_ids:
+            already_mapped_version_ids.add(version.id)
+            changed_section_ids.add(section.id)
 
         # Reading order and parent are this release point's, even when the text
         # deduped into a version created by an earlier one (ADR-0008).
@@ -254,6 +278,47 @@ def load_release(
     title_version.raw_section_elements = raw_count
     session.commit()
     _flush_search(versions_to_sync, retire_keys)
+
+    # Incremental version-change hook (ADR-0074): recompute change rows for
+    # every section whose release map gained a row — a new version group, or an
+    # existing group whose release range this load extended — plus any touched
+    # section with a version no change row covers (what an interrupted earlier
+    # load leaves behind). Runs after the load has committed; a failure here
+    # warns loudly instead of failing the load, because the load itself is
+    # complete and the rows are re-derivable by `python -m ingest
+    # version-changes --recompute`.
+    recompute_ids = set(changed_section_ids)
+    if touched_section_ids:
+        recompute_ids.update(
+            session.scalars(
+                select(SectionVersion.section_id)
+                .outerjoin(
+                    SectionVersionChange,
+                    SectionVersionChange.to_version_id == SectionVersion.id,
+                )
+                .where(
+                    SectionVersion.section_id.in_(touched_section_ids),
+                    SectionVersionChange.id.is_(None),
+                )
+                .distinct()
+            )
+        )
+    if recompute_ids:
+        from ingest import version_changes
+
+        try:
+            version_changes.compute_for_sections(session, sorted(recompute_ids))
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            print(
+                f"WARNING: version-change recompute failed for "
+                f"{len(recompute_ids)} sections of title {meta.doc_number} "
+                f"@ {release_label} ({type(exc).__name__}: {exc}) — the load "
+                "itself is complete; re-derive the rows with `python -m ingest "
+                f"version-changes --title {meta.doc_number} --recompute`",
+                file=sys.stderr,
+            )
 
     return LoadStats(
         release_label=release_label,

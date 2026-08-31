@@ -255,6 +255,43 @@ def main(argv: list[str] | None = None) -> int:
         "--cache-dir", type=Path, default=classification_mod.CACHE_DIR
     )
 
+    version_changes_parser = subparsers.add_parser(
+        "version-changes",
+        help="Classify version transitions (text/notes/structure) and attribute "
+        "text changes to Public Laws via the classification tables (ADR-0074)",
+    )
+    version_changes_parser.add_argument(
+        "--title",
+        action="append",
+        default=None,
+        metavar="NUM",
+        help="Restrict to a title; repeatable. Default: every loaded title",
+    )
+    version_changes_parser.add_argument(
+        "--recompute",
+        action="store_true",
+        help="Redo sections whose change rows are already complete",
+    )
+    version_changes_parser.add_argument(
+        "--reattribute",
+        action="store_true",
+        help="Recompute only the attribution and law rows (what a classification "
+        "table change invalidates); never touches the content flags",
+    )
+    version_changes_parser.add_argument(
+        "--report",
+        action="store_true",
+        help="After the run, write docs/verification/version-changes.json from "
+        "the stored rows; composes with --title/--recompute/--reattribute",
+    )
+    version_changes_parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Directory for the --report artifact (default: docs/verification)",
+    )
+    version_changes_parser.add_argument("--quiet", action="store_true")
+
     hf_export_parser = subparsers.add_parser(
         "hf-export",
         help="Export the corpus as Hugging Face parquet shards (ADR-0069)",
@@ -338,6 +375,7 @@ def main(argv: list[str] | None = None) -> int:
         "verify": _cmd_verify,
         "classification": _cmd_classification,
         "classification-check": _cmd_classification_check,
+        "version-changes": _cmd_version_changes,
         "hf-export": _cmd_hf_export,
         "hf-upload": _cmd_hf_upload,
         "load": _cmd_load,
@@ -737,6 +775,63 @@ def _cmd_classification_check(args: argparse.Namespace) -> int:
         return 0
     print(f"CHANGED ({len(result.changed_files)}): {', '.join(result.changed_files)}")
     return 10
+
+
+def _cmd_version_changes(args: argparse.Namespace) -> int:
+    """Classify version transitions and attribute them (ADR-0074).
+
+    Runs one action — compute (the default, resumable; `--recompute` redoes
+    complete sections) or `--reattribute` (attribution + law rows only, no
+    XML) — and then, when `--report` is given, writes the verification
+    artifact. The flags compose: `--title 16 --report` computes Title 16 and
+    then reports; `--report` alone verifies everything is computed (a fast
+    skip scan) and reports.
+    """
+    from ingest import version_changes as version_changes_mod
+
+    if args.reattribute and args.recompute:
+        print(
+            "--reattribute and --recompute are different actions: --recompute "
+            "redoes the content flags (use the default compute), --reattribute "
+            "only the attribution. Pick one.",
+            file=sys.stderr,
+        )
+        return 2
+
+    on_event = None if args.quiet else print
+
+    try:
+        if args.reattribute:
+            stats = version_changes_mod.run_reattribute(
+                SessionLocal, titles=args.title, on_event=on_event
+            )
+            print(
+                f"reattributed {stats.changes:,} change rows across "
+                f"{stats.sections:,} sections; {stats.laws:,} law rows"
+            )
+        else:
+            stats = version_changes_mod.run_compute(
+                SessionLocal,
+                titles=args.title,
+                recompute=args.recompute,
+                on_event=on_event,
+            )
+            print(
+                f"{stats.sections:,} sections computed ({stats.skipped:,} already "
+                f"complete, skipped): {stats.changes:,} change rows, "
+                f"{stats.laws:,} law rows, {stats.hashes_computed:,} hashes back-filled"
+            )
+    except KeyboardInterrupt:
+        print("\ninterrupted — re-run to resume (the database is the state)", file=sys.stderr)
+        return 130
+
+    if args.report:
+        with SessionLocal() as session:
+            path = version_changes_mod.write_report(
+                session, directory=args.out or version_changes_mod.VERIFICATION_DIR
+            )
+        print(f"report: {path}")
+    return 0
 
 
 _HF_DEPS_HINT = (

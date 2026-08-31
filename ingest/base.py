@@ -24,6 +24,8 @@ from ingest.records import (
     NoteText,
     SectionRecord,
     StructureRecord,
+    notes_hash_of,
+    text_hash_of,
 )
 
 DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
@@ -350,6 +352,12 @@ class StreamingSectionParser:
             seq=seq,
             xml=etree.tostring(element, encoding="unicode", with_tail=False),
             content_key=self._content_key(element),
+            # Computed here, while the element is still in hand — the streaming
+            # loop clears it right after this record is yielded (gotcha 6), and
+            # the backfill path recomputes the same values from the stored
+            # fragment via `plain_text()`/`notes_text()` (ADR-0074).
+            text_hash=text_hash_of(self.plain_text(element)),
+            notes_hash=notes_hash_of(self.notes_text(element)),
             source_credit=self._normalize(
                 element.find(self._q(self.elements.source_credit))
             ),

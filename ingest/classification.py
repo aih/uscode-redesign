@@ -204,7 +204,11 @@ _ECCT_CELL_RE = re.compile(
 _ECCT_CLASSIFICATION_RE = re.compile(
     r"^(?P<title>\d+[A-Za-z]?):(?P<section>\S+)(?:\s+(?P<description>.*))?$"
 )
-_PL_CITATION_RE = re.compile(r"Pub\.\s*L\.\s*(?P<congress>\d+)-(?P<num>\d+)")
+# Dash-tolerant on purpose: OLRC writes public-law citations with a plain
+# hyphen in the ECCT but an EN DASH in source credits (gotcha 17), and
+# `ingest.version_changes.credit_laws` reads the latter through this same
+# pattern. U+2011 is the non-breaking hyphen.
+PL_CITATION_RE = re.compile(r"Pub\.\s*L\.\s*(?P<congress>\d+)[-–‑](?P<num>\d+)")
 
 
 class ClassificationParseError(ValueError):
@@ -1406,8 +1410,8 @@ def parse_ecct(
             continue
         former_title, former_section, former_is_note = _split_classification(values[0])
         new_title, new_section, new_is_note = _split_classification(values[1])
-        affected = _PL_CITATION_RE.search(values[2])
-        prompting = _PL_CITATION_RE.search(values[3])
+        affected = PL_CITATION_RE.search(values[2])
+        prompting = PL_CITATION_RE.search(values[3])
         entries.append(
             EcctEntry(
                 row_seq=len(entries),

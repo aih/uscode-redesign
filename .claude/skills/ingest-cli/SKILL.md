@@ -1,6 +1,6 @@
 ---
 name: ingest-cli
-description: The `python -m ingest` command-line reference for this project — inventory, fetch, backfill, mirror push/pull, load-all, load, reindex_search, verify, verify-downloads, classification, classification-check — plus scripts/vendor_apidocs.py. Use when running, resuming, or debugging any corpus download, load, search-index, classification-table, or verification job.
+description: The `python -m ingest` command-line reference for this project — inventory, fetch, backfill, mirror push/pull, load-all, load, reindex_search, verify, verify-downloads, classification, classification-check, version-changes — plus scripts/vendor_apidocs.py. Use when running, resuming, or debugging any corpus download, load, search-index, classification-table, or verification job.
 ---
 
 # `python -m ingest` — command reference
@@ -120,6 +120,25 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   check failed. Change detection is that sentence and not a body hash — the pages embed a
   per-request jsessionid, so no two downloads are byte-identical. A change to the ECCT alone is
   invisible here; the next `classification` run fetches and hash-gates it.
+
+## python -m ingest version-changes [--title N]... [--recompute] [--reattribute] [--report] [--out DIR]
+  Classifies every version transition — `text` / `notes` / `structure`, `initial` for a
+  section's first group — into `section_version_changes`, and attributes text changes to the
+  Public Laws the classification tables record, into `section_version_change_laws` (ADR-0074).
+  Back-fills `text_hash`/`notes_hash` on `section_versions` rows that lack them by re-parsing
+  the stored fragments, which is the expensive part: Title 16's 40,073 versions took ~3
+  minutes; the full corpus's 489,738 is a ~1.5–2 h single-process run, per-title with commits
+  per batch of 200 sections. Resumable — a section whose change rows already number its
+  version groups is skipped, so an interrupted run just continues; `--recompute` redoes them.
+
+  `--reattribute` redoes only the attribution and law rows (what a changed classification
+  table invalidates) and parses no XML — minutes, not hours. `--report` composes with the
+  run: after computing (or reattributing) it writes docs/verification/version-changes.json
+  from the stored rows, so `--title 16 --report` computes Title 16 and then reports and
+  `--report` alone is a fast complete-check plus the artifact; `--out` redirects it. `load`
+  and `load-all` keep the rows current on their own: `load_release` recomputes change rows
+  for every section whose release map gained a row, and a failure there warns without
+  failing the load (the rows are re-derivable with `--recompute`).
 
 ## python -m ingest load <xmlfile> --release <label> [--currency-date YYYY-MM-DD] [--source-url URL]
                                                   [--source-zip PATH]

@@ -1,8 +1,8 @@
 # Version-change semantics — implementation spec for aih/uscode-redesign
 
 **Status:** spec written 2026-08-30, from a measurement session against the full local corpus
-(session 62, BUILDLOG). No wave has started. Implementing sessions update this line and the
-[§ Status](#status) table as waves land.
+(session 62, BUILDLOG). Wave 1 (V1) is implemented (session 63, ADR-0074). Implementing
+sessions update this line and the [§ Status](#status) table as waves land.
 
 The version timeline groups a section's history by `content_hash` — the XML with `@id` stripped
 (ADR-0007). Everything else in the fragment still participates in the hash, so the timeline
@@ -419,7 +419,7 @@ the next wave starts. File-boundary lists above are the non-interference contrac
 
 | phase | state | branch/PR | notes |
 |---|---|---|---|
-| V1 schema + computation | not started | — | |
+| V1 schema + computation | implemented | `c5-version-changes-v1` / PR #61 | ADR-0074. Migration `b6e1f0a2c9d4`; `ingest/version_changes.py`; `version-changes` subcommand; `load_release` hook; `tbl119pl_2nd_slice.htm` in `make ci-data`. Mid-corpus `initial` groups **are** attributed (departure re-derived from `title_versions`, stored column stays NULL). Title 16 back-filled locally (184 s, 40,073 rows): 79.5% structure / 14.2% notes / 6.3% text, text 29.8% classified — a structure-heavier, less-classified title than the corpus-wide sample predicts (V4 compares corpus-wide). **Surprise:** `concurrent` fired on 3,016 transitions, not ADR-0021 duplicates but recurring content (converter flip-flops/reverts) — recorded in ADR-0074's costs. |
 | V2 repository + API | not started | — | |
 | V3 reader | not started | — | |
 | V4 backfill + deploy wiring | not started | — | |
