@@ -167,7 +167,11 @@ test.describe("the version timeline's two views (ADR-0075)", () => {
 
   test("an attributed amendment carries its law chips", async ({ page }) => {
     await page.goto(PAGE);
-    const chips = page.locator('.timeline[data-view="text"] .timeline__law');
+    // Scoped to the entry, not to the list: a hidden entry's chips are still in
+    // the DOM, and the notes-only specimen carries one.
+    const chips = page.locator(
+      '.timeline[data-view="text"] li[data-change-kind="text"] .timeline__law',
+    );
     await expect(chips).toHaveCount(2);
     await expect(chips.first()).toContainText("Pub. L. 119–14");
     await expect(chips.last()).toContainText("new");
@@ -180,7 +184,9 @@ test.describe("the version timeline's two views (ADR-0075)", () => {
     // accessible name came out `Pub. L. 119–21new`. `toContainText("new")`
     // passes either way, so this reads the whole string.
     await page.goto(PAGE);
-    const chip = page.locator('.timeline[data-view="text"] .timeline__law').last();
+    const chip = page
+      .locator('.timeline[data-view="text"] .timeline__law:has(.timeline__law-action)')
+      .first();
     expect((await chip.innerText()).replace(/\s+/gu, " ").trim()).toBe("Pub. L. 119–21 new");
   });
 
