@@ -286,11 +286,50 @@ def load_release(
     # the load itself is complete — and then *deletes* the change rows it was
     # recomputing, so the failure outlives the warning: the resume skip is a
     # count equality, which sees a missing row and not a stale one.
-    if not defer_version_changes and mapped_versions:
+    if defer_version_changes and mapped_versions:
+        # A deferral has to leave the database saying so. The follow-up pass
+        # resumes on a count equality, which sees a missing change row and not
+        # a stale one — so the rows this hook would have rewritten are deleted
+        # here, exactly as a failed hook deletes them. Without this the pass
+        # would skip as complete every section whose group *range* moved
+        # (`sections_needing_recompute`'s cases 3 and 4) and leave
+        # `window_from_release_id`, `attribution` and `concurrent` stale on
+        # them. During a bulk load of a corpus that has no change rows yet —
+        # what the flag is for — the delete matches nothing and costs an index
+        # probe.
+        from ingest import version_changes
+
+        stale = (
+            sorted(mapped_versions)
+            if is_newest_for_title
+            # A load below the title's newest can move a window for a section
+            # it never touched; `sections_needing_recompute` returns the whole
+            # title for that case and so does this.
+            else sorted(section.id for section in existing_sections.values())
+        )
+        try:
+            version_changes.clear_change_rows(session, stale)
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            print(
+                f"WARNING: could not mark {len(stale)} sections of title "
+                f"{meta.doc_number} @ {release_label} for the deferred "
+                f"version-change pass ({type(exc).__name__}: {exc}) — run "
+                f"`python -m ingest version-changes --title {meta.doc_number} "
+                "--recompute` after the load rather than the plain pass",
+                file=sys.stderr,
+            )
+    elif mapped_versions:
         from ingest import version_changes
 
         recompute_ids: set[int] = set()
         try:
+            version_changes.warn_if_unclassified(
+                session,
+                f"the version-change rows for title {meta.doc_number} "
+                f"@ {release_label}",
+            )
             recompute_ids = version_changes.sections_needing_recompute(
                 session,
                 title_id=title.id,

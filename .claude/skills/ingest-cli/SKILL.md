@@ -53,9 +53,13 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   pair is redone (load_release is idempotent). Each zip is extracted to a temp dir and
   deleted, so the corpus never doubles on disk. `make load-all`.
 
-  `--defer-version-changes` skips the per-load ADR-0074 hook; follow the run with one
+  `--defer-version-changes` skips the per-load ADR-0074 hook; each load instead **deletes the
+  change rows of every section it touched**, so the plain follow-up pass sees them as uncomputed
+  rather than skipping them on its count equality. Follow the run with one
   `python -m ingest version-changes`, which computes each section once rather than once per
-  release point that touched it.
+  release point that touched it. On a corpus with no change rows yet — what the flag is for —
+  the delete matches nothing and costs an index probe (0.13s for Title 42's 8,939 sections;
+  0.61s where the rows exist, against the 17.4s hook it replaces).
 
 ## python -m ingest.reindex_search [--if-changed | --recreate] [--all-versions] [--limit N] [--skip-sections]
   Rebuild the search indices from Postgres (ADR-0028). Normal loading keeps them in step
@@ -140,9 +144,11 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
 
   **Attribution needs the classification tables loaded first.** A section computed while
   `classification_entries` is empty gets `attribution = 'none'` and is then *skipped* as
-  complete; the run warns on stderr when it sees an empty table. `--reattribute` is the
-  repair — it redoes only the attribution and law rows (what a changed classification table
-  invalidates) and parses no XML, minutes rather than hours.
+  complete. Both compute paths warn on stderr when the table is empty — this command and
+  `load`/`load-all`'s own hook, which is the path `make dev-data` takes (it loads Title 16
+  with no tables; `make ci-data` loads the tables first). `--reattribute` is the repair — it
+  redoes only the attribution and law rows (what a changed classification table invalidates)
+  and parses no XML, minutes rather than hours.
 
   `--report` composes with the run: after computing (or reattributing) it writes
   docs/verification/version-changes.json from the stored rows, so `--title 16 --report`

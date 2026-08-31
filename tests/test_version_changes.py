@@ -353,7 +353,7 @@ def test_reattribute_rebuilds_the_laws_without_touching_the_flags(
     from sqlalchemy import delete, select
 
     from db.base import SessionLocal
-    from db.models import SectionVersionChange, SectionVersionChangeLaw
+    from db.models import SectionVersionChangeLaw
 
     with SessionLocal() as session:
         ids = _compute(session, ["/us/usc/t16/s2201"])
@@ -496,6 +496,28 @@ def test_only_the_sections_a_release_can_have_moved_are_recomputed(
             mapped_versions=mapped,
             new_version_sections=set(),
         )
+        session.rollback()
+
+
+def test_clearing_a_sections_rows_is_what_the_resume_skip_can_see(
+    corpus_with_119_2_table,
+):
+    """Both the failed hook and `load-all --defer-version-changes` record
+    themselves by deleting change rows, because `_complete_section_ids` — the
+    resume skip a plain `version-changes` run uses — counts rows against version
+    groups and cannot see a row whose window went stale."""
+    from sqlalchemy import select
+
+    from db.base import SessionLocal
+    from db.models import Title
+
+    with SessionLocal() as session:
+        title_id = session.scalar(select(Title.id).where(Title.num == "16"))
+        section_id = _compute(session, ["/us/usc/t16/s2201"])["/us/usc/t16/s2201"]
+        assert section_id in vc._complete_section_ids(session, title_id)
+
+        vc.clear_change_rows(session, [section_id])
+        assert section_id not in vc._complete_section_ids(session, title_id)
         session.rollback()
 
 

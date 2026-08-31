@@ -173,9 +173,11 @@ def run_load_all(
     """Load every task not already complete. Safe to re-run; safe to interrupt.
 
     `defer_version_changes` passes through to `load_release`: the ADR-0074
-    hook is skipped and the whole corpus's change rows are left to one
-    `python -m ingest version-changes` afterwards, which computes each section
-    once rather than once per release point that touched it.
+    hook is skipped, each load deletes the change rows of the sections it
+    touched so the follow-up pass sees them as uncomputed, and the whole
+    corpus's rows are left to one `python -m ingest version-changes`
+    afterwards, which computes each section once rather than once per release
+    point that touched it.
     """
     report = LoadAllReport(planned=len(tasks))
     started = time.monotonic()

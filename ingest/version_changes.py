@@ -881,6 +881,31 @@ def _classification_tables_are_empty(session: Session) -> bool:
     return session.scalar(select(ClassificationEntry.id).limit(1)) is None
 
 
+def warn_if_unclassified(session: Session, context: str, on_event: OnEvent = None) -> bool:
+    """Say on stderr that attribution is running with no tables to attribute
+    from. Returns whether it warned.
+
+    Every transition computed while `classification_entries` is empty is stored
+    `attribution = 'none'`, which reads exactly like a text change no statute is
+    recorded for — and a later `version-changes` run skips those sections as
+    complete, so nothing revisits them. Both compute paths call this: the CLI
+    run, and `load_release`'s hook, which is the one `make dev-data` takes.
+    """
+    if not _classification_tables_are_empty(session):
+        return False
+    warning = (
+        f"WARNING: classification_entries is empty — {context} carries "
+        "`attribution = 'none'` throughout. Load the tables "
+        "(`python -m ingest classification`) "
+        "and then `python -m ingest version-changes --reattribute`; a plain "
+        "re-run skips these sections as complete."
+    )
+    print(warning, file=sys.stderr)
+    if on_event:
+        on_event(warning)
+    return True
+
+
 def _complete_section_ids(session: Session, title_id: int) -> set[int]:
     """Sections whose change rows already cover every version group — the
     resume skip: a new version group breaks the count equality."""
@@ -931,17 +956,9 @@ def run_compute(
     started = time.monotonic()
     with session_factory() as session:
         title_rows = _title_ids(session, titles)
-        if _classification_tables_are_empty(session):
-            warning = (
-                "WARNING: classification_entries is empty — every transition "
-                "computed by this run will be attributed `none`. Load the tables "
-                "(`python -m ingest classification`) and then "
-                "`version-changes --reattribute`; a plain re-run skips these "
-                "sections as complete."
-            )
-            print(warning, file=sys.stderr)
-            if on_event:
-                on_event(warning)
+        warn_if_unclassified(
+            session, "every transition this run computes", on_event=on_event
+        )
 
     for title_id, title_num in title_rows:
         with session_factory() as session:
@@ -1021,29 +1038,38 @@ def _reattribute_sections(
     stats = ComputeStats()
     context = _section_context(session, section_ids)
 
+    # Chunked like every other id list in this module: a batch of 200 sections
+    # can hold tens of thousands of version groups, and Postgres refuses a
+    # statement carrying more than 65,535 bind parameters.
     credit_of: dict[int | None, str | None] = {None: None}
-    changes = session.scalars(
-        select(SectionVersionChange).where(
-            SectionVersionChange.section_id.in_(section_ids)
+    changes = [
+        change
+        for chunk in _chunked(list(section_ids))
+        for change in session.scalars(
+            select(SectionVersionChange).where(
+                SectionVersionChange.section_id.in_(chunk)
+            )
         )
-    ).all()
-    version_ids = {c.to_version_id for c in changes} | {
-        c.from_version_id for c in changes if c.from_version_id is not None
-    }
-    if version_ids:
+    ]
+    version_ids = sorted(
+        {c.to_version_id for c in changes}
+        | {c.from_version_id for c in changes if c.from_version_id is not None}
+    )
+    for chunk in _chunked(version_ids):
         credit_of.update(
             session.execute(
                 select(SectionVersion.id, SectionVersion.source_credit).where(
-                    SectionVersion.id.in_(version_ids)
+                    SectionVersion.id.in_(chunk)
                 )
             ).all()
         )
 
-    session.execute(
-        delete(SectionVersionChangeLaw).where(
-            SectionVersionChangeLaw.change_id.in_([c.id for c in changes])
+    for chunk in _chunked([c.id for c in changes]):
+        session.execute(
+            delete(SectionVersionChangeLaw).where(
+                SectionVersionChangeLaw.change_id.in_(chunk)
+            )
         )
-    )
     for change in changes:
         stats.changes += 1
         arriving = releases[change.window_to_release_id]

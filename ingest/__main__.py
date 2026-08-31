@@ -186,9 +186,11 @@ def main(argv: list[str] | None = None) -> int:
     load_all_parser.add_argument(
         "--defer-version-changes",
         action="store_true",
-        help="Skip the per-load version-change hook (ADR-0074); follow the run "
-        "with `python -m ingest version-changes`, which computes each section "
-        "once instead of once per release point that touched it",
+        help="Skip the per-load version-change hook (ADR-0074), deleting the "
+        "change rows of every section each load touches so the follow-up sees "
+        "them as uncomputed; follow the run with `python -m ingest "
+        "version-changes`, which computes each section once instead of once "
+        "per release point that touched it",
     )
     load_all_parser.add_argument("--quiet", action="store_true")
 

@@ -149,7 +149,15 @@ V3) can default to statutory changes with the full history one click away.
    missing row and not a stale one. `load-all --defer-version-changes` skips
    the hook for a bulk run that will follow with one `version-changes` pass,
    which computes each section once rather than once per release point that
-   touched it. The unique constraint on `to_version_id` is the idempotency key
+   touched it; it records the deferral **the same way**, by deleting the change
+   rows of every section each load touched (the whole title for a load below
+   the title's newest). Without that the follow-up pass would skip as complete
+   every section whose group range moved — cases 3 and 4, which change no row
+   *count* — and leave `window_from_release_id`, `attribution` and `concurrent`
+   stale on them. Measured on Title 42: 0.61s where the rows exist, 0.13s on a
+   corpus that has none, against the 17.4s hook it replaces. The empty-table
+   warning below is on both paths for the same reason. The unique constraint on
+   `to_version_id` is the idempotency key
    — recompute is delete-and-reinsert per section. Wiring the classification
    poll to `--reattribute` on the deployed box is Phase V4
    (`deploy/update-corpus.sh`).
@@ -175,9 +183,10 @@ V3) can default to statutory changes with the full history one click away.
   which only a manual deletion produces, and `--recompute` covers.
 - **A section computed before the classification tables were loaded is one of
   the skipped**, and its attribution is `none`, which reads exactly like a text
-  change no statute is recorded for. `run_compute` says so on stderr when
-  `classification_entries` is empty; the repair is `--reattribute`, which
-  parses no XML.
+  change no statute is recorded for. Both compute paths say so on stderr when
+  `classification_entries` is empty — the CLI run and `load_release`'s hook,
+  which is the path `make dev-data` takes, since it loads Title 16 with no
+  tables. The repair is `--reattribute`, which parses no XML.
 - **The digests carry no normalization version.** `text_hash` is sha256 of
   `plain_text()` with whitespace removed; a change to what `plain_text()`
   renders — Day 7's table handling is the live candidate — redefines what every
