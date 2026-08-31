@@ -30,6 +30,8 @@ from db.models import (
     Section,
     SectionReleaseMap,
     SectionVersion,
+    SectionVersionChange,
+    SectionVersionChangeLaw,
     SourceCheck,
     StructureNode,
     Title,
@@ -50,6 +52,7 @@ from storage.repository import (
     TitleInfo,
     TocEntry,
     TocResult,
+    VersionLawRef,
 )
 
 _TITLE_IN_IDENTIFIER = re.compile(r"^/us/usc/t(?P<num>[0-9]+[a-zA-Z]?)(?:/|$)")
@@ -676,26 +679,101 @@ class PostgresRepository:
             .where(SectionVersion.section_id == section.id)
         ).all():
             published.setdefault(version_id, []).append((seq, label))
+        for mapped in published.values():
+            mapped.sort()
+
+        changes, laws = self._version_changes(section.id)
 
         rows = self._session.execute(
             select(SectionVersion, ReleasePoint)
             .join(ReleasePoint, ReleasePoint.id == SectionVersion.first_release_id)
             .where(SectionVersion.section_id == section.id)
-            .order_by(ReleasePoint.seq)
         ).all()
+        # Order by the earliest release each group is *mapped* to, never by
+        # `first_release_id`'s seq: an incremental load attaches earlier
+        # releases to a group without lowering `first_release_id` (ADR-0066 —
+        # t16 § 45f's newest group carries first_seen 119-99 while its own
+        # releases run from 117-80). Tie-break by version id so the order is
+        # deterministic.
+        rows.sort(
+            key=lambda row: (
+                published[row[0].id][0][0] if row[0].id in published else row[1].seq,
+                row[0].id,
+            )
+        )
         return [
             SectionVersionInfo(
                 content_hash=version.content_hash.hex(),
                 first_seen=self._ref(first_release),
                 releases=tuple(
-                    label for _seq, label in sorted(published.get(version.id, []))
+                    label for _seq, label in published.get(version.id, [])
                 ),
                 num=version.num,
                 heading=version.heading,
                 status=version.status,
+                **self._change_fields(
+                    changes.get(version.id), laws.get(version.id, [])
+                ),
             )
             for version, first_release in rows
         ]
+
+    def _version_changes(
+        self, section_id: int
+    ) -> tuple[dict[int, SectionVersionChange], dict[int, list[VersionLawRef]]]:
+        """The section's change rows and their attributed laws, both keyed by
+        the arriving version id (ADR-0074). Both empty on a corpus that was
+        loaded but never back-filled."""
+        changes = {
+            change.to_version_id: change
+            for change in self._session.scalars(
+                select(SectionVersionChange).where(
+                    SectionVersionChange.section_id == section_id
+                )
+            )
+        }
+        laws: dict[int, list[VersionLawRef]] = {}
+        if changes:
+            version_of = {
+                change.id: change.to_version_id for change in changes.values()
+            }
+            for law in self._session.scalars(
+                select(SectionVersionChangeLaw)
+                .where(SectionVersionChangeLaw.change_id.in_(version_of.keys()))
+                .order_by(
+                    SectionVersionChangeLaw.pl_congress,
+                    SectionVersionChangeLaw.pl_num,
+                )
+            ):
+                laws.setdefault(version_of[law.change_id], []).append(
+                    VersionLawRef(
+                        pl_congress=law.pl_congress,
+                        pl_num=law.pl_num,
+                        in_classification=law.in_classification,
+                        is_note_classification=law.is_note_classification,
+                        in_source_credit=law.in_source_credit,
+                        classification_actions=tuple(law.classification_actions or ()),
+                    )
+                )
+        return changes, laws
+
+    @staticmethod
+    def _change_fields(
+        change: SectionVersionChange | None, laws: list[VersionLawRef]
+    ) -> dict:
+        """`SectionVersionInfo`'s annotation kwargs — all `None` (and no laws)
+        when the version group has no change row."""
+        if change is None:
+            return {}
+        return {
+            "change_kind": change.change_kind,
+            "text_changed": change.text_changed,
+            "notes_changed": change.notes_changed,
+            "status_changed": change.status_changed,
+            "concurrent": change.concurrent,
+            "attribution": change.attribution,
+            "laws": tuple(laws),
+        }
 
     # ----------------------------------------------------------------- internals
 

@@ -259,8 +259,37 @@ class Neighbors:
 
 
 @dataclass(frozen=True, slots=True)
+class VersionLawRef:
+    """A Public Law attributed to one version transition (ADR-0074)."""
+
+    pl_congress: int
+    pl_num: int
+    in_classification: bool
+    """A classification row for this law names this section."""
+
+    is_note_classification: bool
+    """Only note rows name it."""
+
+    in_source_credit: bool
+    """The citation newly appears in `source_credit` across the transition."""
+
+    classification_actions: tuple[str, ...]
+    """Distinct `action` values of the matching rows (`''` = amended, `new`,
+    `repealed`, `tr to`, …)."""
+
+
+@dataclass(frozen=True, slots=True)
 class SectionVersionInfo:
-    """One entry in a section's change timeline."""
+    """One entry in a section's change timeline.
+
+    Entries are ordered by the earliest release each is mapped to —
+    `releases[0]` — never by `first_seen`, which an incremental load leaves
+    high (ADR-0066). `first_seen` stays in the payload for compatibility.
+
+    The change annotations come from `section_version_changes` (ADR-0074) and
+    are all `None` when no change row exists for the entry — a corpus loaded
+    but not back-filled.
+    """
 
     content_hash: str
     first_seen: ReleaseRef
@@ -270,6 +299,21 @@ class SectionVersionInfo:
     num: str | None
     heading: str | None
     status: str | None
+
+    change_kind: str | None = None
+    """'initial' | 'text' | 'notes' | 'structure'."""
+
+    text_changed: bool | None = None
+    notes_changed: bool | None = None
+    status_changed: bool | None = None
+    concurrent: bool | None = None
+    """The two groups' release ranges overlap (ADR-0021, ADR-0074) — window
+    arithmetic is unreliable for this transition."""
+
+    attribution: str | None = None
+    """'classified' | 'none'."""
+
+    laws: tuple[VersionLawRef, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -410,7 +454,11 @@ class Repository(Protocol):
         ...
 
     def versions(self, identifier: str) -> list[SectionVersionInfo]:
-        """The release points at which a section's content changed, oldest first."""
+        """The release points at which a section's content changed, oldest first.
+
+        Ordered by each entry's earliest mapped release (`releases[0]`),
+        tie-broken deterministically (ADR-0066).
+        """
         ...
 
     def labels(
