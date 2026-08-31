@@ -156,6 +156,18 @@ V3) can default to statutory changes with the full history one click away.
    poll to `--reattribute` on the deployed box is Phase V4
    (`deploy/update-corpus.sh`).
 
+   **The reattribution gate is "a table moved", not "a load ran"** (session 90).
+   `classification --force` ignores the content-hash gate, so on the weekly
+   sweep every fetched document reads as loaded whether or not OLRC edited it —
+   which reattributed all 30,250 law rows every week, and made a transient
+   failure there a red run on a week when nothing had happened.
+   `ClassificationLoadReport.changed` counts documents whose `<PRE>` text
+   really differs, the CLI prints it, and the script reads that. The same sweep
+   now runs the plain `version-changes` pass whether or not `load-all` loaded
+   anything: a half-finished backfill leaves sections with no change rows at
+   all, `versions()` degrades a missing annotation to `None`, and nothing else
+   surfaces it.
+
 ## Costs and limits, named
 
 - **The backfill parses every stored fragment once** (~423,800 transitions

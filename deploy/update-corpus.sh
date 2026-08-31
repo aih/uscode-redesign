@@ -13,9 +13,10 @@
 #     published nothing new — nothing else at all.
 #   * weekly, from .github/workflows/update-corpus.yml with --force. A full
 #     sweep whether or not the daily poll saw anything: it re-pulls the mirror,
-#     re-plans the backfill and recounts, so a load that half-finished or a zip
-#     that never made it to S3 is repaired within the week rather than waiting
-#     for the next release point to expose it.
+#     re-plans the backfill, re-runs the version-change pass and recounts, so a
+#     load that half-finished, a change-row backfill that did, or a zip that
+#     never made it to S3 is repaired within the week rather than waiting for
+#     the next release point to expose it.
 #
 # The daily poll is why `--out` points somewhere disposable. `mirror pull`
 # overwrites data/uscreleasepoints.json with S3's copy, so a poll that wrote
@@ -26,8 +27,9 @@
 # always worked.
 #
 # Chain when there IS something new: mirror pull -> inventory -> backfill ->
-# mirror push -> load-all -> verify. Every step runs inside the `api` container
-# via `docker compose exec`, so the box needs no Python of its own.
+# mirror push -> load-all -> version-changes -> verify. Every step runs inside
+# the `api` container via `docker compose exec`, so the box needs no Python of
+# its own.
 #
 # The classification tables (ADR-0067) are a second source with its own poll and
 # its own check table, run first and independently of all of that.
@@ -146,6 +148,37 @@ run_load() {
     return $status
 }
 
+# The classification load, with its summary line captured for the same reason
+# run_load captures its own: the version timeline's law attributions (ADR-0074)
+# are derived from classification_entries, and redoing them corpus-wide is
+# minutes of delete-and-reinsert over 30,250 rows.
+#
+# `loaded` is not the question. `--force` ignores the content-hash gate, so on
+# the weekly sweep every fetched document reads as loaded whether or not OLRC
+# edited it — which would reattribute the whole corpus 51 weeks a year and turn
+# a transient failure there into a red run on a week when nothing happened.
+# `with new content` is the count of documents whose <PRE> text actually
+# differs from the loaded copy, which is what a stale attribution needs.
+run_classification() {
+    echo "=== $(date -u +%FT%TZ) classification $* ==="
+    local out status changed
+    out="$($COMPOSE exec -T api uv run python -m ingest classification "$@" 2>&1)"
+    status=$?
+    echo "$out"
+    changed="$(printf '%s\n' "$out" \
+        | sed -n 's/.*, \([0-9][0-9]*\) with new content.*/\1/p' | tail -1)"
+    # An unreadable summary must not read as "nothing changed" — that is the
+    # direction that silently leaves the law rows stale. Assume it changed.
+    if ! [[ "$changed" =~ ^[0-9]+$ ]]; then
+        echo "could not read the changed count from classification — assuming a table moved"
+        changed=1
+    fi
+    if [ "$changed" -gt 0 ]; then
+        CLASSIFICATION_CHANGED=1
+    fi
+    return $status
+}
+
 # The database dump, on the mirror (ADR-0013), taken when the corpus changes
 # rather than on a clock.
 #
@@ -199,10 +232,11 @@ echo "=== $(date -u +%FT%TZ) corpus update starting (mode: ${MODE}) ==="
 # which is the weekly repair for a table OLRC edited without extending its
 # range. It is the same weekly Actions run that forces the corpus sweep.
 CLASSIFICATION_STATUS=0
-# Set when a classification load actually ran: the law attributions on the
-# version timeline (ADR-0074) are derived from classification_entries, so a
-# changed table invalidates them. `--reattribute` recomputes only the
-# attribution and law rows — minutes, no XML parsing.
+# Set by run_classification when a load found a document whose <PRE> text
+# really differs: the law attributions on the version timeline (ADR-0074) are
+# derived from classification_entries, so a changed table invalidates them.
+# `--reattribute` recomputes only the attribution and law rows — minutes, no
+# XML parsing.
 CLASSIFICATION_CHANGED=0
 # Set when a version-changes step fails. The rows are re-derivable
 # (`--recompute` / `--reattribute`), so a failure warns and the chain goes on;
@@ -215,11 +249,9 @@ case "$?" in
         echo "a classification table has changed"
         if [ "$MODE" = "check-only" ]; then
             echo "check-only: not loading"
-        elif ! run classification --quiet; then
+        elif ! run_classification --quiet; then
             echo "the classification load failed — see above"
             CLASSIFICATION_STATUS=1
-        else
-            CLASSIFICATION_CHANGED=1
         fi
         ;;
     *)
@@ -232,9 +264,7 @@ esac
 # covered-text gate and the content hash. The check above has already run and
 # recorded; this is the repair pass behind it.
 if [ "$MODE" = "force" ]; then
-    if run classification --force --quiet; then
-        CLASSIFICATION_CHANGED=1
-    else
+    if ! run_classification --force --quiet; then
         echo "the forced classification sweep failed — see above"
         CLASSIFICATION_STATUS=1
     fi
@@ -312,7 +342,16 @@ run_load || { echo "load-all failed"; exit 1; }
 # the load, so this is the repair pass behind it: sections whose rows are
 # already complete are skipped, making it a fast complete-check when the hook
 # succeeded. Runs before the dump so the dump carries the rows.
-if [ "$LOADED" -gt 0 ]; then
+#
+# A forced sweep runs it whether or not anything loaded, which is the whole
+# point of the weekly --force this script's header describes: a backfill that
+# half finished — the box's owed one-time run, killed by a deploy recreating
+# the api container (docs/deploy-status.md) — leaves sections with no change
+# rows at all, and nothing surfaces that. `versions()` degrades a missing
+# annotation to None, so the reader silently falls back to listing every
+# recorded version. On the ~51 weeks a year that load nothing and have nothing
+# to repair, this is the skip scan and no writes.
+if [ "$LOADED" -gt 0 ] || [ "$MODE" = "force" ]; then
     run version-changes --quiet || {
         echo "version-changes failed — the rows are re-derivable; rerun by hand"
         echo "or let the next load repair them"
