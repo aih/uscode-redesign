@@ -121,6 +121,9 @@ def load_release(
     # overwrites the first and flags it, which is why flagging only the later
     # occurrence is enough.
     new_version_identifiers: set[str] = set()
+    # Sections that gained a new version group this load — the ones whose
+    # version-change rows must be recomputed at the end (ADR-0074).
+    changed_section_ids: set[int] = set()
 
     # Only text from the newest release this title has reached is "in force", and
     # loads do not have to arrive in order — `load-all` walks the inventory's seq,
@@ -180,11 +183,14 @@ def load_release(
                 heading=record.heading,
                 status=record.status,
                 source_credit=record.source_credit,
+                text_hash=record.text_hash or None,
+                notes_hash=record.notes_hash or None,
             )
             session.add(version)
             session.flush()
             existing_versions.setdefault(section.id, {})[content_hash] = version
             new_versions += 1
+            changed_section_ids.add(section.id)
             
             versions_to_sync.append({
                 "identifier": record.identifier,
@@ -254,6 +260,17 @@ def load_release(
     title_version.raw_section_elements = raw_count
     session.commit()
     _flush_search(versions_to_sync, retire_keys)
+
+    # Incremental version-change hook (ADR-0074): a section that gained a new
+    # version group has a new transition to classify (and its neighbours in the
+    # timeline may have moved). Recompute change rows for exactly those
+    # sections, after the release map upsert has committed. Sections whose
+    # content deduped are untouched — their transitions did not change.
+    if changed_section_ids:
+        from ingest import version_changes
+
+        version_changes.compute_for_sections(session, sorted(changed_section_ids))
+        session.commit()
 
     return LoadStats(
         release_label=release_label,
