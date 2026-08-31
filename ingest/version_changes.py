@@ -33,7 +33,7 @@ structure-only, which is also how the reader's redline treats it (ADR-0026).
 
 This is ingest-side code: it writes `db.models` directly (architecture rule 1
 governs `api/`, not this) and knows no USLM element names of its own — the
-backfill recovers missing hashes through `parser_for_fragment(xml)` and the
+backfill recovers missing hashes through `parser_for_namespace` and the
 parser's `plain_text()`/`notes_text()`.
 """
 
