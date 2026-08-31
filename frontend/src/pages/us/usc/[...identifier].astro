@@ -36,6 +36,7 @@ import { sectionCommands } from "../../../lib/palette";
 import { cachedReleases } from "../../../lib/releasecache";
 import { citedIdentifiers } from "../../../lib/refs";
 import { comparableReleases, previousChangedRelease } from "../../../lib/compare";
+import { isAnnotated, versionCounts } from "../../../lib/versions";
 import type {
   Entry,
   Labels,
@@ -226,6 +227,16 @@ const compare =
         options: compareOptions,
       }
     : null;
+/** What the "Version history" link says about the section it leads to: how many
+ *  of its recorded versions changed the statutory text, and how many release
+ *  points its history covers (ADR-0075). Null when the timeline call failed or
+ *  when the corpus carries no change rows, where the link keeps the sentence it
+ *  had — a count computed from unannotated entries would be the number of times
+ *  the *XML* moved, which is not what "amended" says. */
+const history =
+  section && timeline && isAnnotated(timeline.versions)
+    ? versionCounts(timeline.versions)
+    : null;
 const upNode = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
 /** The last crumb: the thing on screen, unlinked. `ancestors` stops at the
  *  parent, so without this the trail names everything except the section. */
@@ -324,7 +335,9 @@ const releaseContext = served
 
         <p class="doc-meta">
           <a href={versionsHref(section.identifier)}>
-            Version history — every release point where this text changed
+            {history
+              ? `Version history — amended ${history.amendments} time${history.amendments === 1 ? "" : "s"} over ${history.releases} release point${history.releases === 1 ? "" : "s"}`
+              : "Version history — every release point where this text changed"}
           </a>
         </p>
 

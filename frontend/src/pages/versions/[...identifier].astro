@@ -7,13 +7,27 @@
  * its own URL and a prominent link from the section page, not a footer
  * afterthought (`[...identifier].astro`'s "Version history" link, next to the
  * title).
+ *
+ * Two views (ADR-0075). The default is the statutory changes — the transitions
+ * ADR-0074 classified `text`, plus the entry the history starts at; `?view=all`
+ * is every recorded version, including the ones where only the notes or the
+ * stored XML moved. Both views are the same document: every entry is rendered
+ * and the stylesheet hides what the view does not show, so the page is
+ * cacheable per URL and carries no script.
  */
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import Timeline from "../../components/Timeline.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { REVALIDATE } from "../../lib/cache";
-import { appHref, trimNum } from "../../lib/url";
+import { appHref, trimNum, versionsHref } from "../../lib/url";
+import {
+  VERSIONS_VIEW_PARAM,
+  isAnnotated,
+  readVersionsView,
+  timelineRows,
+  versionCounts,
+} from "../../lib/versions";
 import type { Entry, Section, Versions } from "../../lib/types";
 import { isToc } from "../../lib/types";
 
@@ -43,6 +57,17 @@ const current = entries.length > 0 ? entries[entries.length - 1] : null;
 const title = current
   ? `Versions of ${trimNum(current.num)} · U.S. Code`
   : "Versions · U.S. Code";
+
+/** Which view was asked for, and whether there is a choice to offer. A corpus
+ *  whose change rows have not been computed has no default view to compute
+ *  either, so it gets the whole history and a sentence saying why. */
+const annotated = isAnnotated(entries);
+const view = annotated ? readVersionsView(Astro.url.searchParams.get(VERSIONS_VIEW_PARAM)) : "all";
+const counts = versionCounts(entries);
+/** The rows the view on screen shows, for the picker below the timeline: a
+ *  From/To list naming versions the reader cannot see would be a third view. */
+const shown = timelineRows(entries).filter((row) => view === "all" || row.statutory);
+const shownStarts = shown.map((row) => row.start).filter((start): start is string => start !== null);
 
 // The breadcrumb, at the cost of a second call. `/sections/…/versions` answers
 // `{identifier, versions}` and nothing else — it has no ancestors to give — so
@@ -87,15 +112,50 @@ const currentCrumb: Entry | null = section
         </p>
 
         <p class="lede">
-          {entries.length} distinct version{entries.length === 1 ? "" : "s"} of this section's
-          text, oldest first. Each entry is a release point where the text changed. Most
-          release points leave most sections untouched.
+          {counts.all} distinct version{counts.all === 1 ? "" : "s"} of this section's stored
+          content, oldest first, over {counts.releases} release point
+          {counts.releases === 1 ? "" : "s"}.{" "}
+          {annotated
+            ? `${counts.amendments} of them changed the statutory text.`
+            : "Which of them changed the statutory text is not computed for this corpus, so every recorded version is listed."}
         </p>
 
-        <Timeline identifier={identifier} entries={entries} />
+        {annotated && (
+          <nav class="sortbar" aria-label="Which versions to show">
+            <span class="sortbar__label" id="viewbar-label">
+              Show
+            </span>
+            <ul class="sortbar__list" aria-labelledby="viewbar-label">
+              <li>
+                {view === "text" ? (
+                  <span class="sortbar__option sortbar__option--on" aria-current="true">
+                    Amendments ({counts.statutory})
+                  </span>
+                ) : (
+                  <a class="sortbar__option" href={versionsHref(identifier)}>
+                    Amendments ({counts.statutory})
+                  </a>
+                )}
+              </li>
+              <li>
+                {view === "all" ? (
+                  <span class="sortbar__option sortbar__option--on" aria-current="true">
+                    All recorded versions ({counts.all})
+                  </span>
+                ) : (
+                  <a class="sortbar__option" href={versionsHref(identifier, "all")}>
+                    All recorded versions ({counts.all})
+                  </a>
+                )}
+              </li>
+            </ul>
+          </nav>
+        )}
+
+        <Timeline identifier={identifier} entries={entries} view={view} />
 
         {
-          entries.length > 1 && (
+          shownStarts.length > 1 && (
             <>
               <p class="toc-group">Compare any two versions</p>
               <form class="diff-picker" method="get" action={`/app/diff${identifier}`}>
@@ -104,9 +164,9 @@ const currentCrumb: Entry | null = section
                     From
                   </label>
                   <select class="usa-select picker__select" id="from" name="from">
-                    {entries.map((entry) => (
-                      <option value={entry.first_seen.label} selected={entry === entries[0]}>
-                        {entry.first_seen.label}
+                    {shownStarts.map((start) => (
+                      <option value={start} selected={start === shownStarts[0]}>
+                        {start}
                       </option>
                     ))}
                   </select>
@@ -116,9 +176,12 @@ const currentCrumb: Entry | null = section
                     To
                   </label>
                   <select class="usa-select picker__select" id="to" name="to">
-                    {entries.map((entry) => (
-                      <option value={entry.first_seen.label} selected={entry === current}>
-                        {entry.first_seen.label}
+                    {shownStarts.map((start) => (
+                      <option
+                        value={start}
+                        selected={start === shownStarts[shownStarts.length - 1]}
+                      >
+                        {start}
                       </option>
                     ))}
                   </select>

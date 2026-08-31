@@ -20,15 +20,29 @@
  * and an incremental load can attach an earlier release point to a row without
  * lowering it (ADR-0007's dedupe, gotcha 15). `releases` comes from
  * `section_release_map` and is authoritative.
+ *
+ * The group before the one on screen is not always a group whose *text* is
+ * different. ADR-0007's hash records a new group whenever the stored XML moved
+ * at all, and corpus-wide 75.1% of transitions change no text and no notes
+ * (`docs/verification/version-changes.json`), so the group immediately before
+ * is usually the same words with different markup — the emptiness the whole
+ * control exists to avoid, one level down. ADR-0074's annotations say which
+ * transitions were statutory, so the walk skips the rest (ADR-0075).
  */
 import type { VersionEntry } from "./types";
+import { isStatutoryEntry } from "./versions";
 
 /**
- * The last release point holding text different from what is on screen.
+ * The last release point holding statutory text different from what is on
+ * screen.
  *
  * Null when the release on screen is in the oldest group there is — that text
  * is as old as the corpus and has nothing before it — and null when `selected`
  * is in no group at all, which is a section the timeline does not cover.
+ *
+ * A corpus with no change rows answers `change_kind: null` throughout; there
+ * the walk stops at the first group back, which is the behaviour this function
+ * had before the annotations existed.
  */
 export function previousChangedRelease(
   versions: VersionEntry[],
@@ -36,10 +50,27 @@ export function previousChangedRelease(
 ): string | null {
   const index = versions.findIndex((version) => version.releases.includes(selected));
   if (index <= 0) return null;
-  const before = versions[index - 1].releases;
-  // The *last* release point of the previous group: the one immediately before
-  // the change, so the redline spans one amendment rather than several.
-  return before[before.length - 1] ?? null;
+  // Back to the transition that last changed the words. The group on screen is
+  // the same text as every group behind it up to that point, so the release
+  // point to compare with is the one immediately before it.
+  //
+  // An unannotated entry stops the walk: without a change row there is nothing
+  // saying the transition was not statutory, and the group before is the answer
+  // this function gave before the annotations existed.
+  let changed = index;
+  while (changed > 0 && isFoldedIntoPrevious(versions[changed])) changed -= 1;
+  if (changed <= 0) return null;
+  const releases = versions[changed - 1].releases;
+  // The *last* release point of that group: the one immediately before the
+  // change, so the redline spans one amendment rather than several.
+  return releases[releases.length - 1] ?? null;
+}
+
+/** Whether this entry's arrival left the statutory text as it was — a `notes`
+ *  or `structure` transition. False for an unannotated entry and for the
+ *  oldest, neither of which the walk may pass. */
+function isFoldedIntoPrevious(entry: VersionEntry): boolean {
+  return entry.change_kind != null && !isStatutoryEntry(entry);
 }
 
 /**

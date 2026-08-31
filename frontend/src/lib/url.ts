@@ -58,9 +58,16 @@ export function citationHref(identifier: string, release?: string | null): strin
   return `${encodePath(identifier)}${query({ release })}`;
 }
 
-/** `/app/versions/…` — the change timeline for a section (Day 4). */
-export function versionsHref(identifier: string): string {
-  return `${APP}/versions${encodePath(identifier)}`;
+/**
+ * `/app/versions/…` — the change timeline for a section (Day 4).
+ *
+ * `view` is `all` for every recorded version and omitted for the default view
+ * of statutory changes (ADR-0075), so the address of the default is the address
+ * this route has always had.
+ */
+export function versionsHref(identifier: string, view?: string | null): string {
+  const suffix = view === "all" ? "?view=all" : "";
+  return `${APP}/versions${encodePath(identifier)}${suffix}`;
 }
 
 /**

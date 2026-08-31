@@ -4047,6 +4047,56 @@ dialog.palette {
   color: var(--muted);
 }
 
+/* The two views of the timeline (ADR-0075). Every entry is in the document and
+ * the list root says which view is in force, so the page is one cacheable
+ * response per URL and the switch is a link rather than a script. A later
+ * per-account default flips `data-view` from the pre-paint bootstrap and needs
+ * no markup change, which is why these rules key on the root rather than on a
+ * class the server picks per entry. */
+.timeline[data-view="text"] > li[data-change-kind="notes"],
+.timeline[data-view="text"] > li[data-change-kind="structure"] {
+  display: none;
+}
+
+/* Each entry carries both of its "unchanged through" runs and both of its diff
+ * links: its own group's, and the run it holds once the hidden groups after it
+ * are folded in. One is shown per view. */
+.timeline[data-view="text"] .timeline__releases--own,
+.timeline[data-view="text"] .timeline__diff--own,
+.timeline[data-view="all"] .timeline__releases--effective,
+.timeline[data-view="all"] .timeline__diff--statutory {
+  display: none;
+}
+
+.timeline__kind {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.timeline__laws {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0;
+}
+
+/* A law chip. `--link` on `--page` is the measured pair for a link; the border
+ * is `--edge`, the token for a control's boundary (ADR-0042). */
+.timeline__law {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.timeline__law-action {
+  margin-left: 0.35rem;
+  color: var(--muted);
+}
+
 .diff-picker {
   display: flex;
   flex-wrap: wrap;

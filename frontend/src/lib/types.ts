@@ -129,6 +129,18 @@ export interface Neighbors {
 
 export type Labels = Record<string, Entry>;
 
+/** A Public Law the classification tables attribute to a version transition
+ *  (ADR-0074). `classification_actions` holds the source's own action words —
+ *  the empty string is a plain amendment. */
+export interface VersionLaw {
+  pl_congress: number;
+  pl_num: number;
+  in_classification: boolean;
+  is_note_classification: boolean;
+  in_source_credit: boolean;
+  classification_actions: string[];
+}
+
 export interface VersionEntry {
   content_hash: string;
   first_seen: Release;
@@ -136,6 +148,17 @@ export interface VersionEntry {
   num: string | null;
   heading: string | null;
   status: string | null;
+  /** `initial` | `text` | `notes` | `structure` — how this entry differs from
+   *  the one before it (ADR-0074). Null on every entry of a corpus whose change
+   *  rows have not been computed, which the timeline says out loud. */
+  change_kind?: string | null;
+  text_changed?: boolean | null;
+  notes_changed?: boolean | null;
+  status_changed?: boolean | null;
+  concurrent?: boolean | null;
+  /** `classified` | `none`. */
+  attribution?: string | null;
+  laws?: VersionLaw[];
 }
 
 export interface Versions {
