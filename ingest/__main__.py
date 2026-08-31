@@ -281,8 +281,8 @@ def main(argv: list[str] | None = None) -> int:
     version_changes_parser.add_argument(
         "--report",
         action="store_true",
-        help="Write docs/verification/version-changes.json from the stored rows "
-        "and exit — no computation",
+        help="After the run, write docs/verification/version-changes.json from "
+        "the stored rows; composes with --title/--recompute/--reattribute",
     )
     version_changes_parser.add_argument(
         "--out",
@@ -780,24 +780,25 @@ def _cmd_classification_check(args: argparse.Namespace) -> int:
 def _cmd_version_changes(args: argparse.Namespace) -> int:
     """Classify version transitions and attribute them (ADR-0074).
 
-    Three modes, mutually independent flags:
-
-        (default)       compute change rows, resumably — sections already
-                        complete are skipped unless --recompute
-        --reattribute   recompute attribution + law rows only (fast, no XML)
-        --report        write the verification artifact from stored rows
+    Runs one action — compute (the default, resumable; `--recompute` redoes
+    complete sections) or `--reattribute` (attribution + law rows only, no
+    XML) — and then, when `--report` is given, writes the verification
+    artifact. The flags compose: `--title 16 --report` computes Title 16 and
+    then reports; `--report` alone verifies everything is computed (a fast
+    skip scan) and reports.
     """
     from ingest import version_changes as version_changes_mod
 
-    on_event = None if args.quiet else print
+    if args.reattribute and args.recompute:
+        print(
+            "--reattribute and --recompute are different actions: --recompute "
+            "redoes the content flags (use the default compute), --reattribute "
+            "only the attribution. Pick one.",
+            file=sys.stderr,
+        )
+        return 2
 
-    if args.report:
-        with SessionLocal() as session:
-            path = version_changes_mod.write_report(
-                session, directory=args.out or version_changes_mod.VERIFICATION_DIR
-            )
-        print(f"report: {path}")
-        return 0
+    on_event = None if args.quiet else print
 
     try:
         if args.reattribute:
@@ -808,22 +809,28 @@ def _cmd_version_changes(args: argparse.Namespace) -> int:
                 f"reattributed {stats.changes:,} change rows across "
                 f"{stats.sections:,} sections; {stats.laws:,} law rows"
             )
-            return 0
-        stats = version_changes_mod.run_compute(
-            SessionLocal,
-            titles=args.title,
-            recompute=args.recompute,
-            on_event=on_event,
-        )
+        else:
+            stats = version_changes_mod.run_compute(
+                SessionLocal,
+                titles=args.title,
+                recompute=args.recompute,
+                on_event=on_event,
+            )
+            print(
+                f"{stats.sections:,} sections computed ({stats.skipped:,} already "
+                f"complete, skipped): {stats.changes:,} change rows, "
+                f"{stats.laws:,} law rows, {stats.hashes_computed:,} hashes back-filled"
+            )
     except KeyboardInterrupt:
         print("\ninterrupted — re-run to resume (the database is the state)", file=sys.stderr)
         return 130
 
-    print(
-        f"{stats.sections:,} sections computed ({stats.skipped:,} already complete, "
-        f"skipped): {stats.changes:,} change rows, {stats.laws:,} law rows, "
-        f"{stats.hashes_computed:,} hashes back-filled"
-    )
+    if args.report:
+        with SessionLocal() as session:
+            path = version_changes_mod.write_report(
+                session, directory=args.out or version_changes_mod.VERIFICATION_DIR
+            )
+        print(f"report: {path}")
     return 0
 
 

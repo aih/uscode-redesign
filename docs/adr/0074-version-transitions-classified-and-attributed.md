@@ -58,8 +58,14 @@ V3) can default to statutory changes with the full history one click away.
    version id — never by `first_release_id`, which an incremental load
    attaches earlier releases to without lowering (ADR-0066's finding, now
    load-bearing). `notes_changed` covers the source credit as well as the
-   notes, compared whitespace-collapsed from the version rows' own columns.
-   Both `change_kind` and `attribution` are strings, not enums.
+   notes, compared from the version rows' own columns. Both `change_kind` and
+   `attribution` are strings, not enums.
+
+   **Every textual comparison here is whitespace-removed** — the reading
+   text, the notes, the source credit, and the heading. The spec wrote
+   "whitespace-collapsed" for the heading; that would flip `heading_changed`
+   on the same converter element-boundary whitespace the module suppresses
+   everywhere else, so the heading follows the rule the others use.
 
 4. **The window is the delta of incorporated-law sets, honoring
    `excluded_laws`.** A law L = (congress, num) is in a transition's window
@@ -105,12 +111,19 @@ V3) can default to statutory changes with the full history one click away.
    window and no attribution — an unbounded window would attribute everything
    ever enacted.
 
-9. **Incremental.** `load_release` recomputes change rows for exactly the
-   sections it created new version groups for, after the release map upsert;
-   deduped sections are untouched. The unique constraint on `to_version_id` is
-   the idempotency key — recompute is delete-and-reinsert per section.
-   Wiring the classification poll to `--reattribute` on the deployed box is
-   Phase V4 (`deploy/update-corpus.sh`).
+9. **Incremental.** `load_release` recomputes change rows for every section
+   whose release map gained a row — a new version group, or an existing group
+   this release newly maps, which changes the group's release range and can
+   move an out-of-order load's windows — plus any touched section with a
+   version no change row covers, which is what an interrupted earlier load
+   leaves. A redo of an already-mapped release adds no pairs and recomputes
+   nothing. The hook runs after the load has committed, and a failure in it
+   warns loudly without failing the load: the load is complete at that point
+   and the rows are re-derivable by `--recompute`, while failing would mark a
+   committed load as failed in `load-all`'s ledger. The unique constraint on
+   `to_version_id` is the idempotency key — recompute is delete-and-reinsert
+   per section. Wiring the classification poll to `--reattribute` on the
+   deployed box is Phase V4 (`deploy/update-corpus.sh`).
 
 ## Costs and limits, named
 

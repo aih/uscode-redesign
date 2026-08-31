@@ -132,10 +132,13 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   version groups is skipped, so an interrupted run just continues; `--recompute` redoes them.
 
   `--reattribute` redoes only the attribution and law rows (what a changed classification
-  table invalidates) and parses no XML — minutes, not hours. `--report` writes
-  docs/verification/version-changes.json from the stored rows and computes nothing; `--out`
-  redirects it. `load` and `load-all` keep the rows current on their own: `load_release`
-  recomputes change rows for the sections it created new version groups for.
+  table invalidates) and parses no XML — minutes, not hours. `--report` composes with the
+  run: after computing (or reattributing) it writes docs/verification/version-changes.json
+  from the stored rows, so `--title 16 --report` computes Title 16 and then reports and
+  `--report` alone is a fast complete-check plus the artifact; `--out` redirects it. `load`
+  and `load-all` keep the rows current on their own: `load_release` recomputes change rows
+  for every section whose release map gained a row, and a failure there warns without
+  failing the load (the rows are re-derivable with `--recompute`).
 
 ## python -m ingest load <xmlfile> --release <label> [--currency-date YYYY-MM-DD] [--source-url URL]
                                                   [--source-zip PATH]
