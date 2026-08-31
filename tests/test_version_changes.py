@@ -176,6 +176,45 @@ def test_the_slice_classifies_119_102_to_s2201_and_s2206():
     ]
 
 
+# ------------------------------------------------------- the concurrent rule
+
+
+def _group(version_id: int, first_seq: int, last_seq: int) -> vc._Group:
+    return vc._Group(
+        version_id=version_id,
+        text_hash=b"",
+        notes_hash=b"",
+        heading=None,
+        status=None,
+        source_credit=None,
+        first_seq=first_seq,
+        last_seq=last_seq,
+        first_release_id=first_seq,
+        last_release_id=last_seq,
+    )
+
+
+def test_a_plain_chain_of_versions_is_never_concurrent():
+    groups = [_group(1, 1, 5), _group(2, 6, 10), _group(3, 11, 15)]
+    assert not vc._window_is_unreliable(groups, 1, groups[0])
+    assert not vc._window_is_unreliable(groups, 2, groups[1])
+
+
+def test_two_groups_mapped_at_one_release_are_concurrent():
+    """ADR-0021: the source published several elements under one identifier."""
+    groups = [_group(1, 1, 6), _group(2, 6, 10)]
+    assert vc._window_is_unreliable(groups, 1, groups[0])
+
+
+def test_the_transition_after_a_recurrence_is_concurrent_too():
+    """Content that comes back — group 1 is mapped again at 9-10 — leaves the
+    window into group 3 running straight across an era group 1 held."""
+    recurring = _group(1, 1, 10)
+    groups = [recurring, _group(2, 4, 8), _group(3, 11, 15)]
+    assert vc._window_is_unreliable(groups, 1, groups[0])
+    assert vc._window_is_unreliable(groups, 2, groups[1])
+
+
 # ----------------------------------------------------------------- the corpus
 
 
@@ -348,6 +387,127 @@ def test_reattribute_rebuilds_the_laws_without_touching_the_flags(
         session.rollback()
 
 
+def test_the_backfilled_hashes_equal_the_ones_the_load_wrote(corpus_with_119_2_table):
+    """`_build_record` hashes the element the parser has in hand; the backfill
+    re-parses the stored fragment. The two paths must agree byte for byte, or a
+    back-filled corpus and a freshly loaded one classify the same transition
+    differently."""
+    from sqlalchemy import select, update
+
+    from db.base import SessionLocal
+    from db.models import SectionVersion
+
+    with SessionLocal() as session:
+        ids = _compute(session, ["/us/usc/t16/s2201", "/us/usc/t16/s2206"])
+        rows = session.execute(
+            select(
+                SectionVersion.id, SectionVersion.text_hash, SectionVersion.notes_hash
+            ).where(SectionVersion.section_id.in_(list(ids.values())))
+        ).all()
+        at_load = {row.id: (row.text_hash, row.notes_hash) for row in rows}
+        assert at_load and all(
+            text and notes for text, notes in at_load.values()
+        ), "the load wrote no hashes — reload the corpus"
+
+        session.execute(
+            update(SectionVersion)
+            .where(SectionVersion.id.in_(list(at_load)))
+            .values(text_hash=None, notes_hash=None)
+        )
+        session.flush()
+        assert vc._ensure_hashes(session, list(at_load)) == len(at_load)
+
+        after = session.execute(
+            select(
+                SectionVersion.id, SectionVersion.text_hash, SectionVersion.notes_hash
+            ).where(SectionVersion.id.in_(list(at_load)))
+        ).all()
+        assert {row.id: (row.text_hash, row.notes_hash) for row in after} == at_load
+        session.rollback()
+
+
+def test_only_the_sections_a_release_can_have_moved_are_recomputed(
+    corpus_with_119_2_table,
+):
+    """The incremental hook's set: the two sections 119-102not101 amended are
+    in it, and a load does not recompute every section it maps."""
+    from sqlalchemy import select
+
+    from db.base import SessionLocal
+    from db.models import (
+        ReleasePoint,
+        Section,
+        SectionReleaseMap,
+        SectionVersion,
+        Title,
+    )
+
+    with SessionLocal() as session:
+        title_id = session.scalar(select(Title.id).where(Title.num == "16"))
+        release_id = session.scalar(
+            select(ReleasePoint.id).where(ReleasePoint.label == "119-102not101")
+        )
+        wanted = ["/us/usc/t16/s2201", "/us/usc/t16/s2206"]
+        ids = _compute(session, wanted)
+        others = [
+            section_id
+            for section_id in session.scalars(
+                select(Section.id)
+                .where(Section.title_id == title_id, Section.id.not_in(list(ids.values())))
+                .order_by(Section.id)
+                .limit(48)
+            )
+        ]
+        vc.compute_for_sections(session, others)
+
+        every = list(ids.values()) + others
+        mapped: dict[int, set[int]] = {}
+        for section_id, version_id in session.execute(
+            select(SectionVersion.section_id, SectionReleaseMap.section_version_id)
+            .join(
+                SectionVersion,
+                SectionVersion.id == SectionReleaseMap.section_version_id,
+            )
+            .where(
+                SectionVersion.section_id.in_(every),
+                SectionReleaseMap.release_id == release_id,
+            )
+        ):
+            mapped.setdefault(section_id, set()).add(version_id)
+
+        need = vc.sections_needing_recompute(
+            session,
+            title_id=title_id,
+            release_id=release_id,
+            mapped_versions=mapped,
+            new_version_sections=set(),
+        )
+        assert set(ids.values()) <= need, "an amended section must be recomputed"
+        assert need < set(mapped), "a load must not recompute everything it maps"
+
+        # A section with no change rows at all is in the set whatever else is
+        # true of it — the interrupted-load case, and a corpus never computed.
+        spare = others[0]
+        vc.clear_change_rows(session, [spare])
+        assert spare in vc.sections_needing_recompute(
+            session,
+            title_id=title_id,
+            release_id=release_id,
+            mapped_versions=mapped,
+            new_version_sections=set(),
+        )
+        session.rollback()
+
+
+def test_an_unknown_title_is_an_error_not_an_empty_run(corpus_with_119_2_table):
+    from db.base import SessionLocal
+
+    with SessionLocal() as session:
+        assert vc._title_ids(session, ["16"])
+        with pytest.raises(vc.UnknownTitleError):
+            vc._title_ids(session, ["16", "notatitle"])
+
+
 def test_the_report_counts_what_was_computed(corpus_with_119_2_table):
     from db.base import SessionLocal
 
@@ -364,7 +524,11 @@ def test_the_report_counts_what_was_computed(corpus_with_119_2_table):
 # -------------------------------------------------------------- the migration
 
 
-SCRATCH_DB = "uscode_migration_roundtrip"
+SCRATCH_DB = f"uscode_migration_roundtrip_{os.getpid()}"
+"""Named for the process that creates it. A fixed name races: two worktree
+agents running `make test` against the one local Postgres would drop each
+other's scratch database mid-run, and the loser's alembic run fails on a
+database that no longer exists."""
 
 
 def _alembic(url: str, *args: str) -> None:
@@ -399,9 +563,15 @@ def _column_names(url: str, table: str) -> set[str]:
         engine.dispose()
 
 
+@pytest.mark.slow
 def test_the_migration_round_trips():
     """Upgrade → downgrade → upgrade on a scratch database: the new tables and
-    columns appear, disappear cleanly, and come back."""
+    columns appear, disappear cleanly, and come back.
+
+    Marked slow: it runs every migration in the project three times through a
+    subprocess, which is a minute and a half against the two seconds the rest
+    of this module takes (CLAUDE.md's test speed rule). `make test-slow` and
+    `make test-all` run it."""
     from sqlalchemy import create_engine, text
 
     from db.config import settings
