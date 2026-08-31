@@ -82,6 +82,7 @@ from db.models import ClassificationSourceCheck
 from db.models import EcctEntry as EcctEntryRow
 from ingest.download import Opener, throttle
 from ingest.inventory import USER_AGENT
+from ingest.verification import VERIFICATION_DIR, write_verification_json
 from storage.classification import CLASSIFICATION_SOURCE_URL, law_in_ranges
 
 CLASSIFICATION_BASE_URL = "https://uscode.house.gov/classification/"
@@ -102,7 +103,6 @@ CACHE_DIR = Path("data/classification")
 """Where every fetched page is kept, under its own filename. Gitignored with the
 rest of `data/`; the committed record of a run is the verification artifact."""
 
-VERIFICATION_DIR = Path("docs/verification")
 MANIFEST_PATH = Path("data/manifests/classification.json")
 
 # --- entry pages -----------------------------------------------------------------
@@ -2001,7 +2001,6 @@ def write_verification(
     two parses. `skipped_lines` is the lines themselves here, which is the only
     place they survive — the column on `classification_files` is a count.
     """
-    directory.mkdir(parents=True, exist_ok=True)
     if isinstance(parsed, ParsedEcctFile):
         name = f"classification-ecct-{parsed.congress}-{parsed.session}.json"
         document: dict[str, object] = {
@@ -2030,9 +2029,7 @@ def write_verification(
             "skipped_line_text": list(parsed.skipped_lines),
         }
     document["generated_at"] = datetime.now(timezone.utc).isoformat()
-    path = directory / name
-    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
-    return path
+    return write_verification_json(document, name, directory)
 
 
 def write_classification_manifest(

@@ -5,7 +5,15 @@
 - **Context:** `docs/version-semantics-spec.md` (Phase V1, session 62's design);
   ADR-0007 (dedupe on guid-stripped content), ADR-0021 (several elements per
   identifier), ADR-0066 (`content_first_seen` does not mean what it is called),
-  ADR-0067 (the classification tables). Session 63.
+  ADR-0067 (the classification tables). Session 63; amended in session 89
+  after a fresh-context review of the merged V1 diff — decisions 7 and 9 and
+  four costs.
+
+- **Owed:** `docs/verification/version-changes.json` predates decision 7's
+  second clause and reports `concurrent: 39,645` where the code now computes
+  **77,596**. Every other number in it is unchanged. Regenerate with
+  `python -m ingest version-changes --recompute --report` (3 minutes over the
+  full local corpus, hashes already stored).
 
 ## Context
 
@@ -31,8 +39,7 @@ V3) can default to statutory changes with the full history one click away.
 
 1. **The dedupe key is untouched.** ADR-0007's hash still decides what is
    stored once; this layer annotates the transitions between stored versions.
-   ADR-0007 reserved any widening of "the same content" for its own ADR, and
-   this is deliberately not that — nothing about storage identity moves.
+   ADR-0007 reserved any widening of "the same content" for its own ADR.
 
 2. **Two content hashes on `section_versions`** (`text_hash`, `notes_hash`,
    nullable, back-fillable): sha256 of the parser's `plain_text()` with all
@@ -85,9 +92,9 @@ V3) can default to statutory changes with the full history one click away.
    `is_note_classification` (only note rows name it), `in_source_credit` (the
    citation newly appears across the transition's `source_credit` diff), and
    the distinct `action` vocabulary for display. The measurement found the two
-   signals agree exactly (156/156); recording both keeps that checkable
-   forever. A transition whose text changed with no law recorded stays
-   `attribution = 'none'` — an honest state, never an inferred law.
+   signals agree exactly (156/156); recording both keeps that checkable. A
+   transition whose text changed with no law recorded stays
+   `attribution = 'none'` rather than carrying an inferred law.
 
 6. **No foreign key into `classification_entries`.** Its rows are deleted and
    re-inserted wholesale when a source file changes (`db/models.py` documents
@@ -95,11 +102,17 @@ V3) can default to statutory changes with the full history one click away.
    at any time by `version-changes --reattribute`, which redoes attribution
    and the law rows without touching the content flags and parses no XML.
 
-7. **`concurrent` is the ADR-0021 escape hatch.** Where the source published
-   several elements under one identifier at one release point (160
-   (identifier, release) pairs corpus-wide), the two groups' release ranges
-   overlap, window arithmetic is unreliable, and the row says so instead of
-   pretending.
+7. **`concurrent` says the window arithmetic is unreliable here.** Two shapes
+   set it. The departing group is still mapped at or after the arriving
+   group's first release — at equality, the ADR-0021 case, where the source
+   published several elements under one identifier at one release point (160
+   (identifier, release) pairs corpus-wide). Or some *third* group is mapped
+   inside the window, which is what content that recurs produces: a later run
+   of releases maps back to an earlier group, so the interval between a
+   departure and an arrival can cover releases a third group held. The second
+   clause is the hardening session's amendment; without it only the first
+   transition of such a pair was flagged and its successor's window ran
+   silently across the revert era.
 
 8. **A mid-corpus `initial` group is attributed from the title's previous
    loaded release.** A section absent from the previous loaded release of its
@@ -111,19 +124,43 @@ V3) can default to statutory changes with the full history one click away.
    window and no attribution — an unbounded window would attribute everything
    ever enacted.
 
-9. **Incremental.** `load_release` recomputes change rows for every section
-   whose release map gained a row — a new version group, or an existing group
-   this release newly maps, which changes the group's release range and can
-   move an out-of-order load's windows — plus any touched section with a
-   version no change row covers, which is what an interrupted earlier load
-   leaves. A redo of an already-mapped release adds no pairs and recomputes
-   nothing. The hook runs after the load has committed, and a failure in it
-   warns loudly without failing the load: the load is complete at that point
-   and the rows are re-derivable by `--recompute`, while failing would mark a
-   committed load as failed in `load-all`'s ledger. The unique constraint on
-   `to_version_id` is the idempotency key — recompute is delete-and-reinsert
-   per section. Wiring the classification poll to `--reattribute` on the
-   deployed box is Phase V4 (`deploy/update-corpus.sh`).
+9. **Incremental.** `load_release` recomputes change rows for the sections a
+   load can have moved, in committed batches. The first implementation took
+   that to be every section whose release map gained a row, which on a release
+   the corpus has not seen before is every section of the title — a
+   whole-title pass per load, 27.0s for Title 42, over 3,153 title-releases in
+   a `load-all`. `sections_needing_recompute` names the four cases instead: a
+   new version group; a version no change row covers (an interrupted earlier
+   load, or a corpus loaded before this ADR); a group the title's previous
+   completed load did not map this section to; and a group that departs into a
+   successor, where extending its range moves that successor's window
+   (decision 7's recurrence, which is most of the set — 1,122 of Title 16's
+   1,124). A load that is **not** the title's newest returns every section of
+   the title: inserting a release below the top can lower a group's first
+   mapped release, and it joins the load history a mid-corpus `initial` window
+   departs from, for sections the load never touched. Measured: Title 42 8,465
+   sections → 1,590 and 27.0s → 17.4s, Title 16 5,095 → 1,124.
+
+   The hook runs after the load has committed. A failure warns loudly without
+   failing the load — the load is complete at that point and the rows are
+   re-derivable by `--recompute`, while failing would mark a committed load as
+   failed in `load-all`'s ledger — and then **deletes the change rows it was
+   recomputing**, because the resume skip is a count equality that can see a
+   missing row and not a stale one. `load-all --defer-version-changes` skips
+   the hook for a bulk run that will follow with one `version-changes` pass,
+   which computes each section once rather than once per release point that
+   touched it; it records the deferral **the same way**, by deleting the change
+   rows of every section each load touched (the whole title for a load below
+   the title's newest). Without that the follow-up pass would skip as complete
+   every section whose group range moved — cases 3 and 4, which change no row
+   *count* — and leave `window_from_release_id`, `attribution` and `concurrent`
+   stale on them. Measured on Title 42: 0.61s where the rows exist, 0.13s on a
+   corpus that has none, against the 17.4s hook it replaces. The empty-table
+   warning below is on both paths for the same reason. The unique constraint on
+   `to_version_id` is the idempotency key
+   — recompute is delete-and-reinsert per section. Wiring the classification
+   poll to `--reattribute` on the deployed box is Phase V4
+   (`deploy/update-corpus.sh`).
 
 ## Costs and limits, named
 
@@ -144,17 +181,38 @@ V3) can default to statutory changes with the full history one click away.
   row". A new group breaks the equality either way; what the approximation
   cannot see is a corpus whose *membership* of groups changed at equal count,
   which only a manual deletion produces, and `--recompute` covers.
+- **A section computed before the classification tables were loaded is one of
+  the skipped**, and its attribution is `none`, which reads exactly like a text
+  change no statute is recorded for. Both compute paths say so on stderr when
+  `classification_entries` is empty — the CLI run and `load_release`'s hook,
+  which is the path `make dev-data` takes, since it loads Title 16 with no
+  tables. The repair is `--reattribute`, which parses no XML.
+- **The digests carry no normalization version.** `text_hash` is sha256 of
+  `plain_text()` with whitespace removed; a change to what `plain_text()`
+  renders — Day 7's table handling is the live candidate — redefines what every
+  stored hash means, silently, since old and new rows are the same 32 bytes.
+  The repair is `version-changes --recompute`, which rebuilds every hash from
+  the stored fragments, and nothing detects the need for it.
+- **The incremental hook cannot see the out-of-order case it does not touch.**
+  Loading a release *below* a title's newest changes the departing release of
+  every mid-corpus `initial` window above it, including for sections that
+  release never carried. `sections_needing_recompute` answers by returning the
+  whole title for such a load, which is correct and is the expensive branch;
+  `load-all` walks seq ascending, so the bulk path never takes it.
 - **A section renumbered away (gotcha 3) ends its identifier's timeline**; the
   transfer is a `tr to` action chip at best. Cross-identifier continuity stays
   future work (the declined redirects table, ADR-0065).
 - **`concurrent` fires far beyond ADR-0021's duplicates.** The spec expected it
-  to flag the 160 several-elements-per-identifier pairs; Title 16's backfill
-  flagged **3,016 of 34,776 transitions**, none of them on a section with a
-  same-release duplicate. The cause is content that *recurs*: a mid-era
-  converter serialization variant (or a genuine revert) maps a handful of
-  releases to a group whose neighbour spans releases on both sides, so the
+  to flag the 160 several-elements-per-identifier pairs; the corpus-wide
+  backfill flagged **39,645 of 423,800 transitions** under the first rule and
+  **77,596 (18.3%)** under decision 7's second clause, none of them on a
+  section with a same-release duplicate. The cause is content that *recurs*: a
+  mid-era converter serialization variant (or a genuine revert) maps a handful
+  of releases to a group whose neighbour spans releases on both sides, so the
   ranges overlap and the model — one row per stored group, which cannot
   represent a third era of a twice-used content — reports a window running
   backwards (`119-102not101 → 114-139`). Flagging these unreliable is the
-  design working as defined; representing recurrence properly (a row per era
-  rather than per group) would be its own ADR.
+  design working as defined. Representing recurrence properly (a row per era
+  rather than per group) would be its own ADR; nothing else in the artifact
+  moved when the second clause landed — every other count, share and per-title
+  breakdown is identical.

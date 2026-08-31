@@ -58,6 +58,16 @@ class NoteText:
     text: str
 
 
+def squash(value: str | None) -> str:
+    """`value` with all whitespace removed, `None` as the empty string.
+
+    The one normalizer every ADR-0074 comparison runs through — the reading
+    text, the notes, the source credit, the heading. Element-boundary
+    whitespace from the 2013–2015 converter is not a change (gotcha 8).
+    """
+    return "".join((value or "").split())
+
+
 def text_hash_of(plain_text: str) -> bytes:
     """sha256 of `plain_text` with all whitespace removed (ADR-0074).
 
@@ -66,8 +76,14 @@ def text_hash_of(plain_text: str) -> bytes:
     that a genuine whitespace-only statutory change classifies as
     structure-only, which is also how the reader's redline treats it
     (ADR-0026).
+
+    The digest carries no normalization version: `plain_text()` deciding to
+    render something differently (Day 7's table handling is the live example)
+    silently redefines what a stored hash means, and the repair is
+    `version-changes --recompute`, which rebuilds every hash from the stored
+    fragments. Named in ADR-0074's costs.
     """
-    return hashlib.sha256("".join(plain_text.split()).encode("utf-8")).digest()
+    return hashlib.sha256(squash(plain_text).encode("utf-8")).digest()
 
 
 def notes_hash_of(notes: tuple[NoteText, ...]) -> bytes:
@@ -76,10 +92,6 @@ def notes_hash_of(notes: tuple[NoteText, ...]) -> bytes:
     Each note's topic/role/heading/text, whitespace removed, joined with
     field and record separators so a value cannot bleed into its neighbour.
     """
-
-    def squash(value: str | None) -> str:
-        return "".join((value or "").split())
-
     payload = "\x1e".join(
         "\x1f".join((squash(n.topic), squash(n.role), squash(n.heading), squash(n.text)))
         for n in notes
