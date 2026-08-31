@@ -29,6 +29,7 @@ from storage import (
     TitleInfo,
     TocEntry,
     TocResult,
+    VersionLawRef,
     WatchlistItemRef,
     WatchlistRef,
 )
@@ -245,13 +246,56 @@ class NeighborsOut(BaseModel):
         )
 
 
+class VersionLawOut(BaseModel):
+    """A Public Law attributed to a version transition (ADR-0074)."""
+
+    pl_congress: int
+    pl_num: int
+    in_classification: bool
+    is_note_classification: bool
+    in_source_credit: bool
+    classification_actions: list[str] = Field(
+        description="Distinct `action` values of the matching classification "
+        "rows; the empty string is a plain amendment."
+    )
+
+    @classmethod
+    def of(cls, law: VersionLawRef) -> "VersionLawOut":
+        return cls(
+            pl_congress=law.pl_congress,
+            pl_num=law.pl_num,
+            in_classification=law.in_classification,
+            is_note_classification=law.is_note_classification,
+            in_source_credit=law.in_source_credit,
+            classification_actions=list(law.classification_actions),
+        )
+
+
 class VersionOut(BaseModel):
     content_hash: str
     first_seen: ReleaseOut
-    releases: list[str]
+    releases: list[str] = Field(
+        description="Every ingested release point publishing this content, "
+        "oldest first. `releases[0]` is the authoritative start of the entry; "
+        "`first_seen` stays for compatibility (ADR-0066)."
+    )
     num: str | None
     heading: str | None
     status: str | None
+    change_kind: str | None = Field(
+        default=None,
+        description="initial | text | notes | structure — how this entry "
+        "differs from the one before it (ADR-0074). Null, with the other "
+        "annotations, when change rows have not been computed.",
+    )
+    text_changed: bool | None = None
+    notes_changed: bool | None = None
+    status_changed: bool | None = None
+    concurrent: bool | None = None
+    attribution: str | None = Field(
+        default=None, description="classified | none"
+    )
+    laws: list[VersionLawOut] = Field(default_factory=list)
 
     @classmethod
     def of(cls, version: SectionVersionInfo) -> "VersionOut":
@@ -262,6 +306,13 @@ class VersionOut(BaseModel):
             num=version.num,
             heading=version.heading,
             status=version.status,
+            change_kind=version.change_kind,
+            text_changed=version.text_changed,
+            notes_changed=version.notes_changed,
+            status_changed=version.status_changed,
+            concurrent=version.concurrent,
+            attribution=version.attribution,
+            laws=[VersionLawOut.of(law) for law in version.laws],
         )
 
 
