@@ -63,6 +63,9 @@ the audit confirmed — leave those alone.
      so a link copied from a pinned page is not the moving citation URL. Unstated.
    - With scripting off the entire copy column is absent (`CopyColumn.astro:41-47,89`). Unstated.
 
+   **Fixed** (2026-08-19). All three now hold in the chapter, together with the case the bar was
+   never reaching the reader in: a section with no identified subdivisions.
+
 9. **`/app/design`'s lede contradicts its own contents.**
    `frontend/src/pages/design.astro:394-401` omits four of the page's thirteen sections: the
    reading measure, keyboard navigation, reading density, and print. The TOC at `:413-425` lists

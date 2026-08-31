@@ -336,7 +336,7 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **795** Python tests; `make test-web` = **404** frontend tests; `make test-e2e` = **627**
+`make test` = **815** Python tests; `make test-web` = **404** frontend tests; `make test-e2e` = **630**
 Playwright tests, 322 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline

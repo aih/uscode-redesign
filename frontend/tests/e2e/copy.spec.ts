@@ -174,6 +174,25 @@ test("every control names the provision it copies", async ({ page }) => {
   expect(label).toMatch(/^Copy 16 U\.S\.C\. §/u);
 });
 
+test("a section with no subdivisions gets the bar and no gutter", async ({ page }) => {
+  // § 21 is one block of text with no lettered or numbered subdivisions, which
+  // is the shape more than half the Code's sections have. There is nothing to
+  // put in the gutter and there is still a section to copy.
+  await page.goto("/app/us/usc/t16/s21");
+
+  const whole = page.locator("[data-copy-whole]");
+  await expect(whole).toBeVisible();
+  await expect(whole).toContainText("Whole section");
+
+  await expect(page.locator(".copybtn")).toHaveCount(0);
+  await expect(page.locator(".section-body.has-copy")).toHaveCount(0);
+
+  await page.selectOption("[data-copy-mode]", "text");
+  const text = await copyWith(page, whole, "text");
+  expect(text).toContain("Yellowstone");
+  expect(text.length).toBeGreaterThan(200);
+});
+
 test("a table of contents gets no copy column", async ({ page }) => {
   // There is no statutory text on it to copy, and the toggle would govern
   // nothing.

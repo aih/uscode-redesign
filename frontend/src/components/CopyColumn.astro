@@ -38,13 +38,20 @@
  * is DOM insertion and the clipboard, which is what genuinely cannot happen
  * anywhere else.
  *
+ * ## The bar and the gutter are separate
+ *
+ * The bar appears wherever there is a section to copy. The gutter — the 1.75rem
+ * strip the icons hang in, opened by the `has-copy` class — appears only where
+ * there are identified subdivisions to hang icons on. More than half the Code's
+ * sections have none, and on those the bar's **Whole section** button is the
+ * whole control.
+ *
  * ## With scripting off
  *
  * Nothing appears. No dead buttons, no gutter reserved for controls that will
- * never arrive — the island adds the `has-copy` class that opens the gutter, so
- * the reading column is untouched until the widget is actually working. There
- * is no non-JavaScript way to write to the clipboard, so a control that ships
- * in the HTML would be a promise the page cannot keep.
+ * never arrive, and no bar. There is no non-JavaScript way to write to the
+ * clipboard, so a control that ships in the HTML would be a promise the page
+ * cannot keep.
  *
  * ## The trade
  *
@@ -318,10 +325,10 @@ const whole = targets[0] ?? null;
       wholeBtn.addEventListener("click", onClick);
     }
 
-    if (injected === 0) return;
-    // Only now: the gutter the buttons sit in is opened by this class, so a
-    // page where nothing could be injected keeps its full reading measure.
-    body.classList.add("has-copy");
+    // Nothing to offer at all. Otherwise the bar is shown, and the gutter is
+    // opened only when a button was injected into it — see the docstring.
+    if (!wholeBtn && injected === 0) return;
+    if (injected > 0) body.classList.add("has-copy");
     root.hidden = false;
   }
 

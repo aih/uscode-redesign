@@ -10,9 +10,9 @@ covers:
 
 ## Copying a provision
 
-Beside each provision inside a section is a copy control in the gutter. The section as a whole has
-a **Whole section** button in the bar above the text, and beside that button a **mode** that says
-what copying means:
+Beside each lettered or numbered provision inside a section is a copy control in the gutter. The
+section as a whole has a **Whole section** button in the bar above the text, and beside that button
+a **mode** that says what copying means:
 
 - **Text** — the words alone.
 - **Citation** — `16 U.S.C. § 45f(c)(5)`, computed by the server from the identifier.
@@ -24,6 +24,22 @@ what copying means:
 The mode is remembered. For the one-off exception, hold a modifier as you click: <kbd>Shift</kbd>
 for the citation, <kbd>Alt</kbd> for both, <kbd>Ctrl</kbd>/<kbd>⌘</kbd> for a link — for that click
 only, without disturbing the setting.
+
+A section with no lettered or numbered subdivisions — one block of text under its heading — has the
+bar and its **Whole section** button, and no gutter.
+
+```scenario
+id: copy-a-section-with-no-subdivisions
+title: Copy a section that has no subdivisions
+needs:
+  clipboard: true
+steps:
+  - goto: /app/us/usc/t16/s21
+  - expect: { selector: ".copybtn", count: 0 }
+  - expect: { selector: ".copycol__whole", visible: true }
+  - click: .copycol__whole
+  - expect: { selector: ".copycol__status", contains: "Text copied" }
+```
 
 The copy controls need JavaScript. With scripting off the whole column is absent, gutter and bar
 alike.
