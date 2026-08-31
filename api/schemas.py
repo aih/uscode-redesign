@@ -29,10 +29,10 @@ from storage import (
     TitleInfo,
     TocEntry,
     TocResult,
+    VersionLawRef,
     WatchlistItemRef,
     WatchlistRef,
 )
-from storage.repository import VersionLawRef
 
 
 class ReleaseOut(BaseModel):

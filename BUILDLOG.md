@@ -3146,3 +3146,8 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - The ordering fix both ways: swapping the first two groups' `first_release_id` in a never-committed session leaves the order unchanged (re-adding the old `order_by(ReleasePoint.seq)` makes that test fail — checked, then reverted); and against the full local corpus, § 45f's newest group reports `first_seen` 119-99 with `releases[0]` 117-80 and still sorts last — ADR-0066's measured case, skipped on the CI corpus.
   - s2201's arriving group answers `change_kind='text'`, `attribution='classified'`, law (119, 102) with `in_classification`, `in_source_credit` and action `new`, at the repository and through `GET /api/v1/sections/us/usc/t16/s2201/versions`.
   - Re-check with `uv run pytest tests/test_versions.py`.
+
+### 086a — review fixes (PR #62, same session)
+
+- The fresh-context review returned three quality cleanups, no correctness bugs; all applied. `VersionLawRef` is exported from `storage/__init__.py` (the boundary was widened for exactly this) and `api/schemas.py` takes it from the `from storage import (...)` block like its siblings. Each `published[version_id]` list is sorted once after the map query, so the sort key reads `published[id][0][0]` and `releases` uses the list directly — the "earliest mapped release" is derived in one place. `_version_changes` keys the laws by `to_version_id` alongside the change rows, so `_change_fields` takes a plain law list and one key space.
+- Verified: `make test` 842 passed / 2 skipped, including the old-ordering failure check re-run against the single-sourced sort key.

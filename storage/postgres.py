@@ -679,6 +679,8 @@ class PostgresRepository:
             .where(SectionVersion.section_id == section.id)
         ).all():
             published.setdefault(version_id, []).append((seq, label))
+        for mapped in published.values():
+            mapped.sort()
 
         changes, laws = self._version_changes(section.id)
 
@@ -695,10 +697,7 @@ class PostgresRepository:
         # deterministic.
         rows.sort(
             key=lambda row: (
-                min(
-                    (seq for seq, _label in published.get(row[0].id, [])),
-                    default=row[1].seq,
-                ),
+                published[row[0].id][0][0] if row[0].id in published else row[1].seq,
                 row[0].id,
             )
         )
@@ -707,12 +706,14 @@ class PostgresRepository:
                 content_hash=version.content_hash.hex(),
                 first_seen=self._ref(first_release),
                 releases=tuple(
-                    label for _seq, label in sorted(published.get(version.id, []))
+                    label for _seq, label in published.get(version.id, [])
                 ),
                 num=version.num,
                 heading=version.heading,
                 status=version.status,
-                **self._change_fields(changes.get(version.id), laws),
+                **self._change_fields(
+                    changes.get(version.id), laws.get(version.id, [])
+                ),
             )
             for version, first_release in rows
         ]
@@ -720,9 +721,9 @@ class PostgresRepository:
     def _version_changes(
         self, section_id: int
     ) -> tuple[dict[int, SectionVersionChange], dict[int, list[VersionLawRef]]]:
-        """The section's change rows keyed by arriving version, and their
-        attributed laws keyed by change id (ADR-0074). Both empty on a corpus
-        that was loaded but never back-filled."""
+        """The section's change rows and their attributed laws, both keyed by
+        the arriving version id (ADR-0074). Both empty on a corpus that was
+        loaded but never back-filled."""
         changes = {
             change.to_version_id: change
             for change in self._session.scalars(
@@ -733,19 +734,18 @@ class PostgresRepository:
         }
         laws: dict[int, list[VersionLawRef]] = {}
         if changes:
+            version_of = {
+                change.id: change.to_version_id for change in changes.values()
+            }
             for law in self._session.scalars(
                 select(SectionVersionChangeLaw)
-                .where(
-                    SectionVersionChangeLaw.change_id.in_(
-                        change.id for change in changes.values()
-                    )
-                )
+                .where(SectionVersionChangeLaw.change_id.in_(version_of.keys()))
                 .order_by(
                     SectionVersionChangeLaw.pl_congress,
                     SectionVersionChangeLaw.pl_num,
                 )
             ):
-                laws.setdefault(law.change_id, []).append(
+                laws.setdefault(version_of[law.change_id], []).append(
                     VersionLawRef(
                         pl_congress=law.pl_congress,
                         pl_num=law.pl_num,
@@ -759,7 +759,7 @@ class PostgresRepository:
 
     @staticmethod
     def _change_fields(
-        change: SectionVersionChange | None, laws: dict[int, list[VersionLawRef]]
+        change: SectionVersionChange | None, laws: list[VersionLawRef]
     ) -> dict:
         """`SectionVersionInfo`'s annotation kwargs — all `None` (and no laws)
         when the version group has no change row."""
@@ -772,7 +772,7 @@ class PostgresRepository:
             "status_changed": change.status_changed,
             "concurrent": change.concurrent,
             "attribution": change.attribution,
-            "laws": tuple(laws.get(change.id, ())),
+            "laws": tuple(laws),
         }
 
     # ----------------------------------------------------------------- internals
