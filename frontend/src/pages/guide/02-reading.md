@@ -122,6 +122,9 @@ steps:
 They are four columns on a window 640 pixels or wider, two from 400 pixels, and one below that.
 Each heading names the list beneath it, so a screen reader can move between the four groups.
 
+Below the links, every page names who built the site and links to a profile page outside it,
+beside the disclaimer and the commit the site is running.
+
 ```scenario
 id: footer-groups
 title: The site's own links are grouped at the foot of the page
@@ -132,6 +135,8 @@ steps:
     caption: Browse, Learn, Developers, Site.
   - expect: { selector: '.footnav ul[aria-labelledby="footnav-developers"]', contains: "API documentation" }
     caption: The API reference is under Developers.
+  - expect: { selector: ".doc-meta--byline", contains: "Ari Hershowitz" }
+    caption: Under them, who built the site.
 ```
 
 The header menu opens over the page rather than pushing it down, so the text stays where it was.

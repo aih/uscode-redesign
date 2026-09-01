@@ -3279,3 +3279,22 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `make shots` green over **56 PNGs** (52 + the four `version-data` ones), no horizontal overflow at 320 CSS px or at 1280 zoomed to 200%.
   - **The page reconciles on screen, not only in the test:** its `<tfoot>` reads 489,738 / 65,938 / 32,893 / 72,469 / 318,438 / 16,201 / 49.25%, which is the artifact's corpus block, summed from the 56 rows above it. `?sort=rows` leads with title 42 (136,213), `?sort=classified` with title 9 (100.00%), and title 18a's attribution share renders as an em dash in every order.
   - **Two failures on the first pass of each browser suite were flake, re-run to confirm.** The a11y run overlapping the docker rebuild failed six corpus-driven scans in `375px dark` and `1280px light`; a clean run passed all 344. The e2e run's `preview.spec.ts:68` timed out waiting 3s for the 300ms-delayed hover card; it passed on the re-run. The one real e2e failure was the ratchet doing its job — `chrome.spec.ts`'s footer test lists every footer href by hand, so the new link had to be declared there (and the test renamed from ten links to eleven).
+
+## 093 — 2026-09-01 — Session 71: a byline on every page
+
+- **Tool/model:** Claude Code, Opus 5. Branch `c5-version-data-page`, continuing from `4494c73`.
+- **Asked:** Put a link about Ari Hershowitz on the site, pointing at aih.github.io, easily visible without competing with the reader — "This site was built by Ari Hershowitz (profile), lawyer and legal technologist", the profile link marked as leaving the site.
+- **Decided:**
+  - **The footer's secondary section, not the nav.** The nav groups are behind `.footmenu`, a `<details>` that is closed below 64em (ADR-0058), and a byline in there would be a sentence a phone reader has to open a menu to find. The secondary band is the one part of the footer outside the disclosure — it already carries the disclaimer and the commit line — so the byline is on every page at every width with nothing to open. `.doc-meta--byline` takes the same `-0.5rem` top margin as `.doc-meta--commit`, so the three lines read as one block.
+  - **`usa-link--external`**, which is where the off-site arrow comes from: USWDS's `external-link()` mixin appends the launch icon and inherits `currentColor`, so it inverts with the theme like the two commit-line links beside it.
+  - **The About page says the same sentence.** It carried a different one — "The initial build was designed by Ari Hershowitz (see profile at aih.github.io)" — with an unbalanced closing paren left over from an earlier edit. Both surfaces now say "This site was built by Ari Hershowitz (profile), lawyer and legal technologist"; About keeps the clause about how it was implemented.
+  - **No new scenario, one new assertion.** The claim is a fact about a band of the footer, not a walkthrough, so it rides on `footer-groups` (guide chapter 02) rather than becoming a scene of its own.
+- **Found:** the guide's footer section still says **nine links under four headings** and lists nine; the footer has carried eleven since ADR-0067's classification tables and ADR-0076's version-change data, and `chrome.spec.ts` asserts eleven by href. Left as it stands — it is that section's own drift, not this change's.
+- **Produced:** `frontend/src/components/SiteFooter.astro`, `frontend/src/pages/about.astro`, `frontend/src/styles/site.scss` (`.doc-meta--byline`), `frontend/src/pages/guide/02-reading.md`, this entry.
+- **Verified:**
+  - `make test-web` **457 passed**, unchanged.
+  - The three footer specs in `chrome.spec.ts` and the `footer-groups` guide scenario pass against a dev server carrying the change (`SITE=http://localhost:4399 npx playwright test`); the eleven-href list is untouched, since the byline is outside `.footnav`.
+  - axe-core over `footer` on `/app/about` at 1280 in both themes: **clean**, `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`.
+  - No horizontal overflow at 320 CSS px or 1280-at-200% on `/app/about`, `/app/` and `/app/data/version-changes` — `scrollWidth` against `clientWidth`, the assertion `make shots` makes.
+  - Rendered in both themes at 1280 and at 375: the arrow draws, the line wraps at the phone width, and the link inverts with the theme.
+
