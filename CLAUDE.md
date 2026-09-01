@@ -498,7 +498,8 @@ rows** (`docs/verification/version-changes.json`), every share within 2.5 points
 ADR-0074's recorded cost, not the ~160 ADR-0021 pairs. `load_release` keeps the rows current;
 `deploy/update-corpus.sh` runs `version-changes` after a load that loaded something **or on a
 `--force` sweep**, and `--reattribute` after a classification load that actually changed a table;
-the deployed box owes the migration and the one-time backfill (`docs/deploy-status.md`).
+the deployed box is back-filled too — 2026-09-01, 1,295s, and every leaf of its own report matches
+the development corpus's but `generated_at` (`docs/deploy-status.md`).
 `SectionVersionInfo` and `VersionOut` carry the annotations additively — `change_kind`,
 `text_changed`, `notes_changed`, `status_changed`, `concurrent`, `attribution` and a `laws` list,
 all `None`/empty on a corpus with no change rows — and `versions()` orders groups by the earliest

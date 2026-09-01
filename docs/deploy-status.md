@@ -6,8 +6,10 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-08-31 — the version-change annotations (ADR-0074) owe the box a migration
-and a one-time backfill; see [Still owed](#still-owed). Before that, 2026-08-19 — the site was down
+**Last updated:** 2026-09-01 — the version-change annotations (ADR-0074) are back-filled on the box,
+489,738 change rows in 1,295s, and its report agrees with the development corpus's on every leaf but
+`generated_at`; see [Still owed](#still-owed), which now holds nothing outstanding. Before that,
+2026-08-31 — that backfill was owed. Before that, 2026-08-19 — the site was down
 for about ten hours and every alarm read `OK`;
 see [The outage](#the-outage-2026-08-19-adr-0073). Before that, 2026-08-13 — the classification rows
 are loaded on the box (144,837 of them) and the pages that serve them were waiting on a deploy; that
@@ -67,9 +69,10 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-**One thing is waiting on a merge:** the classification tables, in [Still owed](#still-owed).
-Nothing in this section is blocking — the demo video (ADR-0038) is live and everything else here
-was already done.
+**Nothing.** [Still owed](#still-owed) is a record of finished work as of 2026-09-01 — the
+classification tables and the pages that serve them, and the ADR-0074 version-change backfill.
+Nothing in this section is blocking either: the demo video (ADR-0038) is live and everything else
+here was already done.
 
 - **The demo video is live**, at
   [`/app/demo`](https://uscode.linkedlegislation.org/app/demo). `s3://uscode-mirror-dreamproit/usc/demo/`
@@ -518,41 +521,50 @@ that mean something is actually wrong — with `count_mismatches` printed rather
 
 ## Still owed
 
-**The version-change annotations (ADR-0074) need a migration and a one-time backfill on the box.**
-The next deploy applies migration `b6e1f0a2c9d4` (`deploy-on-box.sh` runs `alembic upgrade head`):
-`text_hash`/`notes_hash` on `section_versions`, plus `section_version_changes` and
-`section_version_change_laws` — all empty on the box, since it was seeded by `pg_restore` from a
-pre-ADR-0074 dump. Filling them re-parses every stored fragment for its hashes: 7m50s on the
-development machine for the corpus's 489,738 versions (`docs/verification/version-changes.json`);
-the t4g is slower, so budget tens of minutes. Once the deploy has landed, run it by hand through
-SSM:
+**The version-change annotations (ADR-0074) are on the box.** Migration `b6e1f0a2c9d4` landed with
+the 2026-08-31 deploy (`deploy-on-box.sh` runs `alembic upgrade head`), and the one-time backfill
+ran 2026-09-01 against the box at `45a581f`:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec -T api \
-    uv run python -m ingest version-changes
+    uv run python -m ingest version-changes --report --out /app/data/manifests
 ```
 
-The subcommand's flags are unchanged by the hardening round (`--title`, `--recompute`,
-`--reattribute`, `--report`, `--out`, `--quiet`), so this is still the command — **without
-`--quiet`**, which the earlier version of this note carried. `--quiet` passes `on_event=None`,
-which is the per-title progress line, the every-tenth-batch elapsed line, and the warning that
-`classification_entries` is empty. For a supervised run that a deploy can kill at any point, those
-lines are how you know where it got to and therefore that resuming is enough; the scheduled run in
-`update-corpus.sh` keeps `--quiet` because its output is a log file nobody reads on the happy path.
+**65,938 sections, 489,738 change rows, 30,250 law rows, 489,738 hashes back-filled in 1,295s** —
+21m35s, against 7m50s on the development machine. The site stayed up throughout: load average
+peaked at 1.43, `/app/us/usc/t16/s45f` answered in 0.54s and `/api/v1/status` in 0.26s.
 
-Resumable — an interrupted run continues where it stopped, and `--title` bounds a run to one title.
-Run it when nothing is deploying: a deploy recreates the `api` container and kills the `exec`, the
-ADR-0035 cost the reindex met above. A kill lands between committed batches, so what is written
-stays written; the one case resuming cannot repair is a section whose rows were rewritten in part —
-the resume skip is a change-row/version-group count equality (ADR-0074), which sees a missing row
-and not a stale one — and `--title N --recompute` on the title that was in flight settles it. Until
-the backfill has run, the first `update-corpus.sh` chain that loads
-anything runs the whole backfill itself — the post-load `version-changes` step skips only sections
-whose rows are complete — which the hand run keeps out of a scheduled window; a weekly `--force`
-sweep now runs that step too, so an interrupted backfill is repaired within the week rather than
-waiting for OLRC to publish. `--report` on the box writes
-`docs/verification/version-changes.json` there; the repo's committed copy is the development
-corpus's, the `database.json` rule.
+`--report` writes to `/app/data/manifests` rather than its `docs/verification/` default, which
+exists only inside the container and goes with the next image recreate; that path is the
+host-mounted volume, so the artifact is at `/var/lib/uscode/manifests/version-changes.json` on the
+box. The repo's committed copy stays the development corpus's, the `database.json` rule. **Every
+leaf of the box's report matches the committed one but `generated_at`** — `by_kind` counts and
+shares, `change_rows`, `concurrent` 77,596, `law_rows` 30,250, `text_classified` 16,201 at 49.25%,
+`transitions` 423,800 — which is two independently loaded corpora agreeing on the annotations.
+
+Re-check it on the box with the attribution split, which is the artifact's numbers from the rows
+themselves:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T db psql -U uscode -d uscode -At -F'|' \
+    -c "select change_kind, attribution, count(*) from section_version_changes group by 1,2 order by 1,2"
+```
+
+Or from outside: `/api/v1/sections/us/usc/t16/s777c/versions` carries eight `classified` text
+transitions, each naming a law that is both in the classification tables and newly in the section's
+source credit, and `/app/versions/us/usc/t16/s777c` renders all 43 entries with `data-change-kind`
+and the `Pub. L. 113–159` chips (EN DASH).
+
+The command is resumable — an interrupted run continues where it stopped, and `--title` bounds a
+run to one title. Run it when nothing is deploying: a deploy recreates the `api` container and
+kills the `exec`, the ADR-0035 cost the reindex met above. A kill lands between committed batches,
+so what is written stays written; the one case resuming cannot repair is a section whose rows were
+rewritten in part — the resume skip is a change-row/version-group count equality (ADR-0074), which
+sees a missing row and not a stale one — and `--title N --recompute` on the title that was in
+flight settles it. `--quiet` is deliberately absent: it passes `on_event=None`, which is the
+per-title progress line, the every-tenth-batch elapsed line, and the warning that
+`classification_entries` is empty. The scheduled run in `update-corpus.sh` keeps the flag, because
+its output is a log file nobody reads on the happy path.
 
 **The classification rows are on the box; the pages that serve them are not.** Run 2026-08-13
 through SSM against the running `api` container, which already carried the loader (the box is at
