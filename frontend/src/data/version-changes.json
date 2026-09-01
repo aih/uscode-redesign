@@ -1,0 +1,590 @@
+{
+  "by_kind": {
+    "initial": {
+      "count": 65938,
+      "share": null
+    },
+    "notes": {
+      "count": 72469,
+      "share": 0.171
+    },
+    "structure": {
+      "count": 318438,
+      "share": 0.7514
+    },
+    "text": {
+      "count": 32893,
+      "share": 0.0776
+    }
+  },
+  "change_rows": 489738,
+  "concurrent": 77596,
+  "generated_at": "2026-08-31T21:21:49.605309+00:00",
+  "law_rows": 30250,
+  "per_title": {
+    "1": {
+      "by_kind": {
+        "initial": 39,
+        "notes": 63,
+        "structure": 73,
+        "text": 10
+      },
+      "text_classified": 6,
+      "text_classified_share": 0.6
+    },
+    "10": {
+      "by_kind": {
+        "initial": 5171,
+        "notes": 6939,
+        "structure": 12864,
+        "text": 4294
+      },
+      "text_classified": 3328,
+      "text_classified_share": 0.775
+    },
+    "11": {
+      "by_kind": {
+        "initial": 280,
+        "notes": 400,
+        "structure": 712,
+        "text": 74
+      },
+      "text_classified": 47,
+      "text_classified_share": 0.6351
+    },
+    "12": {
+      "by_kind": {
+        "initial": 2159,
+        "notes": 2151,
+        "structure": 7163,
+        "text": 581
+      },
+      "text_classified": 170,
+      "text_classified_share": 0.2926
+    },
+    "13": {
+      "by_kind": {
+        "initial": 71,
+        "notes": 61,
+        "structure": 149,
+        "text": 5
+      },
+      "text_classified": 2,
+      "text_classified_share": 0.4
+    },
+    "14": {
+      "by_kind": {
+        "initial": 855,
+        "notes": 515,
+        "structure": 1193,
+        "text": 376
+      },
+      "text_classified": 341,
+      "text_classified_share": 0.9069
+    },
+    "15": {
+      "by_kind": {
+        "initial": 2773,
+        "notes": 2876,
+        "structure": 17033,
+        "text": 1159
+      },
+      "text_classified": 414,
+      "text_classified_share": 0.3572
+    },
+    "16": {
+      "by_kind": {
+        "initial": 5297,
+        "notes": 4938,
+        "structure": 27661,
+        "text": 2177
+      },
+      "text_classified": 649,
+      "text_classified_share": 0.2981
+    },
+    "17": {
+      "by_kind": {
+        "initial": 153,
+        "notes": 109,
+        "structure": 457,
+        "text": 27
+      },
+      "text_classified": 22,
+      "text_classified_share": 0.8148
+    },
+    "18": {
+      "by_kind": {
+        "initial": 1420,
+        "notes": 1510,
+        "structure": 5768,
+        "text": 325
+      },
+      "text_classified": 185,
+      "text_classified_share": 0.5692
+    },
+    "18a": {
+      "by_kind": {
+        "initial": 26,
+        "notes": 1,
+        "structure": 21
+      },
+      "text_classified": 0,
+      "text_classified_share": null
+    },
+    "19": {
+      "by_kind": {
+        "initial": 1233,
+        "notes": 1552,
+        "structure": 4062,
+        "text": 501
+      },
+      "text_classified": 106,
+      "text_classified_share": 0.2116
+    },
+    "2": {
+      "by_kind": {
+        "initial": 1689,
+        "notes": 1866,
+        "structure": 4848,
+        "text": 793
+      },
+      "text_classified": 203,
+      "text_classified_share": 0.256
+    },
+    "20": {
+      "by_kind": {
+        "initial": 2625,
+        "notes": 2486,
+        "structure": 9726,
+        "text": 1113
+      },
+      "text_classified": 413,
+      "text_classified_share": 0.3711
+    },
+    "21": {
+      "by_kind": {
+        "initial": 811,
+        "notes": 974,
+        "structure": 3967,
+        "text": 570
+      },
+      "text_classified": 299,
+      "text_classified_share": 0.5246
+    },
+    "22": {
+      "by_kind": {
+        "initial": 3709,
+        "notes": 4130,
+        "structure": 16675,
+        "text": 1258
+      },
+      "text_classified": 485,
+      "text_classified_share": 0.3855
+    },
+    "23": {
+      "by_kind": {
+        "initial": 179,
+        "notes": 290,
+        "structure": 483,
+        "text": 189
+      },
+      "text_classified": 169,
+      "text_classified_share": 0.8942
+    },
+    "24": {
+      "by_kind": {
+        "initial": 202,
+        "notes": 137,
+        "structure": 256,
+        "text": 32
+      },
+      "text_classified": 20,
+      "text_classified_share": 0.625
+    },
+    "25": {
+      "by_kind": {
+        "initial": 2451,
+        "notes": 2416,
+        "structure": 8033,
+        "text": 1618
+      },
+      "text_classified": 89,
+      "text_classified_share": 0.055
+    },
+    "26": {
+      "by_kind": {
+        "initial": 2261,
+        "notes": 3136,
+        "structure": 11750,
+        "text": 2056
+      },
+      "text_classified": 1338,
+      "text_classified_share": 0.6508
+    },
+    "27": {
+      "by_kind": {
+        "initial": 61,
+        "notes": 25,
+        "structure": 70,
+        "text": 4
+      },
+      "text_classified": 0,
+      "text_classified_share": 0.0
+    },
+    "28": {
+      "by_kind": {
+        "initial": 817,
+        "notes": 935,
+        "structure": 2374,
+        "text": 95
+      },
+      "text_classified": 45,
+      "text_classified_share": 0.4737
+    },
+    "29": {
+      "by_kind": {
+        "initial": 981,
+        "notes": 1211,
+        "structure": 3294,
+        "text": 511
+      },
+      "text_classified": 170,
+      "text_classified_share": 0.3327
+    },
+    "3": {
+      "by_kind": {
+        "initial": 66,
+        "notes": 91,
+        "structure": 130,
+        "text": 19
+      },
+      "text_classified": 2,
+      "text_classified_share": 0.1053
+    },
+    "30": {
+      "by_kind": {
+        "initial": 672,
+        "notes": 645,
+        "structure": 2223,
+        "text": 151
+      },
+      "text_classified": 37,
+      "text_classified_share": 0.245
+    },
+    "31": {
+      "by_kind": {
+        "initial": 503,
+        "notes": 692,
+        "structure": 1948,
+        "text": 145
+      },
+      "text_classified": 100,
+      "text_classified_share": 0.6897
+    },
+    "32": {
+      "by_kind": {
+        "initial": 81,
+        "notes": 73,
+        "structure": 201,
+        "text": 15
+      },
+      "text_classified": 14,
+      "text_classified_share": 0.9333
+    },
+    "33": {
+      "by_kind": {
+        "initial": 1693,
+        "notes": 1638,
+        "structure": 4981,
+        "text": 798
+      },
+      "text_classified": 524,
+      "text_classified_share": 0.6566
+    },
+    "34": {
+      "by_kind": {
+        "initial": 804,
+        "notes": 909,
+        "structure": 2449,
+        "text": 245
+      },
+      "text_classified": 208,
+      "text_classified_share": 0.849
+    },
+    "35": {
+      "by_kind": {
+        "initial": 176,
+        "notes": 247,
+        "structure": 474,
+        "text": 32
+      },
+      "text_classified": 7,
+      "text_classified_share": 0.2188
+    },
+    "36": {
+      "by_kind": {
+        "initial": 1185,
+        "notes": 237,
+        "structure": 2249,
+        "text": 86
+      },
+      "text_classified": 77,
+      "text_classified_share": 0.8953
+    },
+    "37": {
+      "by_kind": {
+        "initial": 268,
+        "notes": 265,
+        "structure": 679,
+        "text": 433
+      },
+      "text_classified": 402,
+      "text_classified_share": 0.9284
+    },
+    "38": {
+      "by_kind": {
+        "initial": 1214,
+        "notes": 1817,
+        "structure": 5347,
+        "text": 993
+      },
+      "text_classified": 624,
+      "text_classified_share": 0.6284
+    },
+    "39": {
+      "by_kind": {
+        "initial": 183,
+        "notes": 278,
+        "structure": 409,
+        "text": 32
+      },
+      "text_classified": 29,
+      "text_classified_share": 0.9062
+    },
+    "4": {
+      "by_kind": {
+        "initial": 47,
+        "notes": 36,
+        "structure": 82,
+        "text": 6
+      },
+      "text_classified": 5,
+      "text_classified_share": 0.8333
+    },
+    "40": {
+      "by_kind": {
+        "initial": 458,
+        "notes": 419,
+        "structure": 1266,
+        "text": 103
+      },
+      "text_classified": 70,
+      "text_classified_share": 0.6796
+    },
+    "41": {
+      "by_kind": {
+        "initial": 241,
+        "notes": 301,
+        "structure": 648,
+        "text": 95
+      },
+      "text_classified": 58,
+      "text_classified_share": 0.6105
+    },
+    "42": {
+      "by_kind": {
+        "initial": 8939,
+        "notes": 10748,
+        "structure": 110417,
+        "text": 6109
+      },
+      "text_classified": 2076,
+      "text_classified_share": 0.3398
+    },
+    "43": {
+      "by_kind": {
+        "initial": 1585,
+        "notes": 1415,
+        "structure": 4122,
+        "text": 280
+      },
+      "text_classified": 66,
+      "text_classified_share": 0.2357
+    },
+    "44": {
+      "by_kind": {
+        "initial": 385,
+        "notes": 440,
+        "structure": 914,
+        "text": 179
+      },
+      "text_classified": 162,
+      "text_classified_share": 0.905
+    },
+    "45": {
+      "by_kind": {
+        "initial": 335,
+        "notes": 347,
+        "structure": 851,
+        "text": 43
+      },
+      "text_classified": 17,
+      "text_classified_share": 0.3953
+    },
+    "46": {
+      "by_kind": {
+        "initial": 1055,
+        "notes": 711,
+        "structure": 2643,
+        "text": 468
+      },
+      "text_classified": 347,
+      "text_classified_share": 0.7415
+    },
+    "47": {
+      "by_kind": {
+        "initial": 455,
+        "notes": 426,
+        "structure": 1199,
+        "text": 206
+      },
+      "text_classified": 64,
+      "text_classified_share": 0.3107
+    },
+    "48": {
+      "by_kind": {
+        "initial": 807,
+        "notes": 654,
+        "structure": 1469,
+        "text": 74
+      },
+      "text_classified": 25,
+      "text_classified_share": 0.3378
+    },
+    "49": {
+      "by_kind": {
+        "initial": 1405,
+        "notes": 1784,
+        "structure": 6046,
+        "text": 908
+      },
+      "text_classified": 770,
+      "text_classified_share": 0.848
+    },
+    "5": {
+      "by_kind": {
+        "initial": 1168,
+        "notes": 1717,
+        "structure": 4760,
+        "text": 426
+      },
+      "text_classified": 261,
+      "text_classified_share": 0.6127
+    },
+    "50": {
+      "by_kind": {
+        "initial": 1605,
+        "notes": 2318,
+        "structure": 5770,
+        "text": 970
+      },
+      "text_classified": 575,
+      "text_classified_share": 0.5928
+    },
+    "50a": {
+      "by_kind": {
+        "initial": 342,
+        "notes": 5,
+        "text": 9
+      },
+      "text_classified": 0,
+      "text_classified_share": 0.0
+    },
+    "51": {
+      "by_kind": {
+        "initial": 253,
+        "notes": 210,
+        "structure": 729,
+        "text": 63
+      },
+      "text_classified": 56,
+      "text_classified_share": 0.8889
+    },
+    "52": {
+      "by_kind": {
+        "initial": 171,
+        "notes": 200,
+        "structure": 175,
+        "text": 13
+      },
+      "text_classified": 9,
+      "text_classified_share": 0.6923
+    },
+    "54": {
+      "by_kind": {
+        "initial": 366,
+        "notes": 544,
+        "structure": 682,
+        "text": 64
+      },
+      "text_classified": 47,
+      "text_classified_share": 0.7344
+    },
+    "5a": {
+      "by_kind": {
+        "initial": 93,
+        "notes": 105,
+        "structure": 114,
+        "text": 45
+      },
+      "text_classified": 0,
+      "text_classified_share": 0.0
+    },
+    "6": {
+      "by_kind": {
+        "initial": 593,
+        "notes": 707,
+        "structure": 3922,
+        "text": 409
+      },
+      "text_classified": 244,
+      "text_classified_share": 0.5966
+    },
+    "7": {
+      "by_kind": {
+        "initial": 3074,
+        "notes": 3176,
+        "structure": 11593,
+        "text": 1509
+      },
+      "text_classified": 783,
+      "text_classified_share": 0.5189
+    },
+    "8": {
+      "by_kind": {
+        "initial": 420,
+        "notes": 557,
+        "structure": 1266,
+        "text": 194
+      },
+      "text_classified": 38,
+      "text_classified_share": 0.1959
+    },
+    "9": {
+      "by_kind": {
+        "initial": 33,
+        "notes": 36,
+        "structure": 48,
+        "text": 3
+      },
+      "text_classified": 3,
+      "text_classified_share": 1.0
+    }
+  },
+  "sections_covered": 65938,
+  "text_classified": 16201,
+  "text_classified_share": 0.4925,
+  "transitions": 423800,
+  "version_groups_hashed": 489738,
+  "version_groups_total": 489738
+}
