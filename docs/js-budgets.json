@@ -10,6 +10,7 @@
     "/app/classification": 36000,
     "/app/classification/[congress]": 36000,
     "/app/classification/ecct": 18500,
+    "/app/data/version-changes": 18500,
     "/app/demo": 18500,
     "/app/design": 39500,
     "/app/diff": 20000,

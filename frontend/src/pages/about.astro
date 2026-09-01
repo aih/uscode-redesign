@@ -5,7 +5,7 @@
  */
 import Base from "../layouts/Base.astro";
 import { setPublicCache } from "../lib/cache";
-import { APP, syntaxHref } from "../lib/url";
+import { APP, syntaxHref, versionDataHref } from "../lib/url";
 
 setPublicCache(Astro.response.headers, null, false);
 ---
@@ -83,6 +83,14 @@ setPublicCache(Astro.response.headers, null, false);
       <a href={syntaxHref()}>
         <span class="toc__heading">
           Search and citation syntax — how to use the search box on each page
+        </span>
+      </a>
+    </li>
+    <li>
+      <a href={versionDataHref()}>
+        <span class="toc__heading">
+          Version changes — how this site classifies a change between two versions of a section,
+          and what the corpus contains
         </span>
       </a>
     </li>

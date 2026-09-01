@@ -130,6 +130,16 @@
       "name": "the Editorial Classification Change Table"
     },
     {
+      "id": "version-data",
+      "path": "/app/data/version-changes",
+      "name": "the version-change data — three tables of counts, the widest of them 56 rows by 8 columns in a scroll region (ADR-0076)"
+    },
+    {
+      "id": "version-data-sorted",
+      "path": "/app/data/version-changes?sort=classified-desc",
+      "name": "the same table re-sorted — a column heading carrying aria-sort=\"descending\""
+    },
+    {
       "id": "guide-index",
       "path": "/app/guide",
       "name": "user guide index"
