@@ -17,6 +17,20 @@
  * The copy is a copy because `docker-compose.prod.yml` builds the reader with
  * `build: ./frontend`, so nothing under `docs/` exists at image-build time.
  *
+ * ## What is dated, and how
+ *
+ * Every count and share comes from the artifact, and `generated_at` is printed
+ * beside them, so the numbers and the date they were true of move together.
+ *
+ * Four facts do not come from the artifact, because it does not carry them:
+ * **58 titles, 381 release points, `119-102not101`, 12 July 2026**. They are
+ * written out under `The corpus`, as `/app/about` writes them out, and they go
+ * stale when a further release point is loaded — at which point the report is
+ * regenerated too, so the sentence to correct is beside the date that makes it
+ * checkable. Putting the release-point coverage into the report itself is the
+ * fix that removes the hand-written half, and it is a change to
+ * `ingest/version_changes.py` rather than to this page.
+ *
  * ## The sort is server-side
  *
  * `?sort=` in `SortBar`'s vocabulary, resolved here, so a sorted table is
@@ -238,6 +252,12 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
 
   <h2 class="toc-group">The corpus</h2>
 
+  <p>
+    These figures describe the corpus as it stood on <strong>{generatedLabel}</strong>:
+    {formatCount(report.sections_covered)} sections across 58 titles, loaded from the OLRC downloads
+    at 381 release points, the newest of them <code>119-102not101</code>, published 12 July 2026.
+  </p>
+
   <div class="uslm-tablewrap" role="region" tabindex="0" aria-label="Corpus-wide totals">
     <table class="usa-table usa-table--striped vdata">
       <caption>Corpus-wide totals</caption>
@@ -391,29 +411,31 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
   <h2 class="toc-group">Where these numbers come from</h2>
 
   <p>
-    The figures on this page are read from a committed file. Nothing here queries the database, so
-    the page renders the same on an empty machine as on the deployed one.
+    Nothing on this page queries the database. The figures are read from a file committed to the
+    repository, so the page renders the same on an empty machine as on the deployed one.
   </p>
 
   <ul>
     <li>
-      Generated <strong>{generatedLabel}</strong> by
-      <code>python -m ingest version-changes --report</code>.
+      Written on <strong>{generatedLabel}</strong> by
+      <code>python -m ingest version-changes --report</code>, which recomputes every figure above
+      from the stored rows.
     </li>
     <li>
       Committed as <code>docs/verification/version-changes.json</code> and copied to
-      <code>frontend/src/data/version-changes.json</code>, which this page reads. A browser test
-      fails the build when the two differ.
+      <code>frontend/src/data/version-changes.json</code>, which this page reads. A test in the
+      browser suite fails the build when the two differ.
     </li>
     <li>
-      The corpus described is the development corpus, loaded from the OLRC downloads on the machine
-      the site is built on.
+      The corpus described is the one loaded on the machine this site is built from. The deployed
+      site's corpus was loaded and back-filled separately, on 2026-09-01, and its own report matched
+      this one on every figure above.
     </li>
   </ul>
 
   <p>
-    The deployed site's own corpus was loaded and back-filled separately, on 2026-09-01. Its report
-    matches this one on every figure above.
+    Loading a further release point moves these figures. Nothing on this page recomputes them: they
+    are replaced when the report is run again, and they are correct as of {generatedLabel}.
   </p>
 
   <p class="doc-meta">
