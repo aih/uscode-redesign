@@ -24,6 +24,10 @@
  * of the disclosure: it is the sentence a reader who arrived from a search
  * engine most needs, and it stays on screen.
  *
+ * The byline naming who built the site sits in the secondary section beside
+ * the disclaimer and the commit line, outside the disclosure, so it is on
+ * every page at every width without a menu to open.
+ *
  * They are in four named groups — Browse, Learn, Developers, Site
  * (ADR-0063). Each label is a real `<h2>` naming its own list, so the groups
  * are headings a screen reader can jump between rather than type set to look
@@ -152,6 +156,12 @@ const commitUrl = commitHash !== "unknown" ? `${repoUrl}/commit/${commitHash}` :
         A conceptual redesign of the Office of the Law Revision Counsel's site, built from the
         official USLM downloads. Not an official publication of the United States government.
         <a href={`${APP}/about`}>More about this site</a>.
+      </p>
+      <p class="doc-meta doc-meta--byline">
+        This site was built by Ari Hershowitz (<a
+          class="usa-link usa-link--external"
+          rel="noopener"
+          href="https://aih.github.io">profile</a>), lawyer and legal technologist.
       </p>
       <p class="doc-meta doc-meta--commit">
         Source: <a class="usa-link usa-link--external" rel="noopener" href={repoUrl}>github.com/aih/uscode-redesign</a>{" "}

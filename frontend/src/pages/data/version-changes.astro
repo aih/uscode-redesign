@@ -193,9 +193,8 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
     A Public Law is incorporated at a release point when its number is at or below the release
     point's own and it is not among that release point's excluded laws. The laws newly incorporated
     across a transition are the difference between those two sets. Release point labels do not
-    describe what a release point contains, so the sets are computed rather than read off the two
-    labels: the text change between <code>116-344not283u1</code> and <code>116-344</code> is Pub. L.
-    116–283 entering, a law below both labels.
+    describe what a release point contains: the text change between <code>116-344not283u1</code> and
+    <code>116-344</code> is Pub. L. 116–283 entering, a law below both labels.
   </p>
 
   <p>
@@ -239,7 +238,7 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
 
   <h2 class="toc-group">The corpus</h2>
 
-  <div class="table-scroll">
+  <div class="uslm-tablewrap" role="region" tabindex="0" aria-label="Corpus-wide totals">
     <table class="usa-table usa-table--striped vdata">
       <caption>Corpus-wide totals</caption>
       <thead>
@@ -263,7 +262,7 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
     </table>
   </div>
 
-  <div class="table-scroll">
+  <div class="uslm-tablewrap" role="region" tabindex="0" aria-label="Change rows by kind">
     <table class="usa-table usa-table--striped vdata">
       <caption>Change rows by kind</caption>
       <thead>
@@ -413,9 +412,8 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
   </ul>
 
   <p>
-    The deployed site's own corpus was back-filled separately, on 2026-09-01, and reported the same
-    values on every figure above. Two independently loaded corpora produce the same classification
-    of the same 423,800 transitions.
+    The deployed site's own corpus was loaded and back-filled separately, on 2026-09-01. Its report
+    matches this one on every figure above.
   </p>
 
   <p class="doc-meta">

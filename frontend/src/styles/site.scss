@@ -2486,6 +2486,13 @@ main[id] {
   margin-top: -0.5rem;
 }
 
+// The byline in the footer's secondary section. It sits in the same block as
+// the disclaimer above it and the commit line below, so it takes the same
+// negative top margin rather than reading as a paragraph of its own.
+.doc-meta--byline {
+  margin-top: -0.5rem;
+}
+
 .doc-meta__rp {
   color: var(--ink);
   font-weight: 700;
@@ -5653,6 +5660,14 @@ dialog.palette {
  * so this is not a classification fix, it is the fix that page always needed. */
 .apidocs__intro code,
 .endpoint__prose code {
+  overflow-wrap: anywhere;
+}
+
+/* The same fix, opted into one span at a time, for a code span in ordinary
+ * prose. `/app/about`'s `load_dataset("dreamproit/uscode", "current",
+ * split="train")` is 317px at 320 CSS px — one unbreakable word 13px wider than
+ * the document, which is what `make shots` measured (WCAG 1.4.10). */
+.code-wrap {
   overflow-wrap: anywhere;
 }
 

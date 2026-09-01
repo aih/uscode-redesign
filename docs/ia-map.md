@@ -15,7 +15,7 @@ ratchet uses, reading `frontend/src/pages/` from disk. The chapter column is eac
 cd frontend && npx vitest run tests/guide.test.ts
 
 # every inbound link, with the file and line that makes it
-cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|syntaxHref|settingsHref|loginHref|signupHref|previewHref|classificationHref|classificationEcctHref|\$\{APP\}/' pages components layouts
+cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|syntaxHref|settingsHref|loginHref|signupHref|previewHref|classificationHref|classificationEcctHref|versionDataHref|\$\{APP\}/' pages components layouts
 ```
 
 `Base.astro`'s props are what "chrome" means in the last column: `crumbs` (breadcrumb trail),

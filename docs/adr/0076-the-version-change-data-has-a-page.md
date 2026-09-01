@@ -123,7 +123,9 @@ timeline used to have eleven had no page to go to.
   0 and renders a `null` share as an em dash; both are asserted rather than
   eyeballed.
 
-- **The per-title table has eight columns and scrolls below about 700px.** It is
-  in the keyboard-reachable `role="region"` with an accessible name that
-  `docs/a11y/known-violations.json` already carries two unfixed instances of;
-  this is not a third.
+- **The per-title table has eight columns and scrolls on a narrow window.** All
+  three tables are in a `role="region"` with `tabindex="0"` and an accessible
+  name — `docs/a11y/known-violations.json` already carries two scrollable
+  regions with no keyboard route in, owned by tasks A4 and A10, and these are
+  not a third. The cost is a tab stop per table at every width, which is
+  `ClassificationTable`'s existing bargain.
