@@ -2486,6 +2486,13 @@ main[id] {
   margin-top: -0.5rem;
 }
 
+// The byline in the footer's secondary section. It sits in the same block as
+// the disclaimer above it and the commit line below, so it takes the same
+// negative top margin rather than reading as a paragraph of its own.
+.doc-meta--byline {
+  margin-top: -0.5rem;
+}
+
 .doc-meta__rp {
   color: var(--ink);
   font-weight: 700;
@@ -5259,6 +5266,47 @@ dialog.palette {
   color: inherit;
 }
 
+/* ------------------------------------------- the version-change data page
+ *
+ * `/app/data/version-changes` (ADR-0076): three tables of counts, one of them
+ * 56 rows by 8 columns. The sort links are `.classtable__sortlink` above —
+ * the same control, and a second copy of it would be a second thing to keep
+ * right.
+ *
+ * `th[aria-sort]` is repainted here for ADR-0071's reason: USWDS gives it a
+ * fixed `$theme-table-sorted-background-color`, #97d4ea, in the light theme
+ * only, and applies it to `aria-sort="none"` as well as to the two real
+ * directions. */
+.vdata {
+  font-size: 0.9rem;
+}
+
+.vdata thead th[aria-sort] {
+  background-color: var(--panel);
+}
+
+/* Counts and percentages, aligned on their last digit so a column can be read
+ * down. `tabular-nums` is what keeps the digits in columns at all — the
+ * interface face's default figures are proportional. */
+.vdata__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vdata--titles tbody th,
+.vdata--titles tfoot th {
+  white-space: nowrap;
+}
+
+/* The corpus totals, under the 56 rows that sum to them. Ruled off rather than
+ * shaded: the striping already owns the row backgrounds. */
+.vdata tfoot th,
+.vdata tfoot td {
+  border-top: 2px solid var(--edge);
+  font-weight: 700;
+}
+
 /* --------------------------------------------------------- filter pills
  *
  * The filters in force, each with the same view minus itself. `.sortbar` beside
@@ -5612,6 +5660,14 @@ dialog.palette {
  * so this is not a classification fix, it is the fix that page always needed. */
 .apidocs__intro code,
 .endpoint__prose code {
+  overflow-wrap: anywhere;
+}
+
+/* The same fix, opted into one span at a time, for a code span in ordinary
+ * prose. `/app/about`'s `load_dataset("dreamproit/uscode", "current",
+ * split="train")` is 317px at 320 CSS px — one unbreakable word 13px wider than
+ * the document, which is what `make shots` measured (WCAG 1.4.10). */
+.code-wrap {
   overflow-wrap: anywhere;
 }
 

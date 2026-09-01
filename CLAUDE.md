@@ -36,12 +36,12 @@ Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 36 route entries (one expanding to
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 38 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and
 fourteen interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
 (ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
 (ADR-0058), both navbar dropdowns (ADR-0061), the command palette (ADR-0062) and the open
-classification lookup (ADR-0067) — **329 scans**,
+classification lookup (ADR-0067) — **343 scans**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -337,15 +337,35 @@ common prefix. Two consequences of making comparisons ordinary: the reader's dif
 **8/0.5s → 20/1s**, and the tests that empty that bucket moved to a Playwright project of their own
 that runs last, because the bucket is global and every worker shares one address.
 
-`make test` = **851** Python tests; `make test-web` = **437** frontend tests; `make test-e2e` = **648**
-Playwright tests, 330 of which are the accessibility scan (**all three are required** — reader
+**The version-change data has a page, fed by a synced artifact** (ADR-0076,
+`docs/version-data-page-spec.md`). `/app/data/version-changes` says how a transition between two
+stored versions is classified and attributed, then shows what the corpus contains: the corpus-wide
+totals, the four kinds with their shares, and all **56** titles that have change rows in four
+orders. It **reaches no data** — the property ADR-0053 gave `/app/design` — so the axe matrix,
+`make shots` and a guide scenario treat it as a fixed target on any corpus. The figures come from
+`frontend/src/data/version-changes.json`, **a copy** of `docs/verification/version-changes.json`
+made by `make sync-verification`: the reader image builds from `./frontend` and nothing under
+`docs/` is in that context, so importing across the boundary gives a working dev server and an image
+that does not build. `frontend/tests/versiondata.test.ts` fails on drift and asserts the
+reconciliation — the 56 rows sum to all four kind counts, to `change_rows` and to `text_classified`.
+The corpus is **58** titles; **11a and 28a hold no sections at any release point**, which is why the
+table is 56 rows and why the page says so. Three shapes a naive renderer gets wrong, all in
+`lib/versiondata.ts`: `by_kind` is sparse (**18a has no `text` key, 50a no `structure`**), a share is
+`null` wherever its denominator is zero (`by_kind.initial.share`, 18a's `text_classified_share`) and
+is rendered as a dash, and a title number is a string (gotcha 16). `SortBar`'s `activeKey` **read the
+classification vocabulary by name** and gave every other value to `pl`; it now strips the `-desc`
+suffix. A count column's forward direction is largest first, since `SortBar` sends an option that is
+not in force to its own forward direction.
+
+`make test` = **851** Python tests; `make test-web` = **457** frontend tests; `make test-e2e` = **663**
+Playwright tests, 344 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(74 ADRs, numbered to 0075 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(75 ADRs, numbered to 0076 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -705,7 +725,7 @@ make test-e2e   # playwright: what only a browser can answer — the theme toggl
                 # end — plus every scenario block in the user guide, run as a test
                 # (ADR-0038). Needs `make dev-all` running.
 make shots      # headless screenshots at 375, 1280, 320 and 1280-at-200%-zoom → docs/screenshots/
-                # (48 PNGs). Fails if a page scrolls sideways at any of them — WCAG 1.4.10 and
+                # (56 PNGs). Fails if a page scrolls sideways at any of them — WCAG 1.4.10 and
                 # 1.4.4 — with the same known-violations ratchet as make test-a11y (ADR-0039)
 make demo-video # replay the guide's `demo: true` scenarios with their captions on screen
                 # → docs/demo/uscode-demo.mp4 (gitignored) + .vtt/scenes.json (committed);

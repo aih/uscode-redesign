@@ -59,10 +59,15 @@ const {
   reversible = true,
 } = Astro.props as Props;
 
-// The classification vocabulary's two keys carry their direction in the same
-// string (`code-desc`), so the key in force is the prefix. Without a direction
-// the sort *is* the key.
-const activeKey = reversible ? (sort.startsWith("code") ? "code" : "pl") : sort;
+// A reversible sort carries its direction in the same string (`code-desc`), so
+// the key in force is what is left with the suffix taken off. Without a
+// direction the sort *is* the key.
+//
+// This used to read the classification vocabulary's two keys by name, which
+// gave every unrecognised value to `pl`. The version-change data page
+// (ADR-0076) sorts on four keys of its own; stripping the suffix is the same
+// answer for `pl`/`code` and the right one for any other vocabulary.
+const activeKey = reversible ? sort.replace(/-desc$/u, "") : sort;
 const descending = reversible && sort.endsWith("-desc");
 const labelId = `${idPrefix}-label`;
 ---

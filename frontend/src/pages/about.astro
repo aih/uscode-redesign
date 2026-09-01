@@ -5,7 +5,7 @@
  */
 import Base from "../layouts/Base.astro";
 import { setPublicCache } from "../lib/cache";
-import { APP, syntaxHref } from "../lib/url";
+import { APP, syntaxHref, versionDataHref } from "../lib/url";
 
 setPublicCache(Astro.response.headers, null, false);
 ---
@@ -87,6 +87,14 @@ setPublicCache(Astro.response.headers, null, false);
       </a>
     </li>
     <li>
+      <a href={versionDataHref()}>
+        <span class="toc__heading">
+          Version changes — how this site classifies a change between two versions of a section,
+          and what the corpus contains
+        </span>
+      </a>
+    </li>
+    <li>
       <a
         class="usa-link usa-link--external"
         rel="noopener"
@@ -124,7 +132,8 @@ setPublicCache(Astro.response.headers, null, false);
     plain text, its verbatim USLM XML, its citation, its place in the Code's hierarchy, and its
     release-point metadata. The dataset is refreshed when OLRC publishes a new release point.
     With the Python <code>datasets</code> library, {" "}
-    <code>load_dataset("dreamproit/uscode", "current", split="train")</code> loads the current
+    <code class="code-wrap">load_dataset("dreamproit/uscode", "current", split="train")</code> loads
+    the current
     text of every section; the dataset card documents both configurations field by field.
   </p>
 
@@ -134,10 +143,11 @@ setPublicCache(Astro.response.headers, null, false);
       class="usa-link usa-link--external"
       rel="noopener"
       href="https://github.com/aih/uscode-redesign">github.com/aih/uscode-redesign</a
-    >. The initial build was designed by Ari Hershowitz (see profile at <a
+    >. This site was built by Ari Hershowitz (<a
       class="usa-link usa-link--external"
       rel="noopener"
-      href="https://aih.github.io">aih.github.io</a>), and implemented with Claude Code (primarily) and Gemini.)
+      href="https://aih.github.io">profile</a>), lawyer and legal technologist, and implemented with
+    Claude Code (primarily) and Gemini.
   </p>
 
   <p class="doc-meta">

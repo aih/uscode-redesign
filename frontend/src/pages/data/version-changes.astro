@@ -1,0 +1,426 @@
+---
+/**
+ * `/app/data/version-changes` — how this site classifies a version change, and
+ * what the corpus turned out to contain (ADR-0074, ADR-0076).
+ *
+ * ## It reaches no data
+ *
+ * The figures come from `src/data/version-changes.json`, a copy of
+ * `docs/verification/version-changes.json` kept equal by `make
+ * sync-verification` and `tests/versiondata.test.ts`. No API call, no database,
+ * no release point — the same property `/app/design` has (ADR-0053), and for
+ * the same payoff: `make shots` and the axe matrix treat the page as a fixed
+ * target, and the guide's scenario can assert its content in CI, where the
+ * fixture corpus is Title 16 at two release points and could never produce
+ * these numbers.
+ *
+ * The copy is a copy because `docker-compose.prod.yml` builds the reader with
+ * `build: ./frontend`, so nothing under `docs/` exists at image-build time.
+ *
+ * ## The sort is server-side
+ *
+ * `?sort=` in `SortBar`'s vocabulary, resolved here, so a sorted table is
+ * citable by its address alone and the page keeps a zero-JavaScript budget.
+ * The four sortable column headings are the same control (ADR-0071), with
+ * `aria-sort` on the one in force.
+ */
+import Base from "../../layouts/Base.astro";
+import SortBar from "../../components/SortBar.astro";
+import REPORT from "../../data/version-changes.json";
+import { setPublicCache } from "../../lib/cache";
+import { APP, versionDataHref } from "../../lib/url";
+import {
+  formatCount,
+  formatShare,
+  parseSort,
+  shareOf,
+  sortTitleRows,
+  titleRows,
+  type SortKey,
+  type VersionChangeReport,
+} from "../../lib/versiondata";
+
+/** Fixed markup with no per-reader content and no release point to pin it to. */
+setPublicCache(Astro.response.headers, null, false);
+
+const report = REPORT as unknown as VersionChangeReport;
+const rows = titleRows(report);
+const sort = parseSort(Astro.url.searchParams.get("sort"));
+const sorted = sortTitleRows(rows, sort);
+
+const activeKey = sort.replace(/-desc$/u, "") as SortKey;
+const descending = sort.endsWith("-desc");
+
+const SORT_OPTIONS = [
+  { key: "title", label: "Title", ascending: "Code order", descending: "reversed" },
+  { key: "rows", label: "Change rows", ascending: "most first", descending: "fewest first" },
+  { key: "text", label: "Text changes", ascending: "most first", descending: "fewest first" },
+  {
+    key: "classified",
+    label: "Attributed",
+    ascending: "largest share first",
+    descending: "smallest share first",
+  },
+];
+
+/** Which column each sortable heading orders by. The other four hold counts the
+ *  page does not offer an order for; a heading that announced itself sortable
+ *  with no control behind it would be worse than a plain one. */
+const SORTABLE: Record<string, SortKey> = {
+  Title: "title",
+  "Change rows": "rows",
+  Text: "text",
+  Attributed: "classified",
+};
+
+const COLUMNS = [
+  "Title",
+  "Change rows",
+  "Initial",
+  "Text",
+  "Notes",
+  "Structure",
+  "Text classified",
+  "Attributed",
+];
+
+function ariaSort(key: SortKey | undefined): "ascending" | "descending" | "none" | undefined {
+  if (key === undefined) return undefined;
+  if (key !== activeKey) return "none";
+  return descending ? "descending" : "ascending";
+}
+
+/** The heading's own link reverses the order when its column is the one in
+ *  force, and otherwise takes the table to that column's first direction. */
+function headingHref(key: SortKey): string {
+  if (key !== activeKey) return versionDataHref(key);
+  return versionDataHref(descending ? key : `${key}-desc`);
+}
+
+const KIND_MEANING: Record<string, string> = {
+  initial: "The first version of a section, which arrived from nothing",
+  text: "The reading text differs",
+  notes: "The notes or the source credit differ, and the reading text does not",
+  structure: "Neither the reading text nor the notes differ",
+};
+
+const generated = new Date(report.generated_at);
+const generatedLabel = generated.toISOString().slice(0, 10);
+const concurrentShare = shareOf(report.concurrent, report.transitions);
+
+const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] = [
+  { label: "Sections covered", count: report.sections_covered, share: null },
+  { label: "Version groups", count: report.version_groups_total, share: null },
+  { label: "Transitions between version groups", count: report.transitions, share: null },
+  { label: "Change rows", count: report.change_rows, share: null },
+  {
+    label: `Text changes attributed to a Public Law, of ${formatCount(report.by_kind.text.count)}`,
+    count: report.text_classified,
+    share: report.text_classified_share,
+  },
+  { label: "Public Law attributions recorded", count: report.law_rows, share: null },
+  {
+    label: `Transitions marked concurrent, of ${formatCount(report.transitions)}`,
+    count: report.concurrent,
+    share: concurrentShare,
+  },
+];
+---
+
+<Base title="Version changes in this corpus · U.S. Code">
+  <h1 class="doc-title">Version changes in this corpus</h1>
+
+  <p class="lede">
+    How this site decides what changed between two versions of a section, which Public Law it
+    attributes a change of text to, and what the whole corpus contains once every transition has
+    been classified.
+  </p>
+
+  <h2 class="toc-group">Version groups and transitions</h2>
+
+  <p>
+    The Code republishes every title at every release point whether or not anything in it changed.
+    This site stores one copy of each distinct text a section has had and points every release
+    point that published it at that copy. Each of those copies is a <strong>version group</strong>,
+    and a <strong>transition</strong> is the move from one to the next.
+  </p>
+
+  <p>
+    Version groups are ordered by the earliest release point each is mapped to. A section's
+    earliest group has nothing before it and is recorded as <code>initial</code>; every later group
+    records the transition that produced it. The <strong>window</strong> of a transition runs from
+    the last release point mapped to the departing group to the first release point mapped to the
+    arriving group.
+  </p>
+
+  <h2 class="toc-group">How a transition is classified</h2>
+
+  <p>
+    Two digests are stored for every version group: a hash of the section's reading text and a hash
+    of its notes and source credit. Both are taken with all whitespace removed. The transition is
+    classified from the two comparisons, in this order:
+  </p>
+
+  <ul>
+    <li>
+      <code>text</code> — the reading text differs. The heading is part of the reading text, so a
+      change to it is a text change.
+    </li>
+    <li><code>notes</code> — the notes or the source credit differ and the reading text does not.</li>
+    <li>
+      <code>structure</code> — neither differs. The stored XML changed in some other way: attribute
+      drift from the converter, element-boundary whitespace, a <code>@style</code> or
+      <code>@class</code> value.
+    </li>
+  </ul>
+
+  <p>
+    A whitespace-only change to statutory text is classified <code>structure</code>. The reader's
+    redline treats such a change the same way.
+  </p>
+
+  <p>
+    A transition is marked <strong>concurrent</strong> when the two groups' release ranges overlap,
+    or when a third group is mapped to a release point inside the window. Both shapes mean the
+    window runs across release points the departing group did not hold, so the window arithmetic —
+    and the attribution that depends on it — is unreliable. The version history says so on the
+    entries concerned.
+  </p>
+
+  <h2 class="toc-group">How a text change is attributed</h2>
+
+  <p>
+    A Public Law is incorporated at a release point when its number is at or below the release
+    point's own and it is not among that release point's excluded laws. The laws newly incorporated
+    across a transition are the difference between those two sets. Release point labels do not
+    describe what a release point contains: the text change between <code>116-344not283u1</code> and
+    <code>116-344</code> is Pub. L. 116–283 entering, a law below both labels.
+  </p>
+
+  <p>
+    Those laws are matched against the <a href={`${APP}/classification`}>classification tables</a>,
+    which record which provision of which Public Law was classified to which Code section. A
+    transition with at least one matching row that is not a note classification is recorded as
+    <code>classified</code>, and the matched laws are listed against it. A transition whose text
+    changed with nothing matching is recorded as <code>none</code>: no classifying statute is
+    recorded for it, and no law is inferred.
+  </p>
+
+  <p>
+    A section that first appears part-way through the corpus is attributed from the previous loaded
+    release point of its title, so a <code>new</code> classification row in that window attributes
+    the section's creation. A section present at the earliest loaded release point of its title
+    gets no window and no attribution.
+  </p>
+
+  <h2 class="toc-group">Limitations</h2>
+
+  <ul>
+    <li>
+      <strong>Attribution reaches {formatShare(report.text_classified_share)} of text changes.</strong
+      > The classification tables begin at the 104th Congress; a provision last amended before then
+      has no row to match. Editorial moves recorded in the Editorial Classification Change Table
+      are not consulted.
+    </li>
+    <li>
+      <strong
+        >{formatCount(report.concurrent)} transitions ({formatShare(concurrentShare)}) are marked
+        concurrent.</strong
+      > Most are content that recurs — a converter serialization variant, or a revert — rather than
+      the sections the source publishes twice under one identifier. Window arithmetic is unreliable
+      on those transitions.
+    </li>
+    <li>
+      <strong>The digests carry no version of their own.</strong> A change to how the reading text
+      is extracted would redefine what every stored hash means. Rebuilding them is a full recompute.
+    </li>
+  </ul>
+
+  <h2 class="toc-group">The corpus</h2>
+
+  <div class="uslm-tablewrap" role="region" tabindex="0" aria-label="Corpus-wide totals">
+    <table class="usa-table usa-table--striped vdata">
+      <caption>Corpus-wide totals</caption>
+      <thead>
+        <tr>
+          <th scope="col">Figure</th>
+          <th scope="col" class="vdata__num">Count</th>
+          <th scope="col" class="vdata__num">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          CORPUS_FIGURES.map((figure) => (
+            <tr>
+              <th scope="row">{figure.label}</th>
+              <td class="vdata__num">{formatCount(figure.count)}</td>
+              <td class="vdata__num">{formatShare(figure.share)}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="uslm-tablewrap" role="region" tabindex="0" aria-label="Change rows by kind">
+    <table class="usa-table usa-table--striped vdata">
+      <caption>Change rows by kind</caption>
+      <thead>
+        <tr>
+          <th scope="col">Kind</th>
+          <th scope="col">Meaning</th>
+          <th scope="col" class="vdata__num">Rows</th>
+          <th scope="col" class="vdata__num">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          (["initial", "text", "notes", "structure"] as const).map((kind) => (
+            <tr>
+              <th scope="row"><code>{kind}</code></th>
+              <td>{KIND_MEANING[kind]}</td>
+              <td class="vdata__num">{formatCount(report.by_kind[kind].count)}</td>
+              <td class="vdata__num">{formatShare(report.by_kind[kind].share)}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <p class="doc-meta">
+    The share is of the {formatCount(report.transitions)} transitions. An <code>initial</code> row
+    has no share: it is an arrival with no departure, one per section covered.
+  </p>
+
+  <h2 class="toc-group">By title</h2>
+
+  <p>
+    {formatCount(rows.length)} titles have change rows. The corpus holds 58; titles 11a and 28a
+    carry no sections at any release point, so they have no version groups to report. The rows below
+    sum to the corpus totals above.
+  </p>
+
+  <SortBar
+    options={SORT_OPTIONS}
+    sort={sort}
+    href={(option: string) => versionDataHref(option)}
+    label="Order the titles"
+    idPrefix="vdata-sort"
+  />
+
+  <div
+    class="uslm-tablewrap vdata__wrap"
+    role="region"
+    tabindex="0"
+    aria-label="Change rows by title"
+  >
+    <table class="usa-table usa-table--striped vdata vdata--titles">
+      <caption>Change rows by title</caption>
+      <thead>
+        <tr>
+          {
+            COLUMNS.map((column) => {
+              const key = SORTABLE[column];
+              const on = key !== undefined && key === activeKey;
+              const numeric = column !== "Title";
+              return (
+                <th
+                  scope="col"
+                  aria-sort={ariaSort(key)}
+                  class={numeric ? "vdata__num" : undefined}
+                >
+                  {key === undefined ? (
+                    column
+                  ) : (
+                    <a
+                      class={`classtable__sortlink${on ? " classtable__sortlink--on" : ""}`}
+                      href={headingHref(key)}
+                      data-sort-column={key}
+                    >
+                      {column}
+                      <span class="classtable__arrow" aria-hidden="true">
+                        {on ? (descending ? "▼" : "▲") : "↕"}
+                      </span>
+                      <span class="usa-sr-only">
+                        {on
+                          ? descending
+                            ? ", sorted descending. Sort ascending"
+                            : ", sorted ascending. Sort descending"
+                          : ", sort by this column"}
+                      </span>
+                    </a>
+                  )}
+                </th>
+              );
+            })
+          }
+        </tr>
+      </thead>
+      <tbody>
+        {
+          sorted.map((row) => (
+            <tr>
+              <th scope="row">{row.num}</th>
+              <td class="vdata__num">{formatCount(row.changeRows)}</td>
+              <td class="vdata__num">{formatCount(row.initial)}</td>
+              <td class="vdata__num">{formatCount(row.text)}</td>
+              <td class="vdata__num">{formatCount(row.notes)}</td>
+              <td class="vdata__num">{formatCount(row.structure)}</td>
+              <td class="vdata__num">{formatCount(row.textClassified)}</td>
+              <td class="vdata__num">{formatShare(row.textClassifiedShare)}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row">All {formatCount(rows.length)}</th>
+          <td class="vdata__num">{formatCount(report.change_rows)}</td>
+          <td class="vdata__num">{formatCount(report.by_kind.initial.count)}</td>
+          <td class="vdata__num">{formatCount(report.by_kind.text.count)}</td>
+          <td class="vdata__num">{formatCount(report.by_kind.notes.count)}</td>
+          <td class="vdata__num">{formatCount(report.by_kind.structure.count)}</td>
+          <td class="vdata__num">{formatCount(report.text_classified)}</td>
+          <td class="vdata__num">{formatShare(report.text_classified_share)}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <h2 class="toc-group">Where these numbers come from</h2>
+
+  <p>
+    The figures on this page are read from a committed file. Nothing here queries the database, so
+    the page renders the same on an empty machine as on the deployed one.
+  </p>
+
+  <ul>
+    <li>
+      Generated <strong>{generatedLabel}</strong> by
+      <code>python -m ingest version-changes --report</code>.
+    </li>
+    <li>
+      Committed as <code>docs/verification/version-changes.json</code> and copied to
+      <code>frontend/src/data/version-changes.json</code>, which this page reads. A browser test
+      fails the build when the two differ.
+    </li>
+    <li>
+      The corpus described is the development corpus, loaded from the OLRC downloads on the machine
+      the site is built on.
+    </li>
+  </ul>
+
+  <p>
+    The deployed site's own corpus was loaded and back-filled separately, on 2026-09-01. Its report
+    matches this one on every figure above.
+  </p>
+
+  <p class="doc-meta">
+    The method is written up as ADR-0074 and <code>docs/version-semantics-spec.md</code> in the{" "}
+    <a class="usa-link usa-link--external" rel="noopener" href="https://github.com/aih/uscode-redesign"
+      >repository</a
+    >. The annotations are shown per section on each{" "}
+    <a href={`${APP}/versions/us/usc/t16/s45f`}>version history</a> page.
+  </p>
+</Base>

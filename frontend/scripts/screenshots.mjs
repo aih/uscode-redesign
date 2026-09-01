@@ -51,6 +51,10 @@ const PAGES = [
   // source data — the widest table on the site, and the one most likely to push
   // a phone sideways, which is what the overflow assertion below is for.
   ["classification", "/app/classification/118/2"],
+  // Session 92: the version-change data (ADR-0076). Three tables of counts, the
+  // widest 56 rows by 8 columns — and it renders the same on any corpus, so
+  // unlike every other shot here it is a fixed target.
+  ["version-data", "/app/data/version-changes"],
 ];
 
 /**
