@@ -101,11 +101,23 @@ timeline used to have eleven had no page to go to.
   `version-changes --report` run that does not also run `make sync-verification`
   leaves a working tree whose page and whose artifact disagree.
 
-- **The numbers describe the corpus at one moment.** `generated_at` is on the
-  page, and nothing recomputes it: a corpus load moves the real figures and the
+- **The numbers describe the corpus at one moment, and the page says which.**
+  `generated_at` is printed above the tables and again under the provenance
+  heading, so a reader is told the figures are correct as of that date and no
+  later. Nothing recomputes them: a corpus load moves the real figures and the
   page keeps saying what the last report said until someone re-runs it. The
   deployed box runs `version-changes` from `update-corpus.sh` (ADR-0074) but
   writes no report and could not commit one if it did.
+
+- **Four facts on the page are hand-written, because the artifact does not carry
+  them:** 58 titles, 381 release points, `119-102not101`, 12 July 2026. They
+  name the extent of the corpus the figures describe, which is what makes the
+  counts mean anything, and `/app/about` writes the same facts out for the same
+  reason. They go stale when a further release point is loaded — at which point
+  the report is regenerated too, so the sentence to correct sits beside the date
+  that makes it checkable. Putting release-point coverage into the report is the
+  change that removes the hand-written half, and it belongs in
+  `ingest/version_changes.py`.
 
 - **The claim that the deployed corpus agrees is dated, not continuous.** It was
   true on 2026-09-01, recorded in BUILDLOG 091 and `docs/deploy-status.md`, and
