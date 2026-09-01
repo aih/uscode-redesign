@@ -420,6 +420,34 @@ def test_forcing_a_re_load_replaces_rows_that_hash_the_same(factory, pages):
 
         assert result.action == "replaced"
         assert not set(session.scalars(select(ClassificationEntry.id))) & before
+        # …and it says so: the rows are new, the content is not. This is the
+        # distinction deploy/update-corpus.sh reads to decide whether the
+        # version timeline's law attributions need redoing (ADR-0074), which
+        # `action` cannot carry because it is "replaced" either way.
+        assert result.content_changed is False
+
+
+@pytest.mark.integration
+def test_content_changed_tracks_the_source_and_not_the_load(factory, pages):
+    parsed = _parse(pages, "tbl118pl_2nd.htm")
+    with factory() as session:
+        first = cls.load_file(session, parsed)
+        session.commit()
+        assert first.action == "inserted"
+        assert first.content_changed is True
+
+        # Same text, no force: skipped by the content gate.
+        unchanged = cls.load_file(session, parsed)
+        session.commit()
+        assert unchanged.action == "unchanged"
+        assert unchanged.content_changed is False
+
+        # Different text: a real edit, however it was reached.
+        trimmed = _trimmed(pages, "tbl118pl_2nd.htm", drop=2)
+        edited = cls.load_file(session, trimmed, force=True)
+        session.commit()
+        assert edited.action == "replaced"
+        assert edited.content_changed is True
 
 
 @pytest.mark.integration
@@ -487,6 +515,7 @@ def test_a_run_over_a_directory_loads_it_and_a_re_run_is_a_no_op(factory, pages,
     )
     assert first.sound
     assert first.loaded == 4
+    assert first.changed == 4
     assert first.rows_written > 100
 
     again = cls.run_classification_load(
@@ -498,6 +527,30 @@ def test_a_run_over_a_directory_loads_it_and_a_re_run_is_a_no_op(factory, pages,
     assert again.sound
     assert again.rows_written == 0
     assert again.loaded == 0
+    assert again.changed == 0
+
+
+@pytest.mark.integration
+def test_a_forced_sweep_loads_everything_and_reports_nothing_changed(
+    factory, pages, tmp_path
+):
+    """What `deploy/update-corpus.sh --force` sees on the 51 weeks a year OLRC
+    has edited nothing: every document reloaded, no document moved. The script
+    reattributes the version timeline's law rows (ADR-0074) on `changed`, not
+    on `loaded`, so the two have to be separable."""
+    common = dict(
+        from_dir=pages,
+        verification_dir=tmp_path / "verification",
+        manifest_path=tmp_path / "classification.json",
+    )
+    cls.run_classification_load(factory, **common)
+
+    swept = cls.run_classification_load(factory, force=True, **common)
+
+    assert swept.sound
+    assert swept.loaded == 4
+    assert swept.changed == 0
+    assert swept.rows_written > 100
 
 
 @pytest.mark.integration

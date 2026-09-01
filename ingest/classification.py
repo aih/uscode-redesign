@@ -1558,6 +1558,12 @@ class FileLoadResult:
     rows_written: int
     rows_deleted: int
     file_id: int | None = None
+    content_changed: bool = True
+    """Whether the extracted `<PRE>` text differs from the copy the registry
+    holds. `action` cannot answer this under `--force`, which reads `'replaced'`
+    whether or not OLRC edited the document; the caller that needs the
+    difference is `deploy/update-corpus.sh`, whose weekly forced sweep would
+    otherwise reattribute the whole version timeline (ADR-0074) every week."""
 
     @property
     def loaded(self) -> bool:
@@ -1595,7 +1601,8 @@ def load_file(
         )
     ).one_or_none()
 
-    unchanged = row is not None and row.content_hash == parsed.content_hash and not force
+    same_content = row is not None and row.content_hash == parsed.content_hash
+    unchanged = same_content and not force
     values = _registry_values(parsed)
 
     if row is None:
@@ -1619,6 +1626,7 @@ def load_file(
             rows_written=0,
             rows_deleted=0,
             file_id=row.id,
+            content_changed=False,
         )
 
     table = EcctEntryRow if parsed.kind == "ecct" else ClassificationEntryRow
@@ -1643,6 +1651,7 @@ def load_file(
         rows_written=len(payload),
         rows_deleted=deleted,
         file_id=row.id,
+        content_changed=not same_content,
     )
 
 
@@ -1719,6 +1728,16 @@ class ClassificationLoadReport:
         """Fetched, and its `<PRE>` text hashed the same — the second gate. Counted
         separately from `skipped`, which never asked for the file at all."""
         return sum(1 for result in self.results if not result.loaded)
+
+    @property
+    def changed(self) -> int:
+        """Documents whose `<PRE>` text really differs from the loaded copy.
+
+        The same as `loaded` on an ordinary run and not on a `--force` sweep,
+        which reloads every document it fetched. It is the honest answer to
+        "did a table move", which is what decides whether the version
+        timeline's law attributions need redoing (ADR-0074)."""
+        return sum(1 for result in self.results if result.content_changed)
 
     @property
     def sound(self) -> bool:

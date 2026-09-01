@@ -9,12 +9,6 @@
   after a fresh-context review of the merged V1 diff — decisions 7 and 9 and
   four costs.
 
-- **Owed:** `docs/verification/version-changes.json` predates decision 7's
-  second clause and reports `concurrent: 39,645` where the code now computes
-  **77,596**. Every other number in it is unchanged. Regenerate with
-  `python -m ingest version-changes --recompute --report` (3 minutes over the
-  full local corpus, hashes already stored).
-
 ## Context
 
 The version timeline groups a section's history by ADR-0007's content hash —
@@ -162,6 +156,18 @@ V3) can default to statutory changes with the full history one click away.
    poll to `--reattribute` on the deployed box is Phase V4
    (`deploy/update-corpus.sh`).
 
+   **The reattribution gate is "a table moved", not "a load ran"** (session 90).
+   `classification --force` ignores the content-hash gate, so on the weekly
+   sweep every fetched document reads as loaded whether or not OLRC edited it —
+   which reattributed all 30,250 law rows every week, and made a transient
+   failure there a red run on a week when nothing had happened.
+   `ClassificationLoadReport.changed` counts documents whose `<PRE>` text
+   really differs, the CLI prints it, and the script reads that. The same sweep
+   now runs the plain `version-changes` pass whether or not `load-all` loaded
+   anything: a half-finished backfill leaves sections with no change rows at
+   all, `versions()` degrades a missing annotation to `None`, and nothing else
+   surfaces it.
+
 ## Costs and limits, named
 
 - **The backfill parses every stored fragment once** (~423,800 transitions
@@ -204,15 +210,17 @@ V3) can default to statutory changes with the full history one click away.
   future work (the declined redirects table, ADR-0065).
 - **`concurrent` fires far beyond ADR-0021's duplicates.** The spec expected it
   to flag the 160 several-elements-per-identifier pairs; the corpus-wide
-  backfill flagged **39,645 of 423,800 transitions** under the first rule and
-  **77,596 (18.3%)** under decision 7's second clause, none of them on a
-  section with a same-release duplicate. The cause is content that *recurs*: a
-  mid-era converter serialization variant (or a genuine revert) maps a handful
-  of releases to a group whose neighbour spans releases on both sides, so the
-  ranges overlap and the model — one row per stored group, which cannot
+  backfill flags **77,596 of 423,800 transitions (18.3%)**, none of them on a
+  section with a same-release duplicate. Decision 7's first clause alone flagged
+  39,645; the second clause is what took it to 77,596. The cause is content
+  that *recurs*: a mid-era converter serialization variant (or a genuine
+  revert) maps a handful of releases to a group whose neighbour spans releases
+  on both sides, so the ranges overlap and the model — one row per stored
+  group, which cannot
   represent a third era of a twice-used content — reports a window running
   backwards (`119-102not101 → 114-139`). Flagging these unreliable is the
   design working as defined. Representing recurrence properly (a row per era
-  rather than per group) would be its own ADR; nothing else in the artifact
-  moved when the second clause landed — every other count, share and per-title
-  breakdown is identical.
+  rather than per group) would be its own ADR. The regenerated artifact
+  (session 90, `--recompute --report`, 112s) moves this number and nothing
+  else: 350 of its 352 leaf values are unchanged, `generated_at` being the
+  other.

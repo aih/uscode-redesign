@@ -115,6 +115,11 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   text hashes the same. `--force` ignores both, which is what the first load on a box and the
   weekly sweep want. `--session 0` is the 104th's whole-congress file.
 
+  The summary line ends `N with new content` — documents whose `<PRE>` text really differs from
+  the loaded copy, which under `--force` is not the same as `N loaded`. That is the count
+  `deploy/update-corpus.sh` reads to decide whether the version timeline's law attributions
+  need `version-changes --reattribute` (ADR-0074).
+
   `--from-file DIR` reads the index pages and the tables off disk instead — the offline path
   `make ci-data` uses. What the directory holds is what loads: a linked file it lacks is
   skipped, and a table it holds that no index page links is loaded with its covered range read

@@ -529,14 +529,28 @@ SSM:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec -T api \
-    uv run python -m ingest version-changes --quiet
+    uv run python -m ingest version-changes
 ```
+
+The subcommand's flags are unchanged by the hardening round (`--title`, `--recompute`,
+`--reattribute`, `--report`, `--out`, `--quiet`), so this is still the command — **without
+`--quiet`**, which the earlier version of this note carried. `--quiet` passes `on_event=None`,
+which is the per-title progress line, the every-tenth-batch elapsed line, and the warning that
+`classification_entries` is empty. For a supervised run that a deploy can kill at any point, those
+lines are how you know where it got to and therefore that resuming is enough; the scheduled run in
+`update-corpus.sh` keeps `--quiet` because its output is a log file nobody reads on the happy path.
 
 Resumable — an interrupted run continues where it stopped, and `--title` bounds a run to one title.
 Run it when nothing is deploying: a deploy recreates the `api` container and kills the `exec`, the
-ADR-0035 cost the reindex met above. Until it has run, the first `update-corpus.sh` chain that loads
+ADR-0035 cost the reindex met above. A kill lands between committed batches, so what is written
+stays written; the one case resuming cannot repair is a section whose rows were rewritten in part —
+the resume skip is a change-row/version-group count equality (ADR-0074), which sees a missing row
+and not a stale one — and `--title N --recompute` on the title that was in flight settles it. Until
+the backfill has run, the first `update-corpus.sh` chain that loads
 anything runs the whole backfill itself — the post-load `version-changes` step skips only sections
-whose rows are complete — which the hand run keeps out of a scheduled window. `--report` on the box writes
+whose rows are complete — which the hand run keeps out of a scheduled window; a weekly `--force`
+sweep now runs that step too, so an interrupted backfill is repaired within the week rather than
+waiting for OLRC to publish. `--report` on the box writes
 `docs/verification/version-changes.json` there; the repo's committed copy is the development
 corpus's, the `database.json` rule.
 

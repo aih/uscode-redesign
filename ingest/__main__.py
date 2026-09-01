@@ -731,10 +731,14 @@ def _cmd_classification(args: argparse.Namespace) -> int:
         on_event=None if args.quiet else print,
     )
 
+    # `changed` is the count deploy/update-corpus.sh reads: under --force every
+    # fetched document is "loaded" whether or not OLRC edited it, and
+    # reattributing the version timeline (ADR-0074) on that would be a
+    # whole-corpus rewrite every week.
     print(
         f"\n{report.links_seen} documents linked: {report.loaded} loaded, "
         f"{report.unchanged} unchanged, {len(report.skipped)} skipped, "
-        f"{len(report.failures)} failed"
+        f"{len(report.failures)} failed, {report.changed} with new content"
     )
     print(
         f"{report.rows_written:,} rows written in {report.elapsed_seconds:.1f}s; "
