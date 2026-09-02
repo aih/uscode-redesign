@@ -126,6 +126,14 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   from its own header. Point `--out`/`--manifest` somewhere disposable when doing that, or a
   fixture slice overwrites the artifacts describing the real files.
 
+- `--probe-ecct` — also request every archived Editorial Classification Change Table name below
+  the newest session the index pages know (`ecct_{congress}-{session}.html` and `.htm`, back to
+  the 104th), whether or not an index page links it; ~60 requests once, a 404 is recorded in the
+  summary rather than failed. Network runs only. `scripts/ecct_wayback.py` is the companion for
+  sessions OLRC overwrote without archiving: it harvests the Wayback Machine's captures of
+  `ecct.html` into `data/classification/wayback/`, which `--from-file` then loads
+  (`docs/ecct-research.md`).
+
 ## python -m ingest classification-check
   The daily poll for the tables (ADR-0067 decision 5). One request to tables.shtml; writes a
   `classification_source_checks` row whatever happens — a sibling of `source_checks` and not a

@@ -537,7 +537,10 @@ Change Table is consulted and gives a third value, `editorial`, with `in_ecct`/`
 law row (migration `c7e2a9f4b1d0`); `build_report` carries `attribution_by_kind`, `by_release` and
 `coverage`, and `/app/data/version-changes` renders them when the artifact does — **the committed
 artifact predates them until `version-changes --recompute --report` and `make sync-verification`
-are run over the full corpus, and the box wants `--reattribute`.**
+are run over the full corpus, and the box wants `--reattribute`.** **The ECCT's earlier sessions are unresolved**
+(`docs/ecct-research.md`): the loader found two documents, its naming pattern was stricter than an
+archived copy might be, and OLRC was unreachable from the session that looked; `classification
+--probe-ecct` and `scripts/ecct_wayback.py` are built and untested against the network.
 
 **Two specs are written and not built: `docs/redis-caching-spec.md` (a Postgres-side corpus
 generation bumped by triggers and read first on every request, so a Redis response cache, the

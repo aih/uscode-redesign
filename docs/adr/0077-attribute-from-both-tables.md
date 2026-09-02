@@ -126,7 +126,10 @@ classification rows on that kind is 0%.
   corpus that is still owed.
 - The ECCT covers the 119th Congress and records the moves made while classifying new laws; OLRC
   says the moves made while preparing a main edition or supplement are accounted for in Table III
-  instead. The page's limitation says both.
+  instead. The page's limitation says both. Whether earlier sessions' tables exist under archived
+  names or only as Wayback captures could not be checked from this session's container;
+  `docs/ecct-research.md` records what was checked, and `classification --probe-ecct` and
+  `scripts/ecct_wayback.py` are the two ways to find out.
 - `_ecct_rows` reads the whole table once per batch of 200 sections and matches in Python. At 21
   rows that is nothing; at a table three orders of magnitude larger it would want an indexed
   query, and the indexes for it exist (`ix_ecct_entries_*`).

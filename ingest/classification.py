@@ -115,12 +115,27 @@ _TABLE_HREF_RE = re.compile(
     r'\.(?P<ext>htm|pdf)))"',
     re.IGNORECASE,
 )
+# Tolerant of the spellings an archived copy might carry — `ecct_118-2.html`
+# (the form OLRC used for the 119th's first session), `ecct118-2.htm`,
+# `ecct_118_2.html` — so a differently named earlier table is found rather than
+# silently dropped. The unsuffixed `ecct.html` is always the current session's.
 _ECCT_FILENAME_RE = re.compile(
-    r"^ecct(?:_(?P<congress>\d+)-(?P<session>\d+))?\.html$", re.IGNORECASE
+    r"^ecct(?:[_-]?(?P<congress>\d+)[_-](?P<session>\d+))?\.html?$", re.IGNORECASE
 )
 _ECCT_HREF_RE = re.compile(
-    r'href="(?P<href>[^"]*?(?P<filename>ecct(?:_(?P<congress>\d+)-(?P<session>\d+))?'
-    r"\.html))\"",
+    r'href="(?P<href>[^"]*?(?P<filename>ecct(?:[_-]?(?P<congress>\d+)[_-](?P<session>\d+))?'
+    r"\.html?))\"",
+    re.IGNORECASE,
+)
+
+ECCT_ARCHIVE_FIRST_CONGRESS = 104
+"""Where the classification tables begin, and therefore the earliest session
+an archived ECCT could describe. Probing below it would ask for nothing OLRC
+has classified."""
+
+_ECCT_EXPLANATION_RE = re.compile(
+    r"classifying\s+new\s+laws\s+(?:from|of|enacted\s+during)\s+the\s+"
+    r"(?P<congress>\d+)(?:st|nd|rd|th)\s+Congress,\s*(?P<session>\d)(?:st|nd|rd|th)\s+Session",
     re.IGNORECASE,
 )
 _CELL_OPEN_RE = re.compile(r"<td\b", re.IGNORECASE)
@@ -1484,6 +1499,114 @@ def page_filename(url: str) -> str:
     return url.rsplit("/", 1)[-1].split("?", 1)[0]
 
 
+def ecct_session_from_page(html: str) -> tuple[int, int] | None:
+    """The Congress and session an ECCT page says it describes, from its own
+    explanation — "changes in classification of earlier laws made in the course
+    of classifying new laws from the 119th Congress, 2nd Session" — or None.
+
+    The unsuffixed `ecct.html` is a rolling document: OLRC rewrites it each
+    session, so a copy fetched (or archived) at some earlier date describes an
+    earlier session, and only the page itself says which.
+    """
+    match = _ECCT_EXPLANATION_RE.search(_clean_text(html))
+    if match is None:
+        return None
+    return int(match.group("congress")), int(match.group("session"))
+
+
+def ecct_archive_candidates(
+    newest: tuple[int, int], *, first_congress: int = ECCT_ARCHIVE_FIRST_CONGRESS
+) -> list[str]:
+    """Every filename an archived ECCT could carry, oldest first, below the
+    newest session the index pages know: `ecct_118-2.html` and its `.htm`
+    twin, for each session from the 104th up. What OLRC actually names an
+    archived table is `ecct_119-1.html`; the `.htm` form is the tables' own
+    extension and the second thing worth asking for."""
+    names: list[str] = []
+    for congress in range(first_congress, newest[0] + 1):
+        for session in (1, 2):
+            if (congress, session) >= newest:
+                break
+            names.append(f"ecct_{congress}-{session}.html")
+            names.append(f"ecct_{congress}-{session}.htm")
+    return names
+
+
+def probe_ecct_archive(
+    *,
+    newest: tuple[int, int],
+    exclude: Iterable[str] = (),
+    first_congress: int = ECCT_ARCHIVE_FIRST_CONGRESS,
+    cache_dir: Path | None = CACHE_DIR,
+    opener: Opener | None = None,
+    on_event: Callable[[str], None] | None = None,
+) -> tuple[list[tuple[TableLink, str]], list[str]]:
+    """Ask OLRC for every archived ECCT name whether or not an index page links
+    it — `(found links with their html, names that answered 404)`.
+
+    The index pages linked exactly two ECCT documents when this was written,
+    the current session's and the 119th's first, and an archived table an index
+    page stopped linking is otherwise unreachable to the loader. One request per
+    candidate under the shared ~1 req/sec throttle: ~60 requests, once, and a
+    404 is a fact to record rather than a failure. A 200 that does not parse as
+    an ECCT — a custom not-found page — counts as a miss too.
+
+    A found page's own sentence (`ecct_session_from_page`) wins over its
+    filename when the two disagree, and the disagreement is reported.
+    """
+    say = on_event or (lambda _message: None)
+    skip = set(exclude)
+    found: list[tuple[TableLink, str]] = []
+    misses: list[str] = []
+    for filename in ecct_archive_candidates(newest, first_congress=first_congress):
+        if filename in skip:
+            continue
+        url = CLASSIFICATION_BASE_URL + filename
+        try:
+            html = fetch_classification_page(
+                url, cache_dir=cache_dir, filename=filename, opener=opener
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code in (403, 404, 410):
+                misses.append(filename)
+                continue
+            say(f"probe {filename}: HTTP {exc.code}")
+            continue
+        except Exception as exc:  # noqa: BLE001 - a probe reports and moves on
+            say(f"probe {filename}: {type(exc).__name__}: {exc}")
+            continue
+        named = _ECCT_FILENAME_RE.match(filename)
+        assert named is not None
+        congress, session_num = int(named.group("congress")), int(named.group("session"))
+        try:
+            parse_ecct(html, filename=filename, source_url=url, congress=congress, session=session_num)
+        except ClassificationParseError:
+            misses.append(filename)
+            say(f"probe {filename}: 200 but not an ECCT")
+            continue
+        stated = ecct_session_from_page(html)
+        if stated is not None and stated != (congress, session_num):
+            say(
+                f"probe {filename}: the page says it is the {stated[0]}th Congress, "
+                f"session {stated[1]}; trusting the page"
+            )
+            congress, session_num = stated
+        found.append(
+            (
+                TableLink(
+                    kind="ecct",
+                    congress=congress,
+                    session=session_num,
+                    filename=filename,
+                    url=url,
+                ),
+                html,
+            )
+        )
+        say(f"probe {filename}: found, {congress}-{session_num}")
+    return found, misses
+
+
 def fetch_classification_page(
     url: str,
     *,
@@ -1714,6 +1837,9 @@ class ClassificationLoadReport:
 
     failures: tuple[tuple[str, str], ...]
     elapsed_seconds: float = 0.0
+    probe_misses: tuple[str, ...] = ()
+    """Archived ECCT names `probe_ecct_archive` asked for and got a 404 (or a
+    page that was not an ECCT). Empty unless the run probed."""
 
     @property
     def rows_written(self) -> int:
@@ -1758,8 +1884,14 @@ def run_classification_load(
     urls: Sequence[str] = (CLASSIFICATION_SOURCE_URL, PRIOR_CLASSIFICATION_SOURCE_URL),
     opener: Opener | None = None,
     on_event: Callable[[str], None] | None = None,
+    probe_ecct: bool = False,
 ) -> ClassificationLoadReport:
     """Walk the two index pages, load every table that changed, write the artifacts.
+
+    `probe_ecct` also asks for every archived ECCT filename below the newest
+    session the index pages know (`probe_ecct_archive`), network runs only:
+    what the index pages link is two ECCT documents, and an earlier session's
+    table OLRC archived without linking is reachable no other way.
 
     Resumable and hash-gated, in two stages. A closed congress's file is skipped
     without a request, because the index page's covered-law sentence already
@@ -1795,6 +1927,23 @@ def run_classification_load(
     if from_dir is not None:
         links.extend(links_on_disk(from_dir, exclude={link.filename for link in links}))
 
+    prefetched: dict[str, str] = {}
+    probe_misses: tuple[str, ...] = ()
+    if probe_ecct and from_dir is None and links:
+        newest = max((link.congress, link.session) for link in links if link.kind == "pl")
+        found, misses = probe_ecct_archive(
+            newest=newest,
+            exclude={link.filename for link in links},
+            cache_dir=cache_dir,
+            opener=opener,
+            on_event=on_event,
+        )
+        for link, html in found:
+            links.append(link)
+            prefetched[link.filename] = html
+        probe_misses = tuple(misses)
+        say(f"probed {len(found) + len(misses)} archived ECCT names: {len(found)} found")
+
     wanted = [
         link
         for link in links
@@ -1816,7 +1965,11 @@ def run_classification_load(
             continue
 
         try:
-            html = _document_html(link, from_dir=from_dir, cache_dir=cache_dir, opener=opener)
+            html = prefetched.get(link.filename)
+            if html is None:
+                html = _document_html(
+                    link, from_dir=from_dir, cache_dir=cache_dir, opener=opener
+                )
             if html is None:
                 skipped.append((link.filename, f"not in {from_dir}"))
                 say(f"skipped {link.filename}: not in {from_dir}")
@@ -1862,6 +2015,7 @@ def run_classification_load(
         skipped=tuple(skipped),
         failures=tuple(failures),
         elapsed_seconds=time.monotonic() - started,
+        probe_misses=probe_misses,
     )
 
 

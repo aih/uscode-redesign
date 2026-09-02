@@ -175,6 +175,65 @@ def test_index_finds_both_ecct_links_and_dates_the_unsuffixed_one(current_links)
     assert (eccts["ecct_119-1.html"].congress, eccts["ecct_119-1.html"].session) == (119, 1)
 
 
+@pytest.mark.parametrize(
+    "filename, expected",
+    [
+        ("ecct.html", (None, None)),
+        ("ecct_119-1.html", ("119", "1")),
+        ("ecct_118-2.htm", ("118", "2")),
+        ("ecct118-2.html", ("118", "2")),
+        ("ecct_118_2.html", ("118", "2")),
+        ("ECCT_117-1.HTML", ("117", "1")),
+    ],
+)
+def test_an_archived_ecct_is_recognised_under_the_spellings_it_might_carry(filename, expected):
+    """OLRC named the one archived table it links `ecct_119-1.html`. An earlier
+    session's copy under another separator or the tables' own `.htm` must be
+    found rather than silently dropped by a stricter pattern."""
+    from ingest.classification import _ECCT_FILENAME_RE, _ECCT_HREF_RE
+
+    match = _ECCT_FILENAME_RE.match(filename)
+    assert match is not None
+    assert (match.group("congress"), match.group("session")) == expected
+    href = _ECCT_HREF_RE.search(f'<a href="{filename}">here</a>')
+    assert href is not None and href.group("filename") == filename
+
+
+def test_a_table_filename_is_not_mistaken_for_an_ecct():
+    from ingest.classification import _ECCT_FILENAME_RE
+
+    for name in ("tbl119pl_2nd.htm", "ecct.pdf", "ecct_119.html", "tables.shtml"):
+        assert _ECCT_FILENAME_RE.match(name) is None, name
+
+
+def test_the_ecct_page_names_the_session_it_describes(ecct_html):
+    """The unsuffixed `ecct.html` is rewritten each session; only its own
+    explanation says which one a copy describes."""
+    from ingest.classification import ecct_session_from_page
+
+    assert ecct_session_from_page(ecct_html) == (119, 2)
+    altered = ecct_html.replace("119th Congress, 2nd Session", "116th Congress, 1st Session")
+    assert ecct_session_from_page(altered) == (116, 1)
+    assert ecct_session_from_page("<html><body><table><tr><th>x</th></tr></table></body></html>") is None
+
+
+def test_the_archive_candidates_stop_below_the_newest_session():
+    from ingest.classification import ecct_archive_candidates
+
+    names = ecct_archive_candidates((106, 1), first_congress=104)
+    assert names == [
+        "ecct_104-1.html",
+        "ecct_104-1.htm",
+        "ecct_104-2.html",
+        "ecct_104-2.htm",
+        "ecct_105-1.html",
+        "ecct_105-1.htm",
+        "ecct_105-2.html",
+        "ecct_105-2.htm",
+    ]
+    assert ecct_archive_candidates((104, 1)) == []
+
+
 def test_an_entry_page_with_no_tables_is_a_parse_error():
     with pytest.raises(ClassificationParseError):
         parse_tables_index("<html><body><p>Nothing here.</p></body></html>")
@@ -722,6 +781,11 @@ def test_the_pl_label_is_derived_and_not_stored(modern):
 
 
 # --- the ECCT ---------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def ecct_html() -> str:
+    return (FIXTURES / "ecct.html").read_text()
 
 
 @pytest.fixture(scope="module")

@@ -250,6 +250,13 @@ def main(argv: list[str] | None = None) -> int:
     classification_parser.add_argument(
         "--no-load", action="store_true", help="Parse and write the artifacts only"
     )
+    classification_parser.add_argument(
+        "--probe-ecct",
+        action="store_true",
+        help="Also request every archived ECCT name below the newest session "
+        "(ecct_{congress}-{session}.html and .htm, back to the 104th) whether or "
+        "not an index page links it; a 404 is recorded, not a failure",
+    )
     classification_parser.add_argument("--quiet", action="store_true")
 
     classification_check_parser = subparsers.add_parser(
@@ -729,7 +736,14 @@ def _cmd_classification(args: argparse.Namespace) -> int:
         verification_dir=args.out,
         manifest_path=args.manifest,
         on_event=None if args.quiet else print,
+        probe_ecct=args.probe_ecct,
     )
+
+    if args.probe_ecct:
+        print(
+            f"\nprobed archived ECCT names: {len(report.probe_misses)} answered 404 "
+            f"({', '.join(report.probe_misses) or 'none'})"
+        )
 
     # `changed` is the count deploy/update-corpus.sh reads: under --force every
     # fetched document is "loaded" whether or not OLRC edited it, and

@@ -281,6 +281,51 @@ def test_a_table_no_index_page_links_is_loaded_anyway(tmp_path, pages):
     assert covered["covered_laws_text"] == "Public Laws 110-1 through 110-180"
 
 
+def test_the_probe_finds_an_archived_ecct_no_index_page_links(tmp_path, pages):
+    """`--probe-ecct` asks for every archived name below the newest session. Here
+    the index slices link `ecct.html` and `ecct_119-1.html`; the server also
+    holds `ecct_118-2.html` (an earlier session's table, unlinked) and
+    `ecct_117-1.htm`, whose page says it is the 119th's second session — the
+    page wins. Everything else answers 404, which is recorded and not failed."""
+    ecct = (pages / "ecct.html").read_text()
+    served = _served(pages, "tables.shtml", "priortables.shtml", "ecct.html")
+    served["ecct_119-1.html"] = ecct
+    served["ecct_118-2.html"] = ecct.replace("119th Congress, 2nd Session", "118th Congress, 2nd Session")
+    served["ecct_117-1.htm"] = ecct
+    events: list[str] = []
+
+    report = cls.run_classification_load(
+        _no_database,
+        load=False,
+        cache_dir=None,
+        verification_dir=tmp_path,
+        manifest_path=tmp_path / "classification.json",
+        opener=_opener(served),
+        on_event=events.append,
+        probe_ecct=True,
+    )
+
+    assert not [f for f in report.failures if f[0].startswith("ecct")]
+    assert "ecct_118-2.html" not in report.probe_misses
+    assert "ecct_118-1.html" in report.probe_misses and "ecct_104-1.htm" in report.probe_misses
+    assert (tmp_path / "classification-ecct-118-2.json").exists()
+    assert any("ecct_117-1.htm: the page says" in event for event in events)
+    assert any(event.startswith("probed ") and "2 found" in event for event in events)
+
+
+def test_the_probe_is_a_network_run_thing(tmp_path, pages):
+    """`--from-file` reads a directory; there is nothing to probe."""
+    report = cls.run_classification_load(
+        _no_database,
+        from_dir=pages,
+        load=False,
+        verification_dir=tmp_path,
+        manifest_path=tmp_path / "classification.json",
+        probe_ecct=True,
+    )
+    assert report.sound and report.probe_misses == ()
+
+
 def test_an_index_page_that_will_not_load_is_a_failure_and_not_a_crash(tmp_path, pages):
     """One page failing must not lose the other one's tables.
 
