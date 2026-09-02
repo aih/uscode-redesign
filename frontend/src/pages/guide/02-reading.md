@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63, 64]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63, 64, 79]
 ---
 
 ## The address of a provision
@@ -514,6 +514,12 @@ tinted panel under a **Quoted** label.
 
 A table wider than the column scrolls inside its own box rather than pushing the page sideways.
 The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll it.
+
+## Install as an app
+
+The site can be installed as a desktop or mobile app from the browser's own install control —
+inside it, links stay in the app window and the title bar follows the light/dark setting. Reading,
+search and navigation are the same as in a browser tab.
 
 ## Printing
 
