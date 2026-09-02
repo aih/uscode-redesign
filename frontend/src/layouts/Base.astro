@@ -273,6 +273,21 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
         document.addEventListener("usc:linktarget", applyLinkTarget);
       }
     </script>
+
+    {/* The offline fallback (ADR-0080). Registered on `load` so it costs the
+        first paint nothing, with `updateViaCache: "none"` so the worker
+        script itself is always checked against the network. Everything the
+        worker does is an enhancement — a browser without it, or a failed
+        registration, is the site exactly as it was. */}
+    <script is:inline>
+      if ("serviceWorker" in navigator) {
+        addEventListener("load", () => {
+          navigator.serviceWorker.register("/app/sw.js", { updateViaCache: "none" }).catch(() => {
+            // No worker — the site is unchanged without one.
+          });
+        });
+      }
+    </script>
   </head>
   <body>
     <a class="usa-skipnav" href="#main">Skip to main content</a>
