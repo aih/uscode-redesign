@@ -171,6 +171,11 @@
       "expectStatus": 404
     },
     {
+      "id": "offline",
+      "path": "/app/offline",
+      "name": "the offline fallback page, rendered online — self-contained, no Base chrome (ADR-0080)"
+    },
+    {
       "id": "title",
       "path": "/app/us/usc/t16",
       "name": "title TOC"
