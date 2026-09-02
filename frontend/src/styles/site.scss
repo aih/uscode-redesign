@@ -1408,8 +1408,9 @@ body {
  * — `sticky.spec.ts`'s geometry assertions are the referee.
  *
  * Below 40em `.topbar` is `display: contents` (above), which renders no box
- * and therefore no padding, so the one bar that still pins there —
- * `.sectionbar` — carries its own copy. */
+ * and therefore no padding, so the surfaces inside it carry their own copies:
+ * `.sectionbar`, the one bar that still pins there, and `.usa-header`, whose
+ * two rows sit at document top. */
 .topbar {
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
@@ -1418,6 +1419,18 @@ body {
 
 @media (max-width: 39.99em) {
   .sectionbar {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* The header rows themselves, in this band. `.topbar`'s padding above covers
+   * them from 40em up, but here it renders no box, and the bar and the search
+   * row sit at document top — under the status bar at scroll 0, and in the
+   * notch in landscape, on every page. The header element rather than each
+   * row: one rule pads both, and `.usa-header` carries the header's own
+   * background, so the inset area paints as more header rather than as page. */
+  .usa-header {
     padding-top: env(safe-area-inset-top);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
