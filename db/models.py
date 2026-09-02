@@ -7,6 +7,7 @@ import datetime
 import uuid
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -690,3 +691,20 @@ class ClassificationSourceCheck(Base):
     changed_files: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     latest_covered_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class CorpusState(Base):
+    """One row (`id = 1`): a counter every corpus write moves (ADR-0078).
+
+    Statement-level triggers on every corpus table — installed by migration
+    `a3f8c2d1e6b7`, not modelled here — run `generation = generation + 1`
+    inside the writer's own transaction, so no writer can forget to bump it.
+    Every server-side cache key is prefixed with the value, which is what turns
+    "a table changed" into "every cached answer computed before the change is
+    unreachable" with no enumeration of which answers those were.
+    """
+
+    __tablename__ = "corpus_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    generation: Mapped[int] = mapped_column(BigInteger, nullable=False)

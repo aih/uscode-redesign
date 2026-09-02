@@ -612,8 +612,16 @@ def test_the_migration_round_trips():
         _alembic(scratch_url, "upgrade", "head")
         tables = _table_names(scratch_url)
         assert {"section_version_changes", "section_version_change_laws"} <= tables
+        assert "corpus_state" in tables  # ADR-0078
         assert {"text_hash", "notes_hash"} <= _column_names(scratch_url, "section_versions")
 
+        # One step back drops the corpus generation (a3f8c2d1e6b7)…
+        _alembic(scratch_url, "downgrade", "-1")
+        tables = _table_names(scratch_url)
+        assert "corpus_state" not in tables
+        assert "section_version_changes" in tables
+
+        # …and the next drops the version-changes tables.
         _alembic(scratch_url, "downgrade", "-1")
         tables = _table_names(scratch_url)
         assert "section_version_changes" not in tables
@@ -623,9 +631,12 @@ def test_the_migration_round_trips():
         )
 
         _alembic(scratch_url, "upgrade", "head")
-        assert {"section_version_changes", "section_version_change_laws"} <= _table_names(
-            scratch_url
-        )
+        upgraded = _table_names(scratch_url)
+        assert {
+            "section_version_changes",
+            "section_version_change_laws",
+            "corpus_state",
+        } <= upgraded
     finally:
         admin = create_engine(settings.database_url, isolation_level="AUTOCOMMIT")
         with admin.connect() as conn:

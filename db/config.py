@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     db_statement_timeout_ms: int = 20_000
     db_idle_in_transaction_timeout_ms: int = 30_000
 
+    # The corpus cache (ADR-0078). Unset means no cache: `storage/cache.py`'s
+    # every method is a no-op and the site runs as it did before the cache
+    # existed. Declared here because this class is `extra="ignore"` — a
+    # `REDIS_URL` in the environment that nothing declares is silently dropped.
+    redis_url: str | None = None
+    redis_max_connections: int = 20
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
