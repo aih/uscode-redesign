@@ -1,0 +1,93 @@
+---
+/**
+ * The one install affordance the site has (ADR-0081): a row of the More menu's
+ * HELP group, hidden until this island can prove there is something for it to
+ * do. There is no banner and no dialog — installation is the browser's
+ * transaction, and the site's whole part in it is one menu row.
+ *
+ * Three states, decided per platform:
+ *
+ *   * **Chromium, installable** — `beforeinstallprompt` fires; the handler
+ *     stashes the event and reveals the button, whose click calls `prompt()`.
+ *     The stash is the only way to offer the prompt from a control of one's
+ *     own: without `preventDefault()` Chromium shows its own mini-infobar on
+ *     Android and nothing at all on desktop beyond the omnibox icon.
+ *   * **iOS Safari, in a tab** — there is no prompt API at all; the row is a
+ *     link to the guide's install section, which describes Share → Add to
+ *     Home Screen. Browsers that are WebKit-with-another-name (CriOS, FxiOS,
+ *     EdgiOS) are excluded: the guide describes Safari's share sheet.
+ *   * **Already standalone** — nothing is revealed. The script checks
+ *     `display-mode: standalone` / `navigator.standalone` before wiring
+ *     anything, and a stylesheet media guard covers the race where
+ *     `appinstalled` arrives after the button was shown.
+ *
+ * A dismissed prompt is not re-offered by this code: the click hides the
+ * button and drops the stash, because a stashed event is single-use. Chromium
+ * refires `beforeinstallprompt` when it is again willing to install, and that
+ * refire is what brings the row back.
+ *
+ * Both elements ship in the markup and start `hidden`, the `ThemeToggle`
+ * shape: without JavaScript neither could do anything, and a dead control in
+ * a menu is worse than no control.
+ */
+import { APP } from "../lib/url";
+
+const guideHref = `${APP}/guide/02-reading#install-as-an-app`;
+---
+
+<button
+  type="button"
+  class="usa-button usa-button--unstyled installapp"
+  data-install-prompt
+  hidden
+>
+  Install this app
+</button>
+<a class="installapp" href={guideHref} data-install-guide hidden>
+  Install this app
+</a>
+
+<script is:inline>
+  {
+    // Which of the two the row is — a prompt button, a guide link, or neither
+    // — is per platform; see this file's frontmatter.
+    const button = document.querySelector("[data-install-prompt]");
+    const guide = document.querySelector("[data-install-guide]");
+    const standalone =
+      matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+    if (!standalone) {
+      let stashed = null;
+
+      window.addEventListener("beforeinstallprompt", (event) => {
+        event.preventDefault();
+        stashed = event;
+        guide.hidden = true;
+        button.hidden = false;
+      });
+
+      window.addEventListener("appinstalled", () => {
+        stashed = null;
+        button.hidden = true;
+        guide.hidden = true;
+      });
+
+      button.addEventListener("click", () => {
+        const prompt = stashed;
+        stashed = null;
+        button.hidden = true;
+        // Single-use by contract; a refired beforeinstallprompt re-reveals.
+        if (prompt) prompt.prompt();
+      });
+
+      // iOS has no prompt event; iPadOS reports itself as a Mac with touch.
+      // Not-Safari WebKit shells are excluded — the guide describes Safari's
+      // share sheet.
+      const ios =
+        (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) &&
+        !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
+      if (ios) guide.hidden = false;
+    }
+  }
+</script>
