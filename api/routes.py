@@ -21,11 +21,14 @@ template — the surface that answers people is `/app`, and the bare citation UR
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import TypeAdapter
 
+from api.cache import ResponseCacheDep
 from api.diff import cached_diff_ops, diff_ops, strip_guids
 from api.schemas import (
     CitationOut,
@@ -71,6 +74,8 @@ from storage import (
     ResolvedRelease,
     SectionResult,
     TocEntry,
+    cache_key,
+    get_cache,
     title_num_from_identifier,
 )
 
@@ -106,10 +111,20 @@ and `docs/verification/loadtest.json` measured ~0.45 rps failing entirely past
 reader onto its own text redline — so this budget is a person's, and 12/minute
 after a burst of 5 is more than a person reading redlines will ever want."""
 
+# What `ResponseCacheDep.through` stores for each cached route (ADR-0078): the
+# route's own response type, dumped `by_alias` so the stored JSON is the wire
+# JSON. One adapter per shape, module-level, because building one is not free.
+_RELEASES_PAYLOAD = TypeAdapter(list[ReleaseOut])
+_TITLES_PAYLOAD = TypeAdapter(list[TitleOut])
+_VERSIONS_PAYLOAD = TypeAdapter(VersionsOut)
+_TOC_PAYLOAD = TypeAdapter(TocOut)
+_LABELS_PAYLOAD = TypeAdapter(dict[str, TocEntryOut])
+
 
 @api.get("/releases", response_model=list[ReleaseOut], summary="All release points")
 def list_releases(
     repository: RepositoryDep,
+    cache: ResponseCacheDep,
     title: str | None = Query(
         default=None, description="Only release points that changed this title."
     ),
@@ -127,10 +142,18 @@ def list_releases(
     empty answer look like a missing law — which is why they are two parameters
     and not one.
     """
-    releases = repository.list_releases(title_num=title)
-    if ingested_title is not None:
-        releases = [r for r in releases if ingested_title in r.ingested_titles]
-    return [ReleaseOut.of(r) for r in releases]
+
+    def compute() -> list[ReleaseOut]:
+        releases = repository.list_releases(title_num=title)
+        if ingested_title is not None:
+            releases = [r for r in releases if ingested_title in r.ingested_titles]
+        return [ReleaseOut.of(r) for r in releases]
+
+    # The slowest unlimited route on the deployed box (27 ms and 44 KB at the
+    # container for `?ingested_title=16`), asked for by every section page.
+    return cache.through(
+        _RELEASES_PAYLOAD, "releases", (title or "", ingested_title or ""), compute
+    )
 
 
 @api.get(
@@ -180,11 +203,16 @@ def status(repository: RepositoryDep) -> StatusOut:
 
 
 @api.get("/titles", response_model=list[TitleOut], summary="Ingested titles")
-def list_titles(repository: RepositoryDep) -> list[TitleOut]:
+def list_titles(repository: RepositoryDep, cache: ResponseCacheDep) -> list[TitleOut]:
     """Every ingested title, in the Code's own order — `1, 2, … 5, 5a, 6, … 11,
     11a, 12, …` (ADR-0025). The ordering is the Repository's contract, not this
     handler's, so the same list arrives sorted from any implementation."""
-    return [TitleOut.of(t) for t in repository.list_titles()]
+    return cache.through(
+        _TITLES_PAYLOAD,
+        "titles",
+        (),
+        lambda: [TitleOut.of(t) for t in repository.list_titles()],
+    )
 
 
 @api.get(
@@ -350,6 +378,7 @@ def neighbors(
 )
 def labels(
     repository: RepositoryDep,
+    cache: ResponseCacheDep,
     identifier: Annotated[
         list[str],
         Query(
@@ -396,10 +425,20 @@ def labels(
             None,
         ),
     )
-    return {
-        found: TocEntryOut.of(entry)
-        for found, entry in repository.labels(paths, resolved).items()
-    }
+    # Keyed on the *resolved* label plus a digest of the list — a hundred
+    # identifiers verbatim is a kilobyte of key. Resolving before the
+    # generation read is fine: the label lands in the key, so a stale
+    # resolution names a stale key, never mislabels a fresh one.
+    digest = hashlib.sha256("\n".join(paths).encode()).hexdigest()
+    return cache.through(
+        _LABELS_PAYLOAD,
+        "labels",
+        (resolved.release.label, digest),
+        lambda: {
+            found: TocEntryOut.of(entry)
+            for found, entry in repository.labels(paths, resolved).items()
+        },
+    )
 
 
 @api.get(
@@ -407,16 +446,24 @@ def labels(
     response_model=VersionsOut,
     summary="Release points at which a section changed",
 )
-def versions(identifier: str, repository: RepositoryDep) -> VersionsOut:
+def versions(
+    identifier: str, repository: RepositoryDep, cache: ResponseCacheDep
+) -> VersionsOut:
     """The section's change timeline — one entry per distinct text, not one per
     release point, since most release points leave most sections untouched."""
     path = normalize_identifier(identifier)
-    found = repository.versions(path)
-    if not found:
-        raise HTTPException(status_code=404, detail=f"no section at {path}")
-    return VersionsOut(
-        identifier=path, versions=[VersionOut.of(version) for version in found]
-    )
+
+    def compute() -> VersionsOut:
+        found = repository.versions(path)
+        if not found:
+            # Raised inside `compute`, so a 404 is never stored: an identifier
+            # asked for before its section loads answers correctly right after.
+            raise HTTPException(status_code=404, detail=f"no section at {path}")
+        return VersionsOut(
+            identifier=path, versions=[VersionOut.of(version) for version in found]
+        )
+
+    return cache.through(_VERSIONS_PAYLOAD, "versions", (path,), compute)
 
 
 @api.get(
@@ -430,6 +477,7 @@ def diff(
     identifier: str,
     response: Response,
     repository: RepositoryDep,
+    cache: ResponseCacheDep,
     from_: str = Query(
         alias="from", description="Release point label to diff from.", examples=["119-99"]
     ),
@@ -481,12 +529,26 @@ def diff(
     # Memoised on the *resolved* labels, and only when both were pinned: an
     # unpinned label names a different release point the moment a newer one is
     # loaded, so caching under it would serve a redline for a pair the URL no
-    # longer means.
+    # longer means. The generation joins the key (ADR-0078) — a re-load can
+    # change even a pinned text — and the same key addresses the Redis tier,
+    # so a restart no longer costs seconds per first comparison.
     if pinned:
+        generation = cache.generation
+        from_label = from_resolved.release.label
+        to_label = to_resolved.release.label
         ops = cached_diff_ops(
-            (path, from_resolved.release.label, to_resolved.release.label, strip),
+            (generation, path, from_label, to_label, strip),
             from_xml,
             to_xml,
+            remote=get_cache(),
+            remote_key=cache_key(
+                f"g{generation}",
+                "diff",
+                path,
+                from_label,
+                to_label,
+                "strip" if strip else "keep",
+            ),
         )
     else:
         ops = diff_ops(from_xml, to_xml)
@@ -544,6 +606,7 @@ def get_by_identifier(
     identifier: str,
     request: Request,
     repository: RepositoryDep,
+    cache: ResponseCacheDep,
     release: ReleaseParam = None,
     date: DateParam = None,
     format: FormatParam = None,
@@ -559,23 +622,41 @@ def get_by_identifier(
     table of contents comes back instead.
     """
     path = normalize_identifier(f"us/usc/{identifier}")
+    # The generation before the data (ADR-0078): the reader keys its release
+    # memo on this response's header, so the header must not be newer than the
+    # section it arrives on.
+    generation = cache.generation
     resolved = _resolve_for(repository, path, release, date)
     wanted = negotiated_format(request, format, allowed=MACHINE_FORMATS)
 
     section = repository.get_section(path, resolved)
     if section is not None:
-        return _section_response(request, section, resolved, wanted)
+        return _section_response(request, section, resolved, wanted, generation)
 
-    toc = repository.get_toc(path, resolved)
-    if toc is not None:
-        return TocOut.of(toc, note=resolved.note)
+    def compute_toc() -> TocOut:
+        toc = repository.get_toc(path, resolved)
+        if toc is not None:
+            return TocOut.of(toc, note=resolved.note)
+        # The one 404 this site can diagnose. Reaching the reader matters as
+        # much as reaching an API client: a bare "nothing here" reads as "this
+        # provision was never enacted", and the truth is that it exists under a
+        # different scheme. Raised inside `compute_toc`, so it is never stored.
+        hint = _appendix_hint(path)
+        detail = not_found(path, resolved)
+        raise HTTPException(
+            status_code=404, detail=f"{detail} — {hint}" if hint else detail
+        )
 
-    # The one 404 this site can diagnose. Reaching the reader matters as much as
-    # reaching an API client: a bare "nothing here" reads as "this provision was
-    # never enacted", and the truth is that it exists under a different scheme.
-    hint = _appendix_hint(path)
-    detail = not_found(path, resolved)
-    raise HTTPException(status_code=404, detail=f"{detail} — {hint}" if hint else detail)
+    # `structure_nodes` is unversioned (ADR-0006), which is why a TOC can only
+    # ever be `max-age=300` to browsers — but under the generation it can be
+    # held server-side until something loads. `note` is in the key because two
+    # requests can resolve to one release point with different notes.
+    return cache.through(
+        _TOC_PAYLOAD,
+        "toc",
+        (path, resolved.release.label, resolved.note or ""),
+        compute_toc,
+    )
 
 
 def _section_response(
@@ -583,10 +664,14 @@ def _section_response(
     section: SectionResult,
     resolved: ResolvedRelease,
     wanted: str,
+    generation: int,
 ) -> Response | SectionOut:
     note = served_note(section, resolved)
     etag = f'"{section.content_hash}"'
     headers = {
+        # In the headers dict rather than on the injected `Response`, because a
+        # handler that returns a `Response` of its own keeps only these.
+        "X-Corpus-Generation": str(generation),
         # Content is immutable per (section text, release point): the same section
         # at the same release point can never change, so the hash of its content is
         # a true ETag (PLAN Day 6's cache-forever plan starts here).

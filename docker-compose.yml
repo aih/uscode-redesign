@@ -57,6 +57,28 @@ services:
       retries: 12
       start_period: 40s
 
+  # The corpus cache (ADR-0078). No published port, no persistence — the cache
+  # is reconstructible, so a restart is a cold start and never a wrong answer —
+  # and `allkeys-lru` under a fixed budget so it can never grow into a tenant
+  # that matters (Postgres and OpenSearch are those).
+  redis:
+    image: redis:7-alpine
+    command:
+      [
+        "redis-server",
+        "--maxmemory", "256mb",
+        "--maxmemory-policy", "allkeys-lru",
+        "--save", "",
+        "--appendonly", "no",
+      ]
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   api:
     build: .
     depends_on:
@@ -64,8 +86,14 @@ services:
         condition: service_healthy
       opensearch:
         condition: service_healthy
+      # `service_started`, not `service_healthy`: the API runs fine without the
+      # cache (storage/cache.py degrades to computing), so a broken Redis must
+      # not keep the site from coming up.
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+psycopg://uscode:uscode@db:5432/uscode
+      REDIS_URL: redis://redis:6379/0
       SEARCH_URL: https://opensearch:9200
       SEARCH_PASSWORD: ${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
       # False *only here*. The image generates a self-signed certificate at
