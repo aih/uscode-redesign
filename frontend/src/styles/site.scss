@@ -1401,6 +1401,35 @@ body {
   }
 }
 
+/* Safe-area insets (ADR-0079). `Base.astro` declares `viewport-fit=cover`, so
+ * an installed standalone window draws to the physical edges of a notched
+ * screen; these keep the chrome's content out from under the notch and the
+ * home indicator. `env()` is 0 everywhere else, so nothing moves in a browser
+ * — `sticky.spec.ts`'s geometry assertions are the referee.
+ *
+ * Below 40em `.topbar` is `display: contents` (above), which renders no box
+ * and therefore no padding, so the one bar that still pins there —
+ * `.sectionbar` — carries its own copy. */
+.topbar {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+@media (max-width: 39.99em) {
+  .sectionbar {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+.usa-footer {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 /* The reason `--sticky-h` exists. Without this, `/us/usc/t16/s45f/c/5` scrolls
  * the highlighted provision to the top of the *document* — which is underneath
  * the bar. Applies to every addressable element in the text, not just the
