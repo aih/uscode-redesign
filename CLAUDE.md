@@ -357,6 +357,24 @@ classification vocabulary by name** and gave every other value to `pl`; it now s
 suffix. A count column's forward direction is largest first, since `SortBar` sends an option that is
 not in force to its own forward direction.
 
+**The reader is installable** (`docs/pwa-spec.md`, ADR-0079, ADR-0080, ADR-0081). The manifest is
+`/app/manifest.webmanifest` — `id`/`scope` `"/app/"` with the trailing slash, `display: standalone`,
+colours read from the token block — with five generated PNGs under `/app/icons` pinned by
+`docs/verification/icons.json` (`scripts/icons.py`, the `scripts/fonts.py` pattern), one
+`theme-color` meta kept on the resolved theme by the pre-paint bootstrap and `ThemeToggle`,
+`viewport-fit=cover` paired with safe-area padding, and a standalone window treated as
+`usc-linktarget === "same"` so cross references and search results stay in the app. Offline is
+`frontend/public/sw.js`, hand-rolled: network-first with navigation preload for `/app` navigations,
+storing only `ok` non-`redirected` responses (the last 40, `usc-pages-v1`), cache-first for
+`_astro`/fonts/uswds/icons, everything else passed through; a failed navigation falls back to the
+cache and then to the self-contained `/app/offline`, which lists the cached sections and uses no
+`Base` chrome. The install surface is **one hidden row in More › Help** (`InstallApp`): a button
+revealed by `beforeinstallprompt` (stash → `prompt()` on click, hidden on `appinstalled`), a link
+to the guide's install section on iOS Safari, nothing in a standalone window — enforced by the
+script and by a `display-mode: standalone` media rule both. `tests/pwa.test.ts` holds the manifest
+contract; `tests/e2e/pwa.spec.ts` proves offline in a browser; the iOS device pass is owed
+(`docs/deploy-status.md`).
+
 `make test` = **851** Python tests; `make test-web` = **457** frontend tests; `make test-e2e` = **663**
 Playwright tests, 344 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and

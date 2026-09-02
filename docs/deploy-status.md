@@ -6,9 +6,11 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-09-01 — the version-change annotations (ADR-0074) are back-filled on the box,
-489,738 change rows in 1,295s, and its report agrees with the development corpus's on every leaf but
-`generated_at`; see [Still owed](#still-owed), which now holds nothing outstanding. Before that,
+**Last updated:** 2026-09-02 — the PWA phases (ADR-0079, ADR-0080, ADR-0081) are merged and not yet
+deployed; [Still owed](#still-owed) now opens with the manual install pass on real devices, which no
+CI emulation can stand in for. Before that, 2026-09-01 — the version-change annotations (ADR-0074)
+are back-filled on the box, 489,738 change rows in 1,295s, and its report agrees with the
+development corpus's on every leaf but `generated_at`. Before that,
 2026-08-31 — that backfill was owed. Before that, 2026-08-19 — the site was down
 for about ten hours and every alarm read `OK`;
 see [The outage](#the-outage-2026-08-19-adr-0073). Before that, 2026-08-13 — the classification rows
@@ -69,10 +71,11 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-**Nothing.** [Still owed](#still-owed) is a record of finished work as of 2026-09-01 — the
-classification tables and the pages that serve them, and the ADR-0074 version-change backfill.
-Nothing in this section is blocking either: the demo video (ADR-0038) is live and everything else
-here was already done.
+**One thing.** The manual install pass on real devices, once the PWA phases deploy — the first
+item under [Still owed](#still-owed), which is otherwise a record of finished work as of
+2026-09-01: the classification tables and the pages that serve them, and the ADR-0074
+version-change backfill. Nothing in this section is blocking: the demo video (ADR-0038) is live
+and everything else here was already done.
 
 - **The demo video is live**, at
   [`/app/demo`](https://uscode.linkedlegislation.org/app/demo). `s3://uscode-mirror-dreamproit/usc/demo/`
@@ -520,6 +523,22 @@ alert nobody reads. The gate is now `source_mismatches` and `incomplete_loads` �
 that mean something is actually wrong — with `count_mismatches` printed rather than gated on.
 
 ## Still owed
+
+**The manual install pass on real devices (ADR-0079, ADR-0080, ADR-0081).** Add to Home Screen has
+no emulation, so nothing in CI has verified the installed experience. Once the PWA phases deploy,
+against `https://uscode.linkedlegislation.org`:
+
+- **iOS Safari** — Share → Add to Home Screen: the icon and name come from the manifest (or the
+  `apple-touch-icon`), the app opens standalone with no browser chrome, cross references navigate
+  in place, and the More menu shows no install row inside the app. Airplane mode: a section read
+  before opens; an unvisited one shows `/app/offline`.
+- **macOS Safari** — File → Add to Dock: same checks.
+- **Desktop Chrome or Edge** — More › Help shows **Install this app**; the click prompts; after
+  installing, the row is gone and the title bar follows the theme toggle. In a notched or
+  landscape window, the sticky chrome clears the safe-area insets (ADR-0079's recorded
+  `--sticky-h` refinement is taken up only if a deep link lands behind the bar here).
+
+Record the result in this file when done.
 
 **The version-change annotations (ADR-0074) are on the box.** Migration `b6e1f0a2c9d4` landed with
 the 2026-08-31 deploy (`deploy-on-box.sh` runs `alembic upgrade head`), and the one-time backfill
