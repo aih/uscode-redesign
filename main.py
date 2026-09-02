@@ -21,6 +21,8 @@ Every question about *which text* belongs to *which release point* is answered b
 the `Repository` behind `storage/` (CLAUDE.md architecture rule 1).
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -39,7 +41,7 @@ from api.settings import settings
 from api.watchlists import default_watchlist, watchlists
 from citation import router as citation_router
 from params import NO_STORE, PRIVATE_PREFIXES
-from storage import RepositoryUnavailableError
+from storage import RepositoryUnavailableError, cache_status, close_cache_client
 
 DESCRIPTION = """
 Any provision of the US Code, at any release point, addressed by a URL that mirrors
@@ -105,6 +107,18 @@ STATIC = Path(__file__).resolve().parent / "static"
 APIDOCS = "/static/apidocs"
 FAVICON = "/favicon.svg"
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Close the corpus cache's connection pool on shutdown (ADR-0078).
+
+    Nothing opens at startup on purpose: `storage/cache.py` builds its client
+    lazily, so a Redis that is down when the process starts delays nothing and
+    the first use pays the (short) connect timeout instead.
+    """
+    yield
+    close_cache_client()
+
+
 # `docs_url=None`/`redoc_url=None` turns off FastAPI's built-in pages so the
 # custom ones below can take those paths. The OpenAPI schema itself is untouched
 # and still served at /openapi.json — it is the *pages* that need rewriting, not
@@ -116,6 +130,7 @@ app = FastAPI(
     description=DESCRIPTION,
     docs_url=None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -135,8 +150,10 @@ app.include_router(search_router)
 def health() -> dict[str, str]:
     """`{"status": "ok"}` if the process is up. It touches no database and no
     search cluster, so it says nothing about whether either is reachable — for
-    that, ask `/api/v1/status`."""
-    return {"status": "ok"}
+    that, ask `/api/v1/status`. `redis` is `disabled`, `ok` or `unavailable`
+    (ADR-0078); it never changes `status`, because `deploy/watchdog.sh` probes
+    this route and a cache outage must not read as a site outage."""
+    return {"status": "ok", "redis": cache_status()}
 
 
 # ------------------------------------------------------------- the docs pages

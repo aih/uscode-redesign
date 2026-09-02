@@ -149,6 +149,30 @@ def test_the_cache_keys_on_the_mode_as_well_as_the_pair():
     clear_diff_cache()
 
 
+def test_the_remote_tier_survives_what_the_lru_does_not():
+    """The Redis tier (ADR-0078): written on a compute, consulted on an LRU
+    miss — so a restart (here, `clear_diff_cache`) costs a Redis read rather
+    than seconds of diffing."""
+    import fakeredis
+
+    from storage.cache import CorpusCache
+
+    clear_diff_cache()
+    remote = CorpusCache(fakeredis.FakeRedis())
+    key = (4, "/us/usc/t16/s1", "119-99", "119-102not101", True)
+    redis_key = "usc:g4:diff:/us/usc/t16/s1:119-99:119-102not101:strip"
+
+    first = cached_diff_ops(key, "one two three", "one four three", remote=remote, remote_key=redis_key)
+
+    clear_diff_cache()  # the process restarted
+    # Different inputs under the same key: an identical answer proves it came
+    # from the remote tier, not from a recomputation.
+    second = cached_diff_ops(key, "totally", "different", remote=remote, remote_key=redis_key)
+
+    assert second == first
+    clear_diff_cache()
+
+
 @pytest.mark.integration
 def test_the_diff_endpoint_strips_guids_by_default_and_says_so(client):
     body = client.get(f"{API}/sections{AMENDED}/diff?from={PRIOR}&to={CURRENT}").json()

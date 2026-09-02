@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { currentGeneration, noteGeneration, resetGeneration } from "../src/lib/generation";
 import { ReleaseCache, TTL_MS } from "../src/lib/releasecache";
 import type { Release } from "../src/lib/types";
 
@@ -66,7 +67,7 @@ describe("ReleaseCache", () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  it("re-fetches once the entry is older than the TTL", async () => {
+  it("re-fetches once the entry is older than the TTL, when no generation is known", async () => {
     const clock = fakeClock();
     const fetcher = vi.fn(async () => [release("119-102not101")]);
     const cache = new ReleaseCache(fetcher, clock.now);
@@ -76,6 +77,46 @@ describe("ReleaseCache", () => {
     await cache.get("16");
     expect(fetcher).toHaveBeenCalledTimes(1);
 
+    clock.advance(2);
+    await cache.get("16");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("serves an entry while the corpus generation stands, with no clock at all", async () => {
+    const clock = fakeClock();
+    const fetcher = vi.fn(async () => [release("119-102not101")]);
+    const cache = new ReleaseCache(fetcher, clock.now, TTL_MS, () => 41);
+
+    await cache.get("16");
+    // Days pass; nothing loads. The entry is still the corpus's own answer.
+    clock.advance(TTL_MS * 1000);
+    await cache.get("16");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-fetches the moment a newer generation has been seen — no window", async () => {
+    const clock = fakeClock();
+    let generation = 41;
+    const fetcher = vi.fn(async () => [release("119-102not101")]);
+    const cache = new ReleaseCache(fetcher, clock.now, TTL_MS, () => generation);
+
+    await cache.get("16");
+    generation = 42; // an ingest commit, reported by any response's header
+    await cache.get("16");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to the TTL for an entry created before any generation arrived", async () => {
+    const clock = fakeClock();
+    let generation: number | null = null;
+    const fetcher = vi.fn(async () => [release("119-102not101")]);
+    const cache = new ReleaseCache(fetcher, clock.now, TTL_MS, () => generation);
+
+    await cache.get("16");
+    generation = 41; // the header starts arriving, but this entry predates it
+    clock.advance(TTL_MS - 1);
+    await cache.get("16");
+    expect(fetcher).toHaveBeenCalledTimes(1);
     clock.advance(2);
     await cache.get("16");
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -141,5 +182,31 @@ describe("ReleaseCache", () => {
     await new Promise((r) => setTimeout(r, 0));
     // The replacement survives: eviction is guarded on still being current.
     expect(cache.size()).toBe(1);
+  });
+});
+
+describe("the generation tracker", () => {
+  it("starts unknown, follows the header, and never goes backwards", () => {
+    resetGeneration();
+    expect(currentGeneration()).toBe(null);
+
+    noteGeneration("41");
+    expect(currentGeneration()).toBe(41);
+
+    noteGeneration("40"); // a slow response from before a load
+    expect(currentGeneration()).toBe(41);
+
+    noteGeneration("42");
+    expect(currentGeneration()).toBe(42);
+    resetGeneration();
+  });
+
+  it("ignores an absent or malformed header", () => {
+    resetGeneration();
+    noteGeneration(null);
+    noteGeneration("not a number");
+    noteGeneration("");
+    expect(currentGeneration()).toBe(null);
+    resetGeneration();
   });
 });

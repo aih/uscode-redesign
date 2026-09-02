@@ -122,4 +122,4 @@ def test_the_front_door_is_the_reader(client):
 def test_the_health_check_is_not_behind_a_redirect(client):
     """Ops routes answer where they are: a load balancer should not have to
     follow a redirect to learn the process is alive."""
-    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/health").json() == {"status": "ok", "redis": "disabled"}

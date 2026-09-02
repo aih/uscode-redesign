@@ -24,6 +24,7 @@ EXPECTED_TABLES = {
     "classification_entries",
     "ecct_entries",
     "classification_source_checks",
+    "corpus_state",
 }
 
 CLASSIFICATION_TABLES = {

@@ -25,6 +25,7 @@ from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.orm import Session
 
 from db.models import (
+    CorpusState,
     GuidMap,
     ReleasePoint,
     Section,
@@ -94,6 +95,14 @@ class PostgresRepository:
 
     def __init__(self, session: Session):
         self._session = session
+
+    def corpus_generation(self) -> int:
+        """`corpus_state`'s single row, bumped by migration `a3f8c2d1e6b7`'s
+        triggers inside every corpus-writing transaction (ADR-0078)."""
+        found = self._session.scalar(
+            select(CorpusState.generation).where(CorpusState.id == 1)
+        )
+        return found if found is not None else 0
 
     # ------------------------------------------------------------------ releases
 
