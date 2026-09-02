@@ -50,6 +50,7 @@ const UNDOCUMENTED_ROUTES = new Set([
   "/app/404",
   "/app/429",
   "/app/healthz",
+  "/app/offline",
   "/app/preview",
 ]);
 
@@ -85,6 +86,7 @@ const INFRASTRUCTURE_ADRS = new Set([
   46, // the per-route JavaScript byte budget — a test harness
   47, // declining a shared cache in front of the spine — a deployment decision
   51, // the search index rebuilds itself on a mapping change — a deploy step
+  80, // the service worker and offline page — Phase P4 moves this into chapter 02's covers
 ]);
 
 const chapters = readChapters();
