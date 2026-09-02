@@ -366,7 +366,7 @@ test("at desktop the menus are rows of links with no hamburger", async ({ page }
   await expect(page.locator(".footmenu__summary")).toBeHidden();
 });
 
-test("the footer's ten links are in four named groups (ADR-0063)", async ({ page }) => {
+test("the footer's eleven links are in four named groups (ADR-0063)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/app/");
 
@@ -393,6 +393,7 @@ test("the footer's ten links are in four named groups (ADR-0063)", async ({ page
     "/app/docs",
     "https://uscode.house.gov/download/download.shtml",
     "/app/design",
+    "/app/data/version-changes",
     "/app/about",
   ]);
 

@@ -123,7 +123,10 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* `viewport-fit=cover` lets a standalone window draw to the edges of a
+        notched screen; the safe-area padding in `site.scss` (ADR-0079) is the
+        other half, and the two only land together. */}
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     <meta name="description" content="Any provision of the US Code, at any release point." />
 
@@ -134,6 +137,23 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
         strip and legible at 16px, and one vector file is both. */}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="mask-icon" href="/favicon.svg" color="#31509d" />
+
+    {/* The reader as an installable app (ADR-0079). The manifest names the
+        identity — /app/ scope, standalone display, the generated icons — and
+        is what makes a browser offer to install; the apple-touch icon is
+        linked as well because iOS prefers it over the manifest's. Static
+        files out of `public/`, like the fonts below; asserted by
+        `tests/pwa.test.ts`. */}
+    <link rel="manifest" href="/app/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon-180.png" />
+
+    {/* The colour an installed window paints its title bar. The default is
+        the light theme's `--page` and the bootstrap below corrects it before
+        first paint for a reader who chose dark; `ThemeToggle` moves it on
+        every toggle. The manifest's `theme_color` cannot follow a runtime
+        theme — this meta is the only thing that can. Both values are the
+        token block's `--page` (`site.scss`), asserted by `tests/pwa.test.ts`. */}
+    <meta name="theme-color" content="#f9f9f7" />
 
     {/* The two faces every page paints text in before it paints anything else:
         Archivo for the chrome, Spectral for the provision (ADR-0052). A webfont
@@ -190,6 +210,14 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
       } catch {
         // No storage (private mode, blocked cookies) — the default stands.
       }
+      /* The title-bar colour of an installed window (ADR-0079), moved with
+         the theme so a dark reader does not sit under a light bar. The meta
+         above defaults to light; only dark needs a correction, here, before
+         first paint. The two values are the token block's `--page`. */
+      if (document.documentElement.dataset.theme === "dark") {
+        const themeMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeMeta) themeMeta.setAttribute("content", "#141310");
+      }
     </script>
 
     <script is:inline>
@@ -221,9 +249,15 @@ const printSource = `${Astro.request.headers.get("host") ?? ""}${Astro.url.pathn
          * by `AuthNav`, which is how the choice follows them to another
          * browser. */
         function applyLinkTarget() {
-          let sameTab = false;
+          /* An installed window behaves as `usc-linktarget === "same"`
+             (ADR-0079): a new tab opened from standalone lands in a browser
+             outside the app, so every cross reference and search result would
+             walk the reader out of what they installed. */
+          let sameTab =
+            matchMedia("(display-mode: standalone)").matches ||
+            navigator.standalone === true;
           try {
-            sameTab = localStorage.getItem("usc-linktarget") === "same";
+            sameTab = sameTab || localStorage.getItem("usc-linktarget") === "same";
           } catch {
             // No storage — the default in the markup stands.
           }

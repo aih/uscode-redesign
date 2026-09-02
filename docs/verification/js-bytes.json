@@ -4,12 +4,12 @@
   "excluded": "CopyColumn's <script type=\"application/json\" data-copy-targets> — its size is the section's provision list rather than code, so it varies per URL and is measured nowhere.",
   "client_bundles": "None. `astro build` emits no client JavaScript for this site; dist/client/_astro holds only CSS, because every island is is:inline and Astro never bundles those.",
   "validated_against": "The rendered page — see docs/adr/0046 for the comparison against a live /app/us/usc/… response.",
-  "total_bytes": 491375,
+  "total_bytes": 538789,
   "routes": [
     {
       "route": "/app/",
       "page": "pages/index.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -24,7 +24,7 @@
     {
       "route": "/app/404",
       "page": "pages/404.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -39,7 +39,7 @@
     {
       "route": "/app/429",
       "page": "pages/429.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -54,7 +54,7 @@
     {
       "route": "/app/about",
       "page": "pages/about.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -69,7 +69,7 @@
     {
       "route": "/app/classification",
       "page": "pages/classification/index.astro",
-      "bytes": 35438,
+      "bytes": 36706,
       "scripts": 10,
       "components": [
         "AuthNav.astro",
@@ -86,7 +86,7 @@
     {
       "route": "/app/classification/[congress]",
       "page": "pages/classification/[congress]/[session].astro",
-      "bytes": 35438,
+      "bytes": 36706,
       "scripts": 10,
       "components": [
         "AuthNav.astro",
@@ -103,7 +103,22 @@
     {
       "route": "/app/classification/ecct",
       "page": "pages/classification/ecct.astro",
-      "bytes": 18250,
+      "bytes": 19518,
+      "scripts": 8,
+      "components": [
+        "AuthNav.astro",
+        "CommandPalette.astro",
+        "DensityToggle.astro",
+        "KeyboardNav.astro",
+        "SiteHeader.astro",
+        "ThemeToggle.astro",
+        "Base.astro"
+      ]
+    },
+    {
+      "route": "/app/data/version-changes",
+      "page": "pages/data/version-changes.astro",
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -118,7 +133,7 @@
     {
       "route": "/app/demo",
       "page": "pages/demo.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -133,7 +148,7 @@
     {
       "route": "/app/design",
       "page": "pages/design.astro",
-      "bytes": 39369,
+      "bytes": 40637,
       "scripts": 12,
       "components": [
         "ApparatusDisclosure.astro",
@@ -152,7 +167,7 @@
     {
       "route": "/app/diff",
       "page": "pages/diff/[...identifier].astro",
-      "bytes": 19671,
+      "bytes": 20939,
       "scripts": 9,
       "components": [
         "AuthNav.astro",
@@ -168,7 +183,7 @@
     {
       "route": "/app/docs",
       "page": "pages/docs.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -183,7 +198,7 @@
     {
       "route": "/app/goto",
       "page": "pages/goto.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -198,7 +213,7 @@
     {
       "route": "/app/guide",
       "page": "pages/guide/index.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -213,7 +228,7 @@
     {
       "route": "/app/login",
       "page": "pages/login.astro",
-      "bytes": 19652,
+      "bytes": 20920,
       "scripts": 9,
       "components": [
         "AuthNav.astro",
@@ -229,7 +244,7 @@
     {
       "route": "/app/provisions",
       "page": "pages/provisions.astro",
-      "bytes": 18935,
+      "bytes": 20203,
       "scripts": 9,
       "components": [
         "AuthNav.astro",
@@ -245,7 +260,7 @@
     {
       "route": "/app/releases",
       "page": "pages/releases.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -260,7 +275,7 @@
     {
       "route": "/app/search",
       "page": "pages/search.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -275,7 +290,7 @@
     {
       "route": "/app/search/syntax",
       "page": "pages/search/syntax.astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",
@@ -290,7 +305,7 @@
     {
       "route": "/app/settings",
       "page": "pages/settings.astro",
-      "bytes": 22594,
+      "bytes": 23862,
       "scripts": 9,
       "components": [
         "AuthNav.astro",
@@ -306,7 +321,7 @@
     {
       "route": "/app/signup",
       "page": "pages/signup.astro",
-      "bytes": 19340,
+      "bytes": 20608,
       "scripts": 9,
       "components": [
         "AuthNav.astro",
@@ -322,7 +337,7 @@
     {
       "route": "/app/us/usc",
       "page": "pages/us/usc/[...identifier].astro",
-      "bytes": 43688,
+      "bytes": 44956,
       "scripts": 13,
       "components": [
         "ApparatusDisclosure.astro",
@@ -342,7 +357,7 @@
     {
       "route": "/app/versions",
       "page": "pages/versions/[...identifier].astro",
-      "bytes": 18250,
+      "bytes": 19518,
       "scripts": 8,
       "components": [
         "AuthNav.astro",

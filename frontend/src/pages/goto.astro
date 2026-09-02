@@ -33,7 +33,7 @@ import CitationNotFound from "../components/CitationNotFound.astro";
 import { ApiError, lookupCitation, releaseParams } from "../lib/api";
 import { setNoStore } from "../lib/cache";
 import { parseCites } from "../lib/query";
-import type { Citation } from "../lib/types";
+import type { Citation, Entry } from "../lib/types";
 import { appHref, gotoHref, searchHref } from "../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
@@ -83,10 +83,19 @@ const EXAMPLES = [
   "title 11",
   "cites 26 usc 501",
 ];
+
+/** The trail out — Home › Search (ADR-0079). This page only renders on a
+ * failure, and a failure page with no way back is worst in an installed
+ * window, which has no browser back button. `current` keeps an empty
+ * identifier so `PrintHeader` stays silent. */
+const crumbs: Entry[] = [{ identifier: "/", level: "home", num: "Home", heading: null }];
+const currentCrumb: Entry = { identifier: "", level: "page", num: "Search", heading: null };
 ---
 
 <Base
   title={query ? `No match for ${query} · U.S. Code` : "Search the U.S. Code"}
+  crumbs={crumbs}
+  current={currentCrumb}
   searchValue={query}
 >
   <h1 class="doc-title">Search or go to a citation</h1>

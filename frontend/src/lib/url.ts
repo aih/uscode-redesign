@@ -213,6 +213,14 @@ export function syntaxHref(): string {
   return `${APP}/search/syntax`;
 }
 
+/** `/app/data/version-changes` — how this site classifies a version change and
+ *  what the corpus contains (ADR-0076). The default order is the Code's own, so
+ *  it is left out of the URL and every sorted view is citable by address. */
+export function versionDataHref(sort?: string | null): string {
+  const path = `${APP}/data/version-changes`;
+  return sort && sort !== "title" ? `${path}?sort=${encodeURIComponent(sort)}` : path;
+}
+
 /** `/app/settings` — the signed-in reader's preferences. */
 export function settingsHref(): string {
   return `${APP}/settings`;

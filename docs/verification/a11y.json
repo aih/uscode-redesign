@@ -6,7 +6,7 @@
     "wcag21a",
     "wcag21aa"
   ],
-  "scans": 329,
+  "scans": 343,
   "routesWithViolations": 4,
   "totals": {
     "violations": 8,

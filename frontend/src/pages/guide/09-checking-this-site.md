@@ -4,8 +4,8 @@ title: Checking this site
 order: 9
 summary: How to verify that what you are reading is what the OLRC published, and what this site does not guarantee.
 covers:
-  routes: ["/app/design"]
-  adrs: [7, 13, 39, 42, 53]
+  routes: ["/app/design", "/app/data/version-changes"]
+  adrs: [7, 13, 39, 42, 53, 76]
 ---
 
 This chapter is how to check the text on this site against the official sources.
@@ -117,6 +117,41 @@ steps:
 An unrecognised status is the last of those steps. A status this site does not know keeps the plain
 badge and prints its own word. The set of statuses is not fixed: the source may publish one this
 site has never seen.
+
+## What changed between two versions of a section
+
+The version history distinguishes an amendment to the statutory text from a change to the notes
+around it and from a change that touched neither. [/app/data/version-changes](/app/data/version-changes)
+describes how that distinction is made, which Public Law a change of text is attributed to, and
+what the whole corpus contains once every transition has been classified: 489,738 change rows over
+423,800 transitions, and 30,250 attributions to a Public Law.
+
+The per-title table lists all 56 titles that have change rows, and can be ordered by title, by
+change rows, by text changes or by the share of text changes attributed to a statute. The order is
+in the address, so a sorted table can be linked to. The rows sum to the corpus totals shown above
+them.
+
+Two limits are stated on the page. Attribution reaches 49.25% of text changes, because the
+classification tables begin at the 104th Congress and a provision last amended before then has no
+row to match. And 77,596 transitions are marked concurrent, where the release points a change
+spans cannot be pinned down and the attribution that depends on them is unreliable.
+
+The figures come from a committed file rather than from the database, so the page reads the same on
+any copy of this site. The file is the one `python -m ingest version-changes --report` writes, and
+the browser test suite fails when the page's copy has drifted from it.
+
+```scenario
+id: version-change-data
+title: The version-change data page reconciles its titles to the corpus
+steps:
+  - goto: /app/data/version-changes
+  - expect:
+      selector: ".vdata--titles tfoot"
+      contains: "489,738"
+  - expect:
+      selector: ".vdata--titles tbody tr"
+      count: 56
+```
 
 ## Limitations
 

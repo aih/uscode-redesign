@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63, 64]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63, 64, 79]
 ---
 
 ## The address of a provision
@@ -64,8 +64,8 @@ From a script, the same address answers with JSON — `curl -L` follows the redi
 search box, and **More**.
 
 Titles opens a short list of titles and a link to all of them. More holds the rest of the site under
-four headings — Reference (Release points, Downloads), Help (User guide, API docs, About), Display
-(the reading-density and theme switches), and Accounts.
+four headings — Reference (Release points, Classification tables, Downloads), Help (User guide, API
+docs, Keyboard shortcuts, About), Display (the reading-density and theme switches), and Accounts.
 
 Both menus open over the page rather than pushing it down, and one is open at a time: opening either
 closes the other. **Esc** closes the open menu and puts the keyboard back on the button that opened
@@ -112,26 +112,33 @@ steps:
     caption: Esc closes the open menu.
 ```
 
-**The foot of the page** carries nine links under four headings:
+**The foot of the page** carries eleven links under four headings:
 
-- **Browse** — Titles, Release points
+- **Browse** — Titles, Release points, Classification tables
 - **Learn** — User guide, Search guide, Keyboard shortcuts
-- **Developers** — API documentation, Source XML (OLRC), Design system
+- **Developers** — API documentation, Source XML (OLRC), Design system, Version-change data
 - **Site** — About
 
 They are four columns on a window 640 pixels or wider, two from 400 pixels, and one below that.
 Each heading names the list beneath it, so a screen reader can move between the four groups.
+
+Below the links, every page names who built the site and links to a profile page outside it,
+beside the disclaimer and the commit the site is running.
 
 ```scenario
 id: footer-groups
 title: The site's own links are grouped at the foot of the page
 steps:
   - goto: /app/us/usc/t16/s45f
-    caption: Every page carries the same nine links at its foot.
+    caption: Every page carries the same eleven links at its foot.
   - expect: { selector: ".footnav__label", count: 4 }
     caption: Browse, Learn, Developers, Site.
+  - expect: { selector: ".footnav a", count: 11 }
+    caption: Eleven links across the four.
   - expect: { selector: '.footnav ul[aria-labelledby="footnav-developers"]', contains: "API documentation" }
     caption: The API reference is under Developers.
+  - expect: { selector: ".doc-meta--byline", contains: "Ari Hershowitz" }
+    caption: Under them, who built the site.
 ```
 
 The header menu opens over the page rather than pushing it down, so the text stays where it was.
@@ -507,6 +514,12 @@ tinted panel under a **Quoted** label.
 
 A table wider than the column scrolls inside its own box rather than pushing the page sideways.
 The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll it.
+
+## Install as an app
+
+The site can be installed as a desktop or mobile app from the browser's own install control —
+inside it, links stay in the app window and the title bar follows the light/dark setting. Reading,
+search and navigation are the same as in a browser tab.
 
 ## Printing
 

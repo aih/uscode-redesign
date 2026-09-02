@@ -1,5 +1,5 @@
 .PHONY: dev dev-web dev-all dev-data ci-data ci-classification-data \
-        test test-web test-slow test-all fixtures \
+        test test-web test-slow test-all fixtures sync-verification \
         verify verify-deep load-all shots loadtest navprofile spine-explain \
         test-e2e test-a11y demo-video measure footnav mobilebar diffcost \
         hf-export hf-upload hf-init
@@ -164,6 +164,16 @@ demo-video:
 
 fixtures:
 	uv run python scripts/extract_fixture.py
+
+# Copy the verification artifacts the reader renders into frontend/src/data/.
+# `docker-compose.prod.yml` builds the reader with `build: ./frontend`, so
+# nothing under docs/ exists at image-build time and the reader cannot import
+# across that boundary (ADR-0053's finding, ADR-0076's application of it).
+# frontend/tests/versiondata.test.ts fails `make test-web` when the copy has
+# drifted from the artifact, so regenerating a report and forgetting this is a
+# red build rather than a stale page.
+sync-verification:
+	cp docs/verification/version-changes.json frontend/src/data/version-changes.json
 
 # Counts recorded at load vs. what section_release_map actually holds. Seconds.
 verify:
