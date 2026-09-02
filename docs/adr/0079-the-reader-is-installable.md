@@ -37,8 +37,11 @@ one surface with no browser back button (finding 10).
    (`uv run --with cairosvg`, the `scripts/fonts.py` pattern — cairosvg is
    not a project dependency) renders `static/favicon.svg` into
    `frontend/public/icons/`: 192/512 `purpose: any`, 192/512
-   `purpose: maskable` with the mark in the inner 80% on a full-bleed
-   background, and an opaque 180px `apple-touch-icon` (iOS composites no
+   `purpose: maskable` with the mark on a full-bleed background scaled to
+   fit the safe-zone **circle** (80% of the diameter, centred — an
+   inner-80%-*square* fit leaves this mark's letter corners ~3.5% outside
+   it, which a strictly circular Android mask shaves; the computed fit is
+   x0.779), and an opaque 180px `apple-touch-icon` (iOS composites no
    alpha). `any` and `maskable` are separate entries — a combined
    `"any maskable"` icon has its `any` rendering cropped (finding 16's
    sources). `docs/verification/icons.json` pins the outputs to the source
@@ -66,11 +69,11 @@ one surface with no browser back button (finding 10).
    scripting off — the safety property the script already had.
 
 5. **`viewport-fit=cover` and the safe-area padding land together.**
-   `env(safe-area-inset-*)` padding on `.topbar`, on `.sectionbar` in the
-   band where `.topbar` is `display: contents` and renders no box, and on
-   `.usa-footer`. `env()` is 0 outside a notched standalone window, so
-   nothing moves in a browser — `sticky.spec.ts`'s geometry assertions are
-   the referee.
+   `env(safe-area-inset-*)` padding on `.topbar`, on `.sectionbar` and
+   `.usa-header` in the band below 40em where `.topbar` is
+   `display: contents` and renders no box, and on `.usa-footer`. `env()` is
+   0 outside a notched standalone window, so nothing moves in a browser —
+   `sticky.spec.ts`'s geometry assertions are the referee.
 
 6. **`/app/search` and `/app/goto` carry a trail** — Home › Search — closing
    ADR-0065's one remaining no-trail gap. The `current` entry keeps an empty
@@ -91,9 +94,17 @@ one surface with no browser back button (finding 10).
 ## Consequences
 
 - **Every route's JS budget rises once** for the theme-color correction and
-  the standalone check (~600 bytes with their comments, in `Base.astro`'s
-  graph, which every route imports) plus `ThemeToggle`'s meta write. Ceilings
-  re-measured per `docs/js-budgets.json`'s headroom rule.
+  the standalone check in `Base.astro`'s graph, which every route imports,
+  plus `ThemeToggle`'s meta write — **1,268 bytes per route** with their
+  comments (`docs/verification/js-bytes.json`, 18,250 → 19,518 on the
+  Base-only routes). Ceilings re-measured per `docs/js-budgets.json`'s
+  headroom rule.
+- **In a standalone window at 40em and up, the inset grows the sticky stack
+  while `--sticky-h` stays fixed**: `scroll-margin-top` spends the token, so
+  a deep link can land behind the bar by up to the top inset. A browser tab
+  is unaffected (`env()` is 0). Making the token spend the inset —
+  `calc(18rem + env(safe-area-inset-top))` — is the refinement if a device
+  pass shows it mattering.
 - **The manifest's colours are static**: an installed dark reader gets a
   light splash; the title bar is correct from first paint.
 - **iOS is unverifiable in CI** — Add to Home Screen has no emulation; the
