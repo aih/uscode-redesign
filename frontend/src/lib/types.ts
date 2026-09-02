@@ -131,7 +131,8 @@ export type Labels = Record<string, Entry>;
 
 /** A Public Law the classification tables attribute to a version transition
  *  (ADR-0074). `classification_actions` holds the source's own action words —
- *  the empty string is a plain amendment. */
+ *  the empty string is a plain amendment, `ed chg` an editorial
+ *  reclassification the ECCT records (ADR-0077). */
 export interface VersionLaw {
   pl_congress: number;
   pl_num: number;
@@ -139,6 +140,12 @@ export interface VersionLaw {
   is_note_classification: boolean;
   in_source_credit: boolean;
   classification_actions: string[];
+  /** The Editorial Classification Change Table records this law as prompting
+   *  a move of a provision into or out of the section. Absent on an API
+   *  older than ADR-0077. */
+  in_ecct?: boolean;
+  /** The move as the ECCT writes it: `42:294t nt → 42:294u new`. */
+  ecct_move?: string | null;
 }
 
 export interface VersionEntry {
@@ -156,7 +163,7 @@ export interface VersionEntry {
   notes_changed?: boolean | null;
   status_changed?: boolean | null;
   concurrent?: boolean | null;
-  /** `classified` | `none`. */
+  /** `classified` | `editorial` | `none` (ADR-0074, ADR-0077). */
   attribution?: string | null;
   laws?: VersionLaw[];
 }

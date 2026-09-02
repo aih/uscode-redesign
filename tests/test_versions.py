@@ -104,6 +104,8 @@ def test_version_out_carries_the_annotations_and_laws():
             "is_note_classification": False,
             "in_source_credit": True,
             "classification_actions": ["", "new"],
+            "in_ecct": False,
+            "ecct_move": None,
         }
     ]
 

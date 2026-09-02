@@ -256,7 +256,17 @@ class VersionLawOut(BaseModel):
     in_source_credit: bool
     classification_actions: list[str] = Field(
         description="Distinct `action` values of the matching classification "
-        "rows; the empty string is a plain amendment."
+        "rows; the empty string is a plain amendment, `ed chg` an editorial "
+        "reclassification."
+    )
+    in_ecct: bool = Field(
+        default=False,
+        description="The Editorial Classification Change Table records this law "
+        "as prompting an editorial move into or out of the section.",
+    )
+    ecct_move: str | None = Field(
+        default=None,
+        description="The move as the ECCT writes it, former → new.",
     )
 
     @classmethod
@@ -268,6 +278,8 @@ class VersionLawOut(BaseModel):
             is_note_classification=law.is_note_classification,
             in_source_credit=law.in_source_credit,
             classification_actions=list(law.classification_actions),
+            in_ecct=law.in_ecct,
+            ecct_move=law.ecct_move,
         )
 
 
@@ -293,7 +305,10 @@ class VersionOut(BaseModel):
     status_changed: bool | None = None
     concurrent: bool | None = None
     attribution: str | None = Field(
-        default=None, description="classified | none"
+        default=None,
+        description="classified | editorial | none — a classification row of "
+        "the change's own kind names a law in the window; only the Editorial "
+        "Classification Change Table does; neither does (ADR-0074, ADR-0077).",
     )
     laws: list[VersionLawOut] = Field(default_factory=list)
 

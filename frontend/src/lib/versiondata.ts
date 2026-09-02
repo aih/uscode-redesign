@@ -40,6 +40,31 @@ export interface TitleReport {
   text_classified_share: number | null;
 }
 
+export type Attribution = "classified" | "editorial" | "none";
+
+/** The attribution vocabulary in reading order: a statute the tables record,
+ *  a move OLRC records, nothing recorded (ADR-0074, ADR-0077). */
+export const ATTRIBUTIONS: Attribution[] = ["classified", "editorial", "none"];
+
+/** One release point's arrivals, per kind (ADR-0077's `by_release`). */
+export interface ReleaseArrivals {
+  label: string;
+  seq: number;
+  initial: number;
+  text: number;
+  notes: number;
+  structure: number;
+}
+
+/** What the corpus the report describes covers — the facts ADR-0076 found the
+ *  page writing by hand. */
+export interface Coverage {
+  titles: number;
+  release_points: number;
+  release_points_loaded: number;
+  newest_loaded: { label: string; currency_date: string } | null;
+}
+
 export interface VersionChangeReport {
   by_kind: Record<ChangeKind, KindTotal>;
   change_rows: number;
@@ -53,6 +78,88 @@ export interface VersionChangeReport {
   transitions: number;
   version_groups_hashed: number;
   version_groups_total: number;
+  /* ADR-0077's additions. Optional: an artifact written before them lacks
+   * every one, and the page renders what it has. */
+  notes_classified?: number;
+  notes_classified_share?: number | null;
+  editorial?: number;
+  attribution_by_kind?: Record<string, Partial<Record<Attribution, number>>>;
+  ecct_law_rows?: number;
+  by_release?: ReleaseArrivals[];
+  coverage?: Coverage;
+}
+
+export interface AttributionRow {
+  kind: ChangeKind;
+  total: number;
+  classified: number;
+  editorial: number;
+  none: number;
+  /** `classified` over the kind's total, or null where the kind is empty. */
+  classifiedShare: number | null;
+}
+
+/** Attribution per kind, every value present as a number, or null when the
+ *  artifact predates ADR-0077 and carries no breakdown. */
+export function attributionRows(report: VersionChangeReport): AttributionRow[] | null {
+  const byKind = report.attribution_by_kind;
+  if (!byKind) return null;
+  return CHANGE_KINDS.map((kind) => {
+    const counts = byKind[kind] ?? {};
+    const classified = counts.classified ?? 0;
+    const editorial = counts.editorial ?? 0;
+    const none = counts.none ?? 0;
+    const total = classified + editorial + none;
+    return {
+      kind,
+      total,
+      classified,
+      editorial,
+      none,
+      classifiedShare: total === 0 ? null : classified / total,
+    };
+  });
+}
+
+export interface ReleaseShare {
+  label: string;
+  count: number;
+  /** This release point's share of every arrival of the kind. */
+  share: number;
+}
+
+/**
+ * The `n` release points that received the most arrivals of `kind`, largest
+ * first, each with its share of all arrivals of that kind — the table that
+ * says whether 75% `structure` is spread across the corpus's history or
+ * concentrated where the source's converter changed. Ties keep release-point
+ * order. Null when the artifact carries no `by_release`.
+ */
+export function topReleases(
+  report: VersionChangeReport,
+  kind: Exclude<ChangeKind, "initial">,
+  n: number,
+): ReleaseShare[] | null {
+  const releases = report.by_release;
+  if (!releases) return null;
+  const total = releases.reduce((sum, entry) => sum + entry[kind], 0);
+  if (total === 0) return [];
+  return [...releases]
+    .sort((a, b) => b[kind] - a[kind] || a.seq - b.seq)
+    .slice(0, n)
+    .filter((entry) => entry[kind] > 0)
+    .map((entry) => ({ label: entry.label, count: entry[kind], share: entry[kind] / total }));
+}
+
+/** The share of all arrivals of `kind` that the top `n` release points hold. */
+export function concentration(
+  report: VersionChangeReport,
+  kind: Exclude<ChangeKind, "initial">,
+  n: number,
+): number | null {
+  const top = topReleases(report, kind, n);
+  if (top === null) return null;
+  return top.reduce((sum, entry) => sum + entry.share, 0);
 }
 
 export interface TitleRow {

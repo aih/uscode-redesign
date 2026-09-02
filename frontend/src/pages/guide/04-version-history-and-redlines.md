@@ -5,7 +5,7 @@ order: 4
 summary: Every release point at which a section changed, which of those changes were amendments, and a readable redline between any two of them.
 covers:
   routes: ["/app/versions", "/app/diff"]
-  adrs: [16, 26, 66, 74, 75]
+  adrs: [16, 26, 66, 74, 75, 77]
 ---
 
 ## Tracking change in the Code
@@ -66,6 +66,15 @@ table row. Where the tables record an action other than a plain amendment — `n
 on an entry that changed the statutory text, **Public laws recorded for this change** on one that
 changed a note or the markup.
 
+A notes-only entry is attributed by the tables' note rows: where a law's provision was classified
+as a note under the section and that law arrived with the change, the entry carries its chip.
+
+Where OLRC moved a provision into or out of the section without Congress amending it, the
+Editorial Classification Change Table records the move and the law that prompted it. Such an entry
+reads as an editorial reclassification, its chips are led by **Editorial reclassification prompted
+by**, each chip carries `ed chg`, and the move is written beside it as the table writes it:
+`42:294t nt → 42:294u new`.
+
 Where the text changed and no statute is recorded against it, the entry says so. Roughly half of
 text changes are in that state: footnote markers, editorial trimming of cross references,
 renumbering notices, and amendments the tables do not carry.
@@ -92,7 +101,7 @@ A change to whitespace alone is recorded as a metadata change, so it does not ap
 amendments view.
 
 The classification tables begin at the 104th Congress. An amendment older than that carries no
-chip.
+chip. The Editorial Classification Change Table covers the 119th Congress only.
 
 ## The From/To picker
 

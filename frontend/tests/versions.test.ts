@@ -7,6 +7,7 @@ import {
   isStatutoryEntry,
   lawActions,
   lawLabel,
+  lawMove,
   lawQuery,
   lawsLabel,
   readVersionsView,
@@ -366,5 +367,46 @@ describe("changeSummary", () => {
 
   it("says nothing about an unannotated entry", () => {
     expect(changeSummary(entry(null, []))).toBeNull();
+  });
+
+  it("names an editorial reclassification for every kind the ECCT can produce", () => {
+    for (const kind of ["initial", "text", "notes"]) {
+      expect(changeSummary(entry(kind, [], { attribution: "editorial" }))).toContain(
+        "reclassif",
+      );
+    }
+    expect(changeSummary(entry("text", [], { attribution: "editorial" }))).not.toContain(
+      "No classifying statute",
+    );
+  });
+});
+
+describe("the ECCT on a chip (ADR-0077)", () => {
+  const plain: VersionLaw = {
+    pl_congress: 119,
+    pl_num: 102,
+    in_classification: true,
+    is_note_classification: false,
+    in_source_credit: false,
+    classification_actions: [""],
+  };
+  const ecct: VersionLaw = {
+    ...plain,
+    pl_num: 75,
+    in_classification: false,
+    classification_actions: ["ed chg"],
+    in_ecct: true,
+    ecct_move: "42:294t nt → 42:294u new",
+  };
+
+  it("leads an editorial entry's chips with the prompting law, not an amendment", () => {
+    expect(lawsLabel(entry("text", [ecct], { attribution: "editorial" }))).toContain("prompted by");
+    expect(lawsLabel(entry("text", [ecct], { attribution: "editorial" }))).not.toContain("Amended");
+  });
+
+  it("carries the move as the table writes it, and nothing for other laws", () => {
+    expect(lawMove(ecct)).toBe("42:294t nt → 42:294u new");
+    expect(lawMove(plain)).toBeNull();
+    expect(lawActions(ecct)).toEqual(["ed chg"]);
   });
 });

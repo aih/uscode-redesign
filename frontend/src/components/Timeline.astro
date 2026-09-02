@@ -29,6 +29,7 @@ import {
   changeSummary,
   lawActions,
   lawLabel,
+  lawMove,
   lawQuery,
   lawsLabel,
   timelineRows,
@@ -71,21 +72,26 @@ const rows = timelineRows(entries, order);
             <p class="timeline__laws">
               <span class="timeline__laws-label">{lawsLabel(entry)}</span>
               {laws.map((law) => (
-                <a
-                  class="timeline__law"
-                  href={classificationHref(null, null, { q: lawQuery(law) })}
-                >
-                  {/* The space is written, not left as whitespace between two
-                      expressions: alone inside an element that text node does
-                      not survive the Astro compiler, and the accessible name
-                      came out `Pub. L. 119–21new` (ADR-0053's `Neighbors`). */}
-                  {lawActions(law).length > 0
-                    ? `${lawLabel(law)} `
-                    : lawLabel(law)}
-                  {lawActions(law).length > 0 && (
-                    <span class="timeline__law-action">{lawActions(law).join(", ")}</span>
+                <>
+                  <a
+                    class="timeline__law"
+                    href={classificationHref(null, null, { q: lawQuery(law) })}
+                  >
+                    {/* The space is written, not left as whitespace between two
+                        expressions: alone inside an element that text node does
+                        not survive the Astro compiler, and the accessible name
+                        came out `Pub. L. 119–21new` (ADR-0053's `Neighbors`). */}
+                    {lawActions(law).length > 0
+                      ? `${lawLabel(law)} `
+                      : lawLabel(law)}
+                    {lawActions(law).length > 0 && (
+                      <span class="timeline__law-action">{lawActions(law).join(", ")}</span>
+                    )}
+                  </a>
+                  {lawMove(law) && (
+                    <span class="timeline__law-move">{`(${lawMove(law)})`}</span>
                   )}
-                </a>
+                </>
               ))}
             </p>
           )}

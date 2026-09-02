@@ -753,6 +753,8 @@ class PostgresRepository:
                         is_note_classification=law.is_note_classification,
                         in_source_credit=law.in_source_credit,
                         classification_actions=tuple(law.classification_actions or ()),
+                        in_ecct=bool(law.in_ecct),
+                        ecct_move=law.ecct_move,
                     )
                 )
         return changes, laws

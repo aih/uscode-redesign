@@ -48,6 +48,69 @@ def _facts(label: str, *, id: int = 0, seq: int = 0) -> vc.ReleaseFacts:
 # ------------------------------------------------------------------ the window
 
 
+# ------------------------------------------------------ attribution (ADR-0077)
+
+
+def _attribute(cls_rows, ecct_rows, kind, departing, arriving):
+    return vc._attribute(cls_rows, ecct_rows, kind, departing, arriving, None, None)
+
+
+DEPARTING = _facts("119-70", id=1, seq=1)
+ARRIVING = _facts("119-102not101", id=2, seq=2)
+
+
+def test_a_text_row_in_the_window_classifies_a_text_change():
+    attribution, laws = _attribute([(119, 102, False, "")], [], "text", DEPARTING, ARRIVING)
+    assert attribution == "classified"
+    assert laws[(119, 102)].text_classification and not laws[(119, 102)].in_ecct
+
+
+def test_a_note_row_classifies_a_notes_change_and_not_a_text_change():
+    """A note row is the classification tables saying a law's provision is set
+    out as a note under the section — exactly the evidence a notes change
+    needs, and no evidence at all for a change of the statutory text."""
+    row = [(119, 102, True, "nt")]
+    assert _attribute(row, [], "notes", DEPARTING, ARRIVING)[0] == "classified"
+    attribution, laws = _attribute(row, [], "text", DEPARTING, ARRIVING)
+    assert attribution == "none"
+    assert laws[(119, 102)].is_note_classification
+
+
+def test_an_ecct_row_in_the_window_attributes_editorially():
+    move = "42:294t nt → 42:294u new"
+    attribution, laws = _attribute([], [(119, 75, move)], "initial", DEPARTING, ARRIVING)
+    assert attribution == "editorial"
+    law = laws[(119, 75)]
+    assert law.in_ecct and law.ecct_move == move
+    assert law.actions == {vc.ECCT_ACTION}
+    assert not law.in_classification
+
+
+def test_a_classification_row_outranks_the_ecct():
+    attribution, laws = _attribute(
+        [(119, 102, False, "")], [(119, 75, "x → y")], "text", DEPARTING, ARRIVING
+    )
+    assert attribution == "classified"
+    assert set(laws) == {(119, 102), (119, 75)}
+
+
+def test_an_ecct_row_outside_the_window_names_nothing():
+    """119-70 is incorporated at both ends, so a move it prompted did not
+    arrive with this transition."""
+    attribution, laws = _attribute([], [(119, 70, "x → y")], "text", DEPARTING, ARRIVING)
+    assert attribution == "none" and laws == {}
+
+
+def test_the_ecct_key_is_the_tables_own_spelling():
+    """The corpus writes the EN DASH; the ECCT writes a hyphen (gotcha 17)."""
+    assert vc.ecct_key("/us/usc/t42/s294u") == ("42", "294u")
+    assert vc.ecct_key("/us/usc/t42/s254c–15") == ("42", "254c-15")
+    assert vc.ecct_key("/us/usc/t5A/s101") == ("5a", "101")
+    assert vc.ecct_key("/us/usc/t16/ch1") is None
+    assert vc.ecct_key("/us/usc/t5a/pl/92/463/s1") is None
+
+
+
 def test_a_not_law_entering_is_in_the_window():
     """Finding 1: label-interval matching misses every `not`-law incorporation."""
     departing = _facts("116-344not283u1")
@@ -540,6 +603,21 @@ def test_the_report_counts_what_was_computed(corpus_with_119_2_table):
         assert "initial" in report["by_kind"]
         assert "16" in report["per_title"]
         assert report["version_groups_total"] >= report["version_groups_hashed"] > 0
+        # ADR-0077's additions: the vocabulary per kind, zero-filled; where the
+        # arrivals land; and what the corpus covers, so the page need not write it.
+        for kind in report["by_kind"]:
+            assert set(report["attribution_by_kind"][kind]) == {"classified", "editorial", "none"}
+        assert report["notes_classified"] <= report["by_kind"].get("notes", {"count": 0})["count"]
+        assert report["editorial"] >= 0 and report["ecct_law_rows"] >= 0
+        labels = [entry["label"] for entry in report["by_release"]]
+        assert labels == sorted(labels, key=lambda l: next(
+            e["seq"] for e in report["by_release"] if e["label"] == l
+        ))
+        assert sum(e["initial"] for e in report["by_release"]) == report["by_kind"]["initial"]["count"]
+        coverage = report["coverage"]
+        assert coverage["titles"] >= 1 and coverage["release_points_loaded"] == 2
+        assert coverage["newest_loaded"]["label"] == "119-102not101"
+        assert coverage["newest_loaded"]["currency_date"] == "2026-07-12"
         session.rollback()
 
 
@@ -608,12 +686,20 @@ def test_the_migration_round_trips():
         admin.dispose()
 
     scratch_url = settings.database_url.rsplit("/", 1)[0] + f"/{SCRATCH_DB}"
+    ecct_columns = {"in_ecct", "ecct_move"}
     try:
         _alembic(scratch_url, "upgrade", "head")
         tables = _table_names(scratch_url)
         assert {"section_version_changes", "section_version_change_laws"} <= tables
         assert {"text_hash", "notes_hash"} <= _column_names(scratch_url, "section_versions")
+        assert ecct_columns <= _column_names(scratch_url, "section_version_change_laws")
 
+        # One step back is ADR-0077's two columns; the tables stay.
+        _alembic(scratch_url, "downgrade", "-1")
+        assert "section_version_change_laws" in _table_names(scratch_url)
+        assert not (ecct_columns & _column_names(scratch_url, "section_version_change_laws"))
+
+        # Two steps back is ADR-0074's tables and hash columns.
         _alembic(scratch_url, "downgrade", "-1")
         tables = _table_names(scratch_url)
         assert "section_version_changes" not in tables
@@ -626,6 +712,7 @@ def test_the_migration_round_trips():
         assert {"section_version_changes", "section_version_change_laws"} <= _table_names(
             scratch_url
         )
+        assert ecct_columns <= _column_names(scratch_url, "section_version_change_laws")
     finally:
         admin = create_engine(settings.database_url, isolation_level="AUTOCOMMIT")
         with admin.connect() as conn:

@@ -26,6 +26,13 @@ The rules, exactly as the spec states them:
   Pub. L. 116-283 entering, a law below both labels. Classification rows are
   matched by `usc_identifier IN identifier_variants(identifier)` because the
   corpus spells 5,697 sections with an EN DASH (gotcha 17).
+- **What counts as classified** (ADR-0077). A transition is `classified` when
+  a classification row of its own kind names a law in the window: a text row
+  for a text change, a note row for a notes change. It is `editorial` when no
+  such row exists but the Editorial Classification Change Table records a law
+  in the window as prompting a move of a provision into or out of the section
+  — OLRC's own record of a change it made without Congress amending the
+  section. Otherwise it is `none`.
 
 Comparison is whitespace-insensitive (`ingest.records.text_hash_of`); the
 recorded cost is that a genuine whitespace-only statutory change classifies as
@@ -40,6 +47,7 @@ parser's `plain_text()`/`notes_text()`.
 from __future__ import annotations
 
 import datetime
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -52,6 +60,7 @@ from sqlalchemy.orm import Session
 
 from db.models import (
     ClassificationEntry,
+    EcctEntry,
     ReleasePoint,
     Section,
     SectionReleaseMap,
@@ -61,7 +70,7 @@ from db.models import (
     Title,
     TitleVersion,
 )
-from ingest.classification import PL_CITATION_RE
+from ingest.classification import PL_CITATION_RE, normalize_section
 from ingest.parser import parser_for_namespace
 from ingest.records import notes_hash_of, squash, text_hash_of
 from ingest.verification import VERIFICATION_DIR, write_verification_json
@@ -233,6 +242,8 @@ class _Law:
     note_classification: bool = False
     text_classification: bool = False
     in_source_credit: bool = False
+    in_ecct: bool = False
+    ecct_move: str | None = None
     actions: set[str] = field(default_factory=set)
 
     @property
@@ -436,12 +447,16 @@ class _SectionContext:
     fall (the departing end of a mid-corpus `initial` window)."""
 
     classification: dict[int, list[tuple[int, int, bool, str]]]
+    ecct: dict[int, list[EcctFact]]
     title_loads: dict[int, list[tuple[int, int]]]
     title_of: dict[int, int]
     section_ids: list[int]
 
     def rows(self, section_id: int) -> Sequence[tuple[int, int, bool, str]]:
         return self.classification.get(section_id, ())
+
+    def ecct_rows(self, section_id: int) -> Sequence[EcctFact]:
+        return self.ecct.get(section_id, ())
 
     def loads(self, section_id: int) -> Sequence[tuple[int, int]]:
         return self.title_loads[self.title_of[section_id]]
@@ -471,10 +486,10 @@ def _section_context(session: Session, section_ids: Sequence[int]) -> _SectionCo
     for row in sections:
         if row.title_id not in title_loads:
             title_loads[row.title_id] = _title_load_seqs(session, row.title_id)
+    identifiers = {row.id: row.identifier for row in sections}
     return _SectionContext(
-        classification=_classification_rows(
-            session, {row.id: row.identifier for row in sections}
-        ),
+        classification=_classification_rows(session, identifiers),
+        ecct=_ecct_rows(session, identifiers),
         title_loads=title_loads,
         title_of={row.id: row.title_id for row in sections},
         section_ids=[row.id for row in sections],
@@ -515,8 +530,70 @@ def _classification_rows(
     return rows
 
 
+EcctFact = tuple[int, int, str]
+"""`(prompting congress, prompting law number, move)` — one Editorial
+Classification Change Table row that names a section on either side, with the
+move as OLRC writes it: `42:294t nt → 42:294u new`."""
+
+_SECTION_PATH_RE = re.compile(r"^/us/usc/t(?P<title>\d+[A-Za-z]?)/s(?P<section>[^/]+)$")
+
+ECCT_ACTION = "ed chg"
+"""OLRC's own token for a cross-reference to the ECCT (`ed chg`, `nt ed chg`
+in the classification tables' description column), reused as the action word
+on a law row the ECCT produced."""
+
+
+def ecct_key(identifier: str) -> tuple[str, str] | None:
+    """`/us/usc/t42/s294u` → `('42', '294u')`, the pair the ECCT is indexed
+    by — the inverse of `derive_usc_identifier`, through the same
+    `normalize_section`, so the EN DASH the corpus writes meets the hyphen the
+    table writes. None for anything that is not a plain section path."""
+    match = _SECTION_PATH_RE.match(identifier)
+    if match is None:
+        return None
+    return match.group("title").lower(), normalize_section(match.group("section"))
+
+
+def _ecct_rows(session: Session, identifiers: dict[int, str]) -> dict[int, list[EcctFact]]:
+    """Per section: every ECCT row whose former or new classification is this
+    section, as the law that prompted the move (ADR-0077).
+
+    The table is read whole — 21 rows corpus-wide against a batch of 200
+    sections — and matched in Python. A row with no parsable prompting law
+    names nothing that could be in a window and is skipped.
+    """
+    by_key: dict[tuple[str, str], int] = {}
+    for section_id, identifier in identifiers.items():
+        key = ecct_key(identifier)
+        if key is not None:
+            by_key[key] = section_id
+    if not by_key:
+        return {}
+    rows: dict[int, list[EcctFact]] = {}
+    for entry in session.scalars(
+        select(EcctEntry).where(
+            EcctEntry.prompting_pl_congress.is_not(None),
+            EcctEntry.prompting_pl_num.is_not(None),
+        )
+    ):
+        move = f"{entry.former_raw} → {entry.new_raw}"
+        fact = (entry.prompting_pl_congress, entry.prompting_pl_num, move)
+        for title, section in (
+            (entry.former_title_num, entry.former_section_norm),
+            (entry.new_title_num, entry.new_section_norm),
+        ):
+            if title is None or section is None:
+                continue
+            section_id = by_key.get((title, section))
+            if section_id is not None and fact not in rows.setdefault(section_id, []):
+                rows[section_id].append(fact)
+    return rows
+
+
 def _attribute(
     cls_rows: Sequence[tuple[int, int, bool, str]],
+    ecct_rows: Sequence[EcctFact],
+    change_kind: str,
     departing: ReleaseFacts | None,
     arriving: ReleaseFacts,
     from_credit: str | None,
@@ -524,11 +601,13 @@ def _attribute(
 ) -> tuple[str, dict[tuple[int, int], _Law]]:
     """The transition's attributed laws and the `attribution` value.
 
-    `classified` needs at least one non-note classification row in the window
-    (finding 5: structure-only transitions match at 0%, so the signal is
-    clean). A law only a note row names, or one only newly present in the
-    source credit, still gets a law row — flagged as what it is — but does not
-    make the transition `classified`.
+    `classified` needs a classification row of the transition's own kind in
+    the window: a text row for a `text` (or `initial`) change, a note row for
+    a `notes` change (finding 5: structure-only transitions match at 0%, so
+    the signal is clean). `editorial` needs an ECCT row whose prompting law is
+    in the window, and no such classification row. A law only a note row names
+    against a text change, or one only newly present in the source credit,
+    still gets a law row — flagged as what it is — but decides nothing.
     """
     laws: dict[tuple[int, int], _Law] = {}
     for congress, num, is_note, action in cls_rows:
@@ -541,13 +620,28 @@ def _attribute(
             law.text_classification = True
         law.actions.add(action)
 
+    for congress, num, move in ecct_rows:
+        if not law_in_window(departing, arriving, congress, num):
+            continue
+        law = laws.setdefault((congress, num), _Law())
+        law.in_ecct = True
+        law.ecct_move = move if law.ecct_move is None else f"{law.ecct_move}; {move}"
+        law.actions.add(ECCT_ACTION)
+
     for congress, num in credit_laws(to_credit) - credit_laws(from_credit):
         if not law_in_window(departing, arriving, congress, num):
             continue
         laws.setdefault((congress, num), _Law()).in_source_credit = True
 
-    classified = any(law.text_classification for law in laws.values())
-    return ("classified" if classified else "none"), laws
+    if change_kind == "notes":
+        classified = any(law.note_classification for law in laws.values())
+    else:
+        classified = any(law.text_classification for law in laws.values())
+    if classified:
+        return "classified", laws
+    if any(law.in_ecct for law in laws.values()):
+        return "editorial", laws
+    return "none", laws
 
 
 def _insert_law_rows(
@@ -565,6 +659,8 @@ def _insert_law_rows(
                 is_note_classification=law.is_note_classification,
                 in_source_credit=law.in_source_credit,
                 classification_actions=sorted(law.actions),
+                in_ecct=law.in_ecct,
+                ecct_move=law.ecct_move,
             )
         )
     return len(laws)
@@ -657,7 +753,13 @@ def compute_for_sections(
                 from_credit = prev.source_credit
 
             attribution, laws = _attribute(
-                section_cls, departing, arriving, from_credit, group.source_credit
+                section_cls,
+                context.ecct_rows(section_id),
+                change_kind,
+                departing,
+                arriving,
+                from_credit,
+                group.source_credit,
             )
             change = SectionVersionChange(
                 section_id=section_id,
@@ -1081,6 +1183,8 @@ def _reattribute_sections(
             )
         attribution, laws = _attribute(
             context.rows(change.section_id),
+            context.ecct_rows(change.section_id),
+            change.change_kind,
             departing,
             arriving,
             credit_of.get(change.from_version_id),
@@ -1125,6 +1229,73 @@ def build_report(session: Session) -> dict:
         select(func.count()).where(SectionVersion.text_hash.is_not(None))
     )
     versions_total = session.scalar(select(func.count()).select_from(SectionVersion))
+
+    # Attribution per kind — the whole vocabulary, every kind, zero-filled, so
+    # a reader of the artifact never has to know which values exist.
+    attribution_by_kind: dict[str, dict[str, int]] = {
+        kind: {"classified": 0, "editorial": 0, "none": 0} for kind in kind_counts
+    }
+    for kind, attribution, count in session.execute(
+        select(
+            SectionVersionChange.change_kind,
+            SectionVersionChange.attribution,
+            func.count(),
+        ).group_by(SectionVersionChange.change_kind, SectionVersionChange.attribution)
+    ):
+        attribution_by_kind.setdefault(kind, {})[attribution] = count
+    notes_total = kind_counts.get("notes", 0)
+    notes_classified = attribution_by_kind.get("notes", {}).get("classified", 0)
+    editorial = sum(counts.get("editorial", 0) for counts in attribution_by_kind.values())
+    ecct_law_rows = session.scalar(
+        select(func.count()).where(SectionVersionChangeLaw.in_ecct.is_(True))
+    )
+
+    # Arrivals per release point: where the transitions of each kind land. A
+    # converter change shows up here as one release point receiving a
+    # `structure` arrival for nearly every section of every title it touched.
+    by_release: dict[str, dict] = {}
+    for label, seq, kind, count in session.execute(
+        select(
+            ReleasePoint.label,
+            ReleasePoint.seq,
+            SectionVersionChange.change_kind,
+            func.count(),
+        )
+        .select_from(SectionVersionChange)
+        .join(ReleasePoint, ReleasePoint.id == SectionVersionChange.window_to_release_id)
+        .group_by(ReleasePoint.label, ReleasePoint.seq, SectionVersionChange.change_kind)
+        .order_by(ReleasePoint.seq)
+    ):
+        entry = by_release.setdefault(
+            label, {"seq": seq, "initial": 0, "text": 0, "notes": 0, "structure": 0}
+        )
+        entry[kind] = count
+
+    # What the corpus these rows describe covers — the four facts ADR-0076
+    # found the page writing by hand.
+    loaded_release_ids = select(TitleVersion.release_id).where(
+        TitleVersion.sections_loaded.is_not(None)
+    )
+    newest_loaded = session.execute(
+        select(ReleasePoint.label, ReleasePoint.currency_date)
+        .where(ReleasePoint.id.in_(loaded_release_ids))
+        .order_by(ReleasePoint.seq.desc())
+        .limit(1)
+    ).first()
+    coverage = {
+        "titles": session.scalar(select(func.count()).select_from(Title)),
+        "release_points": session.scalar(select(func.count()).select_from(ReleasePoint)),
+        "release_points_loaded": session.scalar(
+            select(func.count(func.distinct(TitleVersion.release_id))).where(
+                TitleVersion.sections_loaded.is_not(None)
+            )
+        ),
+        "newest_loaded": (
+            {"label": newest_loaded.label, "currency_date": newest_loaded.currency_date.isoformat()}
+            if newest_loaded is not None
+            else None
+        ),
+    }
 
     per_title_rows = session.execute(
         select(
@@ -1179,8 +1350,19 @@ def build_report(session: Session) -> dict:
         "text_classified_share": (
             round(text_classified / text_total, 4) if text_total else None
         ),
+        "notes_classified": notes_classified,
+        "notes_classified_share": (
+            round(notes_classified / notes_total, 4) if notes_total else None
+        ),
+        "editorial": editorial,
+        "attribution_by_kind": {
+            kind: attribution_by_kind[kind] for kind in sorted(attribution_by_kind)
+        },
         "concurrent": concurrent,
         "law_rows": law_rows,
+        "ecct_law_rows": ecct_law_rows,
+        "by_release": [{"label": label, **entry} for label, entry in by_release.items()],
+        "coverage": coverage,
         "per_title": {
             num: per_title[num]
             for num in sorted(per_title, key=title_sort_key)

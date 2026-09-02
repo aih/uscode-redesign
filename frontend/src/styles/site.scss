@@ -4111,6 +4111,16 @@ dialog.palette {
   color: var(--muted);
 }
 
+/* The editorial move an ECCT-attributed chip stands for, as the table writes
+   it (ADR-0077). Interface face and muted: it explains the chip beside it and
+   is not a citation. */
+.timeline__law-move {
+  font-family: var(--ui);
+  font-size: 0.875em;
+  color: var(--muted);
+  margin-right: 0.5em;
+}
+
 .diff-picker {
   display: flex;
   flex-wrap: wrap;
@@ -5305,6 +5315,36 @@ dialog.palette {
 .vdata tfoot td {
   border-top: 2px solid var(--edge);
   font-weight: 700;
+}
+
+/* ADR-0077: the attribution glossary under its table, and the two arrival
+   tables side by side from 40em, stacked below it. Each table keeps its own
+   scroll region, so the pair never widens the page (WCAG 1.4.10). */
+.vdata__glossary {
+  margin: 0.5rem 0 1.5rem;
+  font-family: var(--ui);
+  font-size: 0.9375rem;
+
+  dt {
+    float: left;
+    clear: left;
+    margin-right: 0.5rem;
+  }
+
+  dd {
+    margin: 0 0 0.25rem 0;
+    overflow: hidden;
+  }
+}
+
+.vdata__pair {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 40em) {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* --------------------------------------------------------- filter pills

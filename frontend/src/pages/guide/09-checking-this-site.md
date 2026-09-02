@@ -122,9 +122,11 @@ site has never seen.
 
 The version history distinguishes an amendment to the statutory text from a change to the notes
 around it and from a change that touched neither. [/app/data/version-changes](/app/data/version-changes)
-describes how that distinction is made, which Public Law a change of text is attributed to, and
-what the whole corpus contains once every transition has been classified: 489,738 change rows over
-423,800 transitions, and 30,250 attributions to a Public Law.
+describes how that distinction is made, which Public Law a change is attributed to and from which
+of OLRC's two tables, and what the whole corpus contains once every transition has been
+classified: 489,738 change rows over 423,800 transitions, and 30,250 attributions to a Public Law.
+Where the report carries them, the page also shows the attribution of each kind of change and the
+release points at which the most changes of each kind arrived.
 
 The per-title table lists all 56 titles that have change rows, and can be ordered by title, by
 change rows, by text changes or by the share of text changes attributed to a statute. The order is
@@ -133,8 +135,9 @@ them.
 
 Two limits are stated on the page. Attribution reaches 49.25% of text changes, because the
 classification tables begin at the 104th Congress and a provision last amended before then has no
-row to match. And 77,596 transitions are marked concurrent, where the release points a change
-spans cannot be pinned down and the attribution that depends on them is unreliable.
+row to match, and the Editorial Classification Change Table covers the 119th Congress only. And
+77,596 transitions are marked concurrent, where the release points a change spans cannot be
+pinned down and the attribution that depends on them is unreliable.
 
 The figures come from a committed file rather than from the database, so the page reads the same on
 any copy of this site. The file is the one `python -m ingest version-changes --report` writes, and

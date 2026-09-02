@@ -275,7 +275,14 @@ class VersionLawRef:
 
     classification_actions: tuple[str, ...]
     """Distinct `action` values of the matching rows (`''` = amended, `new`,
-    `repealed`, `tr to`, …)."""
+    `repealed`, `tr to`, …); `ed chg` for an ECCT match."""
+
+    in_ecct: bool = False
+    """The Editorial Classification Change Table records this law as prompting
+    an editorial move into or out of the section (ADR-0077)."""
+
+    ecct_move: str | None = None
+    """The move as the ECCT writes it: `42:294t nt → 42:294u new`."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,7 +318,7 @@ class SectionVersionInfo:
     arithmetic is unreliable for this transition."""
 
     attribution: str | None = None
-    """'classified' | 'none'."""
+    """'classified' | 'editorial' | 'none' (ADR-0074, ADR-0077)."""
 
     laws: tuple[VersionLawRef, ...] = ()
 

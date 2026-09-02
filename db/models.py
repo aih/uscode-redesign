@@ -255,7 +255,13 @@ class SectionVersionChange(Base):
     elements under one identifier at one release point (ADR-0021), so window
     arithmetic is unreliable here and the UI says so."""
 
-    attribution: Mapped[str] = mapped_column(String)  # 'classified' | 'none'
+    attribution: Mapped[str] = mapped_column(String)
+    """'classified' | 'editorial' | 'none'. `classified` when a classification
+    row of the transition's own kind names a law in the window (a text row for
+    a text change, a note row for a notes change); `editorial` when the only
+    law in the window is one the Editorial Classification Change Table records
+    as prompting a move into or out of this section (ADR-0077)."""
+
     computed_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -291,7 +297,16 @@ class SectionVersionChangeLaw(Base):
 
     classification_actions: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     """Distinct `action` values of the matching rows (`''` = amended, `new`,
-    `repealed`, `tr to`, …) — display vocabulary for the UI."""
+    `repealed`, `tr to`, …) — display vocabulary for the UI. An ECCT match adds
+    OLRC's own token for a cross-reference to that table, `ed chg`."""
+
+    in_ecct: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    """The Editorial Classification Change Table records this law as prompting
+    an editorial move into or out of this section (ADR-0077)."""
+
+    ecct_move: Mapped[str | None] = mapped_column(String, nullable=True)
+    """The move as the ECCT writes it, former → new: `42:294t nt → 42:294u new`.
+    NULL unless `in_ecct`."""
 
 
 class SectionReleaseMap(Base):

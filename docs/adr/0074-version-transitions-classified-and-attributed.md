@@ -181,7 +181,8 @@ V3) can default to statutory changes with the full history one click away.
   miss. The UI wording (V3) says no classifying statute is recorded, never
   "editorial".
 - **ECCT rows are not consulted** (21 editorial moves); a moved provision's
-  text change stays unattributed.
+  text change stays unattributed. *Taken up by ADR-0077, which consults them
+  and adds `editorial` to the attribution vocabulary.*
 - **The resume skip is a count equality** — a section is skipped when its
   change rows number its version groups — rather than "the newest group has a
   row". A new group breaks the equality either way; what the approximation

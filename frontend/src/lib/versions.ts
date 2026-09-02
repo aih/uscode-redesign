@@ -246,9 +246,18 @@ export function lawActions(law: VersionLaw): string[] {
  * so the lead-in is the sentence that makes the list true for its own kind.
  */
 export function lawsLabel(entry: VersionEntry): string {
+  if (entry.attribution === "editorial") return "Editorial reclassification prompted by";
   return entry.change_kind === "text"
     ? "Amended by"
     : "Public laws recorded for this change:";
+}
+
+/**
+ * The editorial move a law's chip stands for, as the ECCT writes it —
+ * `42:294t nt → 42:294u new` — or null for a law the ECCT does not name.
+ */
+export function lawMove(law: VersionLaw): string | null {
+  return law.in_ecct && law.ecct_move ? law.ecct_move : null;
 }
 
 /**
@@ -261,15 +270,23 @@ export function lawsLabel(entry: VersionEntry): string {
  * Null for an entry of a corpus with no change rows.
  */
 export function changeSummary(entry: VersionEntry): string | null {
+  const editorial = entry.attribution === "editorial";
   switch (entry.change_kind) {
     case "initial":
-      return "The oldest text this site holds for this section.";
+      return editorial
+        ? "The oldest text this site holds for this section, which OLRC created by reclassifying a provision."
+        : "The oldest text this site holds for this section.";
     case "text":
+      if (editorial) {
+        return "Statutory text changed by an editorial reclassification, not by an amendment to this section.";
+      }
       return entry.attribution === "classified"
         ? "Statutory text changed."
         : "Statutory text changed. No classifying statute recorded.";
     case "notes":
-      return "Notes updated. The statutory text is unchanged.";
+      return editorial
+        ? "Notes changed by an editorial reclassification. The statutory text is unchanged."
+        : "Notes updated. The statutory text is unchanged.";
     case "structure":
       return "XML/metadata only. Neither the statutory text nor the notes changed.";
     default:

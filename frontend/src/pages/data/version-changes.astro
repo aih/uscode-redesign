@@ -1,7 +1,7 @@
 ---
 /**
  * `/app/data/version-changes` — how this site classifies a version change, and
- * what the corpus turned out to contain (ADR-0074, ADR-0076).
+ * what the corpus turned out to contain (ADR-0074, ADR-0076, ADR-0077).
  *
  * ## It reaches no data
  *
@@ -22,14 +22,12 @@
  * Every count and share comes from the artifact, and `generated_at` is printed
  * beside them, so the numbers and the date they were true of move together.
  *
- * Four facts do not come from the artifact, because it does not carry them:
- * **58 titles, 381 release points, `119-102not101`, 12 July 2026**. They are
- * written out under `The corpus`, as `/app/about` writes them out, and they go
- * stale when a further release point is loaded — at which point the report is
- * regenerated too, so the sentence to correct is beside the date that makes it
- * checkable. Putting the release-point coverage into the report itself is the
- * fix that removes the hand-written half, and it is a change to
- * `ingest/version_changes.py` rather than to this page.
+ * Since ADR-0077 the report carries the corpus's coverage — titles, release
+ * points, the newest loaded release point and its currency date — so those four
+ * facts are no longer written by hand here. An artifact written before that
+ * lacks `coverage`, `attribution_by_kind` and `by_release`; the page renders the
+ * hand-written sentence and omits the two tables until the report is
+ * regenerated, and says nothing false in the meantime.
  *
  * ## The sort is server-side
  *
@@ -44,12 +42,16 @@ import REPORT from "../../data/version-changes.json";
 import { setPublicCache } from "../../lib/cache";
 import { APP, versionDataHref } from "../../lib/url";
 import {
+  ATTRIBUTIONS,
+  attributionRows,
+  concentration,
   formatCount,
   formatShare,
   parseSort,
   shareOf,
   sortTitleRows,
   titleRows,
+  topReleases,
   type SortKey,
   type VersionChangeReport,
 } from "../../lib/versiondata";
@@ -112,15 +114,28 @@ function headingHref(key: SortKey): string {
 }
 
 const KIND_MEANING: Record<string, string> = {
-  initial: "The first version of a section, which arrived from nothing",
-  text: "The reading text differs",
-  notes: "The notes or the source credit differ, and the reading text does not",
-  structure: "Neither the reading text nor the notes differ",
+  initial: "The oldest stored version of a section, with nothing before it",
+  text: "The statutory text differs",
+  notes: "The notes or the source credit differ, and the statutory text does not",
+  structure: "Only the XML differs: neither the statutory text nor the notes changed",
+};
+
+const ATTRIBUTION_MEANING: Record<string, string> = {
+  classified: "A classification-table row of the change's own kind names a law that arrived with it",
+  editorial: "Only the Editorial Classification Change Table names one: OLRC moved a provision",
+  none: "Nothing in either table names a law that arrived with it",
 };
 
 const generated = new Date(report.generated_at);
 const generatedLabel = generated.toISOString().slice(0, 10);
 const concurrentShare = shareOf(report.concurrent, report.transitions);
+const coverage = report.coverage ?? null;
+const attribution = attributionRows(report);
+const TOP = 10;
+const topStructure = topReleases(report, "structure", TOP);
+const topText = topReleases(report, "text", TOP);
+const structureConcentration = concentration(report, "structure", TOP);
+const textConcentration = concentration(report, "text", TOP);
 
 const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] = [
   { label: "Sections covered", count: report.sections_covered, share: null },
@@ -132,13 +147,38 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
     count: report.text_classified,
     share: report.text_classified_share,
   },
-  { label: "Public Law attributions recorded", count: report.law_rows, share: null },
-  {
-    label: `Transitions marked concurrent, of ${formatCount(report.transitions)}`,
-    count: report.concurrent,
-    share: concurrentShare,
-  },
 ];
+if (report.notes_classified !== undefined) {
+  CORPUS_FIGURES.push({
+    label: `Notes changes attributed to a Public Law, of ${formatCount(report.by_kind.notes.count)}`,
+    count: report.notes_classified,
+    share: report.notes_classified_share ?? null,
+  });
+}
+if (report.editorial !== undefined) {
+  CORPUS_FIGURES.push({
+    label: "Changes attributed to an editorial reclassification",
+    count: report.editorial,
+    share: null,
+  });
+}
+CORPUS_FIGURES.push({
+  label: "Public Law attributions recorded",
+  count: report.law_rows,
+  share: null,
+});
+if (report.ecct_law_rows !== undefined) {
+  CORPUS_FIGURES.push({
+    label: "of which recorded from the Editorial Classification Change Table",
+    count: report.ecct_law_rows,
+    share: null,
+  });
+}
+CORPUS_FIGURES.push({
+  label: `Transitions marked concurrent, of ${formatCount(report.transitions)}`,
+  count: report.concurrent,
+  share: concurrentShare,
+});
 ---
 
 <Base title="Version changes in this corpus · U.S. Code">
@@ -146,85 +186,113 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
 
   <p class="lede">
     How this site decides what changed between two versions of a section, which Public Law it
-    attributes a change of text to, and what the whole corpus contains once every transition has
-    been classified.
+    attributes the change to, and what the whole corpus contains once every change has been
+    classified.
   </p>
 
-  <h2 class="toc-group">Version groups and transitions</h2>
+  <h2 class="toc-group">What a version is</h2>
 
   <p>
     The Code republishes every title at every release point whether or not anything in it changed.
-    This site stores one copy of each distinct text a section has had and points every release
-    point that published it at that copy. Each of those copies is a <strong>version group</strong>,
-    and a <strong>transition</strong> is the move from one to the next.
+    This site keeps one copy of each distinct XML a section has had and records which release points
+    published it. Each copy is a <strong>version</strong>; the move from one version to the next is a
+    <strong>transition</strong>. A section's oldest version has no transition and is recorded as
+    <code>initial</code>.
   </p>
 
   <p>
-    Version groups are ordered by the earliest release point each is mapped to. A section's
-    earliest group has nothing before it and is recorded as <code>initial</code>; every later group
-    records the transition that produced it. The <strong>window</strong> of a transition runs from
-    the last release point mapped to the departing group to the first release point mapped to the
-    arriving group.
+    Versions are ordered by the earliest release point that published each one. A transition
+    <strong>departs</strong> from the last release point that published the older version and
+    <strong>arrives</strong> at the first release point that published the newer one; the release
+    points in between are its <strong>window</strong>.
   </p>
 
-  <h2 class="toc-group">How a transition is classified</h2>
+  <h2 class="toc-group">The three questions asked of a transition</h2>
 
   <p>
-    Two digests are stored for every version group: a hash of the section's reading text and a hash
-    of its notes and source credit. Both are taken with all whitespace removed. The transition is
-    classified from the two comparisons, in this order:
+    Two digests are stored for every version, both taken with all whitespace removed: one of the
+    statutory text, one of the notes and the source credit. A transition is classified by asking
+    three questions in order and stopping at the first yes:
+  </p>
+
+  <ol>
+    <li>
+      Did the statutory text change? Then it is <code>text</code>. The section's heading is part of
+      the statutory text.
+    </li>
+    <li>Did the notes or the source credit change? Then it is <code>notes</code>.</li>
+    <li>
+      Otherwise it is <code>structure</code>: the stored XML differs and nothing a reader sees does.
+      The differences are attribute values, element-boundary whitespace and the like, most of them
+      from a change in the converter that produced the file.
+    </li>
+  </ol>
+
+  <p>
+    A change to whitespace alone inside statutory text answers no to the first question and is
+    recorded as <code>structure</code>. The reading redline cannot show such a change either.
+  </p>
+
+  <h2 class="toc-group">Which laws could have caused it</h2>
+
+  <p>
+    A release point incorporates every Public Law up to and including the one it is named for,
+    except the laws its name excludes: <code>119-102not101</code> holds Pub. L. 119–102 and not Pub.
+    L. 119–101. The laws that <strong>arrived with a transition</strong> are the ones incorporated at
+    the arriving release point and not at the departing one. This is a set difference rather than a
+    reading of the labels: between <code>116-344not283u1</code> and <code>116-344</code> the law that
+    arrived is Pub. L. 116–283, which is below both labels.
+  </p>
+
+  <p>
+    A section that first appears part-way through the corpus is treated as arriving from the release
+    point before it in its title's load history, so the law that created it can be found. A section
+    present at the earliest loaded release point of its title has no window and is attributed to
+    nothing.
+  </p>
+
+  <h2 class="toc-group">What the tables say about those laws</h2>
+
+  <p>
+    The laws that arrived are looked up in two tables OLRC publishes. The
+    <a href={`${APP}/classification`}>classification tables</a> record which provision of which
+    Public Law was classified to which Code section, and whether as statutory text or as a note.
+    The <a href={`${APP}/classification/ecct`}>Editorial Classification Change Table</a> records
+    provisions OLRC moved between sections, or between a note and a section, in the course of
+    classifying a new law, with the law that prompted the move. Each transition is recorded as one
+    of three things:
   </p>
 
   <ul>
     <li>
-      <code>text</code> — the reading text differs. The heading is part of the reading text, so a
-      change to it is a text change.
+      <code>classified</code> — a row of the transition's own kind names a law that arrived with it:
+      a text row for a <code>text</code> change, a note row for a <code>notes</code> change, a
+      text row for an <code>initial</code> arrival.
     </li>
-    <li><code>notes</code> — the notes or the source credit differ and the reading text does not.</li>
     <li>
-      <code>structure</code> — neither differs. The stored XML changed in some other way: attribute
-      drift from the converter, element-boundary whitespace, a <code>@style</code> or
-      <code>@class</code> value.
+      <code>editorial</code> — no such row, but the Editorial Classification Change Table records a
+      law that arrived with it as prompting a move into or out of the section. The change is
+      OLRC's, not an amendment to the section.
+    </li>
+    <li>
+      <code>none</code> — neither table names a law that arrived with it. No law is inferred.
     </li>
   </ul>
 
   <p>
-    A whitespace-only change to statutory text is classified <code>structure</code>. The reader's
-    redline treats such a change the same way.
+    Every matched law is listed against the transition on the section's version history, saying
+    which table named it and, for a move, what moved from where to where.
   </p>
 
-  <p>
-    A transition is marked <strong>concurrent</strong> when the two groups' release ranges overlap,
-    or when a third group is mapped to a release point inside the window. Both shapes mean the
-    window runs across release points the departing group did not hold, so the window arithmetic —
-    and the attribution that depends on it — is unreliable. The version history says so on the
-    entries concerned.
-  </p>
-
-  <h2 class="toc-group">How a text change is attributed</h2>
+  <h2 class="toc-group">When the release points do not line up</h2>
 
   <p>
-    A Public Law is incorporated at a release point when its number is at or below the release
-    point's own and it is not among that release point's excluded laws. The laws newly incorporated
-    across a transition are the difference between those two sets. Release point labels do not
-    describe what a release point contains: the text change between <code>116-344not283u1</code> and
-    <code>116-344</code> is Pub. L. 116–283 entering, a law below both labels.
-  </p>
-
-  <p>
-    Those laws are matched against the <a href={`${APP}/classification`}>classification tables</a>,
-    which record which provision of which Public Law was classified to which Code section. A
-    transition with at least one matching row that is not a note classification is recorded as
-    <code>classified</code>, and the matched laws are listed against it. A transition whose text
-    changed with nothing matching is recorded as <code>none</code>: no classifying statute is
-    recorded for it, and no law is inferred.
-  </p>
-
-  <p>
-    A section that first appears part-way through the corpus is attributed from the previous loaded
-    release point of its title, so a <code>new</code> classification row in that window attributes
-    the section's creation. A section present at the earliest loaded release point of its title
-    gets no window and no attribution.
+    A transition is marked <strong>concurrent</strong> when the versions on either side of it were
+    both published at one release point, or when a third version was published inside its window.
+    Both happen when a section's XML returns to an earlier form — a converter alternating between
+    two serialisations, or a genuine revert — because this site keeps one version per distinct
+    XML rather than one per stretch of time. On such a transition the window cannot be trusted, and
+    the version history says so beside the entry.
   </p>
 
   <h2 class="toc-group">Limitations</h2>
@@ -233,30 +301,50 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
     <li>
       <strong>Attribution reaches {formatShare(report.text_classified_share)} of text changes.</strong
       > The classification tables begin at the 104th Congress; a provision last amended before then
-      has no row to match. Editorial moves recorded in the Editorial Classification Change Table
-      are not consulted.
+      has no row to match. The Editorial Classification Change Table covers the 119th Congress only
+      and records the moves made while classifying new laws; moves made while preparing a main
+      edition or supplement are not in it.
     </li>
     <li>
       <strong
         >{formatCount(report.concurrent)} transitions ({formatShare(concurrentShare)}) are marked
         concurrent.</strong
-      > Most are content that recurs — a converter serialization variant, or a revert — rather than
-      the sections the source publishes twice under one identifier. Window arithmetic is unreliable
-      on those transitions.
+      > Most are XML that recurs rather than the sections the source publishes twice under one
+      identifier.
     </li>
     <li>
-      <strong>The digests carry no version of their own.</strong> A change to how the reading text
-      is extracted would redefine what every stored hash means. Rebuilding them is a full recompute.
+      <strong>The digests carry no version of their own.</strong> A change to how the statutory text
+      is extracted would redefine what every stored digest means. Rebuilding them is a full
+      recompute.
     </li>
   </ul>
 
   <h2 class="toc-group">The corpus</h2>
 
-  <p>
-    These figures describe the corpus as it stood on <strong>{generatedLabel}</strong>:
-    {formatCount(report.sections_covered)} sections across 58 titles, loaded from the OLRC downloads
-    at 381 release points, the newest of them <code>119-102not101</code>, published 12 July 2026.
-  </p>
+  {
+    coverage ? (
+      <p>
+        These figures describe the corpus as it stood on <strong>{generatedLabel}</strong>:
+        {formatCount(report.sections_covered)} sections across {formatCount(coverage.titles)} titles,
+        loaded from the OLRC downloads at {formatCount(coverage.release_points_loaded)} of the
+        {formatCount(coverage.release_points)} release points OLRC has published
+        {coverage.newest_loaded && (
+          <>
+            , the newest of them <code>{coverage.newest_loaded.label}</code>, current through{" "}
+            {coverage.newest_loaded.currency_date}
+          </>
+        )}
+        .
+      </p>
+    ) : (
+      <p>
+        These figures describe the corpus as it stood on <strong>{generatedLabel}</strong>:
+        {formatCount(report.sections_covered)} sections across 58 titles, loaded from the OLRC
+        downloads at 381 release points, the newest of them <code>119-102not101</code>, published
+        12 July 2026.
+      </p>
+    )
+  }
 
   <div class="uslm-tablewrap" role="region" tabindex="0" aria-label="Corpus-wide totals">
     <table class="usa-table usa-table--striped vdata">
@@ -313,12 +401,147 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
     has no share: it is an arrival with no departure, one per section covered.
   </p>
 
+  {
+    attribution && (
+      <>
+        <h2 class="toc-group">Attribution by kind</h2>
+
+        <p>
+          What the two tables said about each kind of change. A <code>structure</code> change is
+          expected to match nothing: no law arrives with a change nobody can read.
+        </p>
+
+        <div class="uslm-tablewrap" role="region" tabindex="0" aria-label="Attribution by kind">
+          <table class="usa-table usa-table--striped vdata">
+            <caption>Attribution by kind</caption>
+            <thead>
+              <tr>
+                <th scope="col">Kind</th>
+                <th scope="col" class="vdata__num">Rows</th>
+                {ATTRIBUTIONS.map((value) => (
+                  <th scope="col" class="vdata__num">
+                    <code>{value}</code>
+                  </th>
+                ))}
+                <th scope="col" class="vdata__num">Classified</th>
+              </tr>
+            </thead>
+            <tbody>
+              {attribution.map((row) => (
+                <tr>
+                  <th scope="row">
+                    <code>{row.kind}</code>
+                  </th>
+                  <td class="vdata__num">{formatCount(row.total)}</td>
+                  <td class="vdata__num">{formatCount(row.classified)}</td>
+                  <td class="vdata__num">{formatCount(row.editorial)}</td>
+                  <td class="vdata__num">{formatCount(row.none)}</td>
+                  <td class="vdata__num">{formatShare(row.classifiedShare)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <dl class="vdata__glossary">
+          {ATTRIBUTIONS.map((value) => (
+            <>
+              <dt>
+                <code>{value}</code>
+              </dt>
+              <dd>{ATTRIBUTION_MEANING[value]}</dd>
+            </>
+          ))}
+        </dl>
+      </>
+    )
+  }
+
+  {
+    topStructure && topText && (
+      <>
+        <h2 class="toc-group">Where the changes arrive</h2>
+
+        <p>
+          Every transition arrives at one release point. The two tables below name the {TOP} release
+          points that received the most <code>structure</code> arrivals and the most
+          <code>text</code> arrivals, with each one's share of all arrivals of that kind. Those {TOP}
+          hold {formatShare(structureConcentration)} of the <code>structure</code> arrivals and{" "}
+          {formatShare(textConcentration)} of the <code>text</code> arrivals: a converter change
+          gives one release point a <code>structure</code> arrival for nearly every section of every
+          title it republished, while amendments spread across the release points that incorporated
+          them.
+        </p>
+
+        <div class="vdata__pair">
+          <div
+            class="uslm-tablewrap"
+            role="region"
+            tabindex="0"
+            aria-label="Release points receiving the most structure arrivals"
+          >
+            <table class="usa-table usa-table--striped vdata">
+              <caption>Most <code>structure</code> arrivals</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Release point</th>
+                  <th scope="col" class="vdata__num">Arrivals</th>
+                  <th scope="col" class="vdata__num">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topStructure.map((entry) => (
+                  <tr>
+                    <th scope="row">
+                      <code>{entry.label}</code>
+                    </th>
+                    <td class="vdata__num">{formatCount(entry.count)}</td>
+                    <td class="vdata__num">{formatShare(entry.share)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            class="uslm-tablewrap"
+            role="region"
+            tabindex="0"
+            aria-label="Release points receiving the most text arrivals"
+          >
+            <table class="usa-table usa-table--striped vdata">
+              <caption>Most <code>text</code> arrivals</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Release point</th>
+                  <th scope="col" class="vdata__num">Arrivals</th>
+                  <th scope="col" class="vdata__num">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topText.map((entry) => (
+                  <tr>
+                    <th scope="row">
+                      <code>{entry.label}</code>
+                    </th>
+                    <td class="vdata__num">{formatCount(entry.count)}</td>
+                    <td class="vdata__num">{formatShare(entry.share)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   <h2 class="toc-group">By title</h2>
 
   <p>
     {formatCount(rows.length)} titles have change rows. The corpus holds 58; titles 11a and 28a
-    carry no sections at any release point, so they have no version groups to report. The rows below
-    sum to the corpus totals above.
+    carry no sections at any release point, so they have no versions to report. The rows below sum
+    to the corpus totals above.
   </p>
 
   <SortBar
@@ -439,7 +662,8 @@ const CORPUS_FIGURES: { label: string; count: number; share: number | null }[] =
   </p>
 
   <p class="doc-meta">
-    The method is written up as ADR-0074 and <code>docs/version-semantics-spec.md</code> in the{" "}
+    The method is written up as ADR-0074 and ADR-0077 and in
+    <code>docs/version-semantics-spec.md</code> in the{" "}
     <a class="usa-link usa-link--external" rel="noopener" href="https://github.com/aih/uscode-redesign"
       >repository</a
     >. The annotations are shown per section on each{" "}

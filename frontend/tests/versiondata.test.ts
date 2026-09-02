@@ -22,12 +22,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   CHANGE_KINDS,
+  attributionRows,
+  concentration,
   formatCount,
   formatShare,
   parseSort,
   shareOf,
   sortTitleRows,
   titleRows,
+  topReleases,
   type VersionChangeReport,
 } from "../src/lib/versiondata";
 
@@ -181,5 +184,76 @@ describe("the table's order", () => {
     expect(parseSort("nonsense")).toBe("title");
     expect(parseSort("rows-desc")).toBe("rows-desc");
     expect(parseSort("classified")).toBe("classified");
+  });
+});
+
+describe("ADR-0077's additions to the report", () => {
+  /** A report in the shape `build_report` writes since ADR-0077, small enough
+   *  to check by hand: three release points, a converter change at the second. */
+  const annotated: VersionChangeReport = {
+    ...report,
+    attribution_by_kind: {
+      initial: { classified: 1, editorial: 1, none: 8 },
+      text: { classified: 3, none: 1 },
+      notes: { classified: 2, none: 2 },
+      structure: { none: 20 },
+    },
+    by_release: [
+      { label: "113-21", seq: 1, initial: 10, text: 0, notes: 0, structure: 0 },
+      { label: "113-30", seq: 2, initial: 0, text: 1, notes: 1, structure: 18 },
+      { label: "113-44", seq: 3, initial: 0, text: 3, notes: 3, structure: 2 },
+    ],
+    coverage: {
+      titles: 1,
+      release_points: 382,
+      release_points_loaded: 3,
+      newest_loaded: { label: "113-44", currency_date: "2013-11-01" },
+    },
+  };
+
+  it("renders nothing for an artifact written before them", () => {
+    expect(attributionRows(report)).toBeNull();
+    expect(topReleases(report, "structure", 10)).toBeNull();
+    expect(concentration(report, "text", 10)).toBeNull();
+  });
+
+  it("fills every attribution value for every kind, missing ones as zero", () => {
+    const rows = attributionRows(annotated)!;
+    expect(rows.map((row) => row.kind)).toEqual(CHANGE_KINDS);
+    const text = rows.find((row) => row.kind === "text")!;
+    expect(text).toMatchObject({ total: 4, classified: 3, editorial: 0, none: 1 });
+    expect(text.classifiedShare).toBeCloseTo(0.75);
+    const structure = rows.find((row) => row.kind === "structure")!;
+    expect(structure.classifiedShare).toBe(0);
+  });
+
+  it("gives an empty kind no share rather than a division by zero", () => {
+    const empty = { ...annotated, attribution_by_kind: { initial: { none: 3 } } };
+    const text = attributionRows(empty)!.find((row) => row.kind === "text")!;
+    expect(text.total).toBe(0);
+    expect(text.classifiedShare).toBeNull();
+  });
+
+  it("ranks release points by arrivals of the kind, with each one's share", () => {
+    const top = topReleases(annotated, "structure", 2)!;
+    expect(top.map((entry) => entry.label)).toEqual(["113-30", "113-44"]);
+    expect(top[0].share).toBeCloseTo(0.9);
+    expect(concentration(annotated, "structure", 1)).toBeCloseTo(0.9);
+    expect(concentration(annotated, "structure", 10)).toBeCloseTo(1);
+  });
+
+  it("keeps release-point order on a tie and drops release points with none", () => {
+    const top = topReleases(annotated, "notes", 10)!;
+    expect(top.map((entry) => entry.label)).toEqual(["113-44", "113-30"]);
+    expect(topReleases(annotated, "text", 10)!.map((entry) => entry.label)).toEqual([
+      "113-44",
+      "113-30",
+    ]);
+  });
+
+  it("answers an empty kind with an empty list, not a share of nothing", () => {
+    const none = { ...annotated, by_release: [annotated.by_release![0]] };
+    expect(topReleases(none, "text", 5)).toEqual([]);
+    expect(concentration(none, "text", 5)).toBe(0);
   });
 });
