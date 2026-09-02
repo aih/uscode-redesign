@@ -357,7 +357,7 @@ classification vocabulary by name** and gave every other value to `pl`; it now s
 suffix. A count column's forward direction is largest first, since `SortBar` sends an option that is
 not in force to its own forward direction.
 
-`make test` = **851** Python tests; `make test-web` = **457** frontend tests; `make test-e2e` = **663**
+`make test` = **857** Python tests; `make test-web` = **466** frontend tests; `make test-e2e` = **663**
 Playwright tests, 344 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -365,7 +365,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(75 ADRs, numbered to 0076 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(76 ADRs, numbered to 0077 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -531,9 +531,24 @@ carries its `Pub. L. 119–102` chips (EN DASH); an unattributed one says no cla
 recorded; a corpus with no change rows renders the all view and says the kinds are not computed.
 `previousChangedRelease` — the section header's "Compare with…" default — walks back past the
 notes-only and metadata-only groups, and falls back to its old answer without annotations. All four
-phases are merged (V1 #61, V2 #62, V4 #63, V3 #64, hardening #65).
+phases are merged (V1 #61, V2 #62, V4 #63, V3 #64, hardening #65). **ADR-0077 amends the
+attribution**: a `notes` transition is `classified` by a note row, the Editorial Classification
+Change Table is consulted and gives a third value, `editorial`, with `in_ecct`/`ecct_move` on the
+law row (migration `c7e2a9f4b1d0`); `build_report` carries `attribution_by_kind`, `by_release` and
+`coverage`, and `/app/data/version-changes` renders them when the artifact does — **the committed
+artifact predates them until `version-changes --recompute --report` and `make sync-verification`
+are run over the full corpus, and the box wants `--reattribute`.**
 
-**Next: (1) Day 7 hardening — part of it landed as ADR-0073 under an outage, and what it did not
+**Two specs are written and not built: `docs/redis-caching-spec.md` (a Postgres-side corpus
+generation bumped by triggers and read first on every request, so a Redis response cache, the
+diff memo and the rate limiters can be shared and never stale — R1 alone retires the reader's
+five-minute release-list cache) and `docs/pwa-spec.md` (manifest, icons, a post-build service
+worker whose three rules are ADR-0018's three `Cache-Control` classes, an offline banner drawn
+from an attribute, Save-for-offline at the served-from release point, and a six-agent plan with
+the model each needs).**
+
+**Next: (0) regenerate `docs/verification/version-changes.json` over the full corpus with
+ADR-0077's code and sync it; (1) Day 7 hardening — part of it landed as ADR-0073 under an outage, and what it did not
 cover is the load test below; (2) `docs/verification/loadtest.json` has never been regenerated
 against the deployed box and is now stale for `/app/diff` three times over — ADR-0026 moved the
 reader off the endpoint, ADR-0066 made the endpoint 150-2,000x cheaper, and the reader's own limiter
