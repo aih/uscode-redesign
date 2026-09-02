@@ -35,8 +35,9 @@ The five outputs:
 * `icon-192.png` / `icon-512.png` — the favicon as drawn (`purpose: any`;
   the corners outside the 6/64 radius stay transparent).
 * `icon-maskable-192.png` / `icon-maskable-512.png` — full-bleed background,
-  mark scaled into the inner 80% (the maskable safe zone). Separate files:
-  a single `"any maskable"` icon gets cropped in its `any` uses.
+  mark scaled so its ink fits the safe-zone circle (`SAFE` of the diameter,
+  centred). Separate files: a single `"any maskable"` icon gets cropped in
+  its `any` uses.
 * `apple-touch-icon-180.png` — opaque full-bleed background (iOS composites
   no alpha).
 """
@@ -58,9 +59,11 @@ MANIFEST = ROOT / "docs" / "verification" / "icons.json"
 #: viewBox — read out of the file below, never assumed.
 VIEWBOX = 64
 
-#: The maskable safe zone: platform masks are guaranteed to keep the inner 80%
-#: of the icon, so the whole mark goes there and the background bleeds to the
-#: edge (w3.org/TR/appmanifest, "icon masks").
+#: The maskable safe zone: platform masks are guaranteed to keep a **circle**
+#: of 80% of the icon's diameter, centred (w3.org/TR/appmanifest, "icon
+#: masks") — not the inner 80% square, whose corners a circular mask shaves.
+#: The mark is scaled so its measured ink fits inside that circle; the
+#: background bleeds to the edge.
 SAFE = 0.8
 
 
@@ -109,14 +112,16 @@ def text_element(mark: dict) -> str:
     )
 
 
-def measure_squeeze(mark: dict, svg2png) -> tuple[float, float]:
-    """What `lengthAdjust="spacingAndGlyphs"` would do, measured.
+def measure_ink(mark: dict, svg2png) -> dict:
+    """The word's rendered geometry, measured rather than assumed.
 
     cairosvg drops `textLength`, so the word renders at the natural width of
     whatever font answered the stack — wider than the tile. A browser squeezes
     it to `textLength` units; this measures the natural width (alpha bounding
     box on a probe canvas wide enough not to clip) and returns the same
-    horizontal scale.
+    horizontal scale, plus the ink's vertical extent in tile units — the
+    baseline sits at the favicon's own `y`, so the vertical numbers transfer
+    to the icon unchanged. The maskable fit below needs both axes.
     """
     from PIL import Image  # cairosvg's own dependency
 
@@ -135,19 +140,44 @@ def measure_squeeze(mark: dict, svg2png) -> tuple[float, float]:
     bbox = Image.open(io.BytesIO(png)).getbbox()
     if bbox is None:
         raise SystemExit("the probe render produced no ink to measure")
-    natural = (bbox[2] - bbox[0]) * probe_units / probe_px
+    per_unit = probe_px / probe_units
+    natural = (bbox[2] - bbox[0]) / per_unit
     if natural >= probe_units:
         raise SystemExit("the probe canvas clipped the text; widen it")
-    return mark["text_length"] / natural, natural
+    return {
+        "squeeze": mark["text_length"] / natural,
+        "natural": natural,
+        "ink_top": bbox[1] / per_unit,
+        "ink_bottom": bbox[3] / per_unit,
+    }
+
+
+def maskable_scale(mark: dict, ink: dict) -> float:
+    """How far to shrink the mark so its ink fits the safe-zone circle.
+
+    The guaranteed-visible region of a maskable icon is a centred circle of
+    `SAFE` of the icon's diameter. The word's ink, squeezed to `textLength`
+    wide and measured `ink_top`..`ink_bottom` tall, has its farthest corner at
+    a radius the inner-`SAFE` *square* does not bound — at this aspect ratio
+    the corners of an 80%-square fit sit ~3.5% outside the circle, which a
+    strictly circular Android mask shaves off the letters.
+    """
+    center = VIEWBOX / 2
+    half_w = ink["squeeze"] * ink["natural"] / 2
+    half_h = (ink["ink_bottom"] - ink["ink_top"]) / 2
+    off_center = abs((ink["ink_top"] + ink["ink_bottom"]) / 2 - center)
+    corner = ((half_w**2) + ((off_center + half_h) ** 2)) ** 0.5
+    radius = SAFE * VIEWBOX / 2
+    return min(radius / corner, SAFE)
 
 
 def compose(mark: dict, squeeze: float, *, full_bleed: bool, inset: float = 0.0) -> str:
     """One icon as SVG: the card (or a full-bleed field) and the fitted word.
 
-    `inset` scales the mark into the centre — 0.1 each side for the maskable
-    safe zone. With `full_bleed` the background reaches every edge; the card's
-    rounded corners then vanish against a field of the same colour, which is
-    the point.
+    `inset` scales the mark into the centre — `(1 - maskable_scale()) / 2`
+    each side for the maskable safe zone. With `full_bleed` the background
+    reaches every edge; the card's rounded corners then vanish against a
+    field of the same colour, which is the point.
     """
     card = f'<rect fill="{mark["bg"]}" width="{VIEWBOX}" height="{VIEWBOX}" rx="{mark["rx"]}"/>'
     word = (
@@ -181,14 +211,17 @@ def main() -> None:
         )
 
     mark = read_mark()
-    squeeze, natural = measure_squeeze(mark, svg2png)
+    ink = measure_ink(mark, svg2png)
+    squeeze, natural = ink["squeeze"], ink["natural"]
+    fit = maskable_scale(mark, ink)
     print(
         f"mark: {mark['word']} natural width {natural:.2f} units, "
-        f"squeezed x{squeeze:.5f} to textLength {mark['text_length']:g}"
+        f"squeezed x{squeeze:.5f} to textLength {mark['text_length']:g}; "
+        f"maskable fit x{fit:.5f} inside the {SAFE:g}-diameter circle"
     )
 
     plain = compose(mark, squeeze, full_bleed=False)
-    maskable = compose(mark, squeeze, full_bleed=True, inset=(1 - SAFE) / 2)
+    maskable = compose(mark, squeeze, full_bleed=True, inset=(1 - fit) / 2)
     apple = compose(mark, squeeze, full_bleed=True)
 
     outputs = [
@@ -229,6 +262,7 @@ def main() -> None:
             "naturalWidthUnits": round(natural, 3),
             "squeeze": round(squeeze, 5),
             "maskableSafeZone": SAFE,
+            "maskableScale": round(fit, 5),
         },
         "files": files,
     }

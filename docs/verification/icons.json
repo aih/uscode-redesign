@@ -10,7 +10,8 @@
     "lettering": "#ffffff",
     "naturalWidthUnits": 89.188,
     "squeeze": 0.62789,
-    "maskableSafeZone": 0.8
+    "maskableSafeZone": 0.8,
+    "maskableScale": 0.7792
   },
   "files": [
     {
@@ -31,15 +32,15 @@
       "file": "icon-maskable-192.png",
       "purpose": "maskable",
       "px": 192,
-      "bytes": 5247,
-      "sha256": "5dc3ea4649c180a98d62961458f2230c018e42e3bee3ff9a5732e9932ee06db9"
+      "bytes": 5154,
+      "sha256": "520b75afb413a52bb3e3847d0e9f7c90f6bbef22a808f3e3c59b9d95a03e8c5d"
     },
     {
       "file": "icon-maskable-512.png",
       "purpose": "maskable",
       "px": 512,
-      "bytes": 14718,
-      "sha256": "b67d96f5478a650d46ffed7edee363a9a877856739f43c27c1ceec1838ffdf6f"
+      "bytes": 14516,
+      "sha256": "a74e46db480952dd47ee3fc15828b5c77665c0f33f0a896b74164a4c8028be6d"
     },
     {
       "file": "apple-touch-icon-180.png",
