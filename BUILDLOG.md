@@ -3395,3 +3395,11 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `make test-e2e` against the rebuilt merged stack, twice — once after the merge, once after the fixes: **674 passed, 2 skipped, 0 failed** both times, the a11y scan at **350 scans, 8 violation/route pairs over 2,952 nodes** (the ReDoc bundle's known `color-contrast` pair grew 1,904 → 1,946 nodes with ADR-0078's API additions rendering into `/redoc`; the baseline re-committed).
   - Both sides live together on one stack: `/health` `{"redis":"ok"}`, `X-Corpus-Generation` on the API, the manifest as `application/manifest+json`, `/app/offline` 200 through the proxy.
   - `node --check` on the edited `sw.js`; the review's refuted candidate (inline-script bytes from frontmatter comments) confirmed refuted — frontmatter never ships.
+
+## 100 — 2026-09-02 — Session 78: the install guide names Android
+
+- **Tool/model:** Claude Code, Fable 5.
+- **Asked:** After merging PR #75, review whether the PWA documentation is sufficient; refine it so users know how to install on iOS, Android and desktop.
+- **Decided:** The PWA documentation (ADR-0079–0081, `docs/pwa-spec.md`, guide 02's "Install as an app") was sufficient except that **Android was never named**: the Chrome/Edge bullet described the desktop address-bar icon, and the platform where `beforeinstallprompt` matters most had no instructions. No new ADR — a guide refinement under ADR-0038's duty 6.
+- **Produced:** `frontend/src/pages/guide/02-reading.md` — the install list split into per-platform bullets (Chrome/Edge on a computer; Chrome on Android via ⋮ › *Add to Home screen*; macOS Safari; iOS/iPadOS Safari), the **More › Help** row sentence moved out of the desktop bullet since it applies on Android too, and a flat limitation line that desktop Firefox does not offer installation. Plus a typo fix in the same chapter ("printed n whatever" → "printed in whatever").
+- **Verified:** `npx vitest run tests/guide.test.ts` — 8 passed (covers unchanged: 79, 80, 81 already on chapter 02); the `install-identity` scenario untouched.
