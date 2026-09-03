@@ -2,9 +2,9 @@
 
 **Status:** spec written 2026-09-02, from a three-agent research session (session 95, BUILDLOG):
 a survey of the frontend serving surface, a UX/chrome inventory, and an external practice brief
-on 2026 installability. Phase P1 is implemented (ADR-0079, branch `c5-pwa-p1`, merged) and so is
-P2 (ADR-0080, branch `c5-pwa-p2`); P4 is not started. Implementing sessions update this line and
-the [§ Status](#status) table as waves land.
+on 2026 installability. Phase P1 is implemented (ADR-0079, branch `c5-pwa-p1`, merged), so is
+P2 (ADR-0080, branch `c5-pwa-p2`, merged), and so is P4 (ADR-0081, branch `c5-pwa-p4`).
+Implementing sessions update this line and the [§ Status](#status) table as waves land.
 
 The reader becomes installable as a desktop and mobile app — a web app manifest, app icons, a
 service worker with an offline fallback, and behavior adjustments for a standalone window — while
@@ -405,5 +405,5 @@ the stated merge order. After wave 2, deploy and run the manual device pass (cos
 |---|---|---|---|
 | P1 identity + standalone | implemented | `c5-pwa-p1` | ADR-0079; manifest + icons + theme-color meta + safe-area insets + standalone same-tab links + Home › Search trails; `tests/pwa.test.ts` |
 | P2 worker + offline | implemented | `c5-pwa-p2` | ADR-0080; `sw.js` (network-first + preload, LRU-40 pages, cache-first assets), registration in `Base.astro`, self-contained `/app/offline`, `tests/e2e/pwa.spec.ts` |
-| P4 install surface + docs | not started | — | |
-| deploy + device check | not started | — | manual iOS/macOS install pass against the deployed box; record in `docs/deploy-status.md` |
+| P4 install surface + docs | implemented | `c5-pwa-p4` | ADR-0081; `InstallApp` row in More › Help, chapter 02's full install section + scenario, `/app/offline` in the a11y matrix and the IA map, the device pass owed in `docs/deploy-status.md` |
+| deploy + device check | not started | — | manual iOS/macOS install pass against the deployed box; record in `docs/deploy-status.md` (the checklist is written there) |

@@ -50,6 +50,7 @@ cd frontend/src && grep -rnE 'appHref|versionsHref|diffHref|gotoHref|searchHref|
 | `/app/login` | `login.astro` | Sign in. Switched off in the UI | `provisions.astro:46`, `settings.astro:52`, `signup.astro:53`, `AuthNav:35` | `/app/signup`, the `?next=` destination | header, footer |
 | `/app/signup` | `signup.astro` | Create an account. Switched off in the UI | `login.astro:58`, `AuthNav:37` | `/app/login`, the `?next=` destination | header, footer |
 | `/app/404` | `404.astro` | Anything under `/app` that is not a citation | any wrong URL | `/app/` | header, footer |
+| `/app/offline` | `offline.astro` | What the service worker serves when a navigation cannot reach the site: the recently read sections as links, and a retry (ADR-0080) | the service worker, on a failed navigation with no cached copy of the URL asked for | a cached section, or the retried address | none — self-contained, no `Base`, so it renders from one cached document |
 | `/app/preview/…` | `preview/[...identifier].ts` | The rendered fragment the hover card fetches (ADR-0024). An endpoint, not a page | `CitePreview.astro:199`, by `fetch` | — | none |
 | `/app/healthz` | `healthz.ts` | Liveness for the container | the orchestrator | — | none |
 | `/us/usc/…` | served by FastAPI (`citation.py`) | The bare citation URL; 307s to `/app` or `/api/v1` by `Accept:` (ADR-0010) | printed on every section page; anything a reader pastes | the reader or the API | none |

@@ -36,12 +36,12 @@ Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 38 route entries (one expanding to
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 39 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and
 fourteen interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
 (ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
 (ADR-0058), both navbar dropdowns (ADR-0061), the command palette (ADR-0062) and the open
-classification lookup (ADR-0067) — **343 scans**,
+classification lookup (ADR-0067) — **350 scans**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -357,8 +357,26 @@ classification vocabulary by name** and gave every other value to `pl`; it now s
 suffix. A count column's forward direction is largest first, since `SortBar` sends an option that is
 not in force to its own forward direction.
 
-`make test` = **851** Python tests; `make test-web` = **457** frontend tests; `make test-e2e` = **663**
-Playwright tests, 344 of which are the accessibility scan (**all three are required** — reader
+**The reader is installable** (`docs/pwa-spec.md`, ADR-0079, ADR-0080, ADR-0081). The manifest is
+`/app/manifest.webmanifest` — `id`/`scope` `"/app/"` with the trailing slash, `display: standalone`,
+colours read from the token block — with five generated PNGs under `/app/icons` pinned by
+`docs/verification/icons.json` (`scripts/icons.py`, the `scripts/fonts.py` pattern), one
+`theme-color` meta kept on the resolved theme by the pre-paint bootstrap and `ThemeToggle`,
+`viewport-fit=cover` paired with safe-area padding, and a standalone window treated as
+`usc-linktarget === "same"` so cross references and search results stay in the app. Offline is
+`frontend/public/sw.js`, hand-rolled: network-first with navigation preload for `/app` navigations,
+storing only `ok` non-`redirected` responses (the last 40, `usc-pages-v1`), cache-first for
+`_astro`/fonts/uswds/icons, everything else passed through; a failed navigation falls back to the
+cache and then to the self-contained `/app/offline`, which lists the cached sections and uses no
+`Base` chrome. The install surface is **one hidden row in More › Help** (`InstallApp`): a button
+revealed by `beforeinstallprompt` (stash → `prompt()` on click, hidden on `appinstalled`), a link
+to the guide's install section on iOS Safari, nothing in a standalone window — enforced by the
+script and by a `display-mode: standalone` media rule both. `tests/pwa.test.ts` holds the manifest
+contract; `tests/e2e/pwa.spec.ts` proves offline in a browser; the iOS device pass is owed
+(`docs/deploy-status.md`).
+
+`make test` = **851** Python tests; `make test-web` = **468** frontend tests; `make test-e2e` = **676**
+Playwright tests, 351 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run

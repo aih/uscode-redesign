@@ -5,7 +5,7 @@ order: 2
 summary: Going to a provision by its citation, moving around it and inside it from the keyboard, and reading what the badges and notes on it mean.
 covers:
   routes: ["/app/us/usc", "/us/usc"]
-  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63, 64, 79]
+  adrs: [9, 10, 21, 25, 40, 43, 50, 52, 54, 55, 56, 58, 59, 60, 61, 63, 64, 79, 80, 81]
 ---
 
 ## The address of a provision
@@ -517,9 +517,40 @@ The box takes keyboard focus, so <kbd>Tab</kbd> to it and the arrow keys scroll 
 
 ## Install as an app
 
-The site can be installed as a desktop or mobile app from the browser's own install control —
-inside it, links stay in the app window and the title bar follows the light/dark setting. Reading,
-search and navigation are the same as in a browser tab.
+The site can be installed as a desktop or mobile app. The installed app opens in its own window:
+links between provisions stay in the window, the title bar follows the light/dark setting, and
+reading, search and navigation are the same as in a browser tab.
+
+**Installing.**
+
+- **Chrome or Edge** — the install icon at the right end of the address bar, or the browser's own
+  menu (⋮ or ⋯ › *Install*). When the browser is offering installation, the site's **More › Help**
+  group carries an **Install this app** row that opens the same prompt.
+- **macOS Safari** — **File › Add to Dock**.
+- **iOS and iPadOS Safari** — **Share › Add to Home Screen**. On those devices the **More › Help**
+  group carries a link to this section.
+
+The installed app and the browser tab are the same site: an address works in both. In Chrome and
+Edge a setting changed in one — the theme, the reading density — is in force in the other. An app
+added from Safari keeps settings of its own.
+
+```scenario
+id: install-identity
+title: A section page carries the app identity
+steps:
+  - goto: /app/us/usc/t16/s45f
+  - expect: { selector: 'link[rel="manifest"][href="/app/manifest.webmanifest"]', count: 1 }
+  - expect: { selector: 'link[rel="apple-touch-icon"]', count: 1 }
+```
+
+**Offline.** A page visited recently opens without a connection, from a copy saved on the device;
+the site keeps the last 40. Any other address shows an offline page that lists the saved pages as
+links and offers a retry. A saved section states its release point and whether it is the newest,
+the same line it carries online. While the connection is up, every page comes from the site rather
+than from the saved copy.
+
+Search, the version timeline, comparisons and citation previews need the connection. The pages
+tied to an account — sign in, sign up, My Provisions, settings — are never saved.
 
 ## Printing
 
