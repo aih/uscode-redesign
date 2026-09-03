@@ -23,7 +23,7 @@ import SearchFacets from "../components/SearchFacets.astro";
 import SearchResult from "../components/SearchResult.astro";
 import { ApiError, fetchSearch, releaseParams } from "../lib/api";
 import { CITES_KEYWORD } from "../lib/query";
-import type { SearchResponse } from "../lib/types";
+import type { Entry, SearchResponse } from "../lib/types";
 import { APP, gotoHref, pageOffset, searchHref, syntaxHref } from "../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
@@ -103,9 +103,21 @@ function sortHref(next: string): string {
 const total = data?.total ?? 0;
 const results = data?.results ?? [];
 const title = query ? `Search: ${query} · U.S. Code` : "Search · U.S. Code";
+
+/** The trail out — Home › Search (ADR-0079). Every other rendered page carries
+ * one (ADR-0065's 404/429 included), and an installed standalone window has no
+ * browser back button. `current` keeps an empty identifier so `PrintHeader`,
+ * which renders only for a page with a citation to name, stays silent. */
+const crumbs: Entry[] = [{ identifier: "/", level: "home", num: "Home", heading: null }];
+const currentCrumb: Entry = { identifier: "", level: "page", num: "Search", heading: null };
 ---
 
-<Base title={title} searchValue={asCites ? `${CITES_KEYWORD} ${query}` : query}>
+<Base
+  title={title}
+  crumbs={crumbs}
+  current={currentCrumb}
+  searchValue={asCites ? `${CITES_KEYWORD} ${query}` : query}
+>
   <h1 class="doc-title">Search</h1>
 
   {failure && <ErrorPage status={failure.status} detail={failure.detail} />}

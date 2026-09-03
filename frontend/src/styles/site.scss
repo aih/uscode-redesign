@@ -1218,6 +1218,47 @@
   text-decoration: none;
 }
 
+/* The install row (ADR-0081), one of two elements at a time — the prompt
+ * button or the guide link — both hidden until `InstallApp`'s script reveals
+ * one. Same row geometry as the display switches above; the *colour* differs
+ * by form in dark, deliberately left so: `:root[data-theme="dark"] a` (0-2-1)
+ * beats this rule's 0-2-0 and paints the guide link the dark link blue, the
+ * same as its `.navdrop__item` sibling links, while the button keeps `--ink`
+ * like the toggle buttons. Only one form ever shows, and each matches its own
+ * kind. `[hidden]`'s !important still wins over the `display` here. */
+.navdrop__list .installapp {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+}
+
+.navdrop__list .installapp:hover,
+.navdrop__list .installapp:focus-visible {
+  background: var(--rule);
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* Never visible in an installed window, whatever the script concluded — the
+ * belt to the script's own standalone check, covering the interval between
+ * `appinstalled` and the next load. The row selector hides the `<li>` itself,
+ * children included. */
+@media (display-mode: standalone) {
+  .installapp__row {
+    display: none;
+  }
+}
+
 .navdrop .soon--nav .soon__trigger:hover .soon__label,
 .navdrop .soon--nav .soon__trigger:focus-visible .soon__label {
   text-decoration: underline;
@@ -1401,6 +1442,48 @@ body {
   }
 }
 
+/* Safe-area insets (ADR-0079). `Base.astro` declares `viewport-fit=cover`, so
+ * an installed standalone window draws to the physical edges of a notched
+ * screen; these keep the chrome's content out from under the notch and the
+ * home indicator. `env()` is 0 everywhere else, so nothing moves in a browser
+ * — `sticky.spec.ts`'s geometry assertions are the referee.
+ *
+ * Below 40em `.topbar` is `display: contents` (above), which renders no box
+ * and therefore no padding, so the surfaces inside it carry their own copies:
+ * `.sectionbar`, the one bar that still pins there, and `.usa-header`, whose
+ * two rows sit at document top. */
+.topbar {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+@media (max-width: 39.99em) {
+  .sectionbar {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* The header rows themselves, in this band. `.topbar`'s padding above covers
+   * them from 40em up, but here it renders no box, and the bar and the search
+   * row sit at document top — under the status bar at scroll 0, and in the
+   * notch in landscape, on every page. The header element rather than each
+   * row: one rule pads both, and `.usa-header` carries the header's own
+   * background, so the inset area paints as more header rather than as page. */
+  .usa-header {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+.usa-footer {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 /* The reason `--sticky-h` exists. Without this, `/us/usc/t16/s45f/c/5` scrolls
  * the highlighted provision to the top of the *document* — which is underneath
  * the bar. Applies to every addressable element in the text, not just the
@@ -1415,6 +1498,13 @@ main[id] {
   max-width: var(--measure);
   margin: 0 auto;
   padding: 0 1rem 3rem;
+  /* On top of the 1rem, the safe-area insets (ADR-0079): every page's `<main>`
+   * is this wrapper, and `viewport-fit=cover` applies in landscape Safari as
+   * well as the installed window, where the chrome's own copies above do not
+   * cover the column. `env()` is 0 everywhere else, so this computes to the
+   * shorthand's own 1rem. */
+  padding-left: calc(1rem + env(safe-area-inset-left));
+  padding-right: calc(1rem + env(safe-area-inset-right));
 }
 
 /* Prose *and* a second column, which the reading measure was never sized for.

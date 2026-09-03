@@ -6,11 +6,11 @@
     "wcag21a",
     "wcag21aa"
   ],
-  "scans": 343,
+  "scans": 350,
   "routesWithViolations": 4,
   "totals": {
     "violations": 8,
-    "nodes": 2910,
+    "nodes": 2952,
     "critical": 1,
     "serious": 7,
     "moderate": 0,
@@ -23,7 +23,7 @@
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 1904,
+          "nodes": 1946,
           "firstTarget": "div[data-role=\"redoc-description\"] > p:nth-child(1) > code",
           "help": "Elements must meet minimum color contrast ratio thresholds",
           "seenAt": [

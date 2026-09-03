@@ -67,6 +67,11 @@ const { script = true } = Astro.props;
 
       function paint() {
         const dark = root.dataset.theme === "dark";
+        // An installed window's title bar follows this meta (ADR-0079); the
+        // two values are the token block's `--page`, same as `Base.astro`'s
+        // bootstrap writes.
+        const themeMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeMeta) themeMeta.setAttribute("content", dark ? "#141310" : "#f9f9f7");
         // The label names the destination, not the current state.
         const name = dark ? "Switch to light mode" : "Switch to dark mode";
         for (const b of buttons) {

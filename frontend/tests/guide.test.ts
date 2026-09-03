@@ -50,6 +50,7 @@ const UNDOCUMENTED_ROUTES = new Set([
   "/app/404",
   "/app/429",
   "/app/healthz",
+  "/app/offline",
   "/app/preview",
 ]);
 

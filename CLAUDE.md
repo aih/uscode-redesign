@@ -36,12 +36,12 @@ Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 38 route entries (one expanding to
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 39 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and
 fourteen interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
 (ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
 (ADR-0058), both navbar dropdowns (ADR-0061), the command palette (ADR-0062) and the open
-classification lookup (ADR-0067) — **343 scans**,
+classification lookup (ADR-0067) — **350 scans**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -375,15 +375,35 @@ starts a 30 s cooldown and the site computes; `/health` reports
 limiters are deliberately not moved (the spec's R3; ADR-0029's per-process debt stands).
 `docs/redis-caching-spec.md` on PR #70's branch is the investigation this implements.
 
-`make test` = **866** Python tests; `make test-web` = **462** frontend tests; `make test-e2e` = **663**
-Playwright tests, 344 of which are the accessibility scan (**all three are required** — reader
+**The reader is installable** (`docs/pwa-spec.md`, ADR-0079, ADR-0080, ADR-0081). The manifest is
+`/app/manifest.webmanifest` — `id`/`scope` `"/app/"` with the trailing slash, `display: standalone`,
+colours read from the token block — with five generated PNGs under `/app/icons` pinned by
+`docs/verification/icons.json` (`scripts/icons.py`, the `scripts/fonts.py` pattern), one
+`theme-color` meta kept on the resolved theme by the pre-paint bootstrap and `ThemeToggle`,
+`viewport-fit=cover` paired with safe-area padding, and a standalone window treated as
+`usc-linktarget === "same"` so cross references and search results stay in the app. Offline is
+`frontend/public/sw.js`, hand-rolled: network-first with navigation preload for `/app` navigations,
+storing only `ok` non-`redirected` responses (the last 40, `usc-pages-v1`), cache-first for
+`_astro` and cache-first-with-background-revalidation for fonts/uswds/icons (stable names whose
+bytes regenerate in place; the assets cache is bounded at 120 entries, the offline page exempt),
+everything else passed through; a failed navigation falls back to the
+cache and then to the self-contained `/app/offline`, which lists the cached sections and uses no
+`Base` chrome. The install surface is **one hidden row in More › Help** (`InstallApp`): a button
+revealed by `beforeinstallprompt` (stash → `prompt()` on click, hidden on `appinstalled`), a link
+to the guide's install section on iOS Safari, nothing in a standalone window — enforced by the
+script and by a `display-mode: standalone` media rule both. `tests/pwa.test.ts` holds the manifest
+contract; `tests/e2e/pwa.spec.ts` proves offline in a browser; the iOS device pass is owed
+(`docs/deploy-status.md`).
+
+`make test` = **867** Python tests; `make test-web` = **473** frontend tests; `make test-e2e` = **676**
+Playwright tests, 351 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(75 ADRs, numbered to 0076 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(79 ADRs, numbered to 0081 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -572,7 +592,7 @@ convention every reader who knows those keys has; it is what the guide documents
 **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 2,910 nodes**, down from 41 pairs, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 2,952 nodes**, down from 41 pairs, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by
