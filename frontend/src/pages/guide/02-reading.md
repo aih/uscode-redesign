@@ -523,12 +523,16 @@ reading, search and navigation are the same as in a browser tab.
 
 **Installing.**
 
-- **Chrome or Edge** — the install icon at the right end of the address bar, or the browser's own
-  menu (⋮ or ⋯ › *Install*). When the browser is offering installation, the site's **More › Help**
-  group carries an **Install this app** row that opens the same prompt.
+- **Chrome or Edge on a computer** — the install icon at the right end of the address bar, or the
+  browser's own menu (⋮ or ⋯ › *Install*).
+- **Chrome on Android** — the browser menu (⋮ › *Add to Home screen* › *Install*).
 - **macOS Safari** — **File › Add to Dock**.
 - **iOS and iPadOS Safari** — **Share › Add to Home Screen**. On those devices the **More › Help**
   group carries a link to this section.
+
+While Chrome or Edge is offering installation — on a computer or on Android — the site's
+**More › Help** group carries an **Install this app** row that opens the same prompt. Firefox on a
+computer does not offer installation; the site works there as a browser tab.
 
 The installed app and the browser tab are the same site: an address works in both. In Chrome and
 Edge a setting changed in one — the theme, the reading density — is in force in the other. An app
@@ -556,7 +560,7 @@ tied to an account — sign in, sign up, My Provisions, settings — are never s
 
 Printing a section gives you just the text of the document. Application features are left off the printed page: navigation, the search box, the copy column, the
 chapter rail, the release picker, the **In this section** panel, the previous/next cards and the
-footer. The notes and the source credit are printed n whatever state
+footer. The notes and the source credit are printed in whatever state
 (open/closed) they were in on screen. The page is black on white whether
 or not you were reading in night mode.
 
