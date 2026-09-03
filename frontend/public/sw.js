@@ -35,6 +35,10 @@ const ASSETS = "usc-assets-v1";
 const KNOWN_CACHES = [PAGES, ASSETS];
 
 const OFFLINE_URL = "/app/offline";
+/* The offline page is fetched only at `install`, so an edit to
+ * `offline.astro` reaches already-registered clients only when this file
+ * itself byte-changes. Bump this when the page changes. */
+const OFFLINE_REV = 1;
 const PAGE_LIMIT = 40;
 const ASSET_PREFIXES = ["/app/_astro/", "/app/fonts/", "/app/uswds/", "/app/icons/"];
 /* Pass-through even though they are under /app: the hover preview is one
@@ -92,6 +96,12 @@ self.addEventListener("fetch", (event) => {
   if (BYPASS_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return;
 
   if (ASSET_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
+    /* A direct navigation to an asset URL still has a preload fetch in
+     * flight; consume it in the background so the browser does not log a
+     * cancelled preload. */
+    if (request.mode === "navigate" && event.preloadResponse) {
+      event.waitUntil(event.preloadResponse.catch(() => {}));
+    }
     event.respondWith(assetFirst(request));
     return;
   }
@@ -103,19 +113,28 @@ self.addEventListener("fetch", (event) => {
    * through untouched. */
 });
 
+/** Whether a response may be stored at all. Never `no-store` — the per-user
+ * pages (`/app/login`, `/app/provisions`, …) carry it, and ADR-0018 is the
+ * policy this worker must not contradict. */
+function storable(response) {
+  return (
+    response.ok &&
+    !response.redirected &&
+    !(response.headers.get("Cache-Control") || "").includes("no-store")
+  );
+}
+
 /** Network-first for a navigation, with the recently-read cache behind it. */
 async function pageFirst(event, url) {
   try {
     /* The preload response is the same network fetch, already in flight. */
     const response = (await event.preloadResponse) || (await fetch(event.request));
-    if (response.ok && !response.redirected && url.pathname !== OFFLINE_URL) {
-      const cache = await caches.open(PAGES);
-      /* Delete-then-put moves a revisited page to the back of the queue, so
-       * the trim below removes the least recently *fetched* rather than the
-       * first ever seen. */
-      await cache.delete(event.request);
-      await cache.put(event.request, response.clone());
-      await trim(cache, PAGE_LIMIT);
+    if (storable(response) && url.pathname !== OFFLINE_URL) {
+      /* The store rides in `waitUntil`, off the response path: the reader
+       * gets first byte without waiting on the download completing or the
+       * cache write, and a failed write — quota, most likely — costs the
+       * cache entry rather than the page. */
+      event.waitUntil(storePage(event.request, response.clone()).catch(() => {}));
     }
     return response;
   } catch (error) {
@@ -128,14 +147,25 @@ async function pageFirst(event, url) {
   }
 }
 
+/** Delete-then-put moves a revisited page to the back of the queue, so the
+ * trim removes the least recently *fetched* rather than the first ever seen. */
+async function storePage(request, response) {
+  const cache = await caches.open(PAGES);
+  await cache.delete(request);
+  await cache.put(request, response);
+  await trim(cache, PAGE_LIMIT);
+}
+
 /** Cache-first for the immutable static files. */
 async function assetFirst(request) {
   const cache = await caches.open(ASSETS);
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok && !response.redirected) {
-    await cache.put(request, response.clone());
+  if (storable(response)) {
+    /* Off the response path for the same reason as above: a failed write
+     * must not reject `respondWith` and fail an asset the network answered. */
+    cache.put(request, response.clone()).catch(() => {});
   }
   return response;
 }

@@ -41,12 +41,18 @@ already declined both.
    exists to answer whether the site is up, which a cache would answer
    wrongly.
 
-2. **Only `ok`, non-`redirected` responses are stored.** The reader's
-   canonical-redirect middleware 307s a URL with an empty `?release=`
-   (finding 18's trap), and only the final response is a page worth serving
-   under the URL that was asked for. The store is LRU by fetch order:
+2. **Only `ok`, non-`redirected`, non-`no-store` responses are stored.** The
+   reader's canonical-redirect middleware 307s a URL with an empty
+   `?release=` (finding 18's trap), and only the final response is a page
+   worth serving under the URL that was asked for; the per-user pages —
+   `/app/login`, `/app/signup`, `/app/provisions`, `/app/settings` — carry
+   `Cache-Control: no-store` (`lib/cache.ts`), and ADR-0018 is the policy
+   this worker must not contradict. The store is LRU by fetch order:
    delete-then-put moves a revisited page to the back, and a trim drops the
-   front past 40 entries.
+   front past 40 entries. The write rides in `event.waitUntil`, off the
+   response path — the reader gets first byte without waiting on the cache
+   write, and a failed write (quota, most likely) costs the cache entry
+   rather than the page.
 
 3. **`skipWaiting()` + `clients.claim()`.** The worker precaches no shell —
    it is a thin pass-through — so immediate activation risks nothing and a
@@ -104,3 +110,7 @@ already declined both.
 - **`/app/offline` visited online renders normally** — the worker refuses to
   store it in the pages cache, and the install-time copy in `usc-assets-v1`
   is refreshed on every worker update (`cache: "reload"`).
+- **An edited offline page reaches an already-registered client only when
+  `sw.js` itself byte-changes** — the precache runs in `install`, which
+  fires only for a worker the browser considers new. `OFFLINE_REV` in
+  `sw.js` exists to be bumped alongside such an edit.
