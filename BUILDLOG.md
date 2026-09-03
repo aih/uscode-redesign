@@ -3301,6 +3301,20 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - **The corrected lists were read off the rendered chrome, not off the components' source.** `.footnav a` is eleven — Titles, Release points, Classification tables, User guide, Search guide, Keyboard shortcuts, API documentation, Source XML (OLRC), Design system, Version-change data, About — in the four groups the chapter names, and the **More** panel's three lists read Release points / Classification tables / Downloads, User guide / API docs / Keyboard shortcuts / About, and the two display switches.
   - **`footer-groups` was not re-run in a browser after the edit**: the containerised stack behind `localhost:8000` was stopped part-way through the session, and the scenario visits a section page, which needs the corpus. Its three assertions were checked against the same footer on `/app/about`, which renders without the API. Worth a `make test-e2e` before merge.
 
+## 094 — 2026-09-02 — Session 72: the corpus cache under a generation counter
+
+- **Tool/model:** Claude Code, Fable 5.
+- **Asked:** Implement Redis caching for FastAPI and Astro as a fresh PR from `main`, reviewing PR #70's work with fresh eyes, consulting redis.io's FastAPI integration page and the official fastapi/redis skills, with an invalidation design under which stale data is never served.
+- **Decided:**
+  - PR #70 turned out to carry only a design document (`docs/redis-caching-spec.md`), no code. Its generation design is adopted; its response-level cache is not — what is stored is the **payload** a handler was about to return, so ADR-0018's header logic (resolution-dependent `Cache-Control`, the content-hash ETag, the 304 path) runs on every request and can never be replayed wrongly (ADR-0078).
+  - `corpus_state` + statement-level triggers on all fifteen corpus tables (migration `a3f8c2d1e6b7`); keys are `usc:g{G}:…`; generation read lazily and before the data. `fastapi-redis-sdk`'s factories and `fastapi-cache2` declined for the spec's reasons, re-verified.
+  - The diff memo is generation-keyed (fixing the stale-after-`--force`-reload latent bug) and gains a Redis tier; the reader's release memo keys on `X-Corpus-Generation` instead of five minutes, fed by a monotonic tracker in `getJson`.
+  - Deferred, named in the ADR: classification listings (second repository dependency), Redis-backed rate limiters (spec R3), `loadtest.json` regeneration (R4).
+- **Produced:** `storage/cache.py`, `api/cache.py`, `frontend/src/lib/generation.ts`, migration `a3f8c2d1e6b7`, `Repository.corpus_generation`, five cached routes + section-route header, two-tier diff memo, lifespan + `/health` `redis` field, `redis` service in both compose files, `REDIS_URL` in `db/config.py`/.env.example, ADR-0078, tests (`tests/test_corpus_cache.py`, diff remote-tier test, releasecache/generation Vitest).
+- **Verified:**
+  - `make test` 866 passed (contract test: warm a TOC, `UPDATE structure_nodes` in a second connection, the very next response shows it — no window); `make test-web` 462 passed.
+  - Against the running dev stack: `/health` `{"redis":"ok"}`; `/releases` miss→hit; committed `UPDATE release_points` moved `X-Corpus-Generation` 10→11 and the next request was a miss; a diff key in Redis survived `docker compose restart api`.
+  - Re-check with `uv run pytest tests/test_corpus_cache.py` (integration half needs `make dev-data` + `alembic upgrade head`).
 
 ## 095 — 2026-09-02 — Session 73: the PWA plan
 

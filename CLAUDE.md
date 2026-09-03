@@ -357,6 +357,24 @@ classification vocabulary by name** and gave every other value to `pl`; it now s
 suffix. A count column's forward direction is largest first, since `SortBar` sends an option that is
 not in force to its own forward direction.
 
+**The API caches payloads in Redis, invalidated by a corpus generation** (ADR-0078). One row,
+`corpus_state`, is bumped by statement-level triggers on all fifteen corpus tables inside the
+writer's own transaction (migration `a3f8c2d1e6b7`), so no writer can forget; every cache key is
+`usc:g{G}:…`, and an ingest commit orphans the lot atomically with the data — the contract is
+"visible to the next request", not a TTL. The generation is read **before** the data
+(`Repository.corpus_generation()`, lazy so a 429 still costs no connection), and what is stored
+is the **payload**, never the HTTP response, so ADR-0018's headers are computed fresh on every
+hit. Cached: releases, titles, versions, the TOC, the labels batch; the diff memo is two-tier
+(gen-keyed LRU + Redis) which also fixed a latent bug — nothing called `clear_diff_cache()` in
+production, so a `--force` re-load could serve a stale pinned redline until a restart. Every
+generation-reading response carries `X-Corpus-Generation`, and the reader's release memo
+(ADR-0045) now keys on it instead of on five minutes — `frontend/src/lib/generation.ts` tracks
+the max seen, monotonic. `REDIS_URL` unset = no cache, everything as before; a Redis error
+starts a 30 s cooldown and the site computes; `/health` reports
+`redis: disabled|ok|unavailable` without failing on it. The classification listings and the rate
+limiters are deliberately not moved (the spec's R3; ADR-0029's per-process debt stands).
+`docs/redis-caching-spec.md` on PR #70's branch is the investigation this implements.
+
 **The reader is installable** (`docs/pwa-spec.md`, ADR-0079, ADR-0080, ADR-0081). The manifest is
 `/app/manifest.webmanifest` — `id`/`scope` `"/app/"` with the trailing slash, `display: standalone`,
 colours read from the token block — with five generated PNGs under `/app/icons` pinned by
@@ -375,7 +393,7 @@ script and by a `display-mode: standalone` media rule both. `tests/pwa.test.ts` 
 contract; `tests/e2e/pwa.spec.ts` proves offline in a browser; the iOS device pass is owed
 (`docs/deploy-status.md`).
 
-`make test` = **851** Python tests; `make test-web` = **468** frontend tests; `make test-e2e` = **676**
+`make test` = **867** Python tests; `make test-web` = **473** frontend tests; `make test-e2e` = **676**
 Playwright tests, 351 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -383,7 +401,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(75 ADRs, numbered to 0076 — there is no ADR-0048). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(79 ADRs, numbered to 0081 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.

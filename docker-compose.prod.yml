@@ -92,6 +92,28 @@ services:
       retries: 12
       start_period: 60s
 
+  # The corpus cache (ADR-0078). Same flags as the dev stack: a fixed memory
+  # budget under `allkeys-lru`, no persistence — everything in it is
+  # reconstructible, and a restart must be a cold cache rather than a stale one.
+  redis:
+    image: redis:7-alpine
+    command:
+      [
+        "redis-server",
+        "--maxmemory", "256mb",
+        "--maxmemory-policy", "allkeys-lru",
+        "--save", "",
+        "--appendonly", "no",
+      ]
+    expose:
+      - "6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   api:
     image: ${ECR_REGISTRY:-local}/uscode-api:${IMAGE_TAG:-latest}
     build: .
@@ -100,8 +122,14 @@ services:
         condition: service_healthy
       opensearch:
         condition: service_healthy
+      # `service_started` on purpose: the API degrades to computing when the
+      # cache is unreachable (storage/cache.py), so Redis must never gate the
+      # site coming up.
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+psycopg://uscode:${POSTGRES_PASSWORD}@db:5432/uscode
+      REDIS_URL: redis://redis:6379/0
       # Not inferred from the proxied scheme — see ADR-0019. This is the setting
       # that makes the Secure cookie independent of proxy configuration.
       USC_COOKIE_SECURE: "true"

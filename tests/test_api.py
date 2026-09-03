@@ -31,7 +31,7 @@ API = "/api/v1"  # the machine surface; the bare citation URL only redirects her
 
 
 def test_health(client):
-    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/health").json() == {"status": "ok", "redis": "disabled"}
 
 
 def test_the_plan_demo_url(client):

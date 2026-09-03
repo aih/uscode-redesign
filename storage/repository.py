@@ -392,6 +392,17 @@ class SourceCheckInfo:
 class Repository(Protocol):
     """Everything the API needs. Implemented by `PostgresRepository` today."""
 
+    def corpus_generation(self) -> int:
+        """The corpus write counter (ADR-0078) — moved by every ingest write.
+
+        Read it **before** any data read whose result will be cached under it:
+        under `READ COMMITTED` each statement sees what was committed before it
+        began, so a value computed after the generation was read is either
+        correct for that generation or stored under a generation no later
+        request will ask for. Read after the data, that argument fails.
+        """
+        ...
+
     def last_source_check(self) -> SourceCheckInfo | None:
         """The most recent poll of uscode.house.gov, successful or not.
 

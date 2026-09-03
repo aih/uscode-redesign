@@ -14,6 +14,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 os.environ["DISABLE_SEARCH_SYNC"] = "1"
+# The corpus cache stays out of the suite unless a test installs a fake
+# (`storage.cache.set_cache_for_tests`): a developer's `.env` REDIS_URL must
+# not make test runs share state through a live Redis. Set before `db.config`
+# imports, and to the empty string, which `storage/cache.py` reads as "no
+# cache" — the same as unset, but overriding any .env value.
+os.environ["REDIS_URL"] = ""
 
 import pytest
 

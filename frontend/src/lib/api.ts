@@ -5,6 +5,7 @@
  * (Caddy in front, ADR-0015), `localhost:8000` for `npm run dev`'s own proxy.
  */
 
+import { noteGeneration } from "./generation";
 import { API, ancestorIdentifiers } from "./url";
 import type {
   Citation,
@@ -79,6 +80,9 @@ async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     headers: { accept: "application/json" },
   });
+  // Every response that carries the corpus generation advances the tracker,
+  // which is what the release memo keys on (ADR-0078).
+  noteGeneration(response.headers.get("x-corpus-generation"));
   if (!response.ok) {
     const body: { detail?: string } = await response
       .json()

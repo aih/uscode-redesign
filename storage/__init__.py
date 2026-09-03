@@ -32,6 +32,13 @@ from storage.classification import (
     law_in_ranges,
     normalize_section_input,
 )
+from storage.cache import (
+    CorpusCache,
+    cache_key,
+    cache_status,
+    close_cache_client,
+    get_cache,
+)
 from storage.postgres import PostgresRepository, title_num_from_identifier
 from storage.postgres_accounts import PostgresAccounts
 from storage.postgres_classification import PostgresClassification
