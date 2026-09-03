@@ -25,6 +25,10 @@ setPublicCache(Astro.response.headers, null, false);
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Offline · U.S. Code</title>
+    {/* The title-bar colour of an installed window, defaulting light and
+        corrected below — `Base.astro`'s pair, without which a dark reader's
+        standalone window paints the manifest's light bar over this page. */}
+    <meta name="theme-color" content="#f9f9f7" />
 
     {/* The theme, before first paint — the same script `Base.astro` runs, so
         this page follows the reader's choice with no flash. Density is left
@@ -37,6 +41,10 @@ setPublicCache(Astro.response.headers, null, false);
         }
       } catch {
         // No storage — the light default stands.
+      }
+      if (document.documentElement.dataset.theme === "dark") {
+        const themeMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeMeta) themeMeta.setAttribute("content", "#141310");
       }
     </script>
 
@@ -160,7 +168,17 @@ setPublicCache(Astro.response.headers, null, false);
               const item = document.createElement("li");
               const link = document.createElement("a");
               link.href = url.pathname + url.search;
-              link.textContent = decodeURIComponent(url.pathname + url.search);
+              /* Decoded per entry: `decodeURIComponent` throws on an invalid
+               * percent sequence (`?q=50%` is a storable search URL), and a
+               * throw here would land in the outer catch and hide the whole
+               * list for one bad label. */
+              let label = url.pathname + url.search;
+              try {
+                label = decodeURIComponent(label);
+              } catch {
+                // The raw form stands.
+              }
+              link.textContent = label;
               item.append(link);
               list.append(item);
               shown += 1;

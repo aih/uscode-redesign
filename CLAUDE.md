@@ -384,7 +384,9 @@ colours read from the token block — with five generated PNGs under `/app/icons
 `usc-linktarget === "same"` so cross references and search results stay in the app. Offline is
 `frontend/public/sw.js`, hand-rolled: network-first with navigation preload for `/app` navigations,
 storing only `ok` non-`redirected` responses (the last 40, `usc-pages-v1`), cache-first for
-`_astro`/fonts/uswds/icons, everything else passed through; a failed navigation falls back to the
+`_astro` and cache-first-with-background-revalidation for fonts/uswds/icons (stable names whose
+bytes regenerate in place; the assets cache is bounded at 120 entries, the offline page exempt),
+everything else passed through; a failed navigation falls back to the
 cache and then to the self-contained `/app/offline`, which lists the cached sections and uses no
 `Base` chrome. The install surface is **one hidden row in More › Help** (`InstallApp`): a button
 revealed by `beforeinstallprompt` (stash → `prompt()` on click, hidden on `appinstalled`), a link

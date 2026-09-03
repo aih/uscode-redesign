@@ -60,6 +60,39 @@ here 2026-07-30 when that untracked file was deleted.*
 
 ---
 
+## B3. Version-data page findings from the PR #75 review
+
+PR #75's review (2026-09-02) confirmed four defects in code that predates that PR —
+the version-data page wave (ADR-0076) — and they were left out of the PR to keep it
+scoped. All four are in files main already carries:
+
+1. **`aria-sort` is inverted on the three count columns** of
+   `frontend/src/pages/data/version-changes.astro`: the forward (no-suffix) sort is
+   largest-first, i.e. descending, but `ariaSort()` maps it to `"ascending"` — the
+   arrow glyph and the sr-only text say the opposite of the actual order, and
+   `docs/a11y/routes.json`'s `version-data-sorted` entry bakes the inverted
+   attribute into the baseline. Only the Title column is correct.
+2. **`?sort=classified-desc` puts the null-share rows first**: `sortTitleRows`
+   (`frontend/src/lib/versiondata.ts`) sorts null `textClassifiedShare` last in the
+   forward order and `-desc` is a bare reverse, so title 18a's em-dash row ranks
+   above the genuinely smallest shares. ADR-0071's classification sort keeps nulls
+   last in both directions via a direction-aware flag; this one should too, and
+   `versiondata.test.ts` asserts null placement only forward.
+3. **The sortable column-heading block is a verbatim second copy** of
+   `ClassificationTable.astro`'s (`ariaSort()`, `headingHref()`, the arrow glyphs,
+   the sr-only strings). Fixing item 1 in one copy alone entrenches the divergence;
+   extract a shared sort-heading component first.
+4. **Guide chapter 09 carries two justifying clauses** ("…rather than from the
+   database, so the page reads the same on any copy of this site", "…because the
+   classification tables begin at the 104th Congress…") that Documentation duties 7
+   prohibits; the rationale belongs to ADR-0076.
+
+Items 1–3 are one small session together (1 and 2 change sorted output, so the a11y
+baseline and `versiondata.test.ts` move with them); item 4 is a two-sentence edit
+that can ride along.
+
+---
+
 ## Deleted from the unapproved UI plan, and why
 
 The rest of `docs/ui-improvements-plan-unapproved.md` was dropped rather than folded

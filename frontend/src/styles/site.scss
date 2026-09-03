@@ -1498,6 +1498,13 @@ main[id] {
   max-width: var(--measure);
   margin: 0 auto;
   padding: 0 1rem 3rem;
+  /* On top of the 1rem, the safe-area insets (ADR-0079): every page's `<main>`
+   * is this wrapper, and `viewport-fit=cover` applies in landscape Safari as
+   * well as the installed window, where the chrome's own copies above do not
+   * cover the column. `env()` is 0 everywhere else, so this computes to the
+   * shorthand's own 1rem. */
+  padding-left: calc(1rem + env(safe-area-inset-left));
+  padding-right: calc(1rem + env(safe-area-inset-right));
 }
 
 /* Prose *and* a second column, which the reading measure was never sized for.

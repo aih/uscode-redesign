@@ -191,7 +191,8 @@ from `Base.astro` on `load`: `navigator.serviceWorker.register("/app/sw.js",
 | request | strategy | cache |
 |---|---|---|
 | navigations under `/app/` | network-first, navigation preload enabled; on success, store; on failure, match the URL, else serve the offline page | `usc-pages-v1`, LRU-bounded at 40 entries |
-| `/app/_astro/`, `/app/fonts/`, `/app/uswds/`, `/app/icons/` | cache-first | `usc-assets-v1` |
+| `/app/_astro/` | cache-first — the names carry the build hash | `usc-assets-v1`, bounded at 120 entries |
+| `/app/fonts/`, `/app/uswds/`, `/app/icons/` | cache-first with a background revalidation — stable names whose bytes regenerate in place | `usc-assets-v1` |
 | everything else (`/app/preview/`, `/app/healthz`, non-GET, cross-origin, non-`/app`) | pass through untouched | — |
 
 - Store only `GET` + `response.ok` + `response.redirected === false` (the canonical-redirect

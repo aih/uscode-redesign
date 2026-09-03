@@ -18,7 +18,7 @@
     "/app/goto": 22000,
     "/app/guide": 22000,
     "/app/login": 23500,
-    "/app/offline": 2000,
+    "/app/offline": 2500,
     "/app/provisions": 22500,
     "/app/releases": 22000,
     "/app/search": 22000,

@@ -66,13 +66,21 @@ one surface with no browser back button (finding 10).
    navigator.standalone` as the same-tab preference, so cross references and
    search results navigate in place inside the installed app. A browser tab
    is unchanged, and the markup's `target="_blank"` default stands with
-   scripting off — the safety property the script already had.
+   scripting off — the safety property the script already had. The check is
+   ORed ahead of the stored preference, so an explicit
+   `usc-linktarget === "new"` choice is overridden in the installed app — a
+   new tab opened from standalone lands in a browser outside it. The
+   settings page says so beside the radio; latent while ADR-0034 keeps the
+   form off.
 
 5. **`viewport-fit=cover` and the safe-area padding land together.**
    `env(safe-area-inset-*)` padding on `.topbar`, on `.sectionbar` and
    `.usa-header` in the band below 40em where `.topbar` is
-   `display: contents` and renders no box, and on `.usa-footer`. `env()` is
-   0 outside a notched standalone window, so nothing moves in a browser —
+   `display: contents` and renders no box, and on `.usa-footer`; the reading
+   column carries its own side insets on `.reader-wrap` — every page's
+   `<main>` — since `viewport-fit=cover` applies in landscape Safari as well
+   as the installed window and the chrome's copies do not cover the column.
+   `env()` is 0 outside a notched window, so nothing moves in a browser —
    `sticky.spec.ts`'s geometry assertions are the referee.
 
 6. **`/app/search` and `/app/goto` carry a trail** — Home › Search — closing

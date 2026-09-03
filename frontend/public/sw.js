@@ -12,11 +12,19 @@
  *                                store ok, non-redirected responses in
  *                                usc-pages-v1, LRU-bounded at 40; on failure
  *                                serve the cached copy, else the offline page
- *   /app/_astro/ /app/fonts/     cache-first in usc-assets-v1 — build-hashed
- *   /app/uswds/  /app/icons/     or version-pinned files that never change
- *                                under one URL
+ *   /app/_astro/                 cache-first in usc-assets-v1 — build-hashed,
+ *                                never a new byte under one URL
+ *   /app/fonts/ /app/uswds/      cache-first with a background revalidation:
+ *   /app/icons/                  stable names whose bytes change in place
+ *                                when scripts/fonts.py, scripts/icons.py or
+ *                                a USWDS vendoring bump regenerates them
  *   everything else              untouched: /app/preview/, /app/healthz,
  *                                non-GET, cross-origin, non-/app
+ *
+ * usc-assets-v1 is bounded at ASSET_LIMIT: every deploy mints a new set of
+ * build-hashed _astro names, and without a trim the superseded ones accumulate
+ * for the life of the registration. The offline page is exempt — losing it
+ * loses the fallback.
  *
  * A response is stored only when it is `ok` and not `redirected`: the reader's
  * canonical-redirect middleware 307s a URL with an empty `?release=`, and only
@@ -38,9 +46,12 @@ const OFFLINE_URL = "/app/offline";
 /* The offline page is fetched only at `install`, so an edit to
  * `offline.astro` reaches already-registered clients only when this file
  * itself byte-changes. Bump this when the page changes. */
-const OFFLINE_REV = 1;
+const OFFLINE_REV = 2;
 const PAGE_LIMIT = 40;
+const ASSET_LIMIT = 120;
 const ASSET_PREFIXES = ["/app/_astro/", "/app/fonts/", "/app/uswds/", "/app/icons/"];
+/* The one prefix whose filenames carry the build hash. */
+const HASHED_PREFIX = "/app/_astro/";
 /* Pass-through even though they are under /app: the hover preview is one
  * fetch per citation and useless stale, and the healthcheck exists to answer
  * whether the *site* is up, which a cache would answer wrongly. */
@@ -102,7 +113,7 @@ self.addEventListener("fetch", (event) => {
     if (request.mode === "navigate" && event.preloadResponse) {
       event.waitUntil(event.preloadResponse.catch(() => {}));
     }
-    event.respondWith(assetFirst(request));
+    event.respondWith(assetFirst(event));
     return;
   }
 
@@ -156,18 +167,46 @@ async function storePage(request, response) {
   await trim(cache, PAGE_LIMIT);
 }
 
-/** Cache-first for the immutable static files. */
-async function assetFirst(request) {
+/** Cache-first for the static files. */
+async function assetFirst(event) {
+  const request = event.request;
   const cache = await caches.open(ASSETS);
   const cached = await cache.match(request);
-  if (cached) return cached;
+  if (cached) {
+    /* Everything outside /app/_astro/ keeps its URL when its bytes change —
+     * scripts/fonts.py, scripts/icons.py and a USWDS bump all regenerate in
+     * place — so the cached copy is served and refreshed behind it.
+     * `no-cache` sends the conditional request to the server rather than the
+     * HTTP cache; these files carry ETag/Last-Modified, so an unchanged one
+     * costs a 304. */
+    if (!new URL(request.url).pathname.startsWith(HASHED_PREFIX)) {
+      event.waitUntil(
+        fetch(request, { cache: "no-cache" })
+          .then((response) => (storable(response) ? storeAsset(cache, request, response) : undefined))
+          .catch(() => {}),
+      );
+    }
+    return cached;
+  }
   const response = await fetch(request);
   if (storable(response)) {
     /* Off the response path for the same reason as above: a failed write
      * must not reject `respondWith` and fail an asset the network answered. */
-    cache.put(request, response.clone()).catch(() => {});
+    event.waitUntil(storeAsset(cache, request, response.clone()).catch(() => {}));
   }
   return response;
+}
+
+/** Store an asset and keep the cache bounded. The offline page is exempt from
+ * the trim; everything else evicts oldest-stored first, which after a deploy
+ * is mostly the superseded build-hashed files. */
+async function storeAsset(cache, request, response) {
+  await cache.put(request, response);
+  const keys = await cache.keys();
+  const evictable = keys.filter((key) => new URL(key.url).pathname !== OFFLINE_URL);
+  for (const key of evictable.slice(0, Math.max(0, evictable.length - ASSET_LIMIT))) {
+    await cache.delete(key);
+  }
 }
 
 /** Drop the oldest entries until the cache holds at most `limit`. */

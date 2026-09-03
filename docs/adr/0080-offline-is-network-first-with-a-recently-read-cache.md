@@ -34,12 +34,23 @@ already declined both.
    | request | strategy | cache |
    |---|---|---|
    | navigations under `/app/` | network-first, preload response first; store on success; on failure the cached copy, else the offline page | `usc-pages-v1`, LRU-bounded at 40 |
-   | `/app/_astro/`, `/app/fonts/`, `/app/uswds/`, `/app/icons/` | cache-first | `usc-assets-v1` |
+   | `/app/_astro/` | cache-first | `usc-assets-v1` |
+   | `/app/fonts/`, `/app/uswds/`, `/app/icons/` | cache-first with a background revalidation | `usc-assets-v1` |
    | `/app/preview/`, `/app/healthz`, non-GET, cross-origin, non-`/app` | pass through untouched | — |
 
    The preview is one fetch per citation and useless stale; the healthcheck
    exists to answer whether the site is up, which a cache would answer
-   wrongly.
+   wrongly. Only `/app/_astro/` names carry the build hash; the fonts, icons
+   and USWDS files keep their URLs when `scripts/fonts.py`,
+   `scripts/icons.py` or a vendoring bump regenerates their bytes, so a
+   cached copy of those is served and revalidated behind it
+   (`fetch(request, { cache: "no-cache" })` — the conditional request goes to
+   the server, and an unchanged file costs a 304). Plain cache-first there
+   would keep the old bytes for the life of the registration.
+   `usc-assets-v1` is bounded at 120 entries, evicting oldest-stored first
+   and never the offline page: every deploy mints a new set of build-hashed
+   names, and without a trim the superseded ones accumulate until origin
+   quota pressure starts failing the pages cache's own writes.
 
 2. **Only `ok`, non-`redirected`, non-`no-store` responses are stored.** The
    reader's canonical-redirect middleware 307s a URL with an empty
@@ -68,8 +79,10 @@ already declined both.
 
 5. **The offline page is self-contained.** `frontend/src/pages/offline.astro`
    uses no `Base`, inlines its styling for both themes (a hand-copied set of
-   the token values, plus a copy of the theme bootstrap so a dark reader gets
-   a dark page with no flash) and system fonts — so precaching the one HTML
+   the token values, plus a copy of the theme bootstrap — including the
+   `theme-color` meta and its dark correction, so a dark reader's standalone
+   window does not paint the manifest's light title bar over a dark page) and
+   system fonts — so precaching the one HTML
    document at install suffices, with no build-hashed subresources to
    enumerate from a static worker script. It says the site is unreachable,
    lists the pages `usc-pages-v1` holds as links, and offers a retry
