@@ -590,7 +590,7 @@ convention every reader who knows those keys has; it is what the guide documents
 **`/app/settings` is reachable from no rendered page** — `AuthNav` is its only linker and
 `SiteHeader` does not render `AuthNav` while accounts are off (ADR-0034), so guide chapter 06's prose
 link is the only way in (`docs/ia-map.md`); **the reader's own measured WCAG 2.1 AA failures are cleared** (ADR-0039, ADR-0042) —
-`docs/verification/a11y.json` is **8 route/rule pairs over 2,910 nodes**, down from 41 pairs, and
+`docs/verification/a11y.json` is **8 route/rule pairs over 2,952 nodes**, down from 41 pairs, and
 every one that remains is `docs/a11y/known-violations.json`'s: the vendored Swagger UI / ReDoc bundles
 (ADR-0032, owned as published exceptions), two scrollable regions with no keyboard route in, and
 `html-has-lang` on `/docs` and `/redoc`, which is ours — the shells come from `main.py` — all owned by
