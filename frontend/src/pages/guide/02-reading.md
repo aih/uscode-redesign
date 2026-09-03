@@ -543,12 +543,13 @@ steps:
 ```
 
 **Offline.** A page visited recently opens without a connection, from a copy saved on the device;
-the site keeps the last 40. Any other address shows an offline page that lists the saved sections
-as links and offers a retry. A saved section states its release point and whether it is the newest,
+the site keeps the last 40. Any other address shows an offline page that lists the saved pages as
+links and offers a retry. A saved section states its release point and whether it is the newest,
 the same line it carries online. While the connection is up, every page comes from the site rather
 than from the saved copy.
 
-Search, the version timeline, comparisons and citation previews need the connection.
+Search, the version timeline, comparisons and citation previews need the connection. The pages
+tied to an account — sign in, sign up, My Provisions, settings — are never saved.
 
 ## Printing
 
