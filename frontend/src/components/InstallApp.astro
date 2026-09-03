@@ -26,31 +26,36 @@
  * refires `beforeinstallprompt` when it is again willing to install, and that
  * refire is what brings the row back.
  *
- * Both elements ship in the markup and start `hidden`, the `ThemeToggle`
- * shape: without JavaScript neither could do anything, and a dead control in
- * a menu is worse than no control.
+ * The whole `<li>` ships `hidden` along with both of its children, the
+ * `ThemeToggle` shape taken one element up: without JavaScript neither
+ * control could do anything, and a hidden list *item* — rather than an empty
+ * visible one — keeps a screen reader's item count honest when nothing is
+ * revealed.
  */
 import { APP } from "../lib/url";
 
 const guideHref = `${APP}/guide/02-reading#install-as-an-app`;
 ---
 
-<button
-  type="button"
-  class="usa-button usa-button--unstyled installapp"
-  data-install-prompt
-  hidden
->
-  Install this app
-</button>
-<a class="installapp" href={guideHref} data-install-guide hidden>
-  Install this app
-</a>
+<li class="installapp__row" data-install-row hidden>
+  <button
+    type="button"
+    class="usa-button usa-button--unstyled installapp"
+    data-install-prompt
+    hidden
+  >
+    Install this app
+  </button>
+  <a class="installapp" href={guideHref} data-install-guide hidden>
+    Install this app
+  </a>
+</li>
 
 <script is:inline>
   {
     // Which of the two the row is — a prompt button, a guide link, or neither
     // — is per platform; see this file's frontmatter.
+    const row = document.querySelector("[data-install-row]");
     const button = document.querySelector("[data-install-prompt]");
     const guide = document.querySelector("[data-install-guide]");
     const standalone =
@@ -64,20 +69,22 @@ const guideHref = `${APP}/guide/02-reading#install-as-an-app`;
         stashed = event;
         guide.hidden = true;
         button.hidden = false;
+        row.hidden = false;
       });
 
       window.addEventListener("appinstalled", () => {
         stashed = null;
-        button.hidden = true;
-        guide.hidden = true;
+        row.hidden = true;
       });
 
       button.addEventListener("click", () => {
         const prompt = stashed;
         stashed = null;
-        button.hidden = true;
+        row.hidden = true;
         // Single-use by contract; a refired beforeinstallprompt re-reveals.
-        if (prompt) prompt.prompt();
+        // A refusal (NotAllowedError) has nothing to act on — the row is
+        // already hidden — so the rejection is swallowed rather than logged.
+        if (prompt) prompt.prompt().catch(() => {});
       });
 
       // iOS has no prompt event; iPadOS reports itself as a Mac with touch.
@@ -87,7 +94,10 @@ const guideHref = `${APP}/guide/02-reading#install-as-an-app`;
         (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
           (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) &&
         !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
-      if (ios) guide.hidden = false;
+      if (ios) {
+        guide.hidden = false;
+        row.hidden = false;
+      }
     }
   }
 </script>

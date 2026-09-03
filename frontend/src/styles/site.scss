@@ -1220,8 +1220,12 @@
 
 /* The install row (ADR-0081), one of two elements at a time — the prompt
  * button or the guide link — both hidden until `InstallApp`'s script reveals
- * one. Same row terms as the display switches above; `[hidden]`'s !important
- * still wins over the `display` here. */
+ * one. Same row geometry as the display switches above; the *colour* differs
+ * by form in dark, deliberately left so: `:root[data-theme="dark"] a` (0-2-1)
+ * beats this rule's 0-2-0 and paints the guide link the dark link blue, the
+ * same as its `.navdrop__item` sibling links, while the button keeps `--ink`
+ * like the toggle buttons. Only one form ever shows, and each matches its own
+ * kind. `[hidden]`'s !important still wins over the `display` here. */
 .navdrop__list .installapp {
   display: flex;
   align-items: center;
@@ -1247,9 +1251,10 @@
 
 /* Never visible in an installed window, whatever the script concluded — the
  * belt to the script's own standalone check, covering the interval between
- * `appinstalled` and the next load. */
+ * `appinstalled` and the next load. The row selector hides the `<li>` itself,
+ * children included. */
 @media (display-mode: standalone) {
-  .installapp {
+  .installapp__row {
     display: none;
   }
 }

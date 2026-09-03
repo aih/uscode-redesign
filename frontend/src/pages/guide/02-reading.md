@@ -530,8 +530,9 @@ reading, search and navigation are the same as in a browser tab.
 - **iOS and iPadOS Safari** — **Share › Add to Home Screen**. On those devices the **More › Help**
   group carries a link to this section.
 
-The installed app and the browser tab are the same site: an address works in both, and a change
-made in one — the theme, the reading density — is in force in the other.
+The installed app and the browser tab are the same site: an address works in both. In Chrome and
+Edge a setting changed in one — the theme, the reading density — is in force in the other. An app
+added from Safari keeps settings of its own.
 
 ```scenario
 id: install-identity

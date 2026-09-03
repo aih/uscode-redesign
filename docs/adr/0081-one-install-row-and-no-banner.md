@@ -69,3 +69,8 @@ else.
   via File → Add to Dock, documented in the guide and offered by no row.
   Accepted: a row for a flow with no API and no distinguishing signal would
   show for every macOS reader on every page.
+- **The not-Safari UA exclusion is a list, and the list misses shells** —
+  OPiOS, DuckDuckGo, and desktop-UA Chrome on iPad (which drops `CriOS` and
+  passes the Mac-with-touch test) all get the Safari share-sheet
+  instruction. Since iOS 16.4 their own share menus also offer Add to Home
+  Screen, so the guidance lands a menu away rather than wrong.
