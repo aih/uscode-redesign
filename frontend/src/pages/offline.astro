@@ -1,0 +1,179 @@
+---
+/**
+ * What the service worker serves when a navigation cannot reach the site
+ * (ADR-0080). Precached at worker install, and served under whatever URL the
+ * reader asked for — so nothing here may assume its own address.
+ *
+ * Self-contained on purpose: no `Base`, no `site.scss`, no webfonts. The
+ * worker caches this one document at install, and a page with subresources
+ * would need every build-hashed file enumerated from a static worker script —
+ * the precache-manifest machinery ADR-0079 declined. The styling below is a
+ * hand-inlined copy of the token values for both themes, and the script in
+ * the head is a copy of `Base.astro`'s theme bootstrap, so a dark reader gets
+ * a dark page with no flash even here.
+ *
+ * ADR-0041's rule — never nothing: the page says the site is unreachable,
+ * lists the recently read pages the worker holds, and offers a retry.
+ */
+import { setPublicCache } from "../lib/cache";
+
+setPublicCache(Astro.response.headers, null, false);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline · U.S. Code</title>
+
+    {/* The theme, before first paint — the same script `Base.astro` runs, so
+        this page follows the reader's choice with no flash. Density is left
+        out: nothing below sets type in the reading scale. */}
+    <script is:inline>
+      try {
+        const stored = localStorage.getItem("usc-theme");
+        if (stored === "dark" || stored === "light") {
+          document.documentElement.dataset.theme = stored;
+        }
+      } catch {
+        // No storage — the light default stands.
+      }
+    </script>
+
+    {/* `is:inline`, or Astro extracts this into a build-hashed stylesheet and
+        the document stops being self-contained. */}
+    <style is:inline>
+      /* The token block's values for both themes (`site.scss`), inlined so
+       * this document renders with no stylesheet to fetch. System fonts for
+       * the same reason. */
+      :root {
+        --ink: #171716;
+        --muted: #5d5d52;
+        --rule: #dcdbd4;
+        --page: #f9f9f7;
+        --panel: #f0f0ec;
+        --link: #31509d;
+      }
+      :root[data-theme="dark"] {
+        --ink: #eae8e3;
+        --muted: #b0aea8;
+        --rule: #4a4743;
+        --page: #141310;
+        --panel: #22201d;
+        --link: #9bb7f2;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 3rem 1rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 0.5rem;
+      }
+      p {
+        margin: 0.5rem 0;
+      }
+      a {
+        color: var(--link);
+      }
+      .retry {
+        display: inline-block;
+        margin-top: 0.75rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--rule);
+        border-radius: 0.25rem;
+        background: var(--panel);
+        color: var(--ink);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .stored {
+        margin-top: 2rem;
+        border-top: 1px solid var(--rule);
+        padding-top: 1rem;
+      }
+      .stored h2 {
+        font-size: 1rem;
+        margin: 0 0 0.5rem;
+      }
+      .stored ul {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+      .stored li {
+        margin: 0.25rem 0;
+      }
+      .stored p {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>The site is unreachable</h1>
+      <p>
+        This page could not be loaded — there is no network connection, or the site is not
+        answering.
+      </p>
+      {/* An empty href names the current URL, which is the URL the reader
+          asked for — this page is served under it — so following the link
+          retries that page. No script involved. */}
+      <a class="retry" href="">Try again</a>
+
+      <section class="stored">
+        <h2>Read recently</h2>
+        {/* Filled from the worker's recently-read cache. The paragraph is the
+            no-pages answer and is replaced by the list when there is one —
+            ADR-0041's rule either way. */}
+        <p id="stored-empty">No pages are stored on this device yet.</p>
+        <ul id="stored-pages" hidden></ul>
+      </section>
+
+      <script is:inline>
+        /* The pages the worker holds (`usc-pages-v1`), newest first — the
+         * worker appends on every successful navigation, so the key order is
+         * oldest-first. Wrapped in try/catch: with no worker yet, or the
+         * Cache API unavailable, the no-pages sentence stands. */
+        (async () => {
+          try {
+            const cache = await caches.open("usc-pages-v1");
+            const keys = await cache.keys();
+            const list = document.getElementById("stored-pages");
+            const empty = document.getElementById("stored-empty");
+            let shown = 0;
+            for (const request of keys.reverse()) {
+              const url = new URL(request.url);
+              if (url.pathname === "/app/offline") continue;
+              const item = document.createElement("li");
+              const link = document.createElement("a");
+              link.href = url.pathname + url.search;
+              link.textContent = decodeURIComponent(url.pathname + url.search);
+              item.append(link);
+              list.append(item);
+              shown += 1;
+            }
+            if (shown > 0) {
+              list.hidden = false;
+              empty.hidden = true;
+            }
+          } catch {
+            // The no-pages sentence stands.
+          }
+        })();
+      </script>
+    </main>
+  </body>
+</html>
