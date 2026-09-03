@@ -112,11 +112,26 @@ test("the offline page online renders normally and is not its own list entry", a
 
   await page.goto("/app/offline");
   await expect(page.locator("h1")).toHaveText("The site is unreachable");
-  // Never stored in the pages cache (it lives in usc-assets-v1), so the
-  // recently-read list on the page itself cannot offer it.
+
+  // A per-user page carries Cache-Control: no-store (ADR-0018), which the
+  // worker honours — visited through the fetch handler, it must not land in
+  // the recently-read cache. The store rides in waitUntil, so absence is
+  // only meaningful once a later navigation's write has landed: visit the
+  // section after it and wait for that entry.
+  await page.goto("/app/login");
+  await page.goto(SECTION);
+  await page.waitForFunction(async () => {
+    const cache = await caches.open("usc-pages-v1");
+    return (await cache.match(location.href)) !== undefined;
+  });
+
+  // Never stored in the pages cache: /app/offline lives in usc-assets-v1, so
+  // the recently-read list on the page itself cannot offer it, and /app/login
+  // is no-store.
   const stored = await page.evaluate(async () => {
     const cache = await caches.open("usc-pages-v1");
     return (await cache.keys()).map((request) => new URL(request.url).pathname);
   });
   expect(stored).not.toContain("/app/offline");
+  expect(stored).not.toContain("/app/login");
 });
