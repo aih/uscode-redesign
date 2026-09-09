@@ -94,3 +94,18 @@ rather than wrong ones, so there is no reason to keep the site dark for days.
   widely. Recorded as a known risk of going public, not as something this ADR solves.
 - CloudFront is a drop-in whenever it is wanted, because ADR-0018 already emits exactly the
   headers it reads. Deliberately not part of v1.
+
+## Amended 2026-09-08
+
+The box is shared with statutes.linkedlegislation.org, a second compose project from the statutes
+repository. Decision 5's "Caddy terminates TLS" now happens at a shared edge Caddy, a third compose
+project on the same box, which publishes 80 and 443 and holds the certificates for both hostnames
+in its own store. This site's own Caddy serves plain HTTP on port 8000 inside the container, matched
+on the hostname, reachable from the edge over the external Docker network `edge` by the alias
+`uscode-proxy`; it publishes no ports. `SITE_ADDRESS` is `http://uscode.linkedlegislation.org:8000`.
+The `${DATA_ROOT}/caddy` volume stays mounted and holds the pre-edge certificate for the rollback.
+
+Decision 2's data volume, decision 4's access rule and decision 7's backups are unchanged and are
+this site's alone; the statutes site has its own volume, Postgres, deploy lock, watchdog and
+backups. Runbook: [docs/deploy.md §9 "Sharing the box"](../deploy.md#9-sharing-the-box). The edge
+and the network are the statutes repository's ADR-0017.

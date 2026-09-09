@@ -189,3 +189,21 @@ gets no separate budget.
   forgets refilled buckets without handing a spent one a fresh burst.
 - `docs/verification/xff.md` — the proxy measurement above, reproducible.
 - `git grep Usc0deSearch` finds the credential in `.env.example` only.
+
+## Amendment 2026-09-08 to decision 1
+
+The site now sits behind a shared edge Caddy on the same box (ADR-0020 as amended). The edge
+overwrites `X-Forwarded-For` with the real client (`header_up X-Forwarded-For {remote_host}`) and
+forwards to this site's proxy over the `edge` network, `10.83.0.0/24`. This site's `deploy/Caddyfile`
+sets `trusted_proxies static 10.83.0.0/24` in place of `private_ranges` and writes
+`header_up X-Forwarded-For {client_ip}` in both handle blocks in place of `{remote_host}`.
+`{client_ip}` is the forwarded address when the peer is in the trusted range and the peer itself
+otherwise, so one file serves the dev stack on :8000 and the box behind the edge.
+
+The property decision 1 rests on holds: nothing a caller sends survives to be read by either
+backend. From the internet the first hop is the edge, which overwrites the header before this proxy
+reads it; from any peer outside `10.83.0.0/24` this proxy discards the header and writes the peer.
+`private_ranges` is not used because a workstation peer on the dev stack is in a private range and
+would be trusted to name its own client. Measured 2026-09-08 (`docs/verification/xff.md`): a peer
+on `10.83.0.0/24` sending `X-Forwarded-For: 203.0.113.9` reaches the upstream as `203.0.113.9`; a
+peer on another Docker network sending the same header reaches it as the peer.
