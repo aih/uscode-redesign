@@ -2,7 +2,7 @@
 # First-boot setup for the site box (docs/deploy.md §3), as a script rather
 # than a paste buffer. Run once, over SSM, as root:
 #
-#   SITE_ADDRESS=uscode.linkedlegislation.org \
+#   SITE_ADDRESS=http://uscode.linkedlegislation.org:8000 \
 #   ECR_REGISTRY=739065237548.dkr.ecr.us-east-1.amazonaws.com \
 #   USC_MIRROR_BUCKET=uscode-mirror-dreamproit \
 #     bash bootstrap-box.sh
@@ -14,7 +14,7 @@
 # search 401ing behind a green healthcheck.
 set -euo pipefail
 
-SITE_ADDRESS="${SITE_ADDRESS:?set SITE_ADDRESS to the public hostname}"
+SITE_ADDRESS="${SITE_ADDRESS:?set SITE_ADDRESS to the site address, e.g. http://uscode.linkedlegislation.org:8000 behind the edge (docs/deploy.md §9)}"
 ECR_REGISTRY="${ECR_REGISTRY:?set ECR_REGISTRY}"
 USC_MIRROR_BUCKET="${USC_MIRROR_BUCKET:-uscode-mirror-dreamproit}"
 DATA_ROOT="${DATA_ROOT:-/var/lib/uscode}"

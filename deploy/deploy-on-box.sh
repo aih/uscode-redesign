@@ -100,27 +100,6 @@ docker compose -f docker-compose.prod.yml up -d --wait
 echo "=== recreating the proxy so it picks up deploy/Caddyfile ==="
 docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate proxy
 
-# Prove it rather than assume it: what the proxy is *serving* is the only
-# evidence that the step above did anything, and this is a deploy script whose
-# whole failure mode is looking successful.
-#
-# It has to ask for the real hostname, not localhost — the Caddyfile has one
-# site block, matched on $SITE_ADDRESS, so a request with any other Host gets a
-# 404 from Caddy and would fail this check while the site was perfectly
-# healthy. `--resolve` keeps the request on the box rather than sending it out
-# to DNS and back, so this measures this instance and not whatever the world
-# currently points at. Asserting the directive rather than the status code is
-# the point: a 200 would also be returned by the previous config's 404 handler
-# had this route ever been dropped.
-SITE_ADDRESS="$(grep -E '^SITE_ADDRESS=' .env 2>/dev/null | cut -d= -f2- || true)"
-if [ -n "$SITE_ADDRESS" ]; then
-    echo "=== checking the proxy serves the current Caddyfile ==="
-    curl -sfL --retry 5 --retry-delay 2 --retry-all-errors \
-        --resolve "${SITE_ADDRESS}:443:127.0.0.1" \
-        "https://${SITE_ADDRESS}/robots.txt" | grep -qx 'Disallow: /'
-    echo "robots.txt served as expected"
-fi
-
 # The search index, when and only when the mapping this image declares differs
 # from the one the live index was built with (ADR-0049).
 #
@@ -148,5 +127,48 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps api \
 
 echo "=== pruning old images ==="
 docker image prune -f
+
+# Prove it rather than assume it: what the proxy is *serving* is the only
+# evidence that the recreate above did anything, and this is a deploy script
+# whose whole failure mode is looking successful.
+#
+# The request goes through the edge (docs/deploy.md §9): the shared Caddy on
+# 127.0.0.1:443 that terminates TLS and forwards to this project's proxy over
+# the `edge` network. The Caddyfile has one site block, matched on the
+# hostname in $SITE_ADDRESS, so the request has to carry that hostname;
+# `--resolve` keeps it on the box, so this measures this instance and not
+# whatever DNS points at. Asserting the directive rather than the status code
+# is the point: a 200 would also be returned by the previous config's 404
+# handler had this route ever been dropped.
+#
+# The hostname is $SITE_ADDRESS with the scheme and port stripped:
+# `http://uscode.linkedlegislation.org:8000` and `uscode.linkedlegislation.org`
+# (the shape before the edge, and the rollback) both give
+# `uscode.linkedlegislation.org`.
+#
+# Last, so that an edge that is not answering fails the exit status and skips
+# nothing above it. On the cut-over's first deploy the edge is not up yet
+# (docs/deploy.md §9) and this step is the one that reports it.
+SITE_ADDRESS="$(grep -E '^SITE_ADDRESS=' .env 2>/dev/null | cut -d= -f2- || true)"
+SITE_HOST="${SITE_ADDRESS#*://}"
+SITE_HOST="${SITE_HOST%%/*}"
+SITE_HOST="${SITE_HOST%%:*}"
+if [ -n "$SITE_HOST" ]; then
+    echo "=== checking the proxy serves the current Caddyfile, through the edge ==="
+    if ! ROBOTS="$(curl -sfL --retry 5 --retry-delay 2 --retry-all-errors \
+            --resolve "${SITE_HOST}:443:127.0.0.1" \
+            "https://${SITE_HOST}/robots.txt")"; then
+        echo "nothing answered https://${SITE_HOST}/robots.txt on 127.0.0.1:443." >&2
+        echo "The stack is up; the edge is not. It is the statutes repository's" >&2
+        echo "compose project: bash deploy/edge/up.sh from that checkout on this box." >&2
+        exit 1
+    fi
+    if ! printf '%s\n' "$ROBOTS" | grep -qx 'Disallow: /'; then
+        echo "the edge answered, but robots.txt is not the current Caddyfile's:" >&2
+        printf '%s\n' "$ROBOTS" >&2
+        exit 1
+    fi
+    echo "robots.txt served as expected"
+fi
 
 echo "=== $(date -u +%FT%TZ) deploy of $TAG complete ==="
