@@ -8,11 +8,21 @@
 # into production and put the whole database on a public IP. A separate file
 # cannot make that mistake.
 #
-#   browser :443 ── proxy ─┬── /app/*  → frontend:4321   (Astro SSR on Node)
-#                          └── /*      → api:8001        (FastAPI)
+#   browser :443 ── edge ── uscode-proxy:8000 ─┬── /app/*  → frontend:4321   (Astro SSR on Node)
+#                                              └── /*      → api:8001        (FastAPI)
+#
+# The edge is a Caddy in a third compose project on the same box, from the
+# statutes repository's deploy/edge/. It publishes 80 and 443, terminates TLS
+# for uscode.linkedlegislation.org and statutes.linkedlegislation.org, and
+# reaches this site's proxy over the external Docker network `edge` by the
+# alias `uscode-proxy`. Nothing in this file publishes a port
+# (docs/deploy.md §9).
 #
 # Required in .env beside this file:
-#   SITE_ADDRESS=uscode.example.org      the hostname Caddy answers on
+#   SITE_ADDRESS=http://uscode.linkedlegislation.org:8000
+#                                        the site address Caddy serves: plain
+#                                        HTTP on 8000 inside the container,
+#                                        matched on the hostname, behind the edge
 #   POSTGRES_PASSWORD=…                  openssl rand -base64 32
 #   SEARCH_PASSWORD=…                    openssl rand -base64 24, no "admin" in it
 #   DATA_ROOT=/var/lib/uscode            the mounted data volume
@@ -233,14 +243,32 @@ services:
       frontend:
         condition: service_healthy
     environment:
-      # Caddy reads this as the site address. A bare hostname means automatic
-      # HTTPS from Let's Encrypt; the Caddyfile's default of :8000 means plain
-      # HTTP, which is the dev stack.
+      # Caddy reads this as the site address. Behind the edge it is
+      # `http://uscode.linkedlegislation.org:8000`: plain HTTP on 8000, matched
+      # on the hostname the edge forwards. A bare hostname is the shape before
+      # the edge (automatic HTTPS from Let's Encrypt on 80 and 443, which then
+      # need publishing again); the Caddyfile's default of :8000 is the dev
+      # stack.
       SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
-    ports:
-      - "80:80" # required: the ACME HTTP challenge and the redirect to 443
-      - "443:443"
+    # No published ports. The edge reaches this service as `uscode-proxy` on
+    # the `edge` network; `default` keeps it on this project's network for
+    # api and frontend.
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - uscode-proxy
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ${DATA_ROOT:-/var/lib/uscode}/caddy:/data # certificates outlive the container
+      # Certificates outlive the container. Behind the edge this Caddy issues
+      # none; the volume keeps the certificate from before the edge, which the
+      # rollback (docs/deploy.md §9) reuses.
+      - ${DATA_ROOT:-/var/lib/uscode}/caddy:/data
     restart: unless-stopped
+
+# The network shared with the edge and the statutes site, created by the
+# statutes repository's deploy/edge/up.sh (10.83.0.0/24). `external` means
+# `docker compose down` here never removes it.
+networks:
+  edge:
+    external: true

@@ -117,3 +117,38 @@ docker rm -f xff-echo xff-caddy && docker network rm xfftest
 The regression tests in `tests/test_auth.py` cover the same property from the
 other end: a forged header does not open a fresh throttle bucket, and nothing a
 caller sends reaches `login_attempts.ip`.
+
+## Measured 2026-09-08: `trusted_proxies static 10.83.0.0/24` with `{client_ip}`
+
+For ADR-0029's amendment: the site now sits behind a shared edge on the `edge` network
+(`10.83.0.0/24`), and `deploy/Caddyfile` trusts that range and writes `{client_ip}`. A
+`caddy:2-alpine` container running the branch's Caddyfile (`SITE_ADDRESS=http://uscode.localhost:8000`)
+on the `edge` network and on a scratch network holding an echo upstream at `api:8001`, probed with
+`curlimages/curl` from a peer on each network.
+
+| Peer | Request headers | `client_ip` in the access log | Upstream received |
+|---|---|---|---|
+| `10.83.0.4` (edge network, trusted) | `X-Forwarded-For: 203.0.113.9`, `X-Forwarded-Proto: https` | `203.0.113.9` | `X-Forwarded-For: 203.0.113.9`, `X-Forwarded-Proto: https` |
+| `10.83.0.4` (trusted) | `X-Forwarded-For: 203.0.113.9, 198.51.100.7` | `203.0.113.9` | `X-Forwarded-For: 203.0.113.9`, `X-Forwarded-Proto: http` |
+| `172.27.0.4` (another Docker network, untrusted) | `X-Forwarded-For: 203.0.113.9`, `X-Forwarded-Proto: https` | `172.27.0.4` | `X-Forwarded-For: 172.27.0.4`, `X-Forwarded-Proto: http` |
+| `172.27.0.4` (untrusted) | none | `172.27.0.4` | `X-Forwarded-For: 172.27.0.4`, `X-Forwarded-Proto: http` |
+
+The same run against the dev stack's networks (`uscode-redesign_default`, `172.23.0.0/16`) gave the
+same two answers: `client_ip` `203.0.113.9` from `10.83.0.3`, `172.23.0.9` from `172.23.0.9`.
+
+Reproducing it:
+
+```bash
+docker network create --subnet 10.83.0.0/24 edge      # if deploy/edge/up.sh has not
+docker network create scratch
+docker run --rm -d --name echo --network scratch --network-alias api \
+  -v "$PWD/echo.py:/echo.py:ro" python:3.12-alpine python /echo.py     # the echo.py above, on 8001
+docker run --rm -d --name inner --network edge -e SITE_ADDRESS=http://uscode.localhost:8000 \
+  -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+docker network connect scratch inner
+docker run --rm --network edge    curlimages/curl -s -H 'Host: uscode.localhost' \
+  -H 'X-Forwarded-For: 203.0.113.9' -H 'X-Forwarded-Proto: https' http://inner:8000/api/v1/x
+docker run --rm --network scratch curlimages/curl -s -H 'Host: uscode.localhost' \
+  -H 'X-Forwarded-For: 203.0.113.9' -H 'X-Forwarded-Proto: https' http://inner:8000/api/v1/x
+docker logs echo; docker logs inner | grep http.log.access   # request.client_ip
+```

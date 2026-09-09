@@ -30,10 +30,13 @@
  * `--forwarded-allow-ips "*"` was before ADR-0029: one header, a fresh bucket.
  *
  * What makes it trustworthy is `deploy/Caddyfile`, which *overwrites*
- * `X-Forwarded-For` with `{remote_host}` in both handle blocks. That is why the
- * fix belongs at the proxy rather than in either backend — one line per hop
- * fixes both surfaces, and neither has to be taught which hops to believe. Any
- * deployment putting something else in front must do the same.
+ * `X-Forwarded-For` with `{client_ip}` in both handle blocks: the peer, or the
+ * address the shared edge forwarded when the peer is the edge, which has
+ * overwritten the header with the real client first (ADR-0029 as amended
+ * 2026-09-08). That is why the fix belongs at the proxy rather than in either
+ * backend — one line per hop fixes both surfaces, and neither has to be taught
+ * which hops to believe. Any deployment putting something else in front must
+ * do the same.
  *
  * ## The cost, stated
  *
