@@ -4,9 +4,9 @@ The decision and its reasoning are [ADR-0020](adr/0020-deploy-one-ec2-box-compos
 this is the runbook. Companion to [remote-ops.md](remote-ops.md), which covers the *downloader*
 box — a different, disposable machine with a different job. This one serves the site.
 
-Shape: **one EC2 instance running `docker-compose.prod.yml`**, Caddy terminating HTTPS, Postgres
-in a container on a separate EBS volume, and the corpus pulled from the S3 mirror. No RDS, no
-ECS — see the ADR for why.
+Shape: **one EC2 instance running `docker-compose.prod.yml`**, a shared edge Caddy terminating
+HTTPS for this site and statutes.linkedlegislation.org (§9), Postgres in a container on a separate
+EBS volume, and the corpus pulled from the S3 mirror. No RDS, no ECS — see the ADR for why.
 
 Everything here assumes `AWS_PROFILE=uscode` and `AWS_REGION=us-east-1`, matching the mirror.
 
@@ -137,7 +137,7 @@ Then allocate an Elastic IP, associate it, and point the domain's A record at it
 `deploy/bootstrap-box.sh` does all of this in one idempotent run — fetch it onto the box and:
 
 ```bash
-SITE_ADDRESS=uscode.linkedlegislation.org \
+SITE_ADDRESS=http://uscode.linkedlegislation.org:8000 \
 ECR_REGISTRY=739065237548.dkr.ecr.us-east-1.amazonaws.com \
 USC_MIRROR_BUCKET=uscode-mirror-dreamproit \
   sudo -E bash bootstrap-box.sh
@@ -166,7 +166,7 @@ sudo chown -R ec2-user:ec2-user /var/lib/uscode
 
 git clone https://github.com/<owner>/uscode-redesign.git && cd uscode-redesign
 cat > .env <<EOF
-SITE_ADDRESS=uscode.linkedlegislation.org
+SITE_ADDRESS=http://uscode.linkedlegislation.org:8000
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
 DATA_ROOT=/var/lib/uscode
 USC_MIRROR_BUCKET=uscode-mirror-dreamproit
@@ -175,6 +175,11 @@ SEARCH_PASSWORD=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)!7q
 EOF
 chmod 600 .env
 ```
+
+`SITE_ADDRESS` is the address the site's own Caddy serves: plain HTTP on port 8000 inside the
+container, matched on the hostname, behind the edge (§9). The bare hostname
+`uscode.linkedlegislation.org` is the shape before the edge and the rollback: Caddy then issues
+the certificate itself, and the proxy must publish 80 and 443 again.
 
 **`SEARCH_PASSWORD` is honoured only on the OpenSearch data volume's first boot** — changing it
 later in `.env` does nothing until the volume is wiped, and it must not contain the substring
@@ -197,8 +202,8 @@ return until both are actually answering, not just started. If ECR isn't reachab
 to build locally instead: `docker compose -f docker-compose.prod.yml up -d --build --wait` falls
 back to each service's `build:` block.
 
-Caddy gets its certificate within a few seconds of the DNS record resolving. The site is now up
-and **empty**, which is fine — fill it while it serves. Two ways in, pick one:
+The edge (§9) gets the certificate within a few seconds of the DNS record resolving. The site is
+now up and **empty**, which is fine — fill it while it serves. Two ways in, pick one:
 
 **Fast path — restore a dump.** Minutes, not days, if a recent one exists in the mirror.
 
@@ -388,6 +393,76 @@ installed on the box (`dnf install -y amazon-cloudwatch-agent`, then a config pu
 `disk` for `/var/lib/uscode`). Without it that one alarm sits in `INSUFFICIENT_DATA` — deliberately
 quiet rather than deliberately noisy — and the other four still work, since they come from EC2's
 own metrics.
+
+## 9. Sharing the box
+
+The instance also serves statutes.linkedlegislation.org, from the statutes repository
+(`~/statutes-at-large` on the box). Three compose projects run on it, joined by one external Docker
+network named `edge` (subnet `10.83.0.0/24`):
+
+```
+:443 ── edge (Caddy, TLS for both names; the statutes repository's deploy/edge/)
+         ├── uscode.linkedlegislation.org   → uscode-proxy:8000    (this project's proxy)
+         └── statutes.linkedlegislation.org → statutes-proxy:8000  (the statutes site's proxy)
+```
+
+Shared: the instance, the `edge` network, the edge Caddy, and its certificate store
+(`/var/lib/statutes/edge-caddy`). Not shared: each site's Postgres, data volume, images, deploy
+lock, watchdog, backups, and Caddyfile.
+
+This project's part of it, in `docker-compose.prod.yml` and `deploy/`:
+
+- The `proxy` service publishes no ports. It is on the project's own network for `api` and
+  `frontend`, and on `edge` with the alias `uscode-proxy`, which is the name the edge forwards to.
+- `SITE_ADDRESS=http://uscode.linkedlegislation.org:8000` in `.env`. The Caddyfile listens on 8000
+  inside the container, plain HTTP, matched on the hostname.
+- The Caddyfile trusts `10.83.0.0/24` (`trusted_proxies`) and writes `{client_ip}` into
+  `X-Forwarded-For`: the address the edge forwarded when the peer is the edge, the peer itself
+  otherwise. The edge overwrites the header with the real client before forwarding
+  (ADR-0029, amended 2026-09-08).
+- `deploy-on-box.sh`'s robots.txt check and `watchdog.sh`'s probes go through the edge, at
+  `https://uscode.linkedlegislation.org` resolved to `127.0.0.1`, with the hostname taken from
+  `SITE_ADDRESS`. The watchdog restarts `api`, `frontend` and `proxy` of this project, never the
+  edge; when nothing listens on 127.0.0.1:443 it logs that and restarts nothing.
+- `robots.txt` answers `Disallow: /` on both sites. Links between the two hostnames are plain
+  navigations, allowed by both sites' CSP.
+- `${DATA_ROOT}/caddy` stays mounted on the proxy. It holds the certificate from before the edge,
+  which the rollback below reuses; the edge keeps its own store.
+
+**Cut-over**, from a box serving this site alone:
+
+1. Deploy this shape (`bash deploy/deploy-on-box.sh <sha>`, or the workflow) with
+   `SITE_ADDRESS=http://uscode.linkedlegislation.org:8000` in `.env`. The proxy stops publishing 80
+   and 443 and joins `edge`; the site is unreachable from the internet until step 2. The deploy's
+   final robots.txt check reports that nothing answers on 443 and exits 1; everything before it
+   has run.
+2. From the statutes repository's checkout on the box, `bash deploy/edge/up.sh`. It creates the
+   network, brings the edge up on 80 and 443, and issues the certificate for
+   `uscode.linkedlegislation.org` into the edge's own store.
+3. Check this site through the edge:
+
+   ```bash
+   curl --resolve uscode.linkedlegislation.org:443:127.0.0.1 https://uscode.linkedlegislation.org/robots.txt
+   curl -s -o /dev/null -w '%{http_code}\n' \
+     --resolve uscode.linkedlegislation.org:443:127.0.0.1 https://uscode.linkedlegislation.org/app/us/usc/t16/s45f
+   ```
+
+   Then the §5 smoke test from a workstation.
+4. Deploy the statutes site (its `deploy/deploy-on-box.sh`).
+
+**Rollback** to the site alone:
+
+1. `SITE_ADDRESS=uscode.linkedlegislation.org` in `.env`.
+2. In `docker-compose.prod.yml`, put `ports: ["80:80", "443:443"]` back on the `proxy` service.
+   Remove its `networks` block and the top-level `networks:`, or leave both and keep the `edge`
+   network in place.
+3. Stop the edge (`docker compose down` in the statutes repository's `deploy/edge/`), so 80 and
+   443 are free.
+4. `docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate proxy`. The
+   certificate from before the edge is in `${DATA_ROOT}/caddy`; Caddy uses it while it is valid and
+   renews it.
+
+`deploy-on-box.sh` and `watchdog.sh` work with either `SITE_ADDRESS` shape.
 
 ## What is deliberately not here
 
