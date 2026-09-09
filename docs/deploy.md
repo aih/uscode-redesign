@@ -431,15 +431,19 @@ This project's part of it, in `docker-compose.prod.yml` and `deploy/`:
 
 **Cut-over**, from a box serving this site alone:
 
-1. Deploy this shape (`bash deploy/deploy-on-box.sh <sha>`, or the workflow) with
+1. From the statutes repository's checkout on the box, `bash deploy/edge/up.sh --network-only`.
+   It creates the `edge` network and stops. `docker-compose.prod.yml` declares the network as
+   external, so without it the deploy in step 2 fails at `up` before touching a container
+   (measured 2026-09-09). The edge itself cannot start yet: this site's proxy still holds 80
+   and 443.
+2. Deploy this shape (`bash deploy/deploy-on-box.sh <sha>`, or the workflow) with
    `SITE_ADDRESS=http://uscode.linkedlegislation.org:8000` in `.env`. The proxy stops publishing 80
-   and 443 and joins `edge`; the site is unreachable from the internet until step 2. The deploy's
+   and 443 and joins `edge`; the site is unreachable from the internet until step 3. The deploy's
    final robots.txt check reports that nothing answers on 443 and exits 1; everything before it
    has run.
-2. From the statutes repository's checkout on the box, `bash deploy/edge/up.sh`. It creates the
-   network, brings the edge up on 80 and 443, and issues the certificate for
-   `uscode.linkedlegislation.org` into the edge's own store.
-3. Check this site through the edge:
+3. From the same checkout, `bash deploy/edge/up.sh`. It brings the edge up on 80 and 443 and
+   issues the certificate for `uscode.linkedlegislation.org` into the edge's own store.
+4. Check this site through the edge:
 
    ```bash
    curl --resolve uscode.linkedlegislation.org:443:127.0.0.1 https://uscode.linkedlegislation.org/robots.txt
@@ -448,7 +452,7 @@ This project's part of it, in `docker-compose.prod.yml` and `deploy/`:
    ```
 
    Then the §5 smoke test from a workstation.
-4. Deploy the statutes site (its `deploy/deploy-on-box.sh`).
+5. Deploy the statutes site (its `deploy/deploy-on-box.sh`).
 
 **Rollback** to the site alone:
 
