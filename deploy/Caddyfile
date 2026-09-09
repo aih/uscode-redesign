@@ -10,65 +10,60 @@
 # static export without the API restarting, and vice versa.
 #
 # $SITE_ADDRESS is the site address. It defaults to :8000, which is the dev
-# stack: plain HTTP, no host matching. In production it is a hostname
-# (`uscode.example.org`), and Caddy provisions and renews the certificate for it
-# automatically — that one substitution is the whole HTTPS story.
+# stack: plain HTTP, no host matching. On the box it is
+# `http://uscode.linkedlegislation.org:8000`: plain HTTP on 8000 inside the
+# container, matched on the hostname, behind the shared edge Caddy that
+# publishes 80 and 443 and terminates TLS for this hostname and
+# statutes.linkedlegislation.org (docs/deploy.md §9, ADR-0020 as amended). A
+# bare hostname is the shape before the edge: Caddy provisions and renews the
+# certificate itself, on 80 and 443.
 
 {
-	# Caddy hands X-Forwarded-Proto to the API, and uvicorn is started with
-	# --proxy-headers so `request.url.scheme` is the *client's* scheme rather
-	# than the http of this hop. That is what decides whether the session cookie
-	# gets `Secure` (api/auth.py), so it is a security setting, not a cosmetic
-	# one — and USC_COOKIE_SECURE=true in production means a regression here
-	# cannot silently downgrade the cookie anyway.
+	# Who may name the client. `{client_ip}` in the handle blocks below is the
+	# forwarded X-Forwarded-For address when the peer is in this range and the
+	# peer itself otherwise. The range is the `edge` network the statutes
+	# repository's deploy/edge/up.sh creates, so behind the edge the address
+	# it forwards survives this hop, and on the dev stack a workstation peer
+	# (192.168.65.1 on Docker Desktop, a bridge gateway on Linux) is not
+	# trusted and its X-Forwarded-For is dropped. Not `private_ranges`: a
+	# workstation peer on the dev stack is in a private range too and would be
+	# trusted to name its own client (ADR-0029).
+	#
+	# X-Forwarded-Proto follows the same rule. Behind the edge the scheme is
+	# https at the edge and http on this hop; the edge sends
+	# X-Forwarded-Proto: https, this hop preserves it from the trusted peer,
+	# and uvicorn (--proxy-headers) reads it as `request.url.scheme`. The
+	# session cookie's `Secure` flag does not read it in production:
+	# USC_COOKIE_SECURE=true in docker-compose.prod.yml decides that on its
+	# own (api/auth.py, ADR-0019).
 	servers {
-		trusted_proxies static private_ranges
+		trusted_proxies static 10.83.0.0/24
 	}
 }
 
 {$SITE_ADDRESS::8000} {
 	encode gzip zstd
 
-	# `header_up X-Forwarded-For {remote_host}` *overwrites* rather than appends,
-	# so the header the backends read is always the real peer of this hop.
+	# `header_up X-Forwarded-For {client_ip}` in both handle blocks below
+	# *overwrites* the header rather than appending to it. Both compose files
+	# start uvicorn with `--forwarded-allow-ips "*"`, and in that mode its
+	# proxy-headers middleware returns `x_forwarded_for_hosts[0]`, the
+	# leftmost value; Astro's Node adapter reads the leftmost value too
+	# (`astro/dist/core/app/node.js:121`). So the value written here is the
+	# value both backends key their rate limiters on (ADR-0029).
 	#
-	# It has to be done here, and it is not a belt-and-braces measure. Both
-	# compose files start uvicorn with `--forwarded-allow-ips "*"`, and in that
-	# mode uvicorn's proxy-headers middleware returns
-	# `x_forwarded_for_hosts[0]` — the *leftmost*, entirely client-supplied
-	# value; the reverse scan that finds the first untrusted hop only runs when
-	# trust is not `*`. Astro's Node adapter reads the leftmost value too
-	# (`astro/dist/core/app/node.js:121`), so both surfaces have the same shape.
+	# `{client_ip}` is the forwarded address when the peer is in the
+	# `trusted_proxies` range above and the peer itself otherwise. Behind the
+	# edge the peer is the edge, which has already overwritten the header with
+	# the real client (its own `header_up X-Forwarded-For {remote_host}`), so
+	# the client's address survives this hop and nothing the client sent does.
+	# On the dev stack the peer is the workstation, outside the range, so its
+	# header is dropped and the peer is written. One line serves both shapes.
 	#
-	# The precondition is the `trusted_proxies` setting above, and it is worth
-	# stating exactly, because the mechanism is not "Caddy always appends":
-	# Caddy preserves an inbound X-Forwarded-For only when the peer is a trusted
-	# proxy, and replaces it otherwise. `static private_ranges` therefore means
-	# **any peer on a private network is trusted to name its own client**.
-	#
-	# Measured, with a Caddy 2 container and an echo upstream
-	# (docs/verification/xff.md):
-	#
-	#   trusted_proxies private_ranges, no header_up:
-	#       curl -H 'X-Forwarded-For: 1.2.3.4'  ->  "1.2.3.4, 192.168.65.1"
-	#   the same, with header_up:
-	#       curl -H 'X-Forwarded-For: 1.2.3.4'  ->  "192.168.65.1"
-	#
-	# So the forged value really does land leftmost and win, and uvicorn really
-	# does read it — but only from a peer inside a private range. Facing the
-	# internet directly, as ADR-0020 deploys it, client peers are public and
-	# Caddy already discards what they send. What was exposed is the dev stack,
-	# and any future shape with a CDN, load balancer or sidecar in front — which
-	# ADR-0018 explicitly anticipates. That made the per-IP login throttle
-	# (api/auth.py, ADR-0019) bypassable with one header and `login_attempts.ip`
-	# an attacker-controlled write, in exactly the deployment shape most likely
-	# to come next.
-	#
-	# Overwriting closes it unconditionally, and independently of the trust
-	# setting — which is the property worth having, since the setting is remote
-	# from the code that relies on it. Narrowing `--forwarded-allow-ips` to a
-	# literal range instead was rejected: the compose network's CIDR is assigned
-	# by Docker and changes. See ADR-0029.
+	# Measured (docs/verification/xff.md): from a peer on 10.83.0.0/24 sending
+	# `X-Forwarded-For: 203.0.113.9`, `client_ip` is 203.0.113.9; from a peer
+	# on another Docker network sending the same header, `client_ip` is the
+	# peer.
 	# robots.txt is a property of the *host*, not of either surface, and this
 	# file is the only thing that owns the host — so serving it here is what
 	# makes one answer true for /app and /api/v1 alike, including for a request
@@ -147,7 +142,7 @@
 	# 502 rather than absorbed.
 	handle /app* {
 		reverse_proxy frontend:4321 {
-			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-For {client_ip}
 			transport http {
 				dial_timeout 5s
 				response_header_timeout 30s
@@ -159,7 +154,7 @@
 	# /health, and the OpenAPI docs.
 	handle {
 		reverse_proxy api:8001 {
-			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-For {client_ip}
 			transport http {
 				dial_timeout 5s
 				response_header_timeout 30s

@@ -108,10 +108,12 @@ def _client_ip(request: Request) -> str | None:
     What makes that value trustworthy is *not* uvicorn. Both compose files pass
     `--forwarded-allow-ips "*"`, and in that mode uvicorn takes the header's
     leftmost entry — which the client wrote. The guarantee comes from Caddy
-    instead: `deploy/Caddyfile` sets `header_up X-Forwarded-For {remote_host}`,
-    which *overwrites* the header with the real peer of that hop, so nothing a
-    caller sends survives to be read here. Until that line existed this throttle
-    was bypassable by sending one header (ADR-0029).
+    instead: `deploy/Caddyfile` sets `header_up X-Forwarded-For {client_ip}`,
+    which *overwrites* the header with the peer of that hop, or with the
+    address the shared edge forwarded when the peer is the edge (which has
+    itself overwritten the header with the real client). Nothing a caller
+    sends survives to be read here. Until that line existed this throttle was
+    bypassable by sending one header (ADR-0029, as amended 2026-09-08).
 
     Reading the raw header directly would be wrong for the same reason, and
     would not be improved by the Caddy change: it is right only because a proxy
