@@ -21,16 +21,30 @@
 #   2. Restart the stack's HTTP services after $FAIL_THRESHOLD consecutive
 #      failures.
 #
-# The probe goes through the proxy over the real hostname with --resolve, not
-# to a container port: the Caddyfile has one site block matched on
-# $SITE_ADDRESS, so any other Host gets a 404 that would look like an outage,
-# and going through the proxy is what makes this measure what a reader gets.
+# The probe goes through the edge over the real hostname with --resolve, not
+# to a container port: the shared Caddy on 127.0.0.1:443 forwards to this
+# project's proxy by hostname (docs/deploy.md §9), that proxy's Caddyfile has
+# one site block matched on the hostname in $SITE_ADDRESS, so any other Host
+# gets a 404 that would look like an outage, and going through both proxies
+# is what makes this measure what a reader gets.
+#
+# What it restarts is this project's HTTP services and never the edge. The
+# edge belongs to the statutes repository's compose project and serves the
+# other site too; when nothing listens on 127.0.0.1:443 the log says so and
+# no restart is attempted, since none of this project's services can bring
+# the edge back.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
 DATA_ROOT="$(grep -E '^DATA_ROOT=' .env 2>/dev/null | cut -d= -f2- || true)"
 DATA_ROOT="${DATA_ROOT:-/var/lib/uscode}"
 SITE_ADDRESS="$(grep -E '^SITE_ADDRESS=' .env 2>/dev/null | cut -d= -f2- || true)"
+# The hostname alone: `http://uscode.linkedlegislation.org:8000` behind the
+# edge and the bare `uscode.linkedlegislation.org` before it both give
+# `uscode.linkedlegislation.org`.
+SITE_HOST="${SITE_ADDRESS#*://}"
+SITE_HOST="${SITE_HOST%%/*}"
+SITE_HOST="${SITE_HOST%%:*}"
 REGION="${AWS_REGION:-us-east-1}"
 
 STATE_DIR="${DATA_ROOT}/watchdog"
@@ -52,19 +66,28 @@ mkdir -p "$STATE_DIR" "${DATA_ROOT}/logs"
 
 log() { echo "$(date -u +%FT%TZ) $*" >> "$LOG"; }
 
-if [ -z "$SITE_ADDRESS" ]; then
-    log "no SITE_ADDRESS in .env — cannot probe"
+if [ -z "$SITE_HOST" ]; then
+    log "no hostname in SITE_ADDRESS (${SITE_ADDRESS:-unset}) in .env — cannot probe"
     exit 1
 fi
 
 # Both surfaces, because they fail independently and either one being down is
 # the site being down to somebody: /health is FastAPI, the reader path is Astro
 # calling FastAPI, which is the shape that actually broke.
+#
+# Prints the status code, or `refused` when nothing accepted the connection on
+# 127.0.0.1:443 (curl exit 7): the edge is down, or, in the shape before the
+# edge, this project's proxy is not running.
 probe() {
-    local path="$1"
-    curl -sS -o /dev/null --max-time "$PROBE_TIMEOUT" \
-        --resolve "${SITE_ADDRESS}:443:127.0.0.1" \
-        -w '%{http_code}' "https://${SITE_ADDRESS}${path}" 2>/dev/null
+    local path="$1" code
+    code="$(curl -sS -o /dev/null --max-time "$PROBE_TIMEOUT" \
+        --resolve "${SITE_HOST}:443:127.0.0.1" \
+        -w '%{http_code}' "https://${SITE_HOST}${path}" 2>/dev/null)"
+    if [ "$?" -eq 7 ]; then
+        echo refused
+    else
+        echo "$code"
+    fi
 }
 
 API_CODE="$(probe /health)"
@@ -122,6 +145,14 @@ log "probe failed ($FAILURES/$FAIL_THRESHOLD): api=$API_CODE app=$APP_CODE"
 [ -n "${PROBE_ONLY:-}" ] && exit 1
 [ "$FAILURES" -lt "$FAIL_THRESHOLD" ] && exit 1
 
+# Nothing on 127.0.0.1:443 is the edge, not this site's backends. Restarting
+# them would not bring it back and would interrupt whatever update-corpus.sh
+# is running inside api (ADR-0035).
+if [ "$API_CODE" = "refused" ] && [ "$APP_CODE" = "refused" ]; then
+    log "nothing listens on 127.0.0.1:443 (the edge; before the edge, this project's proxy) — not restarting"
+    exit 1
+fi
+
 # Never restart underneath a deploy. deploy-on-box.sh holds this lock for its
 # whole run, and a deploy legitimately makes the site unavailable for a few
 # seconds while it recreates containers — restarting into that is how a healthy
@@ -140,9 +171,15 @@ if [ $((NOW - LAST)) -lt "$RESTART_COOLDOWN" ]; then
     exit 1
 fi
 
+# api and frontend, and this project's own proxy. Behind the edge a wedged
+# inner Caddy answers the probe as a 502 from the edge, and this script is the
+# only thing that acts on that; the restart is cheap now that the proxy holds
+# no TLS listener and issues no certificate. `restart` keeps the container, so
+# its `edge` network attachment and the `uscode-proxy` alias survive. The
+# edge itself is never restarted from here.
 echo "$NOW" > "$LAST_RESTART_FILE"
-log "restarting api and frontend after $FAILURES failed probes"
-docker compose -f docker-compose.prod.yml restart api frontend >>"$LOG" 2>&1
+log "restarting api, frontend and proxy after $FAILURES failed probes"
+docker compose -f docker-compose.prod.yml restart api frontend proxy >>"$LOG" 2>&1
 log "restart returned $?"
 
 sleep 20
