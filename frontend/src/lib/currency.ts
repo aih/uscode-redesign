@@ -57,6 +57,32 @@ export function usDate(iso: string | null): string | null {
   return year && month && day ? `${month}/${day}/${year}` : null;
 }
 
+/** The `release/title` pairs the corpus should hold and does not, unfinished
+ * loads included, each once. */
+function unloadedTitles(corpus: Status["corpus"]): string[] {
+  const pairs = new Set([...(corpus.unloaded_titles ?? []), ...(corpus.incomplete_loads ?? [])]);
+  return [...pairs].sort();
+}
+
+/** "Title 42 at release point 119-102 is", "Titles 7 and 42 at release point
+ * 119-102 are", "3 titles across 2 release points are". */
+export function describeUnloaded(pairs: string[]): string {
+  const byRelease = new Map<string, string[]>();
+  for (const pair of pairs) {
+    const slash = pair.indexOf("/");
+    const release = pair.slice(0, slash);
+    const title = pair.slice(slash + 1);
+    byRelease.set(release, [...(byRelease.get(release) ?? []), title]);
+  }
+  if (byRelease.size === 1) {
+    const [release, titles] = [...byRelease.entries()][0];
+    if (titles.length === 1) return `Title ${titles[0]} at release point ${release} is`;
+    const list = `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
+    return `Titles ${list} at release point ${release} are`;
+  }
+  return `${pairs.length} titles across ${byRelease.size} release points are`;
+}
+
 export function currencyNote(status: Status | null): CurrencyNote | null {
   if (!status) return null;
   const { source, corpus } = status;
@@ -84,6 +110,22 @@ export function currencyNote(status: Status | null): CurrencyNote | null {
       // The error is shown rather than summarised: whoever can act on it needs
       // to know whether the site was down or its markup changed.
       detail: `${held}${source.error ? ` The check reported: ${source.error}` : ""}`,
+    };
+  }
+
+  // A title the newest release point changed that is not held here is
+  // reported first: the release point is known, so `behind_by` is zero, and
+  // every page of that title is served from the release point before it
+  // (ADR-0082).
+  const unloaded = unloadedTitles(corpus);
+  if (unloaded.length > 0) {
+    return {
+      tone: "warning",
+      text: `${describeUnloaded(unloaded)} not loaded here yet.`,
+      detail:
+        `Those pages are served from the release point before it. ` +
+        `The newest release point every changed title is loaded at is ` +
+        `${corpus.newest_complete_release ?? "not known"}. Checked ${ago}.`,
     };
   }
 

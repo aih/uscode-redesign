@@ -31,6 +31,7 @@ import {
   releaseParams,
 } from "../../../lib/api";
 import { REVALIDATE, setPublicCache } from "../../../lib/cache";
+import { usDate } from "../../../lib/currency";
 import { ACCOUNTS_ENABLED } from "../../../lib/features";
 import { sectionCommands } from "../../../lib/palette";
 import { cachedReleases } from "../../../lib/releasecache";
@@ -293,7 +294,10 @@ const releaseContext = served
       served,
       isNewest,
       newestHref: isNewest ? null : appHref(identifier),
-      note: section?.note ?? toc?.note ?? null,
+      // A section absent from the release point gets its own warning below
+      // (ADR-0083), which carries the note's facts with links; the bar keeps
+      // the served-from line for the ordinary gotcha-10 case only.
+      note: section?.absent_from ? null : (section?.note ?? toc?.note ?? null),
     }
   : null;
 ---
@@ -376,6 +380,33 @@ const releaseContext = served
               </div>
             </div>
           ))}
+
+        {section.absent_from && (
+          <div class="usa-alert usa-alert--warning" role="status" data-absent-from={section.absent_from.label}>
+            <div class="usa-alert__body">
+              <h2 class="usa-alert__heading">
+                Not in the Code at {section.absent_from.label}
+              </h2>
+              <p class="usa-alert__text">
+                <code>{section.identifier}</code> is not in release point{" "}
+                {section.absent_from.label} ({usDate(section.absent_from.currency_date)}). The text
+                below is from {selected} ({usDate(section.served_from.currency_date)}), the most
+                recent release point that contains it. A section can leave the Code by being
+                renumbered or transferred without being marked repealed, so check{" "}
+                <a href={appHref(`/us/usc/t${section.title_num}`)}>
+                  Title {section.title_num} at the most recent release point
+                </a>{" "}
+                for its current status.
+                {section.parent_identifier && (
+                  <>
+                    {" "}Its former place was{" "}
+                    <a href={appHref(section.parent_identifier)}>{section.parent_identifier}</a>.
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
 
         {duplicateHtml.length > 0 && (
           <div class="usa-alert usa-alert--info" role="note">

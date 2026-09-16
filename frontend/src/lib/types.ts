@@ -45,6 +45,13 @@ export interface CorpusStatus {
   latest_currency_date: string | null;
   release_points_known: number;
   behind_by: number | null;
+  /** `release/title` pairs whose load started and never finished (ADR-0082).
+   * Optional: an API older than the field omits it. */
+  incomplete_loads?: string[];
+  /** `release/title` pairs newer than the newest fully loaded release point
+   * that OLRC says changed and this database does not hold. */
+  unloaded_titles?: string[];
+  newest_complete_release?: string | null;
 }
 
 export interface Status {
@@ -90,6 +97,10 @@ export interface Section {
   release: Release;
   served_from: Release;
   content_first_seen: Release;
+  /** Set when the section is not in the Code at the release point that would
+   * have answered; `served_from` is then the most recent release point that
+   * contains it (ADR-0083). Optional: an API older than the field omits it. */
+  absent_from?: Release | null;
   is_exact: boolean;
   note: string | null;
 }

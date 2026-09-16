@@ -175,9 +175,16 @@ def status(repository: RepositoryDep) -> StatusOut:
 
     Polled daily; `stale` goes true after a week without a successful check
     (`storage.SOURCE_CHECK_STALE_AFTER`).
+
+    A third way of being wrong is a load that started and did not finish
+    (ADR-0082): the release point is known and the title is served from the
+    one before it. `corpus.incomplete_loads` and `corpus.unloaded_titles` name
+    those pairs, and `deploy/update-corpus.sh` publishes their count as a
+    CloudWatch metric after every run.
     """
     check = repository.last_source_check()
     releases = repository.list_releases()
+    health = repository.corpus_health()
     loaded = next((r for r in releases if r.ingested_titles), None)
 
     behind_by = None
@@ -198,6 +205,9 @@ def status(repository: RepositoryDep) -> StatusOut:
             latest_currency_date=loaded.currency_date if loaded else None,
             release_points_known=len(releases),
             behind_by=behind_by,
+            incomplete_loads=list(health.incomplete_loads),
+            unloaded_titles=list(health.unloaded_titles),
+            newest_complete_release=health.newest_complete_label,
         ),
     )
 

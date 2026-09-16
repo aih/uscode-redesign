@@ -5,7 +5,7 @@ order: 3
 summary: Release points, how to ask for one, and what every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36, 44, 45, 56]
+  adrs: [18, 36, 44, 45, 56, 82, 83]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
@@ -112,6 +112,25 @@ steps:
 **Where the text is from.** Not every release point is separately stored. If you ask for one
 that is not, the text comes from the newest release point at or before it, and that is noted on the page.
 
+**A section that has left the Code.** A section can stop appearing at a release point without
+being marked repealed: it was renumbered, transferred, or a range of repealed sections was re-cut.
+Asking for one at a release point that does not contain it shows its text from the most recent
+release point that does, under a warning naming both release points. The warning links to the
+title at the most recent release point, which is where its current status is. The API answers the
+same request with `absent_from` set and the sentence in `note`; a release point from before the
+section existed is still a 404.
+
+```scenario
+id: section-absent-falls-back
+title: A renumbered section shows its last text, with a warning
+data: corpus
+steps:
+  - goto: /app/us/usc/t14/s1
+  - expect: { selector: "[data-absent-from]", contains: "is not in release point" }
+  - expect: { selector: "[data-absent-from]", contains: "most recent release point that contains it" }
+  - expect: { selector: "main", contains: "Establishment of Coast Guard" }
+```
+
 The [version history](/app/versions/us/usc/t16/s45f) and [redline](/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101)
 pages carry no release band. The first spans each release point at which the section changed; the
 second is compares text from two points in time.
@@ -133,6 +152,11 @@ The same page says when the site last looked for a new release point — *“Che
 for new release points 3 hours ago.”* It is a plain line when everything is current and a warning
 when it is not, including when the last check **failed**. The API answers the same question at
 `/api/v1/status`.
+
+A title that a release point changed and this site has not finished loading is a warning on the
+same line — *“Title 42 at release point 119-102 is not loaded here yet.”* Pages of that title are
+served from the release point before it, and each one says so in its release band. The API lists
+the pairs under `corpus.unloaded_titles` and `corpus.incomplete_loads`.
 
 ## A note on caching
 

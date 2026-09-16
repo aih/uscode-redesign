@@ -103,7 +103,22 @@ def served_note(section: SectionResult, resolved: ResolvedRelease) -> str | None
     same words: the reader prints it and the API returns it as `note`.
     """
     parts = [resolved.note] if resolved.note else []
-    if not section.is_exact:
+    if section.absent_from is not None:
+        # The title is loaded at that release point and the section is not in
+        # it (ADR-0083). Two facts and an instruction: which release point lacks
+        # it, where the text came from, and that its present status is a
+        # question for the current release point.
+        absent = section.absent_from
+        parts.append(
+            f"{section.identifier} is not in the Code at release point "
+            f"{absent.label} ({absent.currency_date.isoformat()}). This is its "
+            f"text as published at {section.served_from.label} "
+            f"({section.served_from.currency_date.isoformat()}), the most recent "
+            "release point that contains it. Check the most recent release point "
+            "for its current status — a section can leave the Code by being "
+            "renumbered or transferred without being marked repealed."
+        )
+    elif not section.is_exact:
         parts.append(
             f"{section.release.label} is not ingested; this is Title "
             f"{section.title_num} as published at {section.served_from.label} "

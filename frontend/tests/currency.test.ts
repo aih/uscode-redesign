@@ -9,7 +9,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { classificationNote, currencyNote, humanizeAge, usDate } from "../src/lib/currency";
+import {
+  classificationNote,
+  currencyNote,
+  describeUnloaded,
+  humanizeAge,
+  usDate,
+} from "../src/lib/currency";
 import type { ClassificationSource, Status } from "../src/lib/types";
 
 function status(overrides: Partial<Status["source"]> = {}, corpus: Partial<Status["corpus"]> = {}): Status {
@@ -70,6 +76,27 @@ describe("currencyNote", () => {
     expect(note.tone).toBe("ok");
     expect(note.text).toContain("3 hours ago");
     expect(note.detail).toContain("119-102not101");
+  });
+
+  it("warns first about a title the newest release point changed that is not held (ADR-0082)", () => {
+    // The release point is known, so behind_by is 0 — and every page of
+    // title 42 is quietly the release point before. That is the state the
+    // site was in for six days, and it outranks a stale check.
+    const note = currencyNote(
+      status(
+        { stale: true, hours_since_check: 24 * 9 },
+        { unloaded_titles: ["119-102/42"], incomplete_loads: ["119-102/42"], newest_complete_release: "119-102not101" },
+      ),
+    )!;
+    expect(note.tone).toBe("warning");
+    expect(note.text).toBe("Title 42 at release point 119-102 is not loaded here yet.");
+    expect(note.detail).toContain("served from the release point before it");
+    expect(note.detail).toContain("119-102not101");
+  });
+
+  it("is unchanged against an API that does not report unloaded titles", () => {
+    const note = currencyNote(status({}, { unloaded_titles: undefined, incomplete_loads: undefined }))!;
+    expect(note.tone).toBe("ok");
   });
 
   it("warns when nothing has ever checked — never checked is not the same as up to date", () => {
@@ -208,5 +235,23 @@ describe("classificationNote", () => {
     expect(note.tone).toBe("warning");
     expect(note.text).toContain("9 days ago");
     expect(note.detail).toContain("may have published a newer one");
+  });
+});
+
+describe("describeUnloaded", () => {
+  it("names the titles and the release point while there are few enough to read", () => {
+    expect(describeUnloaded(["119-102/42"])).toBe("Title 42 at release point 119-102 is");
+    expect(describeUnloaded(["119-102/7", "119-102/42"])).toBe(
+      "Titles 7 and 42 at release point 119-102 are",
+    );
+    expect(describeUnloaded(["119-102/7", "119-102/15", "119-102/42"])).toBe(
+      "Titles 7, 15 and 42 at release point 119-102 are",
+    );
+  });
+
+  it("counts once the pairs span release points", () => {
+    expect(describeUnloaded(["119-102/42", "119-103/7", "119-103/42"])).toBe(
+      "3 titles across 2 release points are",
+    );
   });
 });

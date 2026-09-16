@@ -6,7 +6,10 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-09-02 — the PWA phases (ADR-0079, ADR-0080, ADR-0081) are merged and not yet
+**Last updated:** 2026-09-16 — title 42 at release point 119-102 was half loaded on the box for six
+days and served as if loaded; see [The half-loaded title](#the-half-loaded-title-2026-09-10-adr-0082),
+and [Still owed](#still-owed) opens with the two hand steps that finish the repair. Before that,
+2026-09-02 — the PWA phases (ADR-0079, ADR-0080, ADR-0081) are merged and not yet
 deployed; [Still owed](#still-owed) now opens with the manual install pass on real devices, which no
 CI emulation can stand in for. Before that, 2026-09-01 — the version-change annotations (ADR-0074)
 are back-filled on the box, 489,738 change rows in 1,295s, and its report agrees with the
@@ -522,7 +525,73 @@ while nothing was wrong, which is worse than not checking at all: an alert that 
 alert nobody reads. The gate is now `source_mismatches` and `incomplete_loads` — the two fields
 that mean something is actually wrong — with `count_mismatches` printed rather than gated on.
 
+## The half-loaded title (2026-09-10, ADR-0082)
+
+**From 2026-09-10 to 2026-09-16 every page of title 42 was served from a release point holding
+none of it.** `/us/usc/t42/s1395b–2` answered 404 "nothing at … in release point 119-102";
+`/us/usc/t42/ch6` and `/us/usc/t42/ch16` rendered as chapters with no sections. Every alarm read
+`OK`, the daily check said "nothing new", and `/api/v1/status` said `behind_by: 0`.
+
+What happened, from the box's own logs (`/var/lib/uscode/logs/update-2026-09-10.log`, `dmesg`):
+
+| | |
+|---|---|
+| 06:41 | the daily check finds 119-102 (titles 7, 12, 15, 42), downloads and mirrors the four zips |
+| 06:43–06:45 | titles 7, 12 and 15 load: 2,926 / 1,999 / 2,701 sections |
+| 06:45 | title 42 starts |
+| 09:31 | `Out of memory: Killed process 1451592 (python3) anon-rss:4784300kB` |
+| 09:31 | `load-all` exits 137 having printed nothing; the script logs "could not read the loaded count" and exits before the verify gate |
+| 09-14 08:04 | the weekly `--force` sweep redoes it and is killed at 5.7 GB; the Actions run goes red |
+
+The loader held every stored version of title 42 — 136,213 rows, 3.8 GB of XML — in one
+dictionary to decide which sections were new (5.48 GB peak for the lookup alone,
+`docs/verification/load-memory.json`). The box has 7.8 GB, shared with Postgres, OpenSearch, Redis
+and the statutes-at-large stack. And the `title_versions` row a load writes first, with its
+completion marker `sections_loaded` still NULL, was what every serving query picked as the newest
+release point for the title.
+
+Fixed in ADR-0082: the serving path ignores a row without the marker; the lookup selects four
+columns (0.17 GB; the whole title 42 load then peaks at 303 MB on the development machine, 50 s);
+`/api/v1/status` reports `incomplete_loads` and `unloaded_titles`; `update-corpus.sh` publishes
+`USCode/CorpusIncomplete` from an EXIT trap on every run; `uscode-corpus-incomplete` alarms on it,
+missing data breaching. The alarm exists on the account as of 2026-09-16 (`INSUFFICIENT_DATA` until
+the first run of the new script publishes).
+
+**Every other title was checked against the inventory on 2026-09-16.** For each of the 58 titles,
+the newest release point the inventory says changed it, against the newest the box holds it at:
+only two things are behind. Title 42 at 119-102 (above), and **119-103** — published with a
+2026-09-02 currency date and first listed by OLRC on 2026-09-16, changing titles 1, 5, 6, 7, 15,
+19, 22, 23, 26, 35, 38, 40, 42, 47 and 50. Nothing else is stale: every other title is held at the
+newest release point that changed it. Both gaps are what the next daily run loads once ADR-0082
+is deployed.
+
+**The next release point is already published.** The inventory fetched on 2026-09-16 lists
+**119-103 (2026-09-02)**, changing 15 titles including 42. The box's check at 06:43 UTC that day
+still reported 119-102 as newest, so its next daily run will find 119-103 and load it. Before
+ADR-0082 is deployed, that load of title 42 is the same kill again and the same six days.
+
 ## Still owed
+
+**Finish the ADR-0082 repair on the box — two hand steps.** Both were blocked from the session
+that made the fix (its auto mode refuses remote writes).
+
+1. Delete the half-loaded row. It has nothing behind it — 0 `section_release_map` rows and 0
+   `guid_map` rows for the pair — and `load-all` redoes any pair without the marker on its next
+   run. The reader ignores the row once ADR-0082 is deployed; until then this is what makes title
+   42 answer. On the box:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml exec -T db psql -U uscode uscode -c "
+   delete from title_versions tv using release_points rp, titles t
+   where rp.id=tv.release_id and t.id=tv.title_id
+     and rp.label='119-102' and t.num='42' and tv.sections_loaded is null"
+   ```
+
+   Then `curl -s https://uscode.linkedlegislation.org/api/v1/us/usc/t42/ch6 | jq '.sections | length'`
+   should be non-zero and `served_from.label` should read `119-83`.
+2. Merge and deploy ADR-0082, then run the sweep so title 42 at 119-102 (and 119-103, by then)
+   actually loads: `bash deploy/update-corpus.sh --force` on the box, or the Monday Actions run.
+   The end of that log should read `published USCode/CorpusIncomplete=0`.
 
 **The manual install pass on real devices (ADR-0079, ADR-0080, ADR-0081).** Add to Home Screen has
 no emulation, so nothing in CI has verified the installed experience. Once the PWA phases deploy,

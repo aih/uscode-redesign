@@ -26,7 +26,7 @@ as it stands now.
 
 ## Fallbacks
 
-A url for a provision that does not (yet?) exist in the U.S. Code returns a response showing that the provision does not exist. Below that it offers the nearest address, hierarchically — a section that is not there suggests its title; a bad subsection of a real section suggests the
+A url for a provision that has never existed in the U.S. Code, or did not yet exist at the release point asked for, returns a response showing that the provision does not exist. (A provision that existed at an earlier release point and does not at this one is shown from the last release point that contains it, with a warning — see chapter 3.) Below that it offers the nearest address, hierarchically — a section that is not there suggests its title; a bad subsection of a real section suggests the
 parent section.
 
 ```scenario

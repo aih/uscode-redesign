@@ -47,6 +47,34 @@ from ingest import search_sync
 GUID_BATCH_SIZE = 500
 
 
+@dataclass(frozen=True, slots=True)
+class _KnownVersion:
+    """What the dedupe loop needs to know about a stored version: which row to
+    map this release point onto, and which release created it (what a superseded
+    version is retired from the search index by)."""
+
+    id: int
+    first_release_id: int
+
+
+def known_versions_statement(title_id: int):
+    """Every stored version of a title as `(section_id, id, content_hash,
+    first_release_id)` — four small columns, deliberately not `SectionVersion`
+    rows. The `xml` column is the corpus itself (3.8 GB for title 42) and the
+    dedupe check never reads it (ADR-0082). `tests/test_load_all.py` holds this
+    statement to that."""
+    return (
+        select(
+            SectionVersion.section_id,
+            SectionVersion.id,
+            SectionVersion.content_hash,
+            SectionVersion.first_release_id,
+        )
+        .join(Section, Section.id == SectionVersion.section_id)
+        .where(Section.title_id == title_id)
+    )
+
+
 class MissingCurrencyDateError(ValueError):
     """Raised when a release point is being created for the first time and neither
     `--currency-date` nor the release-point inventory supplies a date. Source USLM
@@ -104,17 +132,27 @@ def load_release(
     structure_nodes = _load_structure(session, parser, xml_path, title, release)
     session.commit()
 
-    existing_sections = {
-        s.identifier: s
-        for s in session.scalars(select(Section).where(Section.title_id == title.id))
+    # Identifier → section id, and section id → {content hash → known version}.
+    # Ids and hashes only, never ORM rows: the dedupe check needs a version's
+    # id and the release it first appeared at, and nothing else. Loading the
+    # rows themselves loaded every stored text of the title into memory —
+    # title 42 is 136,213 versions and 3.8 GB of XML — which is what killed the
+    # loader on the 8 GB site box, twice, and left a title_versions row with no
+    # sections behind it (ADR-0082).
+    existing_sections: dict[str, int] = {
+        identifier: section_id
+        for section_id, identifier in session.execute(
+            select(Section.id, Section.identifier).where(Section.title_id == title.id)
+        )
     }
-    existing_versions: dict[int, dict[bytes, SectionVersion]] = {}
+    existing_versions: dict[int, dict[bytes, _KnownVersion]] = {}
     if existing_sections:
-        section_ids = [s.id for s in existing_sections.values()]
-        for version in session.scalars(
-            select(SectionVersion).where(SectionVersion.section_id.in_(section_ids))
+        for section_id, version_id, content_hash, first_release_id in session.execute(
+            known_versions_statement(title.id)
         ):
-            existing_versions.setdefault(version.section_id, {})[version.content_hash] = version
+            existing_versions.setdefault(section_id, {})[content_hash] = _KnownVersion(
+                version_id, first_release_id
+            )
 
     status_counts: dict[str, int] = {}
     new_versions = 0
@@ -164,21 +202,24 @@ def load_release(
     release_seq = release.seq
     release_label = release.label
 
+    title_id = title.id
+
     for record in parser.iter_sections(xml_path):
-        section = existing_sections.get(record.identifier)
-        if section is None:
-            section = Section(title_id=title.id, identifier=record.identifier)
+        section_id = existing_sections.get(record.identifier)
+        if section_id is None:
+            section = Section(title_id=title_id, identifier=record.identifier)
             session.add(section)
             session.flush()
-            existing_sections[record.identifier] = section
+            section_id = section.id
+            existing_sections[record.identifier] = section_id
 
         # Hash the guid-stripped form, not the raw XML: guids regenerate at every
         # release point, so raw XML never repeats and dedupe would collapse nothing
         # (ADR-0007). `record.xml` is still what gets stored, verbatim.
         content_hash = hashlib.sha256(record.content_key.encode("utf-8")).digest()
-        siblings = existing_versions.get(section.id, {})
-        version = siblings.get(content_hash)
-        if version is None:
+        siblings = existing_versions.get(section_id, {})
+        known = siblings.get(content_hash)
+        if known is None:
             # Everything this section said before is now superseded. Collected
             # before the new row joins `siblings`, and only when this release is
             # the title's newest — a backfill of an older release point creates
@@ -187,11 +228,11 @@ def load_release(
                 retire_keys.extend(
                     (record.identifier, sibling.first_release_id)
                     for sibling in siblings.values()
-                    if sibling.first_release_id != release.id
+                    if sibling.first_release_id != release_id
                 )
             version = SectionVersion(
-                section_id=section.id,
-                first_release_id=release.id,
+                section_id=section_id,
+                first_release_id=release_id,
                 content_hash=content_hash,
                 xml=record.xml,
                 num=record.num,
@@ -203,10 +244,10 @@ def load_release(
             )
             session.add(version)
             session.flush()
-            existing_versions.setdefault(section.id, {})[content_hash] = version
+            known = _KnownVersion(version.id, release_id)
+            existing_versions.setdefault(section_id, {})[content_hash] = known
             new_versions += 1
-            new_version_sections.add(section.id)
-
+            new_version_sections.add(section_id)
 
             versions_to_sync.append({
                 "identifier": record.identifier,
@@ -214,7 +255,7 @@ def load_release(
                 "heading": record.heading,
                 "xml": record.xml,
                 "status": record.status,
-                "version_id": version.id,
+                "version_id": known.id,
                 # Where this text sits, for `chapter:` and `?sort=citation`.
                 # The same two values written to `section_release_map` below,
                 # read from the record rather than from that row so the index
@@ -234,7 +275,7 @@ def load_release(
             # why sync stays cheap at 91% dedupe (ADR-0028).
             deduped += 1
 
-        mapped_versions.setdefault(section.id, set()).add(version.id)
+        mapped_versions.setdefault(section_id, set()).add(known.id)
 
         # Reading order and parent are this release point's, even when the text
         # deduped into a version created by an earlier one (ADR-0008).
@@ -244,7 +285,7 @@ def load_release(
         }
         session.execute(
             pg_insert(SectionReleaseMap)
-            .values(section_version_id=version.id, release_id=release.id, **placement)
+            .values(section_version_id=known.id, release_id=release_id, **placement)
             .on_conflict_do_update(
                 index_elements=["section_version_id", "release_id"], set_=placement
             )
@@ -252,7 +293,7 @@ def load_release(
 
         for guid_ref in record.guid_refs:
             guid_rows.append(
-                {"guid": guid_ref.guid, "release_id": release.id, "identifier": guid_ref.identifier}
+                {"guid": guid_ref.guid, "release_id": release_id, "identifier": guid_ref.identifier}
             )
         if len(guid_rows) >= GUID_BATCH_SIZE:
             _flush_guid_rows(session, guid_rows)
@@ -305,7 +346,7 @@ def load_release(
             # A load below the title's newest can move a window for a section
             # it never touched; `sections_needing_recompute` returns the whole
             # title for that case and so does this.
-            else sorted(section.id for section in existing_sections.values())
+            else sorted(existing_sections.values())
         )
         try:
             version_changes.clear_change_rows(session, stale)
@@ -332,7 +373,7 @@ def load_release(
             )
             recompute_ids = version_changes.sections_needing_recompute(
                 session,
-                title_id=title.id,
+                title_id=title_id,
                 release_id=release_id,
                 mapped_versions=mapped_versions,
                 new_version_sections=new_version_sections,
