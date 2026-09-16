@@ -5,7 +5,7 @@ order: 3
 summary: Release points, how to ask for one, and what every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36, 44, 45, 56]
+  adrs: [18, 36, 44, 45, 56, 82]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
@@ -133,6 +133,11 @@ The same page says when the site last looked for a new release point — *“Che
 for new release points 3 hours ago.”* It is a plain line when everything is current and a warning
 when it is not, including when the last check **failed**. The API answers the same question at
 `/api/v1/status`.
+
+A title that a release point changed and this site has not finished loading is a warning on the
+same line — *“Title 42 at release point 119-102 is not loaded here yet.”* Pages of that title are
+served from the release point before it, and each one says so in its release band. The API lists
+the pairs under `corpus.unloaded_titles` and `corpus.incomplete_loads`.
 
 ## A note on caching
 
