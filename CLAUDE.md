@@ -411,7 +411,18 @@ newest fully loaded release point, so the 44 never-published title-releases stay
 publishes `USCode/CorpusIncomplete` from an EXIT trap on every run and `uscode-corpus-incomplete`
 alarms on it with missing data breaching.
 
-`make test` = **869** Python tests; `make test-web` = **477** frontend tests; `make test-e2e` = **676**
+**A section absent from a release point shows its last text, with a warning** (ADR-0083, amending
+ADR-0065). A section can leave the Code without a `repealed` marker — renumbering, transfer, a
+re-cut range (gotcha 3): **5,152 of 65,938 sections are absent from their title's newest loaded
+release point** (title 10 1,139, title 14 406 — `/us/usc/t14/s1` ends at 115-384not282not334). A
+request for one at a release point that lacks it used to 404; `get_section` now falls back to the
+newest release point *before* it that publishes the section (`_last_release_holding`), sets
+`SectionResult.absent_from`, and `served_note` says which release point lacks it, where the text is
+from, and to check the most recent release point. The reader renders that as a warning alert with a
+link to the title at the newest release point. Backward only: a release point before the section
+existed is still ADR-0065's 404. `labels` does not fall back (a recorded cost).
+
+`make test` = **873** Python tests; `make test-web` = **477** frontend tests; `make test-e2e` = **676**
 Playwright tests, 351 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -419,7 +430,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(80 ADRs, numbered to 0082 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(81 ADRs, numbered to 0083 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.

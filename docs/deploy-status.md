@@ -557,6 +557,14 @@ columns (0.17 GB; the whole title 42 load then peaks at 303 MB on the developmen
 missing data breaching. The alarm exists on the account as of 2026-09-16 (`INSUFFICIENT_DATA` until
 the first run of the new script publishes).
 
+**Every other title was checked against the inventory on 2026-09-16.** For each of the 58 titles,
+the newest release point the inventory says changed it, against the newest the box holds it at:
+only two things are behind. Title 42 at 119-102 (above), and **119-103** — published with a
+2026-09-02 currency date and first listed by OLRC on 2026-09-16, changing titles 1, 5, 6, 7, 15,
+19, 22, 23, 26, 35, 38, 40, 42, 47 and 50. Nothing else is stale: every other title is held at the
+newest release point that changed it. Both gaps are what the next daily run loads once ADR-0082
+is deployed.
+
 **The next release point is already published.** The inventory fetched on 2026-09-16 lists
 **119-103 (2026-09-02)**, changing 15 titles including 42. The box's check at 06:43 UTC that day
 still reported 119-102 as newest, so its next daily run will find 119-103 and load it. Before
