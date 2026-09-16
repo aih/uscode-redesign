@@ -154,6 +154,14 @@ class SectionOut(BaseModel):
         description="Where these bytes first appeared. Identical content is stored "
         "once across release points, so the fragment's @id values are this one's."
     )
+    absent_from: ReleaseOut | None = Field(
+        default=None,
+        description="Set when the section is not in the Code at the release point "
+        "that would have answered (the newest loaded at or before `release` for "
+        "its title). `served_from` is then the most recent release point that "
+        "contains it, and `note` says so. A section can leave the Code by being "
+        "renumbered or transferred without a `repealed` status (ADR-0083).",
+    )
     is_exact: bool
     note: str | None = None
 
@@ -195,6 +203,9 @@ class SectionOut(BaseModel):
             ],
             release=ReleaseOut.of(section.release),
             served_from=ReleaseOut.of(section.served_from),
+            absent_from=(
+                ReleaseOut.of(section.absent_from) if section.absent_from else None
+            ),
             content_first_seen=ReleaseOut.of(section.content_first_seen),
             is_exact=section.is_exact,
             note=note,

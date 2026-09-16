@@ -320,20 +320,22 @@ class PostgresRepository:
         # back — for /us/usc/t19/s2502 at 117-80 that was a coin flip between an
         # empty stub and the real section. All occurrences are returned in source
         # reading order and the reader shows them all (ADR-0021).
-        rows = self._session.execute(
-            select(SectionVersion, SectionReleaseMap)
-            .join(
-                SectionReleaseMap,
-                SectionReleaseMap.section_version_id == SectionVersion.id,
-            )
-            .where(
-                SectionVersion.section_id == section.id,
-                SectionReleaseMap.release_id == served_from.id,
-            )
-            .order_by(SectionReleaseMap.seq_in_title, SectionVersion.id)
-        ).all()
+        rows = self._occurrences(section.id, served_from.id)
+        absent_from: ReleasePoint | None = None
         if not rows:
-            return None
+            # The title is loaded here and this section is not in it. It may
+            # have been at an earlier release point — renumbered, transferred,
+            # a range re-cut — so answer with the most recent text it had, and
+            # say which release point lacks it (ADR-0083). A request for a
+            # release point *before* the section existed finds nothing older
+            # and stays a 404, which is the other answer and a different one.
+            last = self._last_release_holding(section.id, served_from.seq)
+            if last is None:
+                return None
+            absent_from, served_from = served_from, last
+            rows = self._occurrences(section.id, served_from.id)
+            if not rows:  # pragma: no cover - the map row just found it
+                return None
         version, placement = rows[0]
 
         title = self._session.get(Title, section.title_id)
@@ -378,8 +380,43 @@ class PostgresRepository:
             provision=(
                 self._provision_across(rows, identifier) if remainder else None
             ),
+            absent_from=self._ref(absent_from) if absent_from is not None else None,
             duplicates=duplicates,
         )
+
+    def _occurrences(
+        self, section_id: int, release_id: int
+    ) -> Sequence[tuple[SectionVersion, SectionReleaseMap]]:
+        """Every element published under the section's identifier at one release
+        point, in source reading order (ADR-0021)."""
+        return self._session.execute(
+            select(SectionVersion, SectionReleaseMap)
+            .join(
+                SectionReleaseMap,
+                SectionReleaseMap.section_version_id == SectionVersion.id,
+            )
+            .where(
+                SectionVersion.section_id == section_id,
+                SectionReleaseMap.release_id == release_id,
+            )
+            .order_by(SectionReleaseMap.seq_in_title, SectionVersion.id)
+        ).all()
+
+    def _last_release_holding(self, section_id: int, before_seq: int) -> ReleasePoint | None:
+        """The newest release point strictly before `before_seq` at which the
+        section is published — what a section absent from the current release
+        point falls back to (ADR-0083)."""
+        return self._session.scalars(
+            select(ReleasePoint)
+            .join(SectionReleaseMap, SectionReleaseMap.release_id == ReleasePoint.id)
+            .join(
+                SectionVersion,
+                SectionVersion.id == SectionReleaseMap.section_version_id,
+            )
+            .where(SectionVersion.section_id == section_id, ReleasePoint.seq < before_seq)
+            .order_by(ReleasePoint.seq.desc())
+            .limit(1)
+        ).first()
 
     def _provision_across(
         self, rows: Sequence[tuple[SectionVersion, SectionReleaseMap]], identifier: str

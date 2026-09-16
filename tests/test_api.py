@@ -877,3 +877,132 @@ def test_a_structural_node_is_found_rather_than_reported_missing(client):
     assert title["identifier"] == "/us/usc/t16"
     assert title["kind"] == "title"
     assert title["exists"] is True
+
+
+# --------------------------------------------------------------------------
+# ADR-0083 — a section absent from the current release point
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def vanished_section():
+    """A section of Title 16 that exists at PRIOR and not at CURRENT.
+
+    The fixture corpus has none — nothing left Title 16 between 119-99 and
+    119-102not101 — so one is planted: a version first seen at PRIOR, mapped
+    at PRIOR alone, and removed again afterwards.
+    """
+    import hashlib
+
+    from sqlalchemy import select
+
+    from db.base import SessionLocal
+    from db.models import ReleasePoint, Section, SectionReleaseMap, SectionVersion, Title
+
+    identifier = "/us/usc/t16/s999999"
+    xml = (
+        f'<section identifier="{identifier}" xmlns="http://xml.house.gov/schemas/uslm/1.0">'
+        "<num>§ 999999.</num><heading>Planted</heading><content>Gone by the next release "
+        "point.</content></section>"
+    )
+
+    def remove() -> None:
+        with SessionLocal() as session:
+            section = session.scalars(
+                select(Section).where(Section.identifier == identifier)
+            ).first()
+            if section is None:
+                return
+            for version in session.scalars(
+                select(SectionVersion).where(SectionVersion.section_id == section.id)
+            ):
+                for row in session.scalars(
+                    select(SectionReleaseMap).where(
+                        SectionReleaseMap.section_version_id == version.id
+                    )
+                ):
+                    session.delete(row)
+                session.flush()
+                session.delete(version)
+            session.flush()
+            session.delete(section)
+            session.commit()
+
+    remove()
+    with SessionLocal() as session:
+        title = session.scalars(select(Title).where(Title.num == "16")).one()
+        prior = session.scalars(select(ReleasePoint).where(ReleasePoint.label == PRIOR)).one()
+        section = Section(title_id=title.id, identifier=identifier)
+        session.add(section)
+        session.flush()
+        version = SectionVersion(
+            section_id=section.id,
+            first_release_id=prior.id,
+            content_hash=hashlib.sha256(xml.encode()).digest(),
+            xml=xml,
+            num="§ 999999.",
+            heading="Planted",
+            status=None,
+            source_credit=None,
+        )
+        session.add(version)
+        session.flush()
+        session.add(
+            SectionReleaseMap(
+                section_version_id=version.id,
+                release_id=prior.id,
+                seq_in_title=999999,
+                parent_identifier="/us/usc/t16/ch1",
+            )
+        )
+        session.commit()
+    try:
+        yield identifier
+    finally:
+        remove()
+
+
+def test_a_section_absent_from_the_current_release_point_falls_back_and_says_so(
+    client, vanished_section
+):
+    """The title is loaded at CURRENT and the section is not in it. Answer with
+    the text it last had, name the release point that lacks it, and tell the
+    reader to check the most recent release point (ADR-0083)."""
+    response = client.get(f"{API}{vanished_section}")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["release"]["label"] == CURRENT
+    assert body["absent_from"]["label"] == CURRENT
+    assert body["served_from"]["label"] == PRIOR
+    assert body["is_exact"] is False
+    assert "Planted" in body["xml"]
+    assert f"not in the Code at release point {CURRENT}" in body["note"]
+    assert f"as published at {PRIOR}" in body["note"]
+    assert "Check the most recent release point" in body["note"]
+    assert response.headers["x-served-from"] == PRIOR
+    # An answer that changes under the URL when the section comes back is
+    # never cacheable forever.
+    assert "immutable" not in response.headers["cache-control"]
+
+
+def test_the_fallback_is_exact_where_the_section_exists(client, vanished_section):
+    body = client.get(f"{API}{vanished_section}?release={PRIOR}").json()
+
+    assert body["absent_from"] is None
+    assert body["served_from"]["label"] == PRIOR
+    assert body["is_exact"] is True
+    assert body["note"] is None
+
+
+def test_the_fallback_never_reaches_forward(client, vanished_section):
+    """A release point before the section existed has nothing older to fall
+    back to, and stays the 404 ADR-0065 explains — a different answer."""
+    with_prior_gone = f"{API}{vanished_section}?release=113-21"
+    assert client.get(with_prior_gone).status_code == 404
+
+
+def test_an_ordinary_section_carries_no_absent_from(client):
+    body = client.get(f"{API}{SECTION}").json()
+    assert body["absent_from"] is None
+    assert body["is_exact"] is True
