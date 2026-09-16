@@ -97,6 +97,10 @@ export interface Section {
   release: Release;
   served_from: Release;
   content_first_seen: Release;
+  /** Set when the section is not in the Code at the release point that would
+   * have answered; `served_from` is then the most recent release point that
+   * contains it (ADR-0083). Optional: an API older than the field omits it. */
+  absent_from?: Release | null;
   is_exact: boolean;
   note: string | null;
 }
