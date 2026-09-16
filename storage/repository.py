@@ -389,8 +389,49 @@ class SourceCheckInfo:
         return not self.ok or self.age(now=now) > SOURCE_CHECK_STALE_AFTER
 
 
+@dataclass(frozen=True, slots=True)
+class CorpusHealth:
+    """Whether every (title, release point) this deployment should hold is held.
+
+    A load writes its completion marker last (`title_versions.sections_loaded`,
+    ADR-0014), so a crash mid-title leaves a row that says the title is present
+    at that release point while none of its sections are. Until 2026-09-16 the
+    serving path counted such a row as a load, and the reader answered every
+    request for that title from a release point holding nothing (ADR-0082). The
+    serving path now ignores it; this is the report that says one exists, so it
+    is repaired rather than merely hidden.
+    """
+
+    incomplete_loads: tuple[str, ...]
+    """`label/title` pairs with a `title_versions` row whose load never finished."""
+
+    unloaded_titles: tuple[str, ...]
+    """`label/title` pairs newer than the newest fully loaded release point that
+    the source says changed and this database holds no completed load for. Older
+    gaps are not listed: the backfill ledger records the 44 title-releases OLRC
+    never published (`unavailable`), and they would sit here forever."""
+
+    newest_complete_label: str | None
+    """The newest release point at which every changed title has a completed
+    load — what `unloaded_titles` is measured from."""
+
+    @property
+    def ok(self) -> bool:
+        return not self.incomplete_loads and not self.unloaded_titles
+
+    @property
+    def problems(self) -> int:
+        return len(self.incomplete_loads) + len(self.unloaded_titles)
+
+
 class Repository(Protocol):
     """Everything the API needs. Implemented by `PostgresRepository` today."""
+
+    def corpus_health(self) -> CorpusHealth:
+        """Loads that did not finish, and titles the newest release points
+        changed that are not loaded. Empty on a corpus that holds everything
+        the source has published (ADR-0082)."""
+        ...
 
     def corpus_generation(self) -> int:
         """The corpus write counter (ADR-0078) — moved by every ingest write.

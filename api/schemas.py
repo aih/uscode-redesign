@@ -492,6 +492,20 @@ class CorpusStatusOut(BaseModel):
         "null when the last check never succeeded, because then there is nothing "
         "trustworthy to compare against — which is not the same as zero.",
     )
+    incomplete_loads: list[str] = Field(
+        default_factory=list,
+        description="`release/title` pairs whose load started and never finished "
+        "(ADR-0082). Those pages are served from the release point before it.",
+    )
+    unloaded_titles: list[str] = Field(
+        default_factory=list,
+        description="`release/title` pairs newer than the newest fully loaded "
+        "release point that OLRC says changed and this database does not hold.",
+    )
+    newest_complete_release: str | None = Field(
+        default=None,
+        description="The newest release point at which every changed title is loaded.",
+    )
 
 
 class StatusOut(BaseModel):

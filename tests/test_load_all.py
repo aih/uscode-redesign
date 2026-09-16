@@ -266,3 +266,121 @@ def test_deep_recount_keys_the_ledger_in_its_own_title_form(tmp_path):
     )
     assert _recount_from_source(missing, ledger) is False
     assert missing.source_sections is None
+
+
+# --------------------------------------------------------------------------
+# ADR-0082 — a load that did not finish is not a load
+# --------------------------------------------------------------------------
+
+
+def test_the_dedupe_check_reads_ids_and_hashes_and_never_the_text():
+    """`load_release` looks every stored version of the title up once, to decide
+    whether a section's text is new. Loading the rows themselves loaded every
+    stored text of the title — 3.8 GB for title 42 — and was what the site box
+    ran out of memory on (ADR-0082). The statement is held to four columns."""
+    from ingest.load import known_versions_statement
+
+    statement = known_versions_statement(1)
+    columns = [c.name for c in statement.selected_columns]
+    assert columns == ["section_id", "id", "content_hash", "first_release_id"]
+    assert "xml" not in str(statement)
+
+
+@pytest.mark.integration
+def test_an_unfinished_load_is_neither_served_nor_counted(session_factory):
+    """A `title_versions` row is written at the first commit of a load and its
+    completion marker last, so a loader that dies in between leaves a row that
+    names a release point holding none of the title's sections. Nothing that
+    decides where a title is served from may count that row — and the health
+    report must, so it is repaired rather than hidden."""
+    from sqlalchemy import func, select
+
+    from db.models import ReleasePoint, Title, TitleVersion
+    from storage.postgres import PostgresRepository
+    from tests.test_api import CURRENT
+
+    label = "999-1"
+
+    def remove_planted() -> None:
+        with session_factory() as session:
+            release = session.scalars(
+                select(ReleasePoint).where(ReleasePoint.label == label)
+            ).first()
+            if release is None:
+                return
+            for row in session.scalars(
+                select(TitleVersion).where(TitleVersion.release_id == release.id)
+            ):
+                session.delete(row)
+            # No relationship is declared between the two models, so the unit
+            # of work does not know the order; flush the child rows first.
+            session.flush()
+            session.delete(release)
+            session.commit()
+
+    remove_planted()  # a previous run that died mid-test
+    with session_factory() as session:
+        # Relative to whatever this database holds: a development corpus whose
+        # inventory is ahead of its loads is itself "incomplete", honestly.
+        baseline = PostgresRepository(session).corpus_health()
+        title = session.scalars(select(Title).where(Title.num == "16")).one()
+        newest_seq = session.scalar(select(func.max(ReleasePoint.seq)))
+        release = ReleasePoint(
+            congress=999,
+            law_num=1,
+            excluded_laws=[],
+            label=label,
+            currency_date=date(2099, 1, 1),
+            seq=newest_seq + 1,
+            titles_affected=["16", "47"],
+        )
+        session.add(release)
+        session.flush()
+        session.add(
+            TitleVersion(
+                title_id=title.id,
+                release_id=release.id,
+                source_zip_sha256="",
+                schema_version="uslm-1.0.15",
+                sections_loaded=None,
+            )
+        )
+        session.commit()
+
+    try:
+        with session_factory() as session:
+            repository = PostgresRepository(session)
+
+            # The newest release point *for title 16* is still the newest one
+            # it finished loading at, and a request for the planted release
+            # point is served from there, out loud.
+            assert repository.resolve_release(title_num="16").release.label == CURRENT
+            planted = repository.resolve_release(label=label)
+            section = repository.get_section("/us/usc/t16/s45f", planted)
+            assert section is not None
+            assert section.release.label == label
+            assert section.served_from.label == CURRENT
+            toc = repository.get_toc("/us/usc/t16/ch1", planted)
+            assert toc is not None and toc.served_from.label == CURRENT
+            assert toc.children or toc.sections
+
+            # Neither listing counts it as ingested.
+            by_label = {r.label: r for r in repository.list_releases()}
+            assert by_label[label].ingested_titles == ()
+            assert label not in next(
+                t for t in repository.list_titles() if t.num == "16"
+            ).ingested_releases
+
+            # And the health report names it twice: as a load that did not
+            # finish, and as a title the release point changed that is not held.
+            health = repository.corpus_health()
+            assert f"{label}/16" in health.incomplete_loads
+            assert set(health.unloaded_titles) >= {f"{label}/16", f"{label}/47"}
+            assert health.newest_complete_label == baseline.newest_complete_label
+            assert health.problems == baseline.problems + 3
+            assert not health.ok
+    finally:
+        remove_planted()
+
+    with session_factory() as session:
+        assert PostgresRepository(session).corpus_health() == baseline

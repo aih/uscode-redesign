@@ -40,6 +40,7 @@ from db.models import (
 )
 from storage.repository import (
     AmbiguousReleaseError,
+    CorpusHealth,
     DuplicateOccurrence,
     GuidResolution,
     Neighbors,
@@ -185,7 +186,7 @@ class PostgresRepository:
                 statement = (
                     select(ReleasePoint)
                     .join(TitleVersion, TitleVersion.release_id == ReleasePoint.id)
-                    .where(TitleVersion.title_id == title.id)
+                    .where(TitleVersion.title_id == title.id, _load_finished())
                     .order_by(ReleasePoint.seq.desc())
                     .limit(1)
                 )
@@ -197,9 +198,9 @@ class PostgresRepository:
     def list_releases(self, *, title_num: str | None = None) -> list[ReleaseRef]:
         ingested: dict[int, list[str]] = {}
         for release_id, num in self._session.execute(
-            select(TitleVersion.release_id, Title.num).join(
-                Title, Title.id == TitleVersion.title_id
-            )
+            select(TitleVersion.release_id, Title.num)
+            .join(Title, Title.id == TitleVersion.title_id)
+            .where(_load_finished())
         ).all():
             ingested.setdefault(release_id, []).append(num)
 
@@ -230,12 +231,57 @@ class PostgresRepository:
             error=row.error,
         )
 
+    def corpus_health(self) -> CorpusHealth:
+        incomplete = self._session.execute(
+            select(ReleasePoint.label, Title.num)
+            .select_from(TitleVersion)
+            .join(ReleasePoint, ReleasePoint.id == TitleVersion.release_id)
+            .join(Title, Title.id == TitleVersion.title_id)
+            .where(TitleVersion.sections_loaded.is_(None))
+            .order_by(ReleasePoint.seq, Title.num)
+        ).all()
+
+        # Every completed (release, title) pair, in the padded form the
+        # inventory's `titles_affected` uses (`05`, `18a`), so the two compare.
+        complete: dict[int, set[str]] = {}
+        for release_id, num in self._session.execute(
+            select(TitleVersion.release_id, Title.num)
+            .join(Title, Title.id == TitleVersion.title_id)
+            .where(_load_finished())
+        ).all():
+            complete.setdefault(release_id, set()).add(_padded(num))
+
+        releases = list(
+            self._session.scalars(select(ReleasePoint).order_by(ReleasePoint.seq.desc()))
+        )
+        # Walk newest first until a release point every changed title is loaded
+        # at; the gaps above it are the ones a reader is missing.
+        newest_complete: ReleasePoint | None = None
+        unloaded: list[tuple[int, str, str]] = []
+        for release in releases:
+            affected = [_padded(t) for t in (release.titles_affected or ())]
+            held = complete.get(release.id, set())
+            missing = [t for t in affected if t not in held]
+            if not missing:
+                newest_complete = release
+                break
+            unloaded.extend((release.seq, release.label, t) for t in missing)
+        unloaded.sort(key=lambda row: (row[0], title_sort_key(row[2].lstrip("0"))))
+
+        return CorpusHealth(
+            incomplete_loads=tuple(f"{label}/{num}" for label, num in incomplete),
+            unloaded_titles=tuple(
+                f"{label}/{title.lstrip('0') or '0'}" for _seq, label, title in unloaded
+            ),
+            newest_complete_label=newest_complete.label if newest_complete else None,
+        )
+
     def list_titles(self) -> list[TitleInfo]:
         releases: dict[int, list[tuple[int, str]]] = {}
         for title_id, seq, label in self._session.execute(
-            select(TitleVersion.title_id, ReleasePoint.seq, ReleasePoint.label).join(
-                ReleasePoint, ReleasePoint.id == TitleVersion.release_id
-            )
+            select(TitleVersion.title_id, ReleasePoint.seq, ReleasePoint.label)
+            .join(ReleasePoint, ReleasePoint.id == TitleVersion.release_id)
+            .where(_load_finished())
         ).all():
             releases.setdefault(title_id, []).append((seq, label))
         # Ordered here, not in SQL: `Title.num` is a string, so `ORDER BY` gives
@@ -790,17 +836,28 @@ class PostgresRepository:
         return self._session.scalars(select(Title).where(Title.num == num)).first()
 
     def _served_from(self, title_id: int, release: ReleaseRef) -> ReleasePoint | None:
-        """The newest ingested release point at or before `release` for this title.
+        """The newest *completely* loaded release point at or before `release` for
+        this title.
 
         This is the whole reason a request for a release point we never ingested
         still answers: release points republish every title but change few, so the
         last ingested one before it holds the same text (gotcha 10). What must not
         happen is answering *silently* — callers compare `served_from` to `release`.
+
+        Completely loaded, because a `title_versions` row exists from the first
+        commit of a load and its sections arrive over the following minutes or
+        hours (`sections_loaded` is stamped last, ADR-0014). A load that died in
+        between leaves the row and none of the sections, and serving from it is
+        serving an empty title (ADR-0082).
         """
         return self._session.scalars(
             select(ReleasePoint)
             .join(TitleVersion, TitleVersion.release_id == ReleasePoint.id)
-            .where(TitleVersion.title_id == title_id, ReleasePoint.seq <= release.seq)
+            .where(
+                TitleVersion.title_id == title_id,
+                ReleasePoint.seq <= release.seq,
+                _load_finished(),
+            )
             .order_by(ReleasePoint.seq.desc())
             .limit(1)
         ).first()
@@ -831,6 +888,15 @@ class PostgresRepository:
             # sorting it as a string is the same bug `list_titles` had.
             ingested_titles=tuple(sorted(ingested_titles or (), key=title_sort_key)),
         )
+
+
+def _load_finished():
+    """The one test for "this (title, release point) is really here": the
+    completion marker `load_release` writes last (ADR-0014). Every query that
+    decides what release point to *serve* a title from carries it; a row without
+    it is a load in progress or a load that died, and either way its sections are
+    not all there (ADR-0082)."""
+    return TitleVersion.sections_loaded.is_not(None)
 
 
 def _node_entry(node: StructureNode) -> TocEntry:
