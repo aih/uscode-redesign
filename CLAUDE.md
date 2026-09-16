@@ -395,7 +395,23 @@ script and by a `display-mode: standalone` media rule both. `tests/pwa.test.ts` 
 contract; `tests/e2e/pwa.spec.ts` proves offline in a browser; the iOS device pass is owed
 (`docs/deploy-status.md`).
 
-`make test` = **867** Python tests; `make test-web` = **473** frontend tests; `make test-e2e` = **676**
+**A load that did not finish is not a load** (ADR-0082). A `title_versions` row is written at a
+load's first commit and its completion marker `sections_loaded` last (ADR-0014); every query that
+decides where a title is served from — `_served_from`, `_latest_release`, `list_releases`,
+`list_titles` — now carries `_load_finished()`, so a row without the marker is inert. It was not:
+on 2026-09-10 the box's loader was OOM-killed mid-way through title 42 at 119-102, and for six days
+every page of title 42 was served from a release point holding none of it, under every alarm
+reading OK. The kill was `load_release` selecting every `SectionVersion` row of the title to decide
+what was new — **136,213 rows, 3.8 GB of XML, 5.48 GB peak** — where the loop reads two fields;
+`known_versions_statement` selects four columns (**0.17 GB**, `scripts/load_memory.py` →
+`docs/verification/load-memory.json`), and the whole title 42 load peaks at 303 MB.
+`Repository.corpus_health()` reports `incomplete_loads` and `unloaded_titles` (measured from the
+newest fully loaded release point, so the 44 never-published title-releases stay out of it);
+`/api/v1/status` carries both and the reader's currency note says them first; `update-corpus.sh`
+publishes `USCode/CorpusIncomplete` from an EXIT trap on every run and `uscode-corpus-incomplete`
+alarms on it with missing data breaching.
+
+`make test` = **869** Python tests; `make test-web` = **477** frontend tests; `make test-e2e` = **676**
 Playwright tests, 351 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -403,7 +419,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(79 ADRs, numbered to 0081 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(80 ADRs, numbered to 0082 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
