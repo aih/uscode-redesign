@@ -142,6 +142,41 @@ aws cloudwatch put-metric-alarm \
     --treat-missing-data breaching \
     --region "$REGION"
 
+# The corpus is missing something it should hold (ADR-0082). Every run of
+# deploy/update-corpus.sh ends by publishing USCode/CorpusIncomplete: the
+# number of (title, release point) pairs whose load never finished plus the
+# titles the newest release points changed that have no completed load.
+#
+# It exists because on 2026-09-10 the loader was killed mid-title, the chain
+# exited before its verify gate, and every page of title 42 was served from
+# the release point before for six days under every other alarm reading OK:
+# the site answered, the box was fine, the daily check said "nothing new",
+# and /api/v1/status said behind_by 0 — because the release point *was*
+# known. Nothing asked whether what was known was held.
+#
+#   * one-day period, two evaluation periods, matching the daily run: a new
+#     release point is reported as unloaded by the check that found it if
+#     that run's load fails, and the next day's run either repairs it or
+#     reports it again. Two days is a load that is not going to fix itself.
+#   * `--treat-missing-data breaching`, as for the source check: a run that
+#     never reaches the trap publishes nothing, and that is the failure.
+echo "==> alarm uscode-corpus-incomplete"
+aws cloudwatch put-metric-alarm \
+    --alarm-name uscode-corpus-incomplete \
+    --alarm-description "A title-release this site should hold is missing or half loaded — see corpus.incomplete_loads and corpus.unloaded_titles on /api/v1/status" \
+    --namespace USCode \
+    --metric-name CorpusIncomplete \
+    --statistic Maximum \
+    --period 86400 \
+    --evaluation-periods 2 \
+    --threshold 0 \
+    --comparison-operator GreaterThanThreshold \
+    --dimensions "$DIM" \
+    --alarm-actions "$TOPIC_ARN" \
+    --ok-actions "$TOPIC_ARN" \
+    --treat-missing-data breaching \
+    --region "$REGION"
+
 # Disk needs the CloudWatch agent (it publishes CWAgent/disk_used_percent);
 # without the agent installed this alarm sits in INSUFFICIENT_DATA, which
 # treat-missing-data notBreaching keeps quiet rather than noisy.

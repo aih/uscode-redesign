@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-09-16T20:58:29.327225+00:00",
+  "title": "42",
+  "what": "peak resident set of a process that runs the loader's stored-version lookup for one title, before (SectionVersion rows, text included) and after (four columns) ADR-0082",
+  "runs": {
+    "after": {
+      "versions": 136213,
+      "peak_rss_bytes": 172261376
+    },
+    "before": {
+      "versions": 136213,
+      "peak_rss_bytes": 5481889792
+    }
+  },
+  "ratio": 31.8
+}

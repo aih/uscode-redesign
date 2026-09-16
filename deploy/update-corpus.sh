@@ -29,7 +29,8 @@
 # Chain when there IS something new: mirror pull -> inventory -> backfill ->
 # mirror push -> load-all -> version-changes -> verify. Every step runs inside
 # the `api` container via `docker compose exec`, so the box needs no Python of
-# its own.
+# its own. Whatever happens, the run ends by publishing USCode/CorpusIncomplete
+# (ADR-0082): the count of title-releases the corpus should hold and does not.
 #
 # The classification tables (ADR-0067) are a second source with its own poll and
 # its own check table, run first and independently of all of that.
@@ -122,6 +123,64 @@ print(1 if check is None or check.is_stale() else 0)
         && echo "published USCode/SourceCheckStale=${stale}"
 }
 
+# Whether every (title, release point) the corpus should hold is held
+# (ADR-0082): title_versions rows whose load never finished, plus titles the
+# newest release points changed that have no completed load. Published once
+# per run, from the EXIT trap below, so it reflects the state the run *left*
+# — a failed load-all included, which is the case it exists for: on 2026-09-10
+# the loader was killed by the kernel mid-title, the chain exited before the
+# verify gate, and nothing said so for six days while every page of title 42
+# was served from the release point before. The alarm treats missing data as
+# breaching, like the other two, so a box that never runs this is as loud as
+# one that reports a gap.
+publish_corpus_health() {
+    local problems
+    problems="$($COMPOSE exec -T api python -c "
+from db.base import SessionLocal
+from storage.postgres import PostgresRepository
+with SessionLocal() as session:
+    health = PostgresRepository(session).corpus_health()
+for pair in health.incomplete_loads:
+    print('  unfinished load:', pair)
+for pair in health.unloaded_titles:
+    print('  not loaded:', pair)
+print(health.problems)
+" 2>/dev/null)"
+    local count
+    count="$(printf '%s\n' "$problems" | tail -1 | tr -d '[:space:]')"
+    printf '%s\n' "$problems" | sed '$d'
+    if ! [[ "$count" =~ ^[0-9]+$ ]]; then
+        echo "could not determine corpus health (got '${count}') — publishing 1"
+        count=1
+    fi
+
+    local instance_id
+    instance_id="$(curl -s --max-time 2 -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+        | xargs -I{} curl -s --max-time 2 -H "X-aws-ec2-metadata-token: {}" \
+            http://169.254.169.254/latest/meta-data/instance-id)"
+    if [ -z "$instance_id" ]; then
+        echo "no instance id from IMDS — skipping the CloudWatch metric"
+        return 0
+    fi
+
+    aws cloudwatch put-metric-data --namespace USCode \
+        --metric-name CorpusIncomplete --value "$count" --unit None \
+        --dimensions "InstanceId=${instance_id}" --region "${AWS_REGION:-us-east-1}" \
+        && echo "published USCode/CorpusIncomplete=${count}"
+}
+
+# Every exit path publishes it — the early `exit 1` after a failed load-all is
+# the path that matters most. The trap runs after the lock is taken, so an
+# overlapping run that exits 0 above does not publish a second reading.
+report_health_on_exit() {
+    local status=$?
+    echo "=== $(date -u +%FT%TZ) corpus health ==="
+    publish_corpus_health
+    exit "$status"
+}
+trap report_health_on_exit EXIT
+
 # load-all, with its summary line captured so the rest of this script can know
 # whether the corpus actually changed. It prints
 # `planned N: X loaded, Y skipped, Z failed`, and X is the only honest answer to
@@ -137,6 +196,16 @@ run_load() {
     out="$($COMPOSE exec -T api uv run python -m ingest load-all --quiet 2>&1)"
     status=$?
     echo "$out"
+    # A loader the kernel killed prints nothing at all — no traceback, no
+    # summary — and exits 137. Say so, because "could not read the loaded
+    # count" below is all that was in the log for the 2026-09-10 kill.
+    if [ "$status" -ne 0 ]; then
+        echo "load-all exited ${status}"
+        if [ "$status" -eq 137 ]; then
+            echo "(137: killed — on this box that has meant the kernel's OOM killer;"
+            echo " check \`sudo dmesg -T | grep -i oom\`)"
+        fi
+    fi
     LOADED="$(printf '%s\n' "$out" \
         | sed -n 's/.*planned [0-9]*: \([0-9][0-9]*\) loaded.*/\1/p' | tail -1)"
     # An unparseable summary must not read as "nothing changed" — that is the
