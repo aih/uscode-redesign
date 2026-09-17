@@ -152,7 +152,7 @@ test("a history query with a date range asks whether it changed", async ({ page 
   await page.goto("/app/goto?q=history%2016%20usc%202201%20from%206/12/2026%20to%207/12/2026");
 
   await expect(page).toHaveURL(/\/app\/versions\/us\/usc\/t16\/s2201\?from=6%2F12%2F2026&to=7%2F12%2F2026/u);
-  await expect(page.locator("[data-window-changed='true'] .diff-verdict")).toHaveText("Changed");
+  await expect(page.locator("[data-window-changed='true'] .window__verdict .diff-verdict")).toHaveText("Changed");
 });
 
 test("a history query naming a title says there is no history to open", async ({ page }) => {

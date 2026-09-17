@@ -58,7 +58,7 @@ steps:
     caption: To another.
   - click: ".datewindow .picker__go"
     caption: Check.
-  - expect: { selector: "[data-window-changed='true'] .diff-verdict", contains: "Changed" }
+  - expect: { selector: "[data-window-changed='true'] .window__verdict .diff-verdict", contains: "Changed" }
     caption: "The answer: Changed."
   - expect: { selector: ".window__kinds", contains: "statutory text" }
     caption: And what kind of change it was.
@@ -71,7 +71,7 @@ id: versions-between-dates-unchanged
 title: A section that did not change says so
 steps:
   - goto: /app/versions/us/usc/t16/s45f?from=06/12/2026&to=07/12/2026
-  - expect: { selector: "[data-window-changed='false'] .diff-verdict", contains: "No change" }
+  - expect: { selector: "[data-window-changed='false'] .window__verdict .diff-verdict", contains: "No change" }
   - expect: { selector: ".window__ends", contains: "119-99" }
 ```
 

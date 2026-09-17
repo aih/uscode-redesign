@@ -337,5 +337,5 @@ title: A date range after the citation asks whether it changed
 steps:
   - goto: /app/goto?q=history+16+usc+2201+from+6/12/2026+to+7/12/2026
   - expect: { url: "/app/versions/us/usc/t16/s2201?from=" }
-  - expect: { selector: ".window .diff-verdict", contains: "Changed" }
+  - expect: { selector: ".window__verdict .diff-verdict", contains: "Changed" }
 ```
