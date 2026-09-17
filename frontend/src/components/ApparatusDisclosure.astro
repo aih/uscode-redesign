@@ -21,7 +21,11 @@
  * them.
  *
  * It also opens whatever the URL fragment names, since `#section-notes` on a
- * phone otherwise lands on a closed element with the answer inside it.
+ * phone otherwise lands on a closed element with the answer inside it, and
+ * scrolls to it again once open: the browser has already scrolled to the
+ * closed element, and when that element is near the foot of the page, scroll
+ * anchoring holds what is below it in place as it grows, which leaves the
+ * opened notes above the viewport.
  * `KeyboardNav` does the same for `c` and `n`, which scroll rather than
  * navigate and so never touch the fragment.
  *
@@ -37,7 +41,10 @@
     const openFragment = () => {
       const id = location.hash.slice(1);
       const el = id ? document.getElementById(decodeURIComponent(id)) : null;
-      if (el instanceof HTMLDetailsElement) el.open = true;
+      if (el instanceof HTMLDetailsElement && !el.open) {
+        el.open = true;
+        el.scrollIntoView();
+      }
     };
 
     const start = () => {

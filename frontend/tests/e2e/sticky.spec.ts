@@ -104,6 +104,37 @@ for (const size of WIDTHS) {
   });
 }
 
+test("on a phone, notes opened by a fragment from the foot of the page are in view", async ({
+  page,
+}) => {
+  // The notes are closed below 40em. The browser scrolls to the closed element
+  // before `hashchange` opens it, and scroll anchoring then holds the page's
+  // foot in place as the notes grow. Running the handler from the foot of the
+  // page makes that order certain rather than a matter of timing.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(SECTION);
+  const geometry = await page.evaluate(async () => {
+    const notes = document.getElementById("section-notes") as HTMLDetailsElement;
+    const closed = !notes.open;
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    history.replaceState(null, "", "#section-notes");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return {
+      closed,
+      open: notes.open,
+      top: notes.getBoundingClientRect().top,
+      barBottom: document.querySelector(".sectionbar")!.getBoundingClientRect().bottom,
+    };
+  });
+
+  expect(geometry.closed).toBe(true);
+  expect(geometry.open).toBe(true);
+  expect(geometry.top).toBeGreaterThanOrEqual(geometry.barBottom);
+  expect(geometry.top).toBeLessThan(812);
+});
+
 test.describe("the search box's explainer costs the chrome nothing", () => {
   /**
    * The "i" beside the search label is 18px in a 13px line, so on its own it
