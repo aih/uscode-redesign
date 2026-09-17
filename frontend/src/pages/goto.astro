@@ -32,9 +32,9 @@ import Base from "../layouts/Base.astro";
 import CitationNotFound from "../components/CitationNotFound.astro";
 import { ApiError, lookupCitation, releaseParams } from "../lib/api";
 import { setNoStore } from "../lib/cache";
-import { parseCites } from "../lib/query";
+import { parseCites, parseHistory } from "../lib/query";
 import type { Citation, Entry } from "../lib/types";
-import { appHref, gotoHref, searchHref } from "../lib/url";
+import { appHref, gotoHref, searchHref, versionsHref } from "../lib/url";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim();
 const params = releaseParams(Astro.url);
@@ -46,25 +46,47 @@ if (cites) {
   return Astro.redirect(searchHref(cites.subject, { cites: true }), 307);
 }
 
+// 1b. `history …` — the section's version history rather than its text
+//     (ADR-0084), with an optional date range. The citation after the word
+//     is still the API's to read; what this decides is where a section lands.
+const history = query ? parseHistory(query) : null;
+
 let found: Citation | null = null;
+/** Why a `history` query rendered here instead of redirecting. */
+let historyMessage: string | null = null;
 
 if (query) {
   try {
-    found = await lookupCitation(query, params);
+    found = await lookupCitation(history ? history.subject : query, params);
   } catch (error) {
     // 3. Not a citation, so it was words. `citeparse` is the only thing that
     //    decides this (ADR-0023), which is why the fallback lives after the
-    //    call rather than in a guess before it.
+    //    call rather than in a guess before it. A `history` query with no
+    //    citation after it is not words either: it is told what it needs.
     if (error instanceof ApiError && error.status === 422) {
-      return Astro.redirect(searchHref(query), 307);
+      if (!history) return Astro.redirect(searchHref(query), 307);
+      historyMessage = `“${history.subject}” is not a citation. history needs one: history 16 usc 45f, or history 16 usc 45f from 6/12/2026 to 7/12/2026.`;
+    } else {
+      throw error;
     }
-    throw error;
   }
 }
 
 // 2. A citation that resolves.
 if (found?.exists) {
-  return Astro.redirect(appHref(found.identifier, params.release ?? null), 307);
+  if (history && found.kind === "section") {
+    return Astro.redirect(
+      versionsHref(found.section_identifier, null, history.from ? history : null),
+      307,
+    );
+  }
+  if (history) {
+    // A title or a chapter has no version history — sections are the storage
+    // atom (ADR-0001) and the timeline is per section.
+    historyMessage = `Version history is kept per section, and ${history.subject} is a ${found.kind === "title" ? "title" : "chapter or other subdivision"}. Open it and choose a section.`;
+  } else {
+    return Astro.redirect(appHref(found.identifier, params.release ?? null), 307);
+  }
 }
 
 // Nothing below is cacheable: it is a rendering of one reader's failed attempt.
@@ -82,6 +104,8 @@ const EXAMPLES = [
   "11 usc ch. 5",
   "title 11",
   "cites 26 usc 501",
+  "history 16 usc 2201",
+  "history 16 usc 2201 from 6/12/2026 to 7/12/2026",
 ];
 
 /** The trail out — Home › Search (ADR-0079). This page only renders on a
@@ -104,8 +128,26 @@ const currentCrumb: Entry = { identifier: "", level: "page", num: "Search", head
     !query && (
       <p class="lede">
         Type a citation in almost any written form and you land on the provision. Type
-        anything else and it searches the text.
+        anything else and it searches the text. Prefix a citation with <code>history</code> to
+        open its version history instead, with <code>from</code> and <code>to</code> dates if you
+        want to know whether it changed between them.
       </p>
+    )
+  }
+
+  {
+    historyMessage && (
+      <div class="usa-alert usa-alert--warning" role="alert">
+        <div class="usa-alert__body">
+          <h2 class="usa-alert__heading">No version history to open</h2>
+          <p class="usa-alert__text">{historyMessage}</p>
+          {found?.exists && (
+            <p class="usa-alert__text">
+              <a href={appHref(found.identifier, params.release ?? null)}>Open {history?.subject}</a>
+            </p>
+          )}
+        </div>
+      </div>
     )
   }
 

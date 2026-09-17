@@ -55,6 +55,10 @@ const PAGES = [
   // widest 56 rows by 8 columns — and it renders the same on any corpus, so
   // unlike every other shot here it is a fixed target.
   ["version-data", "/app/data/version-changes"],
+  // Session 80: the date window on the version history (ADR-0084). A form of
+  // two date fields and a button beside a two-column answer, then a redline —
+  // the fields wrap and the columns stack, which is what this shot checks.
+  ["versions-window", "/app/versions/us/usc/t16/s2201?from=06/12/2026&to=07/12/2026"],
 ];
 
 /**

@@ -1,0 +1,129 @@
+---
+/**
+ * The answer to "did this section change between two dates?" (ADR-0084).
+ *
+ * The verdict first, in one line: **Changed** or **No change**, between the
+ * two dates as typed. Under it, what kinds of change arrived; then the two
+ * ends — which release point each date resolved to and what the section was
+ * there, with the section route's own note where the answer is not literally
+ * that release point (an uningested release point, a section that had left
+ * the Code, a label that excludes laws); then every version in force inside
+ * the window, as the timeline; then the redline between the two ends, which
+ * is `/app/diff`'s redline rendered here so the answer is one page.
+ *
+ * Extracted so `/app/design` renders this component rather than a copy of
+ * its markup; the page hands it what it resolved and computed.
+ */
+import StatusBadge from "./StatusBadge.astro";
+import Timeline from "./Timeline.astro";
+import { usDate } from "../lib/currency";
+import { diffLinesHtml, diffSummary } from "../lib/diffdoc";
+import type { DocumentDiff } from "../lib/diffdoc";
+import type { VersionEntry } from "../lib/types";
+import { appHref, diffHref, trimNum } from "../lib/url";
+import { kindsSentence } from "../lib/versions";
+import type { ReleaseOrder, WindowEnd } from "../lib/versions";
+
+interface Props {
+  identifier: string;
+  from: WindowEnd;
+  to: WindowEnd;
+  changed: boolean;
+  /** The kinds of change that arrived inside the window, each once. */
+  kinds: string[];
+  /** Every version in force at some release point in the window, oldest first. */
+  versions: VersionEntry[];
+  /** Whether every entry could be placed in the window — false when the
+   *  release list was unavailable, and said so. */
+  complete?: boolean;
+  /** The reading-text redline between the two ends; null when the section is
+   *  absent at either. */
+  diff: DocumentDiff | null;
+  order?: ReleaseOrder;
+}
+
+const { identifier, from, to, changed, kinds, versions, complete = true, diff, order } = Astro.props;
+
+const sentence = kindsSentence(kinds);
+const fromLabel = from.servedFrom?.label ?? from.release?.label ?? null;
+const toLabel = to.servedFrom?.label ?? to.release?.label ?? null;
+
+/** "release point 119-99 (06/12/2026)". */
+function name(end: WindowEnd): string | null {
+  const release = end.release;
+  return release ? `${release.label} (${usDate(release.currency_date)})` : null;
+}
+---
+
+<section class="window" aria-labelledby="window-verdict" data-window-changed={String(changed)}>
+  <p class="lede window__verdict" id="window-verdict">
+    <strong class="diff-verdict">{changed ? "Changed" : "No change"}</strong>{" "}
+    between <strong>{from.date}</strong> and <strong>{to.date}</strong>.
+    {sentence && <span class="window__kinds"> {sentence}</span>}
+    {!changed && !sentence && <span class="window__kinds"> The same stored text at both ends.</span>}
+  </p>
+
+  <dl class="window__ends">
+    {
+      [from, to].map((end) => (
+        <div class="window__end">
+          <dt>On {end.date}</dt>
+          <dd>
+            {end.release ? (
+              <>
+                Release point <strong>{name(end)}</strong>.{" "}
+                {end.exists ? (
+                  <>
+                    {trimNum(end.num)} {end.heading}
+                    <StatusBadge status={end.status} />{" "}
+                    <a href={appHref(identifier, end.servedFrom?.label ?? end.release.label)}>
+                      Read it
+                    </a>
+                    .
+                  </>
+                ) : (
+                  <>Not in the Code at that release point.</>
+                )}
+                {end.note && <span class="window__note"> {end.note}</span>}
+                {!end.note && end.servedFrom?.caveat && (
+                  <span class="window__note"> {end.servedFrom.caveat}</span>
+                )}
+              </>
+            ) : (
+              <>Before the first release point this site holds.</>
+            )}
+          </dd>
+        </div>
+      ))
+    }
+  </dl>
+
+  {
+    versions.length > 0 && (
+      <>
+        <h3 class="toc-group">Versions in force in this window</h3>
+        {!complete && (
+          <p class="doc-meta">
+            The release list was unavailable, so some versions could not be placed and are not listed.
+          </p>
+        )}
+        <Timeline identifier={identifier} entries={versions} view="all" order={order} />
+      </>
+    )
+  }
+
+  {
+    diff && fromLabel && toLabel && (
+      <>
+        <h3 class="toc-group">Redline</h3>
+        <p class="doc-meta">
+          <strong class="diff-verdict">{diffSummary(diff)}.</strong> Comparing{" "}
+          <strong>{fromLabel}</strong> to <strong>{toLabel}</strong>.{" "}
+          <a href={diffHref(identifier, fromLabel, toLabel)}>Open the redline on its own page</a>, which
+          also offers the source-level comparison.
+        </p>
+        <div class="diff-view diff-view--text" set:html={diffLinesHtml(diff.lines)} />
+      </>
+    )
+  }
+</section>

@@ -24,6 +24,7 @@
  */
 import StatusBadge from "./StatusBadge.astro";
 import type { VersionEntry } from "../lib/types";
+import { usDate } from "../lib/currency";
 import { appHref, classificationHref, diffHref, trimNum } from "../lib/url";
 import {
   changeSummary,
@@ -63,7 +64,13 @@ const rows = timelineRows(entries, order);
         <li data-change-kind={row.kind}>
           <a class="timeline__release" href={appHref(identifier, row.start)}>
             {row.start ?? entry.first_seen.label}
-          </a>{" "}
+          </a>
+          {/* The date beside the label (ADR-0084): a release point is named
+              for a public law, and a reader asking "when?" should not have to
+              look it up. `first_release` is `releases[0]` as a stamp. */}
+          {entry.first_release && (
+            <span class="timeline__date">{usDate(entry.first_release.currency_date)}</span>
+          )}{" "}
           — {trimNum(entry.num)} {entry.heading}
           <StatusBadge status={entry.status} />
           {summary && <p class="timeline__kind">{summary}</p>}

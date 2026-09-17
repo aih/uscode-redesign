@@ -5,7 +5,7 @@ order: 4
 summary: Every release point at which a section changed, which of those changes were amendments, and a readable redline between any two of them.
 covers:
   routes: ["/app/versions", "/app/diff"]
-  adrs: [16, 26, 66, 74, 75]
+  adrs: [16, 26, 66, 74, 75, 84]
 ---
 
 ## Tracking change in the Code
@@ -26,6 +26,69 @@ steps:
   - expect: { selector: "main", contains: "119-99" }
     caption: Each entry says when that text first appeared, and what it stood unchanged through.
 ```
+
+Each entry names the release point its text first appeared at and that release point's currency
+date.
+
+## Between two dates
+
+The form under the summary line asks whether the section changed between two dates. Each date
+resolves to the newest release point on or before it. Dates are MM/DD/YYYY or YYYY-MM-DD; an empty
+To runs to today. The answer has a URL — `?from=06/12/2026&to=07/12/2026` on the history page —
+and can be sent to someone.
+
+The answer opens with **Changed** or **No change** and, where something arrived, what kind of
+change it was: the statutory text, the notes, or the stored XML alone. Under it, each date names
+the release point it resolved to and the section as published there, with a link to that text. A
+release point whose label excludes a law carries that caveat on its end. Then every version in
+force at some release point in the window, and the redline between the two ends, with a link to
+the same redline on its own page.
+
+```scenario
+id: versions-between-dates
+title: Ask whether a section changed between two dates
+demo: true
+demoOrder: 75
+steps:
+  - goto: /app/versions/us/usc/t16/s2201
+    caption: The version history carries a form for two dates.
+  - fill: { selector: "#window-from", value: "06/12/2026" }
+    caption: From one date.
+  - fill: { selector: "#window-to", value: "07/12/2026" }
+    caption: To another.
+  - click: ".datewindow .picker__go"
+    caption: Check.
+  - expect: { selector: "[data-window-changed='true'] .diff-verdict", contains: "Changed" }
+    caption: "The answer: Changed."
+  - expect: { selector: ".window__kinds", contains: "statutory text" }
+    caption: And what kind of change it was.
+  - expect: { selector: ".window .diff-view", visible: true }
+    caption: With the redline between the two dates under it.
+```
+
+```scenario
+id: versions-between-dates-unchanged
+title: A section that did not change says so
+steps:
+  - goto: /app/versions/us/usc/t16/s45f?from=06/12/2026&to=07/12/2026
+  - expect: { selector: "[data-window-changed='false'] .diff-verdict", contains: "No change" }
+  - expect: { selector: ".window__ends", contains: "119-99" }
+```
+
+A date the form cannot read, a To before its From, or two dates before the first release point
+this site holds are answered under the form, and the history stays on the page.
+
+```scenario
+id: versions-between-dates-refused
+title: A date the form cannot read is said under the form
+steps:
+  - goto: /app/versions/us/usc/t16/s2201?from=yesterday
+  - expect: { selector: ".datewindow__error", contains: "not a date" }
+  - expect: { selector: ".timeline", visible: true }
+```
+
+The same question is a search-box query: `history 16 usc 2201 from 6/12/2026 to 7/12/2026`. See
+[Search and citations](/app/guide/05-search-and-citations).
 
 ## Amendments and every recorded version
 

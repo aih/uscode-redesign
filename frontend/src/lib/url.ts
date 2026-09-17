@@ -65,9 +65,27 @@ export function citationHref(identifier: string, release?: string | null): strin
  * of statutory changes (ADR-0075), so the address of the default is the address
  * this route has always had.
  */
-export function versionsHref(identifier: string, view?: string | null): string {
-  const suffix = view === "all" ? "?view=all" : "";
-  return `${APP}/versions${encodePath(identifier)}${suffix}`;
+export function versionsHref(
+  identifier: string,
+  view?: string | null,
+  window?: { from: string; to?: string | null } | null,
+): string {
+  const params = new URLSearchParams();
+  if (view === "all") params.set("view", "all");
+  // A date window (ADR-0084): `from` alone runs to today, the way the API
+  // reads it, so an empty `to` is left out rather than written empty.
+  if (window?.from) {
+    params.set("from", window.from);
+    if (window.to) params.set("to", window.to);
+  }
+  const query = params.toString();
+  return `${versionsAction(identifier)}${query ? `?${query}` : ""}`;
+}
+
+/** The path half of `versionsHref`, for the date-window GET form whose own
+ *  fields supply the query string (rule 5: a form action is an href). */
+export function versionsAction(identifier: string): string {
+  return `${APP}/versions${encodePath(identifier)}`;
 }
 
 /**

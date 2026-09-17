@@ -4139,6 +4139,15 @@ dialog.palette {
   font-weight: 700;
 }
 
+/* The currency date beside the release label (ADR-0084), in the muted ink
+ * the "Unchanged through" run already uses: the label is the link and the
+ * date is what it means. */
+.timeline__date {
+  margin-left: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .timeline__releases {
   font-size: 0.85rem;
   color: var(--muted);
@@ -4207,6 +4216,104 @@ dialog.palette {
   align-items: flex-end;
   gap: 0.75rem;
   margin: 1.5rem 0;
+}
+
+/* "Between two dates" on `/app/versions` (ADR-0084). A panel — `--panel`, the
+ * apparatus surface — holding two date fields and a button on `.picker__*`'s
+ * terms, so it reads as the same kind of control as the release switcher's
+ * date form. The fields wrap below 30em rather than shrinking past the nine
+ * characters a date needs. */
+.datewindow {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--panel);
+  border-left: 3px solid var(--edge);
+}
+
+.datewindow__heading {
+  margin-top: 0;
+}
+
+.datewindow__lead {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.datewindow__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.datewindow__fields > div {
+  flex: 0 1 9rem;
+  min-width: 7rem;
+}
+
+.datewindow__hint {
+  margin-top: 0.5rem;
+}
+
+.datewindow__error {
+  margin-top: 0.5rem;
+}
+
+/* The answer. The verdict line is the page's lede voice — `.lede` — with the
+ * verdict itself in `.diff-verdict`, the same emphasis `/app/diff`'s summary
+ * carries; `data-window-changed` is for the tests, not the stylesheet. */
+.window {
+  margin: 1.5rem 0 2rem;
+}
+
+.window__verdict {
+  margin-bottom: 0.75rem;
+}
+
+.window__kinds {
+  color: var(--ink);
+}
+
+.window__ends {
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.window__end {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--panel);
+  border-left: 3px solid var(--edge);
+}
+
+.window__end dt {
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.window__end dd {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+}
+
+.window__note {
+  color: var(--muted);
+}
+
+.window .timeline {
+  margin-bottom: 1rem;
+}
+
+.window .diff-view {
+  margin-top: 0.75rem;
 }
 
 .diff-view {

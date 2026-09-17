@@ -101,6 +101,9 @@ export interface Section {
    * have answered; `served_from` is then the most recent release point that
    * contains it (ADR-0083). Optional: an API older than the field omits it. */
   absent_from?: Release | null;
+  /** Hex sha256 of the guid-stripped content: two sections with one hash are
+   *  one text. Optional: an API older than the field omits it. */
+  content_hash?: string;
   is_exact: boolean;
   note: string | null;
 }
@@ -152,10 +155,25 @@ export interface VersionLaw {
   classification_actions: string[];
 }
 
+/** A release point as a point in time (`ReleaseStampOut`): enough to place a
+ *  version entry on a calendar. `caveat` is set when the label excludes laws
+ *  (gotcha 5). */
+export interface ReleaseStamp {
+  label: string;
+  currency_date: string;
+  seq: number;
+  caveat: string | null;
+}
+
 export interface VersionEntry {
   content_hash: string;
   first_seen: Release;
   releases: string[];
+  /** `releases[0]` with its currency date; null for an entry mapped to no
+   *  release point. */
+  first_release?: ReleaseStamp | null;
+  /** The newest release point publishing this text. */
+  last_release?: ReleaseStamp | null;
   num: string | null;
   heading: string | null;
   status: string | null;
@@ -172,9 +190,35 @@ export interface VersionEntry {
   laws?: VersionLaw[];
 }
 
+/** One end of a date window (`VersionAtDateOut`, ADR-0084). */
+export interface VersionAtDate {
+  date: string;
+  release: Release;
+  exists: boolean;
+  served_from: Release | null;
+  absent_from: Release | null;
+  num: string | null;
+  heading: string | null;
+  status: string | null;
+  content_hash: string | null;
+  note: string | null;
+}
+
+/** `VersionWindowOut` — the API's answer to "did it change between two
+ *  dates?". The reader computes its own (`lib/versions.ts`), for the reason
+ *  `/app/diff` computes its own redline; this mirrors the API for the client. */
+export interface VersionWindow {
+  from: VersionAtDate;
+  to: VersionAtDate;
+  changed: boolean;
+  change_kinds: string[];
+  diff: DiffOp[] | null;
+}
+
 export interface Versions {
   identifier: string;
   versions: VersionEntry[];
+  window?: VersionWindow | null;
 }
 
 export interface DiffSection {

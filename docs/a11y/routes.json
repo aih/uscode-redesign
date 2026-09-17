@@ -221,6 +221,11 @@
       "name": "version timeline, every recorded version (ADR-0075)"
     },
     {
+      "id": "versions-window",
+      "path": "/app/versions/us/usc/t16/s2201?from=06/12/2026&to=07/12/2026",
+      "name": "version timeline answering a date window: the verdict, the two ends, the versions in force and the redline (ADR-0084)"
+    },
+    {
       "id": "diff",
       "path": "/app/diff/us/usc/t16/s45f?from=119-99&to=119-102not101",
       "name": "reading-text redline"

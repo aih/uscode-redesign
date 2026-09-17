@@ -5,7 +5,7 @@ order: 8
 summary: The same answers as JSON or as the source XML, at the same addresses, for anyone who would rather ask a program than a browser.
 covers:
   routes: ["/app/docs"]
-  adrs: [29, 32, 57, 73]
+  adrs: [29, 32, 57, 73, 84]
 ---
 
 Everything the reader shows comes from a public API at `/api/v1`. The reader calls the same routes
@@ -28,7 +28,7 @@ steps:
 | `/api/v1/us/usc/{identifier}` | a provision, section or table-of-contents node |
 | `/api/v1/us/usc/?id={guid}` | the provision that guid pins |
 | `/api/v1/sections/{identifier}/neighbors` | previous and next in reading order |
-| `/api/v1/sections/{identifier}/versions` | the release points at which the text changed |
+| `/api/v1/sections/{identifier}/versions` | the release points at which the text changed, each with its date; with `?from=&to=`, whether it changed between two dates |
 | `/api/v1/sections/{identifier}/diff?from=&to=` | a redline between two of them |
 | `/api/v1/search?q=` | keyword search: also `?sort=`, `?limit=`, `?offset=`, `?release=`, `?date=` |
 | `/api/v1/citation?q=` | a citation in any accepted written form, resolved to an identifier |
@@ -47,6 +47,25 @@ fragments as stored, and its ops reassemble either side byte for byte. The respo
 
 On `/api/v1/search`, `?sort=` takes `relevance`, `citation` or `recent`; `?limit=` is 1 to 100 and
 defaults to 20; `?offset=` runs to 1000.
+
+On `/api/v1/sections/{identifier}/versions`, every entry carries `first_release` and
+`last_release` — the release point its text first appeared at and the newest one publishing it,
+each with its `currency_date`. `?from=` and `?to=` take dates in `YYYY-MM-DD` or `MM/DD/YYYY`
+form; each resolves to the newest release point on or before it. `?to=` defaults to today and
+needs a `?from=`; a `?to=` before its `?from=` is a `422`. With a window, the response carries
+`window`: each end's `date`, the `release` it resolved to, whether the section `exists` there and
+the `served_from` release point with its `note` and `caveat`; `changed`; `change_kinds`, the
+kinds that arrived inside the window; and `diff`, the guid-stripped ops. `versions` is then the
+entries in force in the window. A window before the section existed at either date is a `404`
+naming the release point it is first published at.
+
+```scenario
+id: api-versions-window
+title: The versions route answers whether a section changed between two dates
+steps:
+  - goto: /api/v1/sections/us/usc/t16/s2201/versions?from=2026-06-12&to=2026-07-12
+  - expect: { selector: "body", contains: "\"changed\":true" }
+```
 
 There are also routes for accounts, watchlists and per-account settings —
 `/api/v1/auth/*`, `/api/v1/watchlists*`, `/api/v1/settings`. Accounts are switched off in the
@@ -79,7 +98,7 @@ for your client, which for a browser is the reader.
 forever. A response without one, or one resolved by `?date=`, carries a short revalidation window
 instead.
 
-**Rate limits.** Five routes are throttled per caller. Each is a token bucket — a burst up to the
+**Rate limits.** Six routes are throttled per caller. Each is a token bucket — a burst up to the
 capacity, refilled at a sustained rate:
 
 | Route | Burst | Sustained |
@@ -88,6 +107,7 @@ capacity, refilled at a sustained rate:
 | `/api/v1/citation` | 120 | 10 a second |
 | `/api/v1/labels` | 300 | 30 a second |
 | `/api/v1/sections/{identifier}/diff` | 5 | 1 every 5 seconds |
+| `/api/v1/sections/{identifier}/versions?from=` | 5 | 1 every 5 seconds — the diff's bucket; the plain timeline is not limited |
 | `POST /api/v1/auth/signup` | 10 | 30 an hour |
 
 Over the limit you get a `429` with a `Retry-After` header saying how long to wait.

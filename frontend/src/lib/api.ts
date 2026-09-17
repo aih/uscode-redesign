@@ -400,9 +400,22 @@ export async function nearestAncestor(
   return null;
 }
 
-/** The section's change timeline — the version page's own data (Day 4). */
-export async function fetchVersions(identifier: string): Promise<Versions> {
-  return getJson<Versions>(`/api/v1/sections${identifier}/versions`);
+/**
+ * The section's change timeline — the version page's own data (Day 4).
+ *
+ * `window` asks the API's own "changed between two dates?" form (ADR-0084).
+ * The reader does not send it: that form shares the diff route's per-caller
+ * budget, and the reader renders from one address for everyone, so
+ * `/app/versions` cuts the window itself from the plain timeline and two
+ * dated section fetches. The parameter is here for the same reason
+ * `fetchDiff` is — the client matches the API's surface.
+ */
+export async function fetchVersions(
+  identifier: string,
+  window: { from: string; to?: string | null } | null = null,
+): Promise<Versions> {
+  const query = window ? qs({ from: window.from, to: window.to }) : "";
+  return getJson<Versions>(`/api/v1/sections${identifier}/versions${query}`);
 }
 
 /**

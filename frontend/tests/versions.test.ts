@@ -4,6 +4,11 @@ import type { VersionEntry, VersionLaw } from "../src/lib/types";
 import {
   changeSummary,
   isAnnotated,
+  isoDate,
+  kindsSentence,
+  readWindowRequest,
+  releaseOnOrBefore,
+  versionsInWindow,
   isStatutoryEntry,
   lawActions,
   lawLabel,
@@ -366,5 +371,123 @@ describe("changeSummary", () => {
 
   it("says nothing about an unannotated entry", () => {
     expect(changeSummary(entry(null, []))).toBeNull();
+  });
+});
+
+// ------------------------------------------------------- a window of dates
+
+describe("versionsInWindow", () => {
+  // The reader's copy of `versions_in_window` (ADR-0084): the same walk over
+  // the same map, tested on the same shapes as tests/test_versions_window.py.
+  const order = releaseOrder(
+    [1, 2, 3, 4, 5, 6, 7, 8].map((seq) => ({ label: `119-${seq}`, seq })),
+  );
+  const rp = (seq: number) => ({ seq });
+  const labels = (seqs: number[]) => seqs.map((seq) => `119-${seq}`);
+
+  it("starts with the entry in force at start and lists each arrival", () => {
+    const a = entry("initial", labels([1, 2, 3]));
+    const b = entry("notes", labels([4, 5]));
+    const c = entry("text", labels([6, 7, 8]));
+
+    const cut = versionsInWindow([a, b, c], rp(2), rp(7), order);
+
+    expect(cut.versions).toEqual([a, b, c]);
+    expect(cut.kinds).toEqual(["notes", "text"]);
+    expect(cut.complete).toBe(true);
+  });
+
+  it("reports no arrival for a window inside one entry", () => {
+    const a = entry("initial", labels([1, 2, 3, 4]));
+    const b = entry("text", labels([5]));
+
+    const cut = versionsInWindow([a, b], rp(2), rp(4), order);
+
+    expect(cut.versions).toEqual([a]);
+    expect(cut.kinds).toEqual([]);
+  });
+
+  it("takes the entry in force before a start between release points", () => {
+    const a = entry("initial", labels([1, 2]));
+    const b = entry("text", labels([6]));
+
+    expect(versionsInWindow([a, b], rp(4), rp(6), order).versions).toEqual([a, b]);
+  });
+
+  it("follows recurring content where the map says it was", () => {
+    const a = entry("initial", labels([1, 2, 5, 6]));
+    const b = entry("text", labels([3, 4]));
+
+    const cut = versionsInWindow([a, b], rp(1), rp(6), order);
+
+    expect(cut.versions).toEqual([a, b, a]);
+    expect(cut.kinds).toEqual(["text", "initial"]);
+  });
+
+  it("begins with the arrival when the section was absent at start", () => {
+    const a = entry("initial", labels([5, 6]));
+
+    const cut = versionsInWindow([a], rp(1), rp(6), order);
+
+    expect(cut.versions).toEqual([a]);
+    expect(cut.kinds).toEqual(["initial"]);
+  });
+
+  it("says when an entry could not be placed", () => {
+    const a = entry("initial", ["113-21"]);
+    const b = entry("text", labels([6]));
+
+    const cut = versionsInWindow([a, b], rp(1), rp(6), order);
+
+    expect(cut.versions).toEqual([b]);
+    expect(cut.complete).toBe(false);
+  });
+});
+
+describe("readWindowRequest", () => {
+  it("needs a from; to alone is not a window", () => {
+    expect(readWindowRequest(new URLSearchParams("from=06/12/2026&to=07/12/2026"))).toEqual({
+      from: "06/12/2026",
+      to: "07/12/2026",
+    });
+    expect(readWindowRequest(new URLSearchParams("from=2026-06-12"))).toEqual({
+      from: "2026-06-12",
+      to: null,
+    });
+    expect(readWindowRequest(new URLSearchParams("to=2026-06-12"))).toBeNull();
+    expect(readWindowRequest(new URLSearchParams("from=&to="))).toBeNull();
+  });
+});
+
+describe("isoDate and releaseOnOrBefore", () => {
+  const releases = [
+    { label: "119-99", currency_date: "2026-06-12", seq: 379 },
+    { label: "119-102not101", currency_date: "2026-07-12", seq: 381 },
+    { label: "119-102", currency_date: "2026-07-12", seq: 382 },
+  ] as never[];
+
+  it("reads both date forms the API accepts", () => {
+    expect(isoDate("07/12/2026")).toBe("2026-07-12");
+    expect(isoDate("7/2/2026")).toBe("2026-07-02");
+    expect(isoDate("2026-07-12")).toBe("2026-07-12");
+    expect(isoDate("yesterday")).toBeNull();
+  });
+
+  it("resolves a date the way resolve_release does: newest on or before it", () => {
+    expect(releaseOnOrBefore(releases, "06/30/2026")?.label).toBe("119-99");
+    // Two release points on one date: the later in the global order wins.
+    expect(releaseOnOrBefore(releases, "2026-07-12")?.label).toBe("119-102");
+    expect(releaseOnOrBefore(releases, "2001-01-01")).toBeNull();
+  });
+});
+
+describe("kindsSentence", () => {
+  it("joins the kinds into one sentence", () => {
+    expect(kindsSentence([])).toBeNull();
+    expect(kindsSentence(["text"])).toBe("The statutory text changed.");
+    expect(kindsSentence(["text", "notes"])).toBe("The statutory text changed and the notes changed.");
+    expect(kindsSentence(["initial", "text", "structure"])).toBe(
+      "The section entered the Code, the statutory text changed and only the stored XML or metadata changed.",
+    );
   });
 });

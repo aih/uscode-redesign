@@ -163,6 +163,11 @@ class SectionOut(BaseModel):
         "contains it, and `note` says so. A section can leave the Code by being "
         "renumbered or transferred without a `repealed` status (ADR-0083).",
     )
+    content_hash: str = Field(
+        description="Hex sha256 of the guid-stripped content (ADR-0007), the "
+        "same value the `ETag` carries: two answers with one hash are one "
+        "text, whatever release points they were read at."
+    )
     is_exact: bool
     note: str | None = None
 
@@ -208,6 +213,7 @@ class SectionOut(BaseModel):
                 ReleaseOut.of(section.absent_from) if section.absent_from else None
             ),
             content_first_seen=ReleaseOut.of(section.content_first_seen),
+            content_hash=section.content_hash,
             is_exact=section.is_exact,
             note=note,
         )

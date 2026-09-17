@@ -1,0 +1,94 @@
+---
+/**
+ * "Between two dates" — the form on `/app/versions/…` that asks whether a
+ * section changed between two dates (ADR-0084).
+ *
+ * A plain GET form posting back to the page, so it works with scripting off
+ * and its answer has a URL: `?from=06/12/2026&to=07/12/2026` is the question
+ * and can be sent to someone. Two text fields rather than `<input
+ * type="date">`, for the reason `ReleasePicker` gives: `type=date` imposes the
+ * browser's locale on a field this site documents as MM/DD/YYYY, the form
+ * uscode.house.gov prints and the one `parse_date_param` names first. `to` may
+ * be left empty, which runs the window to today.
+ *
+ * The view in force rides along as a hidden field: a GET form posts its own
+ * fields and nothing else (ADR-0072's trap), so without it a reader on
+ * `?view=all` who asked a question would land back on the default view.
+ *
+ * Extracted so `/app/design` renders this component rather than a copy of
+ * its markup.
+ */
+import { versionsAction } from "../lib/url";
+import { VERSIONS_FROM_PARAM, VERSIONS_TO_PARAM, VERSIONS_VIEW_PARAM } from "../lib/versions";
+import type { VersionsView } from "../lib/versions";
+
+interface Props {
+  identifier: string;
+  /** The values as typed, echoed back so a correction starts from them. */
+  from?: string | null;
+  to?: string | null;
+  view?: VersionsView;
+  /** Why the last question could not be answered, printed under the fields. */
+  message?: string | null;
+  /** Ids are page-unique; `/app/design` renders the form beside a page that
+   *  has none, and a second copy would need its own. */
+  idPrefix?: string;
+}
+
+const { identifier, from = null, to = null, view = "text", message = null, idPrefix = "window" } = Astro.props;
+const fromId = `${idPrefix}-from`;
+const toId = `${idPrefix}-to`;
+const hintId = `${idPrefix}-hint`;
+const headingId = `${idPrefix}-h`;
+---
+
+<form class="datewindow" method="get" action={versionsAction(identifier)} aria-labelledby={headingId}>
+  <h2 class="toc-group datewindow__heading" id={headingId}>Between two dates</h2>
+  <p class="datewindow__lead">
+    Did this section change between two dates? Each date resolves to the newest release point on or
+    before it.
+  </p>
+  {view === "all" && <input type="hidden" name={VERSIONS_VIEW_PARAM} value="all" />}
+  <div class="datewindow__fields">
+    <div>
+      <label class="usa-label picker__label" for={fromId}>From</label>
+      <input
+        class="usa-input picker__date"
+        id={fromId}
+        name={VERSIONS_FROM_PARAM}
+        type="text"
+        inputmode="numeric"
+        placeholder="MM/DD/YYYY"
+        autocomplete="off"
+        value={from ?? ""}
+        required
+        aria-describedby={hintId}
+      />
+    </div>
+    <div>
+      <label class="usa-label picker__label" for={toId}>To</label>
+      <input
+        class="usa-input picker__date"
+        id={toId}
+        name={VERSIONS_TO_PARAM}
+        type="text"
+        inputmode="numeric"
+        placeholder="MM/DD/YYYY"
+        autocomplete="off"
+        value={to ?? ""}
+        aria-describedby={hintId}
+      />
+    </div>
+    <button class="usa-button picker__go" type="submit">Check</button>
+  </div>
+  <p class="picker__hint datewindow__hint" id={hintId}>
+    MM/DD/YYYY or YYYY-MM-DD. An empty To runs to today.
+  </p>
+  {
+    message && (
+      <p class="usa-error-message datewindow__error" role="alert">
+        {message}
+      </p>
+    )
+  }
+</form>

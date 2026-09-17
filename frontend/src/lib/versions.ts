@@ -14,7 +14,7 @@
  * release points an entry's own group carried, and the run it carries once the
  * groups the default view hides are folded into it.
  */
-import type { VersionEntry, VersionLaw } from "./types";
+import type { Release, Section, VersionEntry, VersionLaw } from "./types";
 
 export type VersionsView = "text" | "all";
 
@@ -275,4 +275,179 @@ export function changeSummary(entry: VersionEntry): string | null {
     default:
       return null;
   }
+}
+
+// ------------------------------------------------------- a window of dates
+
+/** `?from=` / `?to=` on `/app/versions/…` (ADR-0084). */
+export const VERSIONS_FROM_PARAM = "from";
+export const VERSIONS_TO_PARAM = "to";
+
+/** What the reader asked for, as typed: the API validates the form. */
+export interface WindowRequest {
+  from: string;
+  to: string | null;
+}
+
+/** Read the two date fields off the page's URL. `from` alone is a window to
+ *  today; `to` alone is not a window and is reported as such by the page. */
+export function readWindowRequest(params: URLSearchParams): WindowRequest | null {
+  const from = (params.get(VERSIONS_FROM_PARAM) ?? "").trim();
+  const to = (params.get(VERSIONS_TO_PARAM) ?? "").trim();
+  return from ? { from, to: to || null } : null;
+}
+
+/**
+ * The section's history between two release points, cut from the timeline
+ * by release-point order — the reader's copy of `versions_in_window` in
+ * `storage/repository.py`, over the same map.
+ *
+ * `versions` is the entry in force at `start` (which may have begun before
+ * it) followed by each entry that arrived inside `(start, end]`, oldest first.
+ * `kinds` are the kinds of those arrivals, each once. `order` places a label
+ * in the global sequence; an entry whose every label the order does not know
+ * cannot be placed and is left out, which the page reports rather than hides.
+ */
+export interface VersionWindowCut {
+  versions: VersionEntry[];
+  kinds: string[];
+  /** Whether every entry could be placed. */
+  complete: boolean;
+}
+
+export function versionsInWindow(
+  entries: VersionEntry[],
+  start: { seq: number },
+  end: { seq: number },
+  order: ReleaseOrder,
+): VersionWindowCut {
+  const bySeq = new Map<number, VersionEntry>();
+  let complete = true;
+  for (const entry of entries) {
+    let placed = false;
+    for (const label of entry.releases ?? []) {
+      const seq = order(label);
+      if (seq === undefined) continue;
+      bySeq.set(seq, entry);
+      placed = true;
+    }
+    if (!placed) complete = false;
+  }
+
+  let baseline: VersionEntry | null = null;
+  let baselineSeq = -1;
+  for (const [seq, entry] of bySeq) {
+    if (baselineSeq < seq && seq <= start.seq) {
+      baseline = entry;
+      baselineSeq = seq;
+    }
+  }
+
+  const sequence: VersionEntry[] = baseline ? [baseline] : [];
+  for (const seq of [...bySeq.keys()].sort((a, b) => a - b)) {
+    if (seq > start.seq && seq <= end.seq) {
+      const entry = bySeq.get(seq)!;
+      if (sequence[sequence.length - 1] !== entry) sequence.push(entry);
+    }
+  }
+
+  const kinds: string[] = [];
+  for (const entry of baseline ? sequence.slice(1) : sequence) {
+    if (entry.change_kind && !kinds.includes(entry.change_kind)) kinds.push(entry.change_kind);
+  }
+  if (!baseline && sequence.length > 0 && !kinds.includes("initial")) kinds.unshift("initial");
+
+  return { versions: sequence, kinds, complete };
+}
+
+/**
+ * One end of the window as the page resolved it, in the fields the result
+ * panel prints — built from the section fetched with `?date=`, or from the
+ * release list alone when the section was not in the Code by then.
+ */
+export interface WindowEnd {
+  /** As typed. */
+  date: string;
+  /** The release point the date resolved to: `section.release` when the
+   *  section exists, otherwise the release list's answer, or null when the
+   *  date precedes the first release point. */
+  release: Release | null;
+  /** The release point the text was read from (gotcha 10, ADR-0083). */
+  servedFrom: Release | null;
+  absentFrom: Release | null;
+  exists: boolean;
+  num: string | null;
+  heading: string | null;
+  status: string | null;
+  contentHash: string | null;
+  /** The section route's own sentence when the answer is not literally the
+   *  release point the date names. */
+  note: string | null;
+}
+
+export function windowEnd(date: string, section: Section | null, fallback: Release | null): WindowEnd {
+  return {
+    date,
+    release: section?.release ?? fallback,
+    servedFrom: section?.served_from ?? null,
+    absentFrom: section?.absent_from ?? null,
+    exists: section !== null,
+    num: section?.num ?? null,
+    heading: section?.heading ?? null,
+    status: section?.status ?? null,
+    contentHash: section?.content_hash ?? null,
+    note: section?.note ?? null,
+  };
+}
+
+/** The newest release point on or before a date, from the release list: the
+ *  same rule `resolve_release` applies, for the end of a window where the
+ *  section does not exist and no section fetch can name one. */
+export function releaseOnOrBefore(releases: Release[], date: string): Release | null {
+  const iso = isoDate(date);
+  if (!iso) return null;
+  let best: Release | null = null;
+  for (const release of releases) {
+    if (release.currency_date <= iso && (best === null || release.seq > best.seq)) best = release;
+  }
+  return best;
+}
+
+/** `07/12/2026`, `7/12/2026` or `2026-07-12` → `2026-07-12`; null for anything
+ *  else. Both forms `parse_date_param` accepts, so the page and the API read
+ *  one date the same way. */
+export function isoDate(typed: string): string | null {
+  const trimmed = typed.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(trimmed)) return trimmed;
+  const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/u.exec(trimmed);
+  if (!us) return null;
+  return `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
+}
+
+/** The sentence a change kind adds to the window's verdict. */
+export function kindLabel(kind: string): string {
+  switch (kind) {
+    case "initial":
+      return "the section entered the Code";
+    case "text":
+      return "the statutory text changed";
+    case "notes":
+      return "the notes changed";
+    case "structure":
+      return "only the stored XML or metadata changed";
+    default:
+      return kind;
+  }
+}
+
+/** "The statutory text changed and the notes changed." — the kinds as one
+ *  sentence, or null when nothing arrived. */
+export function kindsSentence(kinds: string[]): string | null {
+  if (kinds.length === 0) return null;
+  const parts = kinds.map(kindLabel);
+  const joined =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `${joined.charAt(0).toUpperCase()}${joined.slice(1)}.`;
 }
