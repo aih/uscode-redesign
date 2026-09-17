@@ -23,6 +23,7 @@ from storage import (
     GuidResolution,
     Neighbors,
     ReleaseRef,
+    ResolvedRelease,
     SectionResult,
     SectionVersionInfo,
     SourceCheckInfo,
@@ -282,6 +283,29 @@ class VersionLawOut(BaseModel):
         )
 
 
+class ReleaseStampOut(BaseModel):
+    """A release point as a point in time: enough to place a version entry
+    on a calendar without the inventory fields `ReleaseOut` carries."""
+
+    label: str = Field(examples=["119-99"])
+    currency_date: datetime.date
+    seq: int = Field(description="Global ordering. Release-point labels do not sort.")
+    caveat: str | None = Field(
+        default=None,
+        description="Set when the label excludes laws (gotcha 5): the text is "
+        "not fully current through `currency_date`.",
+    )
+
+    @classmethod
+    def of(cls, release: ReleaseRef) -> "ReleaseStampOut":
+        return cls(
+            label=release.label,
+            currency_date=release.currency_date,
+            seq=release.seq,
+            caveat=release.caveat,
+        )
+
+
 class VersionOut(BaseModel):
     content_hash: str
     first_seen: ReleaseOut
@@ -289,6 +313,16 @@ class VersionOut(BaseModel):
         description="Every ingested release point publishing this content, "
         "oldest first. `releases[0]` is the authoritative start of the entry; "
         "`first_seen` stays for compatibility (ADR-0066)."
+    )
+    first_release: ReleaseStampOut | None = Field(
+        default=None,
+        description="`releases[0]` with its currency date — when this text "
+        "first appeared. Null for an entry mapped to no release point.",
+    )
+    last_release: ReleaseStampOut | None = Field(
+        default=None,
+        description="The newest release point publishing this text, with its "
+        "currency date.",
     )
     num: str | None
     heading: str | None
@@ -314,6 +348,16 @@ class VersionOut(BaseModel):
             content_hash=version.content_hash,
             first_seen=ReleaseOut.of(version.first_seen),
             releases=list(version.releases),
+            first_release=(
+                ReleaseStampOut.of(version.first_release)
+                if version.first_release
+                else None
+            ),
+            last_release=(
+                ReleaseStampOut.of(version.last_release)
+                if version.last_release
+                else None
+            ),
             num=version.num,
             heading=version.heading,
             status=version.status,
@@ -327,11 +371,103 @@ class VersionOut(BaseModel):
         )
 
 
+class VersionAtDateOut(BaseModel):
+    """One end of a date window: the release point a date resolved to, and
+    the section as published there (ADR-0084)."""
+
+    date: datetime.date = Field(description="The date asked for.")
+    release: ReleaseOut = Field(
+        description="The newest release point on or before `date`."
+    )
+    exists: bool = Field(
+        description="Whether the section is in the Code at that release point. "
+        "False before the section first appeared."
+    )
+    served_from: ReleaseOut | None = Field(
+        default=None,
+        description="The release point the text was read from — earlier than "
+        "`release` when the title is unchanged between the two, or when the "
+        "section has left the Code by then (ADR-0083, `absent_from`).",
+    )
+    absent_from: ReleaseOut | None = None
+    num: str | None = None
+    heading: str | None = None
+    status: str | None = None
+    content_hash: str | None = Field(
+        default=None,
+        description="Hex sha256 of the guid-stripped content: equal on both "
+        "ends means the same text.",
+    )
+    note: str | None = Field(
+        default=None,
+        description="Set when the answer is not literally the release point "
+        "the date names — the same sentence the section route returns.",
+    )
+
+    @classmethod
+    def of(
+        cls,
+        date: datetime.date,
+        resolved: ResolvedRelease,
+        section: SectionResult | None,
+        note: str | None,
+    ) -> "VersionAtDateOut":
+        return cls(
+            date=date,
+            release=ReleaseOut.of(resolved.release),
+            exists=section is not None,
+            served_from=ReleaseOut.of(section.served_from) if section else None,
+            absent_from=(
+                ReleaseOut.of(section.absent_from)
+                if section and section.absent_from
+                else None
+            ),
+            num=section.num if section else None,
+            heading=section.heading if section else None,
+            status=section.status if section else None,
+            content_hash=section.content_hash if section else None,
+            note=note,
+        )
+
+
+class VersionWindowOut(BaseModel):
+    """The answer to "did this section change between two dates?" (ADR-0084)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_: VersionAtDateOut = Field(alias="from")
+    to: VersionAtDateOut
+    changed: bool = Field(
+        description="Whether the text at `to` differs from the text at `from`. "
+        "True when the section is in the Code at one end and not the other."
+    )
+    change_kinds: list[str] = Field(
+        description="The kinds of every version that arrived inside the window "
+        "— initial | text | notes | structure — in order, each once. Empty when "
+        "nothing arrived, and empty on a corpus with no change rows even when "
+        "`changed` is true."
+    )
+    diff: list[DiffOpOut] | None = Field(
+        default=None,
+        description="The two texts diffed with `@id` guids stripped, as "
+        "`/sections/{identifier}/diff` reports them. Null when the section is "
+        "absent at either end.",
+    )
+
+
 class VersionsOut(BaseModel):
     identifier: str
     versions: list[VersionOut] = Field(
         description="One entry per distinct content, oldest first. Consecutive "
-        "release points publishing identical text share an entry."
+        "release points publishing identical text share an entry. With "
+        "`?from=`/`?to=`, only the entries in force at some release point in "
+        "the window: the one in force at `from`, then each arrival."
+    )
+    window: VersionWindowOut | None = Field(
+        default=None,
+        description="Present when the request carried `?from=` (and optionally "
+        "`?to=`): the two ends, whether the text changed between them, what "
+        "kinds of change arrived, and the diff.",
     )
 
 

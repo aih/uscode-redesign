@@ -64,6 +64,8 @@ from storage.repository import (
     TocEntry,
     TocResult,
     VersionLawRef,
+    VersionWindow,
+    versions_in_window,
 )
 
 __all__ = [
@@ -107,6 +109,8 @@ __all__ = [
     "UnknownTitleError",
     "UserRef",
     "VersionLawRef",
+    "VersionWindow",
+    "versions_in_window",
     "WatchlistItemRef",
     "WatchlistRef",
     "get_accounts",
