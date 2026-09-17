@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 from main import app
 from storage import get_repository
-from storage.repository import ReleaseRef, ResolvedRelease
+from storage.repository import ReleaseRef, ResolvedRelease, VersionChangePoints
 
 # The identifier the index actually holds is the full USLM `@identifier` — a
 # path, not a fragment. A fixture using "t16/s1" is what let the reader ship a
@@ -59,10 +59,17 @@ def _response(hits):
 
 
 class FakeRepository:
-    """Only the one method the search handler is allowed to reach for."""
+    """The two methods the search handler reaches for: release resolution, and
+    the change points that annotate a page of results."""
 
     def __init__(self):
         self.asked = []
+        self.points: dict[int, VersionChangePoints] = {}
+        self.points_asked: list[list[int]] = []
+
+    def change_points(self, version_ids):
+        self.points_asked.append(list(version_ids))
+        return {v: self.points[v] for v in version_ids if v in self.points}
 
     def resolve_release(self, *, label=None, on_date=None, title_num=None):
         self.asked.append((label, on_date))
@@ -124,6 +131,44 @@ def test_search_returns_full_identifiers(client, search_client):
     assert result["snippets"] == [
         {"field": "heading", "text": "<em>National</em> Park Service"}
     ]
+
+
+def test_a_result_names_where_its_text_last_changed_and_its_latest_change(
+    client, search_client, repository
+):
+    search_client.search.return_value = _response([_hit(version_id=7)])
+    repository.points[7] = VersionChangePoints(
+        text_since=OLDER, changed_at=NEWEST, change_kind="structure"
+    )
+
+    result = client.get("/api/v1/search?q=National").json()["results"][0]
+
+    assert repository.points_asked == [[7]]
+    assert result["text_changed_release"] == "119-99"
+    assert result["last_changed_release"] == "119-102not101"
+    assert result["last_change_kind"] == "structure"
+
+
+def test_a_result_without_change_rows_leaves_the_fields_null(client, search_client, repository):
+    search_client.search.return_value = _response([_hit(version_id=7)])
+
+    result = client.get("/api/v1/search?q=National").json()["results"][0]
+
+    assert result["text_changed_release"] is None
+    assert result["last_changed_release"] is None
+
+
+def test_a_failed_change_point_lookup_does_not_fail_the_search(client, search_client, repository):
+    search_client.search.return_value = _response([_hit(version_id=7)])
+
+    def broken(version_ids):
+        raise RuntimeError("database gone")
+
+    repository.change_points = broken
+    response = client.get("/api/v1/search?q=National")
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["text_changed_release"] is None
 
 
 def test_search_defaults_to_the_text_in_force(client, search_client, repository):

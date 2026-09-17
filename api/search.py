@@ -99,7 +99,18 @@ class SearchResultItem(BaseModel):
     type: str  # "section" or "structure"
     snippets: List[SearchSnippet] = []
     first_release: Optional[str] = None
-    """The release point this text first appeared at — "unchanged since"."""
+    """The release point this stored version first appeared at, whatever changed
+    there — the text, the notes, or only the XML."""
+    text_changed_release: Optional[str] = None
+    """The release point at which this section's text last changed, at or before
+    this version (ADR-0074). Null on a corpus with no change rows."""
+    last_changed_release: Optional[str] = None
+    """The release point this version arrived at. Later than
+    `text_changed_release` when a notes-only or metadata-only change followed
+    the text."""
+    last_change_kind: Optional[str] = None
+    """`initial`, `text`, `notes` or `structure` — what changed at
+    `last_changed_release`."""
     is_current: bool = True
     title_num: Optional[str] = None
     status: Optional[str] = None
@@ -216,6 +227,7 @@ def search(
         total = collapsed["value"]
 
     results = []
+    version_ids: list[int | None] = []
     for hit in hits:
         # Under collapse the outer hit is the best-scoring version of the section;
         # the one actually in force at the requested release is the inner hit.
@@ -232,6 +244,7 @@ def search(
             for text in texts:
                 snippets.append(SearchSnippet(field=field, text=text))
 
+        version_ids.append(source.get("version_id") if type_str == "section" else None)
         results.append(SearchResultItem(
             identifier=source.get("identifier"),
             heading=source.get("heading"),
@@ -246,6 +259,7 @@ def search(
             id_collision=bool(source.get("id_collision", False)),
         ))
 
+    _annotate_change_points(repository, results, version_ids)
     if resolved is None:
         _count_earlier_matches(client, parsed, results)
 
@@ -257,6 +271,31 @@ def search(
         sort=sort,
         facets=_facets(res.get("aggregations", {})),
     )
+
+
+def _annotate_change_points(
+    repository, results: list[SearchResultItem], version_ids: list[int | None]
+) -> None:
+    """Fill in where each section's text last changed and where its latest
+    change of any kind arrived, from the change rows (ADR-0074).
+
+    Like the earlier-match count, a failure here leaves the fields null rather
+    than failing a search whose results are already built."""
+    wanted = [version_id for version_id in version_ids if version_id is not None]
+    if not wanted:
+        return
+    try:
+        points = repository.change_points(wanted)
+    except Exception:
+        log.exception("change points for search results failed")
+        return
+    for result, version_id in zip(results, version_ids):
+        found = points.get(version_id) if version_id is not None else None
+        if found is None:
+            continue
+        result.text_changed_release = found.text_since.label if found.text_since else None
+        result.last_changed_release = found.changed_at.label
+        result.last_change_kind = found.change_kind
 
 
 def _count_earlier_matches(client, parsed, results: list[SearchResultItem]) -> None:

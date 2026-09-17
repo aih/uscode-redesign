@@ -458,3 +458,25 @@ export function kindsSentence(kinds: string[]): string | null {
   return sentences.join(" ");
 }
 
+/** A search result's change facts, as its meta line states them:
+ *  "text unchanged since 118-5", then " · XML/metadata changed at 119-83" when
+ *  a notes-only or metadata-only change arrived after the text. Falls back to
+ *  the stored version's first release point without change rows. */
+export function resultChangeNote(result: {
+  first_release: string | null;
+  text_changed_release?: string | null;
+  last_changed_release?: string | null;
+  last_change_kind?: string | null;
+}): string | null {
+  const text = result.text_changed_release ?? null;
+  if (!text) return result.first_release ? `unchanged since ${result.first_release}` : null;
+  const last = result.last_changed_release ?? null;
+  if (!last || last === text) return `text unchanged since ${text}`;
+  const what =
+    result.last_change_kind === "notes"
+      ? "notes changed"
+      : result.last_change_kind === "structure"
+        ? "XML/metadata changed"
+        : "changed";
+  return `text unchanged since ${text} · ${what} at ${last}`;
+}

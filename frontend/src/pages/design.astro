@@ -430,6 +430,9 @@ const RESULTS: SearchResultItem[] = [
       },
     ],
     first_release: "119-102not101",
+    text_changed_release: "118-22u1",
+    last_changed_release: "119-102not101",
+    last_change_kind: "structure",
     is_current: true,
     title_num: "0",
     status: null,
@@ -447,6 +450,9 @@ const RESULTS: SearchResultItem[] = [
       { field: "text", text: "Repealed. Pub. L. 000-00, § 2, Jan. 1, 2024, 0 Stat. 0." },
     ],
     first_release: "119-99",
+    text_changed_release: "119-99",
+    last_changed_release: "119-99",
+    last_change_kind: "text",
     is_current: true,
     title_num: "0",
     status: "repealed",
@@ -1242,8 +1248,9 @@ const TYPE_ROLES = [
   <h2 class="toc-group" id="search">Search results</h2>
 
   <p>
-    A result row carries the identifier, the release point at which this exact text first
-    appeared, and — when the words are in text the section no longer holds — a link to the
+    A result row carries the identifier, the release point at which the section's text last
+    changed — with the release point of a later notes-only or metadata-only change beside it, as
+    in the first row — and, when the words are in text the section no longer holds, a link to the
     versions that did hold them. The second row shows the caveat a section carries when the
     source published more than one provision under one identifier at one release point.
   </p>

@@ -92,8 +92,10 @@ steps:
 
 Each result is headed by its citation — `16 U.S.C. § 3831`, not `§ 3831` — followed by the heading,
 with the words that matched marked. A chapter or subchapter heading is headed `Title 16, CHAPTER 1`
-instead. Under it are the identifier, the status if the provision has one, the release point this
-exact text first appeared at, and a link to any earlier versions that also matched.
+instead. Under it are the identifier, the status if the provision has one, the release point at which
+the section's text last changed, and a link to any earlier versions that also matched. When the notes
+or only the XML changed after that, the row names that release point too. For 16 U.S.C. § 3831 it
+reads *text unchanged since 115-442 · XML/metadata changed at 118-274not159*.
 
 ```scenario
 id: search-result-citation
@@ -101,6 +103,14 @@ title: A result names the title it is in
 steps:
   - goto: /app/search?q=conservation
   - expect: { selector: ".searchresult__cite", contains: "U.S.C." }
+```
+
+```scenario
+id: search-result-text-change
+title: A result says when its text last changed
+steps:
+  - goto: /app/search?q=conservation
+  - expect: { selector: ".searchresult__changed", contains: "text unchanged since" }
 ```
 
 The search **matches the words you typed** without applying fuzzy matching or stemming by default.

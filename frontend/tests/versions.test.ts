@@ -6,6 +6,7 @@ import {
   isAnnotated,
   isoDate,
   kindsSentence,
+  resultChangeNote,
   readWindowRequest,
   releaseOnOrBefore,
   versionsInWindow,
@@ -501,5 +502,28 @@ describe("kindsSentence", () => {
     expect(kindsSentence(["initial", "structure", "text"])).toBe(
       "The section entered the Code. The statute text and XML/metadata changed.",
     );
+  });
+});
+
+describe("resultChangeNote", () => {
+  it("names the text change, and a later notes or metadata change beside it", () => {
+    const base = { first_release: "119-83" };
+    expect(
+      resultChangeNote({ ...base, text_changed_release: "118-5", last_changed_release: "119-83", last_change_kind: "structure" }),
+    ).toBe("text unchanged since 118-5 · XML/metadata changed at 119-83");
+    expect(
+      resultChangeNote({ ...base, text_changed_release: "118-5", last_changed_release: "119-83", last_change_kind: "notes" }),
+    ).toBe("text unchanged since 118-5 · notes changed at 119-83");
+  });
+
+  it("says one thing when the latest change was the text", () => {
+    expect(
+      resultChangeNote({ first_release: "118-5", text_changed_release: "118-5", last_changed_release: "118-5", last_change_kind: "text" }),
+    ).toBe("text unchanged since 118-5");
+  });
+
+  it("falls back to the stored version's first release point without change rows", () => {
+    expect(resultChangeNote({ first_release: "119-83" })).toBe("unchanged since 119-83");
+    expect(resultChangeNote({ first_release: null, text_changed_release: null })).toBeNull();
   });
 });

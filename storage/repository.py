@@ -367,6 +367,23 @@ class VersionWindow:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class VersionChangePoints:
+    """Where a stored version stands in its section's change history (ADR-0074).
+
+    `text_since` is the release point at which the section's text last changed
+    at or before this version: the arrival of the newest `initial` or `text`
+    group. `changed_at` is this version's own arrival, whatever its kind; it is
+    later than `text_since` when a notes-only or metadata-only change followed
+    the text. Both come from `section_version_changes` and are ordered by the
+    earliest release each group is mapped to (ADR-0066)."""
+
+    text_since: ReleaseRef | None
+    changed_at: ReleaseRef
+    change_kind: str
+    """'initial' | 'text' | 'notes' | 'structure' — this version's arrival."""
+
+
 def versions_in_window(
     versions: Sequence[SectionVersionInfo], start: ReleaseRef, end: ReleaseRef
 ) -> VersionWindow:
@@ -609,6 +626,15 @@ class Repository(Protocol):
 
         Ordered by each entry's earliest mapped release (`releases[0]`),
         tie-broken deterministically (ADR-0066).
+        """
+        ...
+
+    def change_points(self, version_ids: Sequence[int]) -> dict[int, VersionChangePoints]:
+        """For each stored version id, the release point its section's text last
+        changed at and the release point this version arrived at.
+
+        Keyed by version id. A version with no change row — a corpus loaded but
+        not back-filled — is absent. One call answers a page of search results.
         """
         ...
 
