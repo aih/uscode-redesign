@@ -33,8 +33,21 @@
  * are headings a screen reader can jump between rather than type set to look
  * like headings. The columns are four from 40em, two from 25em and one below
  * that.
+ *
+ * The secondary section opens with the site's currency (ADR-0085): the newest
+ * release point loaded, its date, and the day uscode.house.gov was last
+ * checked, with `currencyNote`'s headline ahead of them when it is a warning.
+ * Dates rather than "3 hours ago", because the page may be cached.
  */
 import { APP, classificationHref, syntaxHref, versionDataHref } from "../lib/url";
+import FooterCurrency from "./FooterCurrency.astro";
+import type { FooterCurrency as FooterFacts } from "../lib/sitecurrency";
+
+interface Props {
+  currency?: FooterFacts | null;
+}
+
+const { currency = null } = Astro.props;
 
 declare const __COMMIT_HASH__: string;
 const commitHash: string = __COMMIT_HASH__;
@@ -152,6 +165,7 @@ const commitUrl = commitHash !== "unknown" ? `${repoUrl}/commit/${commitHash}` :
   </div>
   <div class="usa-footer__secondary-section">
     <div class="grid-container">
+      {currency && <FooterCurrency currency={currency} />}
       <p class="doc-meta">
         A conceptual redesign of the Office of the Law Revision Counsel's site, built from the
         official USLM downloads. Not an official publication of the United States government.

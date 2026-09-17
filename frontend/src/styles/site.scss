@@ -776,6 +776,101 @@
   display: none;
 }
 
+/* ------------------------------------------------------ the dateline (ADR-0085)
+ *
+ * The newest release point loaded and its date, under the wordmark. One line
+ * of secondary text at every width, and it adds no height to the header: on
+ * the bar it sits inside the home link's 44px box, and above 64em the logo's
+ * margins give back what it takes.
+ *
+ * Its two parts are flex items on a one-line box that clips, so where the bar
+ * is too narrow for both, the release point wraps out of sight and the date
+ * stays. The clipped part is still read by a screen reader. */
+.dateline {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.3em;
+  height: 1.25em;
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.dateline__through,
+.dateline__rp {
+  white-space: nowrap;
+}
+
+/* "release point" is for a screen reader at every width, and below 30em so is
+ * "Current": the bar reads "Through 07/12/2026 · 119-102", the header above
+ * 30em "Current through 07/12/2026 · 119-102", and both are read aloud as
+ * "Current through 07/12/2026 · release point 119-102". Short enough to sit
+ * under the wordmark without widening the logo, which at 1280px and 200% zoom
+ * pushed the search button 10px past the edge. */
+.dateline__rpword {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 29.99em) {
+  .dateline__current {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .dateline__word {
+    text-transform: capitalize;
+  }
+
+  /* 0.72rem and a narrower gap keep both parts on a 320px bar. */
+  .dateline {
+    column-gap: 0.25em;
+    font-size: 0.72rem;
+  }
+}
+
+/* Above 64em the logo's margins give back the dateline's line, so the header
+ * is the 73.5px it was. The block is centred on the nav row beside it. */
+@media (min-width: 64em) {
+  .usa-header--basic .usa-logo--dated {
+    margin-top: 1.42rem;
+    margin-bottom: 0.64rem;
+  }
+}
+
+.navbar__brand--dated {
+  position: relative;
+}
+
+/* The wordmark moves to the top of its 44px link and the dateline takes the
+ * bottom. `pointer-events: none` hands a tap on the dateline to the link. */
+.navbar__brand--dated a {
+  align-items: flex-start;
+  padding-top: 0.2rem;
+  box-sizing: border-box;
+}
+
+.navbar__brand--dated .dateline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.3rem;
+  pointer-events: none;
+}
+
 @media (min-width: 64em) {
   /* No box, so the three children below are items of the nav's row. A plain
    * `<div>` — deliberately not the `<nav>`, whose landmark is the one thing on
@@ -2597,6 +2692,20 @@ main[id] {
 
 .source-currency__detail {
   color: var(--muted);
+}
+
+// The front page's currency panel (ADR-0085). The alert is `SourceCurrency`'s.
+.sitecurrency-panel__alert {
+  margin-top: 0.75rem;
+}
+
+.sitecurrency-panel__alert .source-currency {
+  margin-bottom: 0;
+}
+
+// The footer's currency line. The warning is the headline `currencyNote` wrote.
+.sitecurrency__warning {
+  color: var(--ink);
 }
 
 // Labels the repeated bodies apart when the source published one identifier more

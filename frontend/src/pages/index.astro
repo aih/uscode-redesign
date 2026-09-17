@@ -1,10 +1,19 @@
 ---
-/** `/app/` — the front page: what is loaded, and the demo citation. */
+/** `/app/` — the front page: what is loaded, how current it is (ADR-0085),
+ * and the demo citation. */
 import Base from "../layouts/Base.astro";
+import SiteCurrencyPanel from "../components/SiteCurrencyPanel.astro";
 import { fetchTitles } from "../lib/api";
+import { cachedReleases } from "../lib/releasecache";
+import { cachedStatus } from "../lib/sitecurrency";
 import { APP, appHref } from "../lib/url";
 
-const titles = await fetchTitles();
+const [titles, status] = await Promise.all([fetchTitles(), cachedStatus()]);
+const newest = status?.corpus.latest_release
+  ? ((await cachedReleases(null).catch(() => [])).find(
+      (release) => release.label === status.corpus.latest_release,
+    ) ?? null)
+  : null;
 const DEMO = "/us/usc/t16/s45f/c/5?date=07/12/2026";
 
 function releaseCount(n: number): string {
@@ -19,6 +28,8 @@ function releaseCount(n: number): string {
     Look up any provision as it stood at any published release point. Its URL mirrors the USLM
     identifier published by the Office of the Law Revision Counsel.
   </p>
+
+  <SiteCurrencyPanel status={status} release={newest} />
 
   <div class="usa-summary-box" role="region" aria-labelledby="demo-heading">
     <div class="usa-summary-box__body">

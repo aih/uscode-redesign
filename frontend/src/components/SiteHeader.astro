@@ -76,6 +76,15 @@
  * refused: it would leave the reader tabbing the bar in an order they cannot
  * see.
  *
+ * ## The dateline (ADR-0085)
+ *
+ * Under both copies of the wordmark: the newest release point loaded and the
+ * date it is current through, from `Base`'s memoised `/api/v1/status`. It is
+ * text, not a link, and it is outside the home link, so the link's name stays
+ * the site's name. On the bar it is positioned inside the home link's 44px box
+ * with `pointer-events: none`, so a tap on it is a tap on the link and the bar
+ * stays 52px. Nothing renders when the status is unavailable.
+ *
  * The Accounts row is last, and is the slot `AuthNav` takes when
  * `ACCOUNTS_ENABLED` flips (ADR-0034). With accounts off, the island is not
  * rendered at all rather than rendered and hidden: a hidden island still ships
@@ -83,6 +92,7 @@
  * be told nobody.
  */
 import AuthNav from "./AuthNav.astro";
+import Dateline from "./Dateline.astro";
 import ComingSoon from "./ComingSoon.astro";
 import InstallApp from "./InstallApp.astro";
 import SiteSearch from "./SiteSearch.astro";
@@ -96,13 +106,16 @@ import {
 } from "../lib/features";
 import { APP, appHref, classificationHref } from "../lib/url";
 import { NAV_TITLES } from "../data/nav-titles";
+import type { Dateline as DatelineFacts } from "../lib/sitecurrency";
 
 interface Props {
   /** Prefills the one search box when a page is showing a query's results. */
   searchValue?: string | null;
+  /** The newest release point loaded and its date (ADR-0085). */
+  dateline?: DatelineFacts | null;
 }
 
-const { searchValue = null } = Astro.props;
+const { searchValue = null, dateline = null } = Astro.props;
 
 /** One href and one string for both copies of the wordmark. */
 const home = `${APP}/`;
@@ -114,10 +127,13 @@ const wordmark = "United States Code";
     {/* USWDS's own bar, and the desktop row's first item. Hidden below 64em,
         where `.navbar` below is the bar instead. */}
     <div class="usa-navbar">
-      <div class="usa-logo">
+      <div class={dateline ? "usa-logo usa-logo--dated" : "usa-logo"}>
         <em class="usa-logo__text">
           <a href={home} title={wordmark}>{wordmark}</a>
         </em>
+        {dateline && (
+          <Dateline dateline={dateline} />
+        )}
       </div>
     </div>
     <nav aria-label="Primary" class="usa-nav">
@@ -305,8 +321,11 @@ const wordmark = "United States Code";
 
         {/* The bar's wordmark. Displayed below 64em, where `.usa-navbar`'s copy
             is not, so exactly one of the two is ever a link on the page. */}
-        <span class="navbar__brand">
+        <span class={dateline ? "navbar__brand navbar__brand--dated" : "navbar__brand"}>
           <a href={home} title={wordmark}>{wordmark}</a>
+          {dateline && (
+            <Dateline dateline={dateline} as="span" />
+          )}
         </span>
 
         {/* One tap from any page below 64em, which is where ADR-0061 left it
