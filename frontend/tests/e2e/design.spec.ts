@@ -139,7 +139,9 @@ test.describe("the version timeline's two views (ADR-0075)", () => {
   test("the default view hides the notes-only and metadata-only entries", async ({ page }) => {
     await page.goto(PAGE);
     const text = page.locator('.timeline[data-view="text"]');
-    const all = page.locator('.timeline[data-view="all"]');
+    // `.first()`: the date-window answer specimen (ADR-0084) renders a second
+    // all-view timeline further down the page.
+    const all = page.locator('.timeline[data-view="all"]').first();
 
     await expect(text.locator("li")).toHaveCount(5);
     await expect(text.locator('li[data-change-kind="notes"]')).toBeHidden();
@@ -213,14 +215,17 @@ test.describe("the version timeline's two views (ADR-0075)", () => {
 
   test("a concurrent entry says so, and offers no redline", async ({ page }) => {
     await page.goto(PAGE);
-    const entry = page.locator(
-      '.timeline[data-view="all"] li[data-change-kind="notes"]',
-    );
+    const entry = page
+      .locator('.timeline[data-view="all"]')
+      .first()
+      .locator('li[data-change-kind="notes"]');
     await expect(entry).toContainText("Another stored version of this section is mapped inside");
     await expect(entry).toContainText("do not run forwards");
     await expect(entry.locator(".timeline__diff")).toHaveCount(0);
     // Every other entry after the first still has one.
-    await expect(page.locator('.timeline[data-view="all"] .timeline__diff')).toHaveCount(3);
+    await expect(
+      page.locator('.timeline[data-view="all"]').first().locator(".timeline__diff"),
+    ).toHaveCount(3);
   });
 
   test("the view switch is the sort bar with no direction to reverse", async ({ page }) => {

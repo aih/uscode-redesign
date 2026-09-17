@@ -760,9 +760,14 @@ class PostgresRepository:
             return []
         section, _remainder = match
 
-        published: dict[int, list[tuple[int, str]]] = {}
-        for version_id, seq, label in self._session.execute(
-            select(SectionReleaseMap.section_version_id, ReleasePoint.seq, ReleasePoint.label)
+        # The whole release row rather than (seq, label): the entry carries
+        # each release point as a ref, so a caller can place it in time
+        # without fetching the release list (ADR-0084). A section is mapped
+        # to at most one row per release point, so this is bounded by the
+        # inventory.
+        published: dict[int, list[tuple[int, ReleasePoint]]] = {}
+        for version_id, release in self._session.execute(
+            select(SectionReleaseMap.section_version_id, ReleasePoint)
             .join(ReleasePoint, ReleasePoint.id == SectionReleaseMap.release_id)
             .join(
                 SectionVersion,
@@ -770,9 +775,9 @@ class PostgresRepository:
             )
             .where(SectionVersion.section_id == section.id)
         ).all():
-            published.setdefault(version_id, []).append((seq, label))
+            published.setdefault(version_id, []).append((release.seq, release))
         for mapped in published.values():
-            mapped.sort()
+            mapped.sort(key=lambda pair: pair[0])
 
         changes, laws = self._version_changes(section.id)
 
@@ -798,11 +803,14 @@ class PostgresRepository:
                 content_hash=version.content_hash.hex(),
                 first_seen=self._ref(first_release),
                 releases=tuple(
-                    label for _seq, label in published.get(version.id, [])
+                    release.label for _seq, release in published.get(version.id, [])
                 ),
                 num=version.num,
                 heading=version.heading,
                 status=version.status,
+                published=tuple(
+                    self._ref(release) for _seq, release in published.get(version.id, [])
+                ),
                 **self._change_fields(
                     changes.get(version.id), laws.get(version.id, [])
                 ),

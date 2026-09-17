@@ -36,12 +36,12 @@ Playwright test, and (when flagged `demo: true`) a captioned scene of `make demo
 ratchet refuses a reader route or an ADR that no chapter accounts for. See Documentation duties 6.
 
 **Accessibility is a ratchet in the browser suite** (ADR-0039). `frontend/tests/e2e/a11y.spec.ts`
-runs axe-core over the route matrix in `docs/a11y/routes.json` — 39 route entries (one expanding to
+runs axe-core over the route matrix in `docs/a11y/routes.json` — 40 route entries (one expanding to
 every guide chapter on disk), three viewports, both themes, one `forced-colors: active` pass and
 fourteen interactive states — among them the compact reading density (ADR-0054), the open shortcut dialog
 (ADR-0055), the open release switcher (ADR-0056) and both site menus open at a phone width
 (ADR-0058), both navbar dropdowns (ADR-0061), the command palette (ADR-0062) and the open
-classification lookup (ADR-0067) — **350 scans**,
+classification lookup (ADR-0067) — **357 scans**,
 against `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`. A
 violation whose (route, rule) pair is not in `docs/a11y/known-violations.json` fails the build, and a
 serious or critical one fails **even when listed** unless its entry names that exact impact in
@@ -422,15 +422,35 @@ from, and to check the most recent release point. The reader renders that as a w
 link to the title at the newest release point. Backward only: a release point before the section
 existed is still ADR-0065's 404. `labels` does not fall back (a recorded cost).
 
-`make test` = **873** Python tests; `make test-web` = **477** frontend tests; `make test-e2e` = **676**
-Playwright tests, 351 of which are the accessibility scan (**all three are required** — reader
+**A section's history between two dates** (ADR-0084). `GET /sections/{id}/versions?from=&to=`
+resolves each date the way `?date=` does and answers `window`: each end as it resolved (with the
+section route's own `note` and the release point's `caveat`), `changed` from the two ends'
+guid-stripped hashes, `change_kinds` for what arrived in between, the diff; `versions` is cut to
+the window by `versions_in_window` in `storage/repository.py`, pure and shared. Every entry carries
+`first_release`/`last_release` with dates. The windowed form shares the diff's rate limit through a
+dependency that reads the query string; both routes memoise the redline on the *served-from* pair.
+**The reader does not call that form** — it renders from one address for everyone against a
+person's budget — so `/app/versions` cuts the window itself (`versionsInWindow`, the same walk in
+TypeScript) from the plain timeline and two `?date=` section fetches, and diffs the reading texts,
+under the diff's middleware bucket when `?from=` is present; `SectionOut` gained `content_hash` so
+the verdict compares hashes rather than redlines. The form is `VersionWindowForm`, the answer
+`VersionWindowResult`, both on `/app/design`; an empty `?from=`/`?to=` is stripped like an empty
+`?release=`. On the one search box, **`history <citation>`** lands on the history and
+`history <citation> from <date> to <date>` on the answer (`parseHistory` beside `parseCites`; the
+citation still goes to `/api/v1/citation`); a title or chapter gets a message, not a redirect. Two
+traps: the timeline's release labels carry no dates, so the reader needs `cachedReleases` to place
+an end where the section does not exist; and `new Date().toISOString()` is UTC's calendar, which
+is tomorrow in a US evening.
+
+`make test` = **891** Python tests; `make test-web` = **494** frontend tests; `make test-e2e` = **694**
+Playwright tests, 358 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
 fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job can't go green having run
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(81 ADRs, numbered to 0083 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(82 ADRs, numbered to 0084 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.

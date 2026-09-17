@@ -311,6 +311,11 @@ class SectionVersionInfo:
     heading: str | None
     status: str | None
 
+    published: tuple[ReleaseRef, ...] = ()
+    """The same release points as `releases`, as refs — each with its `seq` and
+    `currency_date` — so a caller can place the entry in time without a second
+    round trip for the release list."""
+
     change_kind: str | None = None
     """'initial' | 'text' | 'notes' | 'structure'."""
 
@@ -325,6 +330,89 @@ class SectionVersionInfo:
     """'classified' | 'none'."""
 
     laws: tuple[VersionLawRef, ...] = ()
+
+    @property
+    def first_release(self) -> ReleaseRef | None:
+        """The release point this text starts at — `releases[0]` as a ref."""
+        return self.published[0] if self.published else None
+
+    @property
+    def last_release(self) -> ReleaseRef | None:
+        """The newest release point publishing this text."""
+        return self.published[-1] if self.published else None
+
+
+@dataclass(frozen=True, slots=True)
+class VersionWindow:
+    """A section's history between two release points (ADR-0084).
+
+    `versions` is every entry in force at some release point in
+    `[start, end]`, oldest first: the entry in force at `start` — which may
+    have begun before it — followed by each entry that arrived within the
+    window. `change_kinds` are the kinds of those arrivals, in order, each
+    once; an entry with no change row contributes nothing to it.
+    """
+
+    start: ReleaseRef
+    end: ReleaseRef
+    versions: tuple[SectionVersionInfo, ...]
+    change_kinds: tuple[str, ...]
+
+    @property
+    def changed(self) -> bool:
+        """Whether the stored content at `end` differs from the content at
+        `start`. Two entries with one hash are one entry, so this is a count."""
+        return len(self.versions) > 1 and (
+            self.versions[0].content_hash != self.versions[-1].content_hash
+        )
+
+
+def versions_in_window(
+    versions: Sequence[SectionVersionInfo], start: ReleaseRef, end: ReleaseRef
+) -> VersionWindow:
+    """Cut a section's timeline down to `[start, end]` by release-point `seq`.
+
+    Pure, so every `Repository` implementation shares it. The walk is over the
+    release points each entry is *mapped* to, not over `first_seen` (ADR-0066),
+    and it follows recurring content (ADR-0021): an entry mapped before and
+    again inside the window counts as in force where the map says it is.
+
+    A section absent at `start` — mapped to nothing at or before it — begins
+    the window with its first arrival inside it, so `versions[0]` is then an
+    arrival rather than a baseline and `changed` reads it as one.
+    """
+    by_seq: dict[int, SectionVersionInfo] = {}
+    for entry in versions:
+        for release in entry.published:
+            by_seq[release.seq] = entry
+
+    baseline: SectionVersionInfo | None = None
+    baseline_seq = -1
+    for seq, entry in by_seq.items():
+        if baseline_seq < seq <= start.seq:
+            baseline, baseline_seq = entry, seq
+
+    sequence: list[SectionVersionInfo] = [baseline] if baseline else []
+    for seq in sorted(by_seq):
+        if start.seq < seq <= end.seq:
+            entry = by_seq[seq]
+            if not sequence or sequence[-1] is not entry:
+                sequence.append(entry)
+
+    kinds: list[str] = []
+    arrivals = sequence[1:] if baseline else sequence
+    for entry in arrivals:
+        if entry.change_kind and entry.change_kind not in kinds:
+            kinds.append(entry.change_kind)
+
+    # Without a baseline, an arrival is a change from nothing: the section
+    # was not in the Code at `start`.
+    if baseline is None and sequence and "initial" not in kinds:
+        kinds.insert(0, "initial")
+
+    return VersionWindow(
+        start=start, end=end, versions=tuple(sequence), change_kinds=tuple(kinds)
+    )
 
 
 @dataclass(frozen=True, slots=True)

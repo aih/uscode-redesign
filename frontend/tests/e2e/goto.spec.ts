@@ -137,3 +137,38 @@ test("a hyphen typed on a keyboard finds OLRC's en dash", async ({ page }) => {
   await expect(page).toHaveURL(/s45a%E2%80%931|s45a–1/u);
   await expect(page.locator("h1.doc-title")).toContainText("45a");
 });
+
+test("a history query opens the section's version history", async ({ page }) => {
+  // The second prefix the box reads (ADR-0084). The citation after it is still
+  // the API's to read; a subsection lands on its section's history.
+  await page.goto("/app/");
+  await page.fill(BOX, "history 16 usc 2201(b)(1)");
+  await page.press(BOX, "Enter");
+
+  await expect(page).toHaveURL(/\/app\/versions\/us\/usc\/t16\/s2201$/u);
+});
+
+test("a history query with a date range asks whether it changed", async ({ page }) => {
+  await page.goto("/app/goto?q=history%2016%20usc%202201%20from%206/12/2026%20to%207/12/2026");
+
+  await expect(page).toHaveURL(/\/app\/versions\/us\/usc\/t16\/s2201\?from=6%2F12%2F2026&to=7%2F12%2F2026/u);
+  await expect(page.locator("[data-window-changed='true'] .window__verdict .diff-verdict")).toHaveText("Changed");
+});
+
+test("a history query naming a title says there is no history to open", async ({ page }) => {
+  await page.goto("/app/goto?q=history%20title%2016");
+
+  const alert = page.locator(".usa-alert--warning");
+  await expect(alert).toContainText("kept per section");
+  await expect(alert.getByRole("link", { name: /Open title 16/u })).toHaveAttribute(
+    "href",
+    /\/app\/us\/usc\/t16/u,
+  );
+});
+
+test("a history query with no citation after it is told what it needs", async ({ page }) => {
+  await page.goto("/app/goto?q=history%20navigable%20waters");
+
+  await expect(page).toHaveURL(/\/app\/goto/u);
+  await expect(page.locator(".usa-alert--warning")).toContainText("is not a citation");
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CITES_KEYWORD, parseCites } from "../src/lib/query";
+import { CITES_KEYWORD, HISTORY_KEYWORD, parseCites, parseHistory } from "../src/lib/query";
 
 describe("parseCites", () => {
   // The one routing decision the header's single box can make without asking
@@ -42,5 +42,69 @@ describe("parseCites", () => {
   it("exports the keyword the UI shows, so the hint and the parser cannot drift", () => {
     expect(CITES_KEYWORD).toBe("cites");
     expect(parseCites(`${CITES_KEYWORD} 26 usc 501`)).not.toBeNull();
+  });
+});
+
+describe("parseHistory", () => {
+  // The second prefix the box reads without the API (ADR-0084). The citation
+  // after it is still `citeparse`'s to read; only the keyword and a trailing
+  // date range are lifted here.
+
+  it("takes the citation out of a history query", () => {
+    expect(parseHistory("history 16 usc 45f")).toEqual({
+      subject: "16 usc 45f",
+      from: null,
+      to: null,
+    });
+  });
+
+  it("does not care about case or surrounding space", () => {
+    expect(parseHistory("  HISTORY 11 U.S.C. § 523(a)(1)  ")).toEqual({
+      subject: "11 U.S.C. § 523(a)(1)",
+      from: null,
+      to: null,
+    });
+  });
+
+  it("reads a date range off the end, in either date form", () => {
+    expect(parseHistory("history 16 usc 2201 from 6/12/2026 to 7/12/2026")).toEqual({
+      subject: "16 usc 2201",
+      from: "6/12/2026",
+      to: "7/12/2026",
+    });
+    expect(parseHistory("history 16 usc 2201 between 2026-06-12 and 2026-07-12")).toEqual({
+      subject: "16 usc 2201",
+      from: "2026-06-12",
+      to: "2026-07-12",
+    });
+  });
+
+  it("reads a start alone, which runs to today", () => {
+    expect(parseHistory("history 16 usc 2201 since 2024-01-01")).toEqual({
+      subject: "16 usc 2201",
+      from: "2024-01-01",
+      to: null,
+    });
+  });
+
+  it("leaves a range it cannot read in the subject", () => {
+    // `citeparse` will refuse it and the page says why; guessing at a date
+    // here would send the reader somewhere with the wrong dates in the URL.
+    expect(parseHistory("history 16 usc 2201 from yesterday")).toEqual({
+      subject: "16 usc 2201 from yesterday",
+      from: null,
+      to: null,
+    });
+  });
+
+  it("needs a whole word and a subject", () => {
+    expect(parseHistory("historyof 16 usc 45f")).toBeNull();
+    expect(parseHistory("history")).toBeNull();
+    expect(parseHistory("legislative history")).toBeNull();
+  });
+
+  it("exports the keyword the UI shows, so the hint and the parser cannot drift", () => {
+    expect(HISTORY_KEYWORD).toBe("history");
+    expect(parseHistory(`${HISTORY_KEYWORD} 16 usc 45f`)).not.toBeNull();
   });
 });

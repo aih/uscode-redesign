@@ -78,7 +78,7 @@ label means a law that was *skipped*: at `119-102not101` the text is current
 through 07/12/2026 **except** for Public Law 119-101. Responses carry that caveat
 rather than only a date.
 
-**Rate limits.** Seven route families are throttled per client (ADR-0029). Each is
+**Rate limits.** Eight route families are throttled per client (ADR-0029). Each is
 a token bucket: a burst up to the capacity, refilled at the sustained rate. Over
 budget, the response is **429** with a `Retry-After` header in seconds.
 
@@ -89,6 +89,9 @@ budget, the response is **429** with a `Retry-After` header in seconds.
 * `GET /api/v1/classifications/suggest` — burst 30, then 5 a second. Tighter than
   the rest of that family because a browser calls it directly, as someone types.
 * `GET /api/v1/sections/{identifier}/diff` — burst 5, then 1 every 5 seconds.
+* `GET /api/v1/sections/{identifier}/versions?from=` — the diff's bucket, shared:
+  a windowed timeline computes the same redline. The plain timeline is not
+  limited.
 * `POST /api/v1/auth/signup` — burst 10, then 30 an hour.
 
 `POST /api/v1/auth/login` is throttled by failure count rather than by request

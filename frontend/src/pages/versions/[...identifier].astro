@@ -14,23 +14,48 @@
  * stored XML moved. Both views are the same document: every entry is rendered
  * and the stylesheet hides what the view does not show, so the page is
  * cacheable per URL and carries no script.
+ *
+ * A date window (ADR-0084). `?from=&to=` asks whether the section changed
+ * between two dates, and the page answers above the history: the verdict,
+ * the kinds of change, the two ends, the versions in force in between and
+ * the redline. It is computed here rather than asked of the API's own
+ * `?from=&to=` form, for the reason `/app/diff` builds its own redline: that
+ * form shares the diff route's per-caller budget, and this page renders from
+ * one address for everyone. So the page reads the plain timeline, fetches the
+ * section at each date the way any `?date=` request does, cuts the timeline
+ * with `versionsInWindow` — the same walk as `versions_in_window` — and diffs
+ * the two reading texts. The middleware puts the windowed page in the diff's
+ * bucket for the same reason it puts `/app/diff` there.
  */
 import Base from "../../layouts/Base.astro";
 import ErrorPage from "../../components/ErrorPage.astro";
 import SortBar from "../../components/SortBar.astro";
 import Timeline from "../../components/Timeline.astro";
+import VersionWindowForm from "../../components/VersionWindowForm.astro";
+import VersionWindowResult from "../../components/VersionWindowResult.astro";
 import { ApiError, fetchIdentifier, fetchVersions } from "../../lib/api";
 import { REVALIDATE } from "../../lib/cache";
+import { usDate } from "../../lib/currency";
+import { documentDiff } from "../../lib/diffdoc";
+import type { DocumentDiff } from "../../lib/diffdoc";
 import { cachedReleases } from "../../lib/releasecache";
-import { appHref, trimNum, versionsHref } from "../../lib/url";
+import { appHref, diffAction, trimNum, versionsHref } from "../../lib/url";
+import { parseFragment, readingBlocks } from "../../lib/uslm";
 import {
+  VERSIONS_TO_PARAM,
   VERSIONS_VIEW_PARAM,
   isAnnotated,
+  isoDate,
   readVersionsView,
+  readWindowRequest,
+  releaseOnOrBefore,
   releaseOrder,
   timelineRows,
   versionCounts,
+  versionsInWindow,
+  windowEnd,
 } from "../../lib/versions";
+import type { VersionWindowCut, WindowEnd } from "../../lib/versions";
 import type { Entry, Release, Section, Versions } from "../../lib/types";
 import { isToc } from "../../lib/types";
 
@@ -90,6 +115,87 @@ const releases = await cachedReleases(titleNum).catch((error) => {
 const order = releases.length > 0 ? releaseOrder(releases) : undefined;
 
 const rows = timelineRows(entries, order);
+
+/* ------------------------------------------------------------ the window */
+
+/** What was asked. `to` alone is not a window; the form says so. */
+const request = readWindowRequest(Astro.url.searchParams);
+const toAlone = !request && (Astro.url.searchParams.get(VERSIONS_TO_PARAM) ?? "").trim() !== "";
+/** Today, in the form the API reads it, for a window with no `to`. The
+ *  local calendar rather than UTC's: the box is in the reader's evening. */
+const today = isoDate(new Date().toLocaleDateString("en-US")) ?? new Date().toISOString().slice(0, 10);
+
+let windowMessage: string | null = toAlone ? "Add a From date: the window runs from From to To." : null;
+let answer: {
+  from: WindowEnd;
+  to: WindowEnd;
+  changed: boolean;
+  cut: VersionWindowCut;
+  diff: DocumentDiff | null;
+} | null = null;
+
+/** The section as published at a date, or null when the API says there is
+ *  nothing there — a section not yet in the Code, or a date before the first
+ *  release point. Any other failure is the page's. */
+async function sectionAt(date: string): Promise<Section | null> {
+  try {
+    const body = await fetchIdentifier(identifier, { date });
+    return isToc(body) ? null : body;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+if (request && versions) {
+  const fromIso = isoDate(request.from);
+  const toIso = request.to ? isoDate(request.to) : today;
+  if (!fromIso) {
+    windowMessage = `From "${request.from}" is not a date in MM/DD/YYYY or YYYY-MM-DD form.`;
+  } else if (!toIso) {
+    windowMessage = `To "${request.to}" is not a date in MM/DD/YYYY or YYYY-MM-DD form.`;
+  } else if (fromIso > toIso) {
+    windowMessage = `From (${request.from}) is after To (${request.to ?? "today"}).`;
+  } else {
+    const [a, b] = await Promise.all([sectionAt(fromIso), sectionAt(toIso)]);
+    const from = windowEnd(request.from, a, releaseOnOrBefore(releases, fromIso));
+    const to = windowEnd(request.to ?? `today (${usDate(today)})`, b, releaseOnOrBefore(releases, toIso));
+    if (!from.release && !to.release) {
+      const earliest = releases.reduce<Release | null>(
+        (best, release) => (best === null || release.seq < best.seq ? release : best),
+        null,
+      );
+      windowMessage = earliest
+        ? `Both dates are before the first release point this site holds, ${earliest.label} (${earliest.currency_date}).`
+        : "Both dates are before the first release point this site holds.";
+    } else if (!a && !b) {
+      windowMessage = `${trimNum(current?.num)} is not in the Code at either date.`;
+    } else {
+      // The cut takes the release point each date *resolved* to — what the
+      // section route calls `release` — not the one the text was served from,
+      // which is what `versions_in_window` is handed on the API side too.
+      const start = from.release ?? { seq: -1 };
+      const end = to.release ?? { seq: Number.MAX_SAFE_INTEGER };
+      const cut = order
+        ? versionsInWindow(entries, start, end, order)
+        : { versions: [], kinds: [], complete: false };
+      const diff =
+        a && b
+          ? documentDiff(readingBlocks(parseFragment(a.xml)), readingBlocks(parseFragment(b.xml)))
+          : null;
+      answer = {
+        from,
+        to,
+        changed: !a || !b || (a.content_hash && b.content_hash
+          ? a.content_hash !== b.content_hash
+          : diff !== null && diff.changed + diff.inserted + diff.deleted > 0),
+        cut,
+        diff,
+      };
+    }
+  }
+}
+
 /**
  * The From/To picker's options: every recorded version, in both views.
  *
@@ -162,11 +268,35 @@ const currentCrumb: Entry | null = section
             : "Which of them changed the statutory text is not computed for this corpus, so every recorded version is listed."}
         </p>
 
+        <VersionWindowForm
+          identifier={identifier}
+          from={request?.from ?? Astro.url.searchParams.get("from")}
+          to={request?.to ?? Astro.url.searchParams.get(VERSIONS_TO_PARAM)}
+          view={view}
+          message={windowMessage}
+        />
+
+        {answer && (
+          <VersionWindowResult
+            identifier={identifier}
+            from={answer.from}
+            to={answer.to}
+            changed={answer.changed}
+            kinds={answer.cut.kinds}
+            versions={answer.cut.versions}
+            complete={answer.cut.complete}
+            diff={answer.diff}
+            order={order}
+          />
+        )}
+
+        {answer && <h2 class="toc-group">Full history</h2>}
+
         {annotated && (
           <SortBar
             options={viewOptions}
             sort={view}
-            href={(next) => versionsHref(identifier, next)}
+            href={(next) => versionsHref(identifier, next, request)}
             label="Which versions to show"
             idPrefix="viewbar"
             heading="Show"
@@ -185,7 +315,7 @@ const currentCrumb: Entry | null = section
                   The list covers every recorded version, including the ones this view hides.
                 </p>
               )}
-              <form class="diff-picker" method="get" action={`/app/diff${identifier}`}>
+              <form class="diff-picker" method="get" action={diffAction(identifier)}>
                 <div>
                   <label class="usa-label picker__label" for="from">
                     From

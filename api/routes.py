@@ -21,6 +21,7 @@ template — the surface that answers people is `/app`, and the bare citation UR
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import re
 from typing import Annotated, Literal
@@ -46,7 +47,9 @@ from api.schemas import (
     TitleOut,
     TocEntryOut,
     TocOut,
+    VersionAtDateOut,
     VersionOut,
+    VersionWindowOut,
     VersionsOut,
 )
 from citeparse import ParsedCitation, parse_citation
@@ -77,6 +80,7 @@ from storage import (
     cache_key,
     get_cache,
     title_num_from_identifier,
+    versions_in_window,
 )
 
 api = APIRouter(
@@ -110,6 +114,17 @@ and `docs/verification/loadtest.json` measured ~0.45 rps failing entirely past
 ~10 concurrent. Nothing calls this server-side any more — ADR-0026 moved the
 reader onto its own text redline — so this budget is a person's, and 12/minute
 after a burst of 5 is more than a person reading redlines will ever want."""
+
+
+
+def _limit_versions_window(request: Request) -> None:
+    """The diff's budget, applied to the versions route only when a date window
+    is asked for (ADR-0084). A plain timeline is cached and cheap; a windowed
+    one resolves two release points, reads two texts and computes a redline,
+    which is what `_limit_diff` exists to bound."""
+    if request.query_params.get("from") or request.query_params.get("to"):
+        _limit_diff(request)
+
 
 # What `ResponseCacheDep.through` stores for each cached route (ADR-0078): the
 # route's own response type, dumped `by_alias` so the stored JSON is the wire
@@ -454,26 +469,180 @@ def labels(
 @api.get(
     "/sections/{identifier:path}/versions",
     response_model=VersionsOut,
-    summary="Release points at which a section changed",
+    summary="Release points at which a section changed, or whether it changed between two dates",
+    responses={404: {"model": ErrorOut}, 422: {"model": ErrorOut}, 429: {"model": ErrorOut}},
+    dependencies=[Depends(_limit_versions_window)],
 )
 def versions(
-    identifier: str, repository: RepositoryDep, cache: ResponseCacheDep
+    identifier: str,
+    repository: RepositoryDep,
+    cache: ResponseCacheDep,
+    from_: str | None = Query(
+        default=None,
+        alias="from",
+        description=(
+            "Start of a date window, `YYYY-MM-DD` or `MM/DD/YYYY`. Resolves to "
+            "the newest release point on or before it. With it, the response "
+            "carries `window` and `versions` is cut down to the window."
+        ),
+        examples=["06/12/2026"],
+    ),
+    to: str | None = Query(
+        default=None,
+        description=(
+            "End of the date window, same forms. Defaults to today — the newest "
+            "release point — and needs `from`; a `to` alone is a 422, as is a "
+            "`to` before its `from`."
+        ),
+        examples=["07/12/2026"],
+    ),
 ) -> VersionsOut:
     """The section's change timeline — one entry per distinct text, not one per
-    release point, since most release points leave most sections untouched."""
-    path = normalize_identifier(identifier)
+    release point, since most release points leave most sections untouched.
+    Each entry names the release point its text first appeared at and the
+    newest one publishing it, with their currency dates.
 
-    def compute() -> VersionsOut:
-        found = repository.versions(path)
-        if not found:
-            # Raised inside `compute`, so a 404 is never stored: an identifier
-            # asked for before its section loads answers correctly right after.
-            raise HTTPException(status_code=404, detail=f"no section at {path}")
-        return VersionsOut(
-            identifier=path, versions=[VersionOut.of(version) for version in found]
+    With `from` (and optionally `to`), the answer to whether the section
+    changed between two dates (ADR-0084): each date resolves to the newest
+    release point on or before it, the way `?date=` does everywhere else, and
+    `window` reports the section at each end, `changed`, the kinds of change
+    that arrived in between, and the guid-stripped diff. `versions` is then
+    the entries in force at some release point in the window. A release point
+    whose label excludes laws carries its `caveat` on the end it resolves
+    to — the text there is not fully current through the date.
+
+    The windowed form shares the diff route's rate limit."""
+    path = normalize_identifier(identifier)
+    from_date = parse_date_param(from_)
+    to_date = parse_date_param(to)
+
+    if from_date is None and to_date is None:
+
+        def compute() -> VersionsOut:
+            found = repository.versions(path)
+            if not found:
+                # Raised inside `compute`, so a 404 is never stored: an identifier
+                # asked for before its section loads answers correctly right after.
+                raise HTTPException(status_code=404, detail=f"no section at {path}")
+            return VersionsOut(
+                identifier=path, versions=[VersionOut.of(version) for version in found]
+            )
+
+        return cache.through(_VERSIONS_PAYLOAD, "versions", (path,), compute)
+
+    if from_date is None:
+        raise HTTPException(
+            status_code=422,
+            detail="`to` needs a `from`: the window runs from `from` to `to`, "
+            "or to today when `to` is omitted",
+        )
+    if to_date is None:
+        to_date = datetime.date.today()
+    if from_date > to_date:
+        raise HTTPException(
+            status_code=422,
+            detail=f"from {from_date.isoformat()} is after to {to_date.isoformat()}",
         )
 
-    return cache.through(_VERSIONS_PAYLOAD, "versions", (path,), compute)
+    title_num = title_num_from_identifier(path)
+    start = resolve_release_or_404(
+        repository, release=None, on_date=from_date, title_num=title_num
+    )
+    end = resolve_release_or_404(
+        repository, release=None, on_date=to_date, title_num=title_num
+    )
+
+    found = repository.versions(path)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"no section at {path}")
+
+    from_section = repository.get_section(path, start)
+    to_section = repository.get_section(path, end)
+    if from_section is None and to_section is None:
+        first = found[0].first_release
+        since = (
+            f"; it is first published at {first.label} "
+            f"({first.currency_date.isoformat()})"
+            if first
+            else ""
+        )
+        raise HTTPException(
+            status_code=404,
+            detail=f"{path} is not in the Code at {start.release.label} "
+            f"({start.release.currency_date.isoformat()}) or at "
+            f"{end.release.label} ({end.release.currency_date.isoformat()}){since}",
+        )
+
+    window = versions_in_window(found, start.release, end.release)
+    ops = (
+        _redline_ops(cache, path, from_section, to_section, strip=True)
+        if from_section is not None and to_section is not None
+        else None
+    )
+    changed = (
+        from_section is None
+        or to_section is None
+        or from_section.content_hash != to_section.content_hash
+    )
+    return VersionsOut(
+        identifier=path,
+        versions=[VersionOut.of(version) for version in window.versions],
+        window=VersionWindowOut(
+            from_=VersionAtDateOut.of(
+                from_date,
+                start,
+                from_section,
+                served_note(from_section, start) if from_section else None,
+            ),
+            to=VersionAtDateOut.of(
+                to_date,
+                end,
+                to_section,
+                served_note(to_section, end) if to_section else None,
+            ),
+            changed=changed,
+            change_kinds=list(window.change_kinds),
+            diff=[DiffOpOut.of(op) for op in ops] if ops is not None else None,
+        ),
+    )
+
+
+def _redline_ops(
+    cache: ResponseCacheDep,
+    path: str,
+    from_section: SectionResult,
+    to_section: SectionResult,
+    *,
+    strip: bool,
+) -> list:
+    """The diff between two texts of one section, memoised on the release
+    points the texts were *served from* (ADR-0066, ADR-0078).
+
+    `served_from` rather than the label asked for: the text is a function of
+    the release point it was read at, so two requests that resolve to one
+    served-from pair share one redline, and a pair that no request pinned —
+    two dates — is as cacheable as a pinned one. The generation joins the key,
+    so a re-load can never serve a stale redline; the same key addresses the
+    Redis tier."""
+    from_xml = strip_guids(from_section.xml) if strip else from_section.xml
+    to_xml = strip_guids(to_section.xml) if strip else to_section.xml
+    generation = cache.generation
+    from_label = from_section.served_from.label
+    to_label = to_section.served_from.label
+    return cached_diff_ops(
+        (generation, path, from_label, to_label, strip),
+        from_xml,
+        to_xml,
+        remote=get_cache(),
+        remote_key=cache_key(
+            f"g{generation}",
+            "diff",
+            path,
+            from_label,
+            to_label,
+            "strip" if strip else "keep",
+        ),
+    )
 
 
 @api.get(
@@ -533,34 +702,17 @@ def diff(
         response.headers["Cache-Control"] = IMMUTABLE
 
     strip = guids == "strip"
-    from_xml = strip_guids(from_section.xml) if strip else from_section.xml
-    to_xml = strip_guids(to_section.xml) if strip else to_section.xml
 
-    # Memoised on the *resolved* labels, and only when both were pinned: an
-    # unpinned label names a different release point the moment a newer one is
-    # loaded, so caching under it would serve a redline for a pair the URL no
-    # longer means. The generation joins the key (ADR-0078) — a re-load can
-    # change even a pinned text — and the same key addresses the Redis tier,
-    # so a restart no longer costs seconds per first comparison.
+    # Memoised on the release points the texts were served from, and only
+    # when both labels were pinned: an unpinned label names a different
+    # release point the moment a newer one is loaded, so caching under it
+    # would serve a redline for a pair the URL no longer means. The key and
+    # the Redis tier are `_redline_ops`'s (ADR-0078, ADR-0084).
     if pinned:
-        generation = cache.generation
-        from_label = from_resolved.release.label
-        to_label = to_resolved.release.label
-        ops = cached_diff_ops(
-            (generation, path, from_label, to_label, strip),
-            from_xml,
-            to_xml,
-            remote=get_cache(),
-            remote_key=cache_key(
-                f"g{generation}",
-                "diff",
-                path,
-                from_label,
-                to_label,
-                "strip" if strip else "keep",
-            ),
-        )
+        ops = _redline_ops(cache, path, from_section, to_section, strip=strip)
     else:
+        from_xml = strip_guids(from_section.xml) if strip else from_section.xml
+        to_xml = strip_guids(to_section.xml) if strip else to_section.xml
         ops = diff_ops(from_xml, to_xml)
 
     return DiffOut(

@@ -72,14 +72,18 @@ const preview = new RateLimiter("preview", 60, 5);
  */
 const diff = new RateLimiter("diff", 20, 1);
 
-/** `context.url.pathname` carries Astro's `base`, so these are full paths. */
-const LIMITED: ReadonlyArray<readonly [string, RateLimiter]> = [
-  ["/app/preview/", preview],
-  ["/app/diff/", diff],
+/** `context.url.pathname` carries Astro's `base`, so these are full paths.
+ *  `/app/versions/` joins the diff's bucket only when it is asked for a date
+ *  window (ADR-0084): the plain timeline computes nothing, the windowed one
+ *  builds the same redline `/app/diff/` does. */
+const LIMITED: ReadonlyArray<readonly [(url: URL) => boolean, RateLimiter]> = [
+  [(url) => url.pathname.startsWith("/app/preview/"), preview],
+  [(url) => url.pathname.startsWith("/app/diff/"), diff],
+  [(url) => url.pathname.startsWith("/app/versions/") && url.searchParams.has("from"), diff],
 ];
 
 /**
- * The two parameters that mean "a moment in time", and are meaningless empty.
+ * The parameters that mean "a moment in time", and are meaningless empty.
  *
  * The release switcher is a plain GET form with no JavaScript (ADR-0044), and a
  * GET form submits every named control it has. Its "Newest — follows new
@@ -89,7 +93,7 @@ const LIMITED: ReadonlyArray<readonly [string, RateLimiter]> = [
  * URL the reader is invited to copy and cite. Redirecting to the clean form
  * once, here, is cheaper than teaching every page to strip it.
  */
-const EMPTY_PARAMS = ["release", "date"] as const;
+const EMPTY_PARAMS = ["release", "date", "from", "to"] as const;
 
 /** Strip `?release=` / `?date=` with no value, or null if there are none. */
 function canonicalUrl(url: URL): URL | null {
@@ -114,7 +118,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (clean) return context.redirect(`${clean.pathname}${clean.search}`, 307);
   }
 
-  const match = LIMITED.find(([prefix]) => context.url.pathname.startsWith(prefix));
+  const match = LIMITED.find(([applies]) => applies(context.url));
   if (!match) return next();
 
   // Guarded because `clientAddress` throws on an adapter that cannot supply one.
@@ -163,6 +167,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
 /** `/app/diff/us/usc/t16/s45f` → `/us/usc/t16/s45f`. The identifier under a
  *  limited route, or an empty string when the path carries none. */
 function wantedIdentifier(pathname: string): string {
-  const match = /^\/app\/(?:diff|preview)(\/us\/usc\/.+)$/u.exec(pathname);
+  const match = /^\/app\/(?:diff|preview|versions)(\/us\/usc\/.+)$/u.exec(pathname);
   return match ? match[1] : "";
 }

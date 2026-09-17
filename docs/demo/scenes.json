@@ -23,7 +23,7 @@
       "id": "section-by-address",
       "title": "Open a section by its citation",
       "startMs": 14433,
-      "durationMs": 9633,
+      "durationMs": 9567,
       "captions": [
         "The citation is the URL. This is 16 U.S.C. § 45f.",
         "The section, with its number and heading as the Code prints them."
@@ -32,8 +32,8 @@
     {
       "id": "provision-in-context",
       "title": "A subsection is shown inside its whole section",
-      "startMs": 24067,
-      "durationMs": 8367,
+      "startMs": 24000,
+      "durationMs": 8333,
       "captions": [
         "Ask for subsection (c)(5) —",
         "— and it is highlighted in place, inside the whole section."
@@ -42,8 +42,8 @@
     {
       "id": "chapter-rail",
       "title": "The sections around this one, with their status",
-      "startMs": 32433,
-      "durationMs": 15367,
+      "startMs": 32333,
+      "durationMs": 15233,
       "captions": [
         "Beside the section, the rest of the subchapter in reading order.",
         "The section you are reading is marked in the list.",
@@ -53,8 +53,8 @@
     {
       "id": "neighbors-next",
       "title": "Move to the next section from the sticky bar",
-      "startMs": 47800,
-      "durationMs": 14867,
+      "startMs": 47567,
+      "durationMs": 14633,
       "captions": [
         "Reading order is preserved, and a chapter can be read section by section.",
         "The sticky bar carries previous, next and up-one-level.",
@@ -64,8 +64,8 @@
     {
       "id": "section-contents",
       "title": "Jump to the notes from the top of a section",
-      "startMs": 62667,
-      "durationMs": 15667,
+      "startMs": 62200,
+      "durationMs": 15567,
       "captions": [
         "Above the text, a section's own contents — its subsections, its source credit, its notes.",
         "Every top-level provision, with its heading.",
@@ -76,8 +76,8 @@
     {
       "id": "keyboard-help",
       "title": "Open the shortcut list from the keyboard",
-      "startMs": 78333,
-      "durationMs": 20933,
+      "startMs": 77767,
+      "durationMs": 20567,
       "captions": [
         "Press ? anywhere on the site.",
         "The list opens over whatever you were reading.",
@@ -87,10 +87,25 @@
       ]
     },
     {
+      "id": "apparatus-toggle",
+      "title": "Close and reopen the notes",
+      "startMs": 98333,
+      "durationMs": 28767,
+      "captions": [
+        "A section, with its source credit and its notes at the end of the text.",
+        "On a wide window both start open.",
+        "The amendment history, in full.",
+        "The Notes button closes them, and the caret turns over.",
+        "The text of the section, without the apparatus around it.",
+        "Pressing it again brings them back.",
+        "The notes, open again."
+      ]
+    },
+    {
       "id": "release-pin",
       "title": "Read a section as it stood at a named release point",
-      "startMs": 99267,
-      "durationMs": 10633,
+      "startMs": 127100,
+      "durationMs": 10467,
       "captions": [
         "Add ?release= to any address to read it as it stood at that release point.",
         "The page names the release point it answered from."
@@ -99,8 +114,8 @@
     {
       "id": "date-resolves",
       "title": "A date resolves to the release point in force then",
-      "startMs": 109900,
-      "durationMs": 10600,
+      "startMs": 137567,
+      "durationMs": 10433,
       "captions": [
         "Or ask by date, and the site finds the release point in force then.",
         "12 July 2026 resolves to release point 119-102not101."
@@ -109,8 +124,8 @@
     {
       "id": "switch-keeps-provision",
       "title": "Switching release point keeps the provision you were reading",
-      "startMs": 120500,
-      "durationMs": 18400,
+      "startMs": 148000,
+      "durationMs": 18267,
       "captions": [
         "Reading subsection (c)(5) of § 45f, pinned to release point 119-99.",
         "The bar names the release point you are reading, and opens the ways to change it.",
@@ -122,18 +137,33 @@
     {
       "id": "versions-timeline",
       "title": "See every release point at which a section's text changed",
-      "startMs": 138900,
-      "durationMs": 10833,
+      "startMs": 166267,
+      "durationMs": 10600,
       "captions": [
         "The version history: one entry per distinct text.",
         "Each entry says when that text first appeared, and what it stood unchanged through."
       ]
     },
     {
+      "id": "versions-between-dates",
+      "title": "Ask whether a section changed between two dates",
+      "startMs": 176867,
+      "durationMs": 22233,
+      "captions": [
+        "The version history carries a form for two dates.",
+        "From one date.",
+        "To another.",
+        "Check.",
+        "The answer: Changed.",
+        "And what kind of change it was.",
+        "With the redline between the two dates under it."
+      ]
+    },
+    {
       "id": "diff-real-change",
       "title": "Compare two release points and see what the words did",
-      "startMs": 149733,
-      "durationMs": 10267,
+      "startMs": 199100,
+      "durationMs": 10167,
       "captions": [
         "A redline between any two release points, in the reading text.",
         "Removed words struck through, added words underlined."
@@ -142,8 +172,8 @@
     {
       "id": "citation-box",
       "title": "Type a citation and land on the provision",
-      "startMs": 160000,
-      "durationMs": 13833,
+      "startMs": 209266,
+      "durationMs": 13633,
       "captions": [
         "One box takes a citation or a phrase.",
         "Type a citation in more or less any written form.",
@@ -154,8 +184,8 @@
     {
       "id": "keyword-search",
       "title": "Search the text of the Code",
-      "startMs": 173833,
-      "durationMs": 11800,
+      "startMs": 222900,
+      "durationMs": 11600,
       "captions": [
         "Anything that is not a citation searches the text of the Code.",
         "Matches are highlighted, and each result says where it sits in the Code."
@@ -164,8 +194,8 @@
     {
       "id": "search-scope-title",
       "title": "Restrict a search to one title",
-      "startMs": 185633,
-      "durationMs": 7967,
+      "startMs": 234500,
+      "durationMs": 7667,
       "captions": [
         "title:16 searches Title 16 and nothing else.",
         "Every result is in the title you asked for."
@@ -174,8 +204,8 @@
     {
       "id": "search-facet-goes-in-the-url",
       "title": "A filter you click is part of the search's address",
-      "startMs": 193600,
-      "durationMs": 11367,
+      "startMs": 242166,
+      "durationMs": 13200,
       "captions": [
         "The counts say which titles and statuses the matches fall into.",
         "Selecting one narrows the search.",
@@ -185,8 +215,8 @@
     {
       "id": "copy-whole-section",
       "title": "Copy a whole section",
-      "startMs": 204967,
-      "durationMs": 14267,
+      "startMs": 255366,
+      "durationMs": 14133,
       "captions": [
         "Every provision has a copy control, and the whole section has its own button.",
         "Choose what copying means — text, citation, both, or a link.",
@@ -196,8 +226,8 @@
     {
       "id": "hover-preview",
       "title": "Read a cross reference without losing your place",
-      "startMs": 219233,
-      "durationMs": 11767,
+      "startMs": 269500,
+      "durationMs": 11633,
       "captions": [
         "Statutory text is full of references to other statutory text.",
         "Hover one and the cited provision comes to you —",
@@ -207,25 +237,27 @@
     {
       "id": "theme-toggle",
       "title": "Switch the site to dark",
-      "startMs": 231000,
-      "durationMs": 11267,
+      "startMs": 281133,
+      "durationMs": 13733,
       "captions": [
         "Light is the default setting.",
-        "One control in the header switches it.",
+        "More holds the display switches.",
+        "One control switches the theme.",
         "The choice is remembered, and lands before the page paints."
       ]
     },
     {
       "id": "density-toggle",
       "title": "Switch the reading density to compact",
-      "startMs": 242267,
-      "durationMs": 11933,
+      "startMs": 294866,
+      "durationMs": 14333,
       "captions": [
         "Comfortable is the default setting.",
+        "More holds the display switches.",
         "The control beside the theme toggle switches it.",
         "The control now reads Comfortable, which is the way back."
       ]
     }
   ],
-  "totalMs": 254200
+  "totalMs": 309200
 }

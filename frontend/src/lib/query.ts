@@ -14,13 +14,19 @@
  *      plain GET form (no JavaScript, ADR-0023), and a word you type is the
  *      only control a text input has. See `docs/citation-index-plan.md` for the
  *      reverse index this becomes.
+ *   1b. **`history …`** — the version history of a section rather than its
+ *      text (ADR-0084), with an optional `from <date> to <date>` after the
+ *      citation. The same shape as `cites` for the same reason: a word you
+ *      type is the only control a text input has. The citation itself is
+ *      still the API's to read.
  *   2. **Anything that parses as a citation** — a lookup. Decided by
  *      `citeparse.py` behind `GET /api/v1/citation`, never here: the parser
  *      accepts 84 forms and is the single source of truth for what a citation
  *      is (ADR-0023). This module cannot and must not guess.
  *   3. **Everything else** — a keyword search.
  *
- * So the only thing decidable without the API is (1), which is what lives here.
+ * So the only things decidable without the API are (1) and (1b), which is what
+ * lives here.
  */
 
 /** The prefix that means "find provisions citing this one". */
@@ -44,4 +50,48 @@ export function parseCites(raw: string): CitesQuery | null {
   if (!match) return null;
   const subject = match[1].trim();
   return subject ? { subject } : null;
+}
+
+/** The prefix that means "the version history of this section". */
+export const HISTORY_KEYWORD = "history";
+
+export interface HistoryQuery {
+  /** The citation, with the keyword and any date range removed. */
+  subject: string;
+  /** `MM/DD/YYYY` or `YYYY-MM-DD`, as typed; the API validates the form. */
+  from: string | null;
+  to: string | null;
+}
+
+/** A date as a reader types one: `07/12/2026`, `7/12/2026` or `2026-07-12`. */
+const DATE = String.raw`(?:\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{2}-\d{2})`;
+
+/**
+ * `"history 16 usc 45f"` → `{ subject: "16 usc 45f", from: null, to: null }`;
+ * `"history 16 usc 45f from 6/12/2026 to 7/12/2026"` carries the range;
+ * `"history 16 usc 45f since 2024-01-01"` is `from` alone, which runs to
+ * today. Anything else → `null`.
+ *
+ * The same rules as `parseCites`: case-insensitive, a whole word followed by
+ * whitespace, and a subject to look up. The range is read off the end so a
+ * citation containing the word "from" — none does, but the parser is not
+ * asked to know that — is left whole.
+ */
+export function parseHistory(raw: string): HistoryQuery | null {
+  const match = new RegExp(`^${HISTORY_KEYWORD}\\s+(.+)$`, "iu").exec(raw.trim());
+  if (!match) return null;
+  let subject = match[1].trim();
+  let from: string | null = null;
+  let to: string | null = null;
+
+  const range = new RegExp(
+    String.raw`^(.*?)\s+(?:from|since|between)\s+(${DATE})(?:\s+(?:to|and|until)\s+(${DATE}))?$`,
+    "iu",
+  ).exec(subject);
+  if (range) {
+    subject = range[1].trim();
+    from = range[2];
+    to = range[3] ?? null;
+  }
+  return subject ? { subject, from, to } : null;
 }

@@ -66,6 +66,8 @@ import SortBar from "../components/SortBar.astro";
 import ShortcutsDialog from "../components/ShortcutsDialog.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import Timeline from "../components/Timeline.astro";
+import VersionWindowForm from "../components/VersionWindowForm.astro";
+import VersionWindowResult from "../components/VersionWindowResult.astro";
 import COLOR_PAIRS from "../data/color-pairs.json";
 import { setPublicCache } from "../lib/cache";
 import { documentDiff, diffLinesHtml, diffSummary } from "../lib/diffdoc";
@@ -1068,6 +1070,69 @@ const TYPE_ROLES = [
   </p>
 
   <div class="diff-view diff-view--text" set:html={diffLinesHtml(redline.lines)} />
+
+  <p class="spec__label">Between two dates — the question</p>
+
+  <p>
+    The form on the version history page (ADR-0084): two dates, a plain GET back to the page,
+    and the question kept in the URL. The second copy shows the message a date it cannot read
+    gets.
+  </p>
+
+  <div class="spec">
+    <VersionWindowForm identifier="/us/usc/t0/s1" idPrefix="spec-window" />
+  </div>
+
+  <div class="spec">
+    <VersionWindowForm
+      identifier="/us/usc/t0/s1"
+      idPrefix="spec-window-error"
+      from="yesterday"
+      message="From “yesterday” is not a date in MM/DD/YYYY or YYYY-MM-DD form."
+    />
+  </div>
+
+  <p class="spec__label">Between two dates — the answer</p>
+
+  <p>
+    The verdict first, then the two ends as they resolved, the versions in force in between,
+    and the redline. The second end resolved to a release point whose label excludes a law,
+    and carries that caveat.
+  </p>
+
+  <div class="spec">
+    <VersionWindowResult
+      identifier="/us/usc/t0/s1"
+      from={{
+        date: "06/01/2026",
+        release: RP_OLD,
+        servedFrom: RP_OLD,
+        absentFrom: null,
+        exists: true,
+        num: "§ 1.",
+        heading: "Specimen provision",
+        status: null,
+        contentHash: "1",
+        note: null,
+      }}
+      to={{
+        date: "07/12/2026",
+        release: RP_NEW,
+        servedFrom: RP_NEW,
+        absentFrom: null,
+        exists: true,
+        num: "§ 1.",
+        heading: "Specimen provision",
+        status: null,
+        contentHash: "2",
+        note: null,
+      }}
+      changed={true}
+      kinds={["text", "notes"]}
+      versions={VERSIONS.slice(2)}
+      diff={redline}
+    />
+  </div>
 
   {/* ------------------------------------------------------------------ text */}
   <h2 class="toc-group" id="text">Statutory text and the copy control</h2>

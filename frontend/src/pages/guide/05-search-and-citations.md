@@ -5,7 +5,7 @@ order: 5
 summary: One box that takes a citation or a phrase, works out which you meant, searches strictly unless you ask it not to, and lets you scope, filter and order what comes back.
 covers:
   routes: ["/app/goto", "/app/search", "/app/search/syntax"]
-  adrs: [23, 28, 31, 49, 62, 71]
+  adrs: [23, 28, 31, 49, 62, 71, 84]
 ---
 
 There is one box in the header and it answers two kinds of question. Type a citation and it goes
@@ -307,4 +307,35 @@ title: The "cites" prefix says what it is
 steps:
   - goto: /app/search?q=cites+16+usc+45f&cites=1
   - expect: { selector: "main", contains: "keyword search" }
+```
+
+### Opening a section's version history
+
+Prefixing a citation with `history` — `history 16 usc 2201` — opens the section's version history
+instead of its text. A subsection citation opens the history of its section.
+
+A date range after the citation asks whether the section changed between two dates:
+`history 16 usc 2201 from 6/12/2026 to 7/12/2026`. `between … and …` reads the same way, and
+`since` with one date runs to today. Dates are MM/DD/YYYY or YYYY-MM-DD. The history page answers
+with the range filled in; see [Between two dates](/app/guide/04-version-history-and-redlines).
+
+A title or a chapter has no version history. `history title 16` says so and links to the title.
+
+```scenario
+id: history-prefix
+title: The "history" prefix opens the version history
+steps:
+  - goto: /app/
+  - fill: { selector: ".navtools .sitesearch__input", value: "history 16 usc 2201" }
+  - press: Enter
+  - expect: { url: "/app/versions/us/usc/t16/s2201" }
+```
+
+```scenario
+id: history-prefix-dates
+title: A date range after the citation asks whether it changed
+steps:
+  - goto: /app/goto?q=history+16+usc+2201+from+6/12/2026+to+7/12/2026
+  - expect: { url: "/app/versions/us/usc/t16/s2201?from=" }
+  - expect: { selector: ".window__verdict .diff-verdict", contains: "Changed" }
 ```
