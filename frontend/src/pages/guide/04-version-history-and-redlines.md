@@ -60,7 +60,7 @@ steps:
     caption: Check.
   - expect: { selector: "[data-window-changed='true'] .window__verdict .diff-verdict", contains: "Changed" }
     caption: "The answer: Changed."
-  - expect: { selector: ".window__kinds", contains: "statutory text" }
+  - expect: { selector: ".window__kinds", contains: "The statute text changed." }
     caption: And what kind of change it was.
   - expect: { selector: ".window .diff-view", visible: true }
     caption: With the redline between the two dates under it.

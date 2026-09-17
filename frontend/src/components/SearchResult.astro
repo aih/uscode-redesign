@@ -4,7 +4,9 @@
  *
  * The unit indexed is the deduped section *version*, so a row carries facts
  * about text as well as about a provision: where this exact text first
- * appeared, how many superseded versions also matched, and whether the source
+ * appeared, where the section's text last changed and whether a notes-only or
+ * metadata-only change came after it (ADR-0074), how many superseded versions
+ * also matched, and whether the source
  * published more than one element under this identifier at this release point
  * (ADR-0021, which the index cannot hold both halves of).
  *
@@ -19,6 +21,7 @@ import { resultCitation } from "../lib/cite";
 import type { SearchResultItem } from "../lib/types";
 import { appHref, versionsHref } from "../lib/url";
 import { highlightHtml } from "../lib/uslm";
+import { resultChangeNote } from "../lib/versions";
 
 interface Props {
   result: SearchResultItem;
@@ -35,6 +38,7 @@ const body = result.snippets.filter((s) => s.field !== "heading");
 // `§ 232` is a section number in 58 titles. The row leads with the whole
 // citation instead, which is the form a reader can write down.
 const citation = resultCitation(result.title_num, result.num, result.type);
+const changeNote = resultChangeNote(result);
 ---
 
 <li class="searchresult">
@@ -59,7 +63,7 @@ const citation = resultCitation(result.title_num, result.num, result.type);
     <code>{result.identifier}</code>
     {result.type === "structure" && result.level && <> · {result.level}</>}
     {result.status && <> · {result.status}</>}
-    {result.first_release && <> · unchanged since {result.first_release}</>}
+    {changeNote && <span class="searchresult__changed">{` · ${changeNote}`}</span>}
     {/* The words are in text this section no longer carries. Worth saying: the
         difference between a provision that does not mention the subject and one
         that stopped mentioning it is most of what a version history is for. */}

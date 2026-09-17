@@ -435,14 +435,40 @@ TypeScript) from the plain timeline and two `?date=` section fetches, and diffs 
 under the diff's middleware bucket when `?from=` is present; `SectionOut` gained `content_hash` so
 the verdict compares hashes rather than redlines. The form is `VersionWindowForm`, the answer
 `VersionWindowResult`, both on `/app/design`; an empty `?from=`/`?to=` is stripped like an empty
-`?release=`. On the one search box, **`history <citation>`** lands on the history and
+`?release=`. On the one search box, **`history <citation>`** (short form `v`: `v 16/2201`, `v16/2201`) lands on the history and
 `history <citation> from <date> to <date>` on the answer (`parseHistory` beside `parseCites`; the
 citation still goes to `/api/v1/citation`); a title or chapter gets a message, not a redirect. Two
 traps: the timeline's release labels carry no dates, so the reader needs `cachedReleases` to place
 an end where the section does not exist; and `new Date().toISOString()` is UTC's calendar, which
 is tomorrow in a US evening.
 
-`make test` = **891** Python tests; `make test-web` = **494** frontend tests; `make test-e2e` = **694**
+**The site says how current it is in the chrome** (ADR-0085). `Base` reads `/api/v1/status` once
+per five minutes per process, or sooner when the corpus generation moves (`lib/sitecurrency.ts`,
+null answers not kept), and hands the header a `Dateline` — *Current through 07/12/2026 · 119-102*
+under both wordmarks, "release point" read aloud and not shown — and the footer a `FooterCurrency` with the day of the last
+check (a date, since a pinned page is cached for a year) and the warning headline first when there
+is one; the front page carries `SiteCurrencyPanel` above the example citation. **No header height
+changed**: on the bar the dateline is absolutely positioned inside the home link's 44px box with
+`pointer-events: none` (bar 52px, header 104px), below 30em "Current" is visually hidden too at
+0.72rem and below 22.5em "through" as well, so `07/12/2026 · 119-102not101` fits the 162px a 320px
+bar leaves the brand, and from 64em the logo's margins give back the line (73.52 → 73.47px) and
+the line is 0.72rem so a 13-character label fits the 238px logo. The two parts are flex
+items on a one-line clipping box, so a label too long for the bar drops out of sight and stays in
+the accessibility tree. `/app/design` passes `currency={false}` and renders the three components as
+specimens. Three traps: **a logo widened by its dateline overflows at 1280px and 200% zoom**, where
+`make shots`' CSS `zoom` lays the desktop header out in 640 CSS px (237 → 272px put the search
+button 10px past the edge), which is why "release point" is never shown; **text split
+across flex items loses the spaces between them in `textContent`** (`ReleaseContext`'s line has the
+same shape), so the separators carry their own; and **the development corpus's newest label is `119-102`,
+CI's is `119-102not101`**, so a width check against the live label passed here and clipped there
+— `currency.spec.ts` now substitutes the 13-character label itself. Search results now say where the **text** last
+changed: `Repository.change_points(version_ids)` reads `section_version_changes` for a page of
+results in two queries, and a row reads *text unchanged since 115-442 · XML/metadata changed at
+118-274not159* when a notes-only or metadata-only change came later — ordered by the earliest
+mapped release, so it no longer repeats the index's `first_release_label`, which ADR-0066 showed
+can be later than the text's arrival.
+
+`make test` = **896** Python tests; `make test-web` = **509** frontend tests; `make test-e2e` = **706**
 Playwright tests, 358 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -450,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(82 ADRs, numbered to 0084 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(83 ADRs, numbered to 0085 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.

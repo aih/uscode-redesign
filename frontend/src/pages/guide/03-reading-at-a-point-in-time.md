@@ -5,7 +5,7 @@ order: 3
 summary: Release points, how to ask for one, and what every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36, 44, 45, 56, 82, 83]
+  adrs: [18, 36, 44, 45, 56, 82, 83, 85]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
@@ -152,6 +152,24 @@ The same page says when the site last looked for a new release point — *“Che
 for new release points 3 hours ago.”* It is a plain line when everything is current and a warning
 when it is not, including when the last check **failed**. The API answers the same question at
 `/api/v1/status`.
+
+The header shows the newest release point this site has loaded and the date it is current through,
+under the site's name: *Current through 07/12/2026 · 119-102not101*. Below 480 pixels wide it reads
+*Through 07/12/2026 · 119-102not101*, and below 360 pixels *07/12/2026 · 119-102not101*. A release
+point label longer than 13 characters may not fit on that line, and is then left off it. The footer of every page states the same release
+point and date, the day the site last checked uscode.house.gov, and a link to the release point
+list, and starts with the warning when there is one. The front page shows the same facts above the
+example citation, with the caveat of a `not` release point.
+
+```scenario
+id: site-currency
+title: The header, the footer and the front page state the newest release point loaded
+steps:
+  - goto: /app/
+  - expect: { selector: "header .dateline", contains: "Current through 07/12/2026" }
+  - expect: { selector: "footer [data-site-currency]", contains: "Newest release point loaded" }
+  - expect: { selector: ".sitecurrency-panel", contains: "current through 07/12/2026" }
+```
 
 A title that a release point changed and this site has not finished loading is a warning on the
 same line — *“Title 42 at release point 119-102 is not loaded here yet.”* Pages of that title are

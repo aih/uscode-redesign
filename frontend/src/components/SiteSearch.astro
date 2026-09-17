@@ -31,7 +31,7 @@
  * placeholder (ADR-0061) — and the explanation lives in a popover.
  */
 import { gotoHref, syntaxHref } from "../lib/url";
-import { CITES_KEYWORD, HISTORY_KEYWORD } from "../lib/query";
+import { CITES_KEYWORD, HISTORY_KEYWORD, HISTORY_SHORT_KEYWORD } from "../lib/query";
 
 interface Props {
   /** Prefilled when a page is showing the result of a query.
@@ -125,6 +125,6 @@ const infoLead =
   <p class="sitesearch__hint" id={`${id}-hint`}>
     A citation goes straight there; anything else searches the text. Prefix{" "}
     <code>{CITES_KEYWORD}</code> to find provisions citing one, or{" "}
-    <code>{HISTORY_KEYWORD}</code> for its version history.
+    <code>{HISTORY_KEYWORD}</code> (or <code>{HISTORY_SHORT_KEYWORD}</code>) for its version history.
   </p>
 </form>

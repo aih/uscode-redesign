@@ -1,0 +1,56 @@
+---
+/**
+ * The site's currency on the front page (ADR-0085): the newest release point
+ * loaded, the date it is current through, its caveat when it is a `not`
+ * release point (gotcha 5), and when uscode.house.gov was last checked.
+ *
+ * The release facts use `ReleaseContext`'s line. The check is `currencyNote`'s
+ * headline on a plain line when it is reassuring; a warning is `SourceCurrency`'s
+ * alert, which carries the detail as well.
+ */
+import SourceCurrency from "./SourceCurrency.astro";
+import { currencyNote, usDate } from "../lib/currency";
+import type { Release, Status } from "../lib/types";
+import { APP } from "../lib/url";
+
+interface Props {
+  status: Status | null;
+  /** The newest release point loaded, for its caveat. */
+  release?: Release | null;
+  /** For a page that renders more than one panel. */
+  headingId?: string;
+}
+
+const { status, release = null, headingId = "site-currency-heading" } = Astro.props;
+const label = status?.corpus.latest_release ?? null;
+const date = usDate(status?.corpus.latest_currency_date ?? null);
+const note = currencyNote(status);
+const caveat = release && release.label === label ? release.caveat : null;
+---
+
+{
+  label && date && (
+    <section class="releaseblock sitecurrency-panel" aria-labelledby={headingId}>
+      <h2 class="usa-sr-only" id={headingId}>
+        Site currency
+      </h2>
+      <p class="releasebar__line">
+        <span class="releasebar__what">Newest release point loaded</span>{" "}
+        <span class="releasebar__rp">{label}</span>{" "}
+        <span class="releasebar__date">current through {date}</span>
+      </p>
+      {caveat && <p class="releasebar__caveat">{caveat}</p>}
+      {note?.tone === "ok" && (
+        <p class="releasebar__note">
+          {note.text}{" "}
+          <a href={`${APP}/releases`}>All release points</a>
+        </p>
+      )}
+      {note?.tone === "warning" && (
+        <div class="sitecurrency-panel__alert">
+          <SourceCurrency status={status} />
+        </div>
+      )}
+    </section>
+  )
+}

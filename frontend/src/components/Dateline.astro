@@ -1,0 +1,27 @@
+---
+/**
+ * The header's line under the wordmark (ADR-0085): the date the newest release
+ * point loaded is current through, and its label. "release point" is for a
+ * screen reader only, and below 30em so is "Current".
+ */
+import type { Dateline } from "../lib/sitecurrency";
+
+interface Props {
+  dateline: Dateline;
+  /** `p` under USWDS's wordmark, `span` inside the bar's. */
+  as?: "p" | "span";
+}
+
+const { dateline, as: Tag = "p" } = Astro.props as Props;
+---
+
+<Tag class="dateline"
+  ><span class="dateline__through"
+    ><span class="dateline__current">Current </span><span class="dateline__word">through</span>
+    {dateline.date}</span
+  ><span class="dateline__rp"
+    ><span aria-hidden="true"> · </span><span class="dateline__rpword">release point </span>{
+      dateline.label
+    }</span
+  ></Tag
+>

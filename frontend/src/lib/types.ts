@@ -324,6 +324,13 @@ export interface SearchResultItem {
   type: "section" | "structure";
   snippets: SearchSnippet[];
   first_release: string | null;
+  /** The release point at which the section's text last changed, at or before
+   * this version (ADR-0074). Absent from an older API; null without change rows. */
+  text_changed_release?: string | null;
+  /** The release point this version arrived at, whatever changed there. */
+  last_changed_release?: string | null;
+  /** `initial`, `text`, `notes` or `structure`. */
+  last_change_kind?: string | null;
   is_current: boolean;
   title_num: string | null;
   status: string | null;

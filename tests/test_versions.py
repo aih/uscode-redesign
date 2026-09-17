@@ -260,3 +260,56 @@ def test_the_adr_0066_measured_case_sorts_by_its_mapped_start(repository):
     assert all(
         entry.releases[0] != newest.releases[0] for entry in entries[:-1]
     )
+
+
+# ------------------------------------------------------ change points (search)
+
+
+def _version_arriving_at(session, identifier, label):
+    from db.models import ReleasePoint, Section, SectionVersionChange
+
+    return session.execute(
+        select(SectionVersionChange)
+        .join(Section, Section.id == SectionVersionChange.section_id)
+        .join(ReleasePoint, ReleasePoint.id == SectionVersionChange.window_to_release_id)
+        .where(Section.identifier == identifier, ReleasePoint.label == label)
+    ).scalar_one()
+
+
+@pytest.mark.integration
+def test_change_points_name_the_text_change_and_the_arrival(repository):
+    repo, session = repository
+    change = _version_arriving_at(session, AMENDED, CURRENT)
+
+    points = repo.change_points([change.to_version_id])[change.to_version_id]
+
+    assert points.change_kind == "text"
+    assert points.changed_at.label == CURRENT
+    assert points.text_since is not None and points.text_since.label == CURRENT
+
+
+@pytest.mark.integration
+def test_change_points_look_past_a_later_notes_only_change(repository):
+    """The fixture holds only `initial` and `text` arrivals, so the notes-only
+    case is made by relabelling one inside this test's rolled-back session."""
+    repo, session = repository
+    change = _version_arriving_at(session, AMENDED, CURRENT)
+    change.change_kind = "notes"
+    session.flush()
+
+    points = repo.change_points([change.to_version_id])[change.to_version_id]
+    # The newest text arrival before it, read off the timeline: the initial
+    # version on the CI corpus, a later amendment on a full one.
+    previous_text = [
+        entry
+        for entry in repo.versions(AMENDED)
+        if entry.change_kind in ("initial", "text")
+        and entry.published[0].seq < points.changed_at.seq
+    ][-1]
+
+    assert points.change_kind == "notes"
+    assert points.changed_at.label == CURRENT
+    assert points.text_since is not None
+    assert points.text_since.label == previous_text.releases[0]
+    assert points.text_since.seq < points.changed_at.seq
+    assert repo.change_points([]) == {}

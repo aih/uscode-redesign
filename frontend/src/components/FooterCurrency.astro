@@ -1,0 +1,24 @@
+---
+/**
+ * The footer's currency line (ADR-0085): `currencyNote`'s headline when it is
+ * a warning, the newest release point loaded and its date, and the day
+ * uscode.house.gov was last checked.
+ */
+import type { FooterCurrency } from "../lib/sitecurrency";
+import { APP } from "../lib/url";
+
+interface Props {
+  currency: FooterCurrency;
+}
+
+const { currency } = Astro.props;
+---
+
+<p class="doc-meta sitecurrency" data-site-currency>
+  {currency.warning && <strong class="sitecurrency__warning">{currency.warning}</strong>}
+  {currency.warning && " "}
+  Newest release point loaded: <span class="doc-meta__rp">{currency.label}</span>, current through{" "}
+  {currency.date}.
+  {currency.checkedOn && ` Checked uscode.house.gov for new release points on ${currency.checkedOn}.`}
+  {" "}<a href={`${APP}/releases`}>All release points</a>.
+</p>

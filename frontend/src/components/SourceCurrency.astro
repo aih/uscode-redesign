@@ -32,14 +32,16 @@ const note = currencyNote(Astro.props.status);
         <div class="usa-alert__body">
           <p class="usa-alert__text">
             {note.text}
-            {note.detail && <span class="source-currency__detail"> {note.detail}</span>}
+            {note.detail && " "}
+            {note.detail && <span class="source-currency__detail">{note.detail}</span>}
           </p>
         </div>
       </div>
     ) : (
       <p class="doc-meta source-currency" role="status">
         {note.text}
-        {note.detail && <span class="source-currency__detail"> {note.detail}</span>}
+        {note.detail && " "}
+        {note.detail && <span class="source-currency__detail">{note.detail}</span>}
       </p>
     ))
 }

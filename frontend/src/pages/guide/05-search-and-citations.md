@@ -92,8 +92,10 @@ steps:
 
 Each result is headed by its citation — `16 U.S.C. § 3831`, not `§ 3831` — followed by the heading,
 with the words that matched marked. A chapter or subchapter heading is headed `Title 16, CHAPTER 1`
-instead. Under it are the identifier, the status if the provision has one, the release point this
-exact text first appeared at, and a link to any earlier versions that also matched.
+instead. Under it are the identifier, the status if the provision has one, the release point at which
+the section's text last changed, and a link to any earlier versions that also matched. When the notes
+or only the XML changed after that, the row names that release point too. For 16 U.S.C. § 3831 it
+reads *text unchanged since 115-442 · XML/metadata changed at 118-274not159*.
 
 ```scenario
 id: search-result-citation
@@ -101,6 +103,14 @@ title: A result names the title it is in
 steps:
   - goto: /app/search?q=conservation
   - expect: { selector: ".searchresult__cite", contains: "U.S.C." }
+```
+
+```scenario
+id: search-result-text-change
+title: A result says when its text last changed
+steps:
+  - goto: /app/search?q=conservation
+  - expect: { selector: ".searchresult__changed", contains: "text unchanged since" }
 ```
 
 The search **matches the words you typed** without applying fuzzy matching or stemming by default.
@@ -314,6 +324,9 @@ steps:
 Prefixing a citation with `history` — `history 16 usc 2201` — opens the section's version history
 instead of its text. A subsection citation opens the history of its section.
 
+`v` is the short form of `history`. `v 16 usc 2201`, `v 16/2201` and `v16/2201` open the same
+history; the space after `v` can be left out when a digit follows.
+
 A date range after the citation asks whether the section changed between two dates:
 `history 16 usc 2201 from 6/12/2026 to 7/12/2026`. `between … and …` reads the same way, and
 `since` with one date runs to today. Dates are MM/DD/YYYY or YYYY-MM-DD. The history page answers
@@ -327,6 +340,16 @@ title: The "history" prefix opens the version history
 steps:
   - goto: /app/
   - fill: { selector: ".navtools .sitesearch__input", value: "history 16 usc 2201" }
+  - press: Enter
+  - expect: { url: "/app/versions/us/usc/t16/s2201" }
+```
+
+```scenario
+id: history-prefix-short
+title: The v prefix is the short form of history
+steps:
+  - goto: /app/
+  - fill: { selector: ".navtools .sitesearch__input", value: "v16/2201" }
   - press: Enter
   - expect: { url: "/app/versions/us/usc/t16/s2201" }
 ```

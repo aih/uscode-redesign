@@ -54,6 +54,7 @@ from storage.repository import (
     TitleInfo,
     TocEntry,
     TocResult,
+    VersionChangePoints,
     VersionLawRef,
 )
 
@@ -817,6 +818,52 @@ class PostgresRepository:
             )
             for version, first_release in rows
         ]
+
+    def change_points(self, version_ids: Sequence[int]) -> dict[int, VersionChangePoints]:
+        ids = sorted({int(version_id) for version_id in version_ids})
+        if not ids:
+            return {}
+        arrivals = self._session.execute(
+            select(
+                SectionVersionChange.to_version_id,
+                SectionVersionChange.section_id,
+                SectionVersionChange.change_kind,
+                ReleasePoint,
+            )
+            .join(ReleasePoint, ReleasePoint.id == SectionVersionChange.window_to_release_id)
+            .where(SectionVersionChange.to_version_id.in_(ids))
+        ).all()
+        if not arrivals:
+            return {}
+
+        # Every text arrival of the sections on the page, oldest first. A
+        # handful per section: 7.8% of transitions change the text.
+        text_arrivals: dict[int, list[ReleasePoint]] = {}
+        for section_id, release in self._session.execute(
+            select(SectionVersionChange.section_id, ReleasePoint)
+            .join(ReleasePoint, ReleasePoint.id == SectionVersionChange.window_to_release_id)
+            .where(
+                SectionVersionChange.section_id.in_({row[1] for row in arrivals}),
+                SectionVersionChange.change_kind.in_(("initial", "text")),
+            )
+        ).all():
+            text_arrivals.setdefault(section_id, []).append(release)
+        for releases in text_arrivals.values():
+            releases.sort(key=lambda release: release.seq)
+
+        points: dict[int, VersionChangePoints] = {}
+        for version_id, section_id, change_kind, arrived in arrivals:
+            text_since = None
+            for release in text_arrivals.get(section_id, []):
+                if release.seq > arrived.seq:
+                    break
+                text_since = release
+            points[version_id] = VersionChangePoints(
+                text_since=self._ref(text_since) if text_since else None,
+                changed_at=self._ref(arrived),
+                change_kind=change_kind,
+            )
+        return points
 
     def _version_changes(
         self, section_id: int

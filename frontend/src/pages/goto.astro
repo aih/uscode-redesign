@@ -65,7 +65,7 @@ if (query) {
     //    citation after it is not words either: it is told what it needs.
     if (error instanceof ApiError && error.status === 422) {
       if (!history) return Astro.redirect(searchHref(query), 307);
-      historyMessage = `“${history.subject}” is not a citation. history needs one: history 16 usc 45f, or history 16 usc 45f from 6/12/2026 to 7/12/2026.`;
+      historyMessage = `“${history.subject}” is not a citation. ${history.keyword} needs one: ${history.keyword} 16 usc 45f, or ${history.keyword} 16 usc 45f from 6/12/2026 to 7/12/2026.`;
     } else {
       throw error;
     }
@@ -106,6 +106,7 @@ const EXAMPLES = [
   "cites 26 usc 501",
   "history 16 usc 2201",
   "history 16 usc 2201 from 6/12/2026 to 7/12/2026",
+  "v 16/2201",
 ];
 
 /** The trail out — Home › Search (ADR-0079). This page only renders on a
@@ -128,8 +129,8 @@ const currentCrumb: Entry = { identifier: "", level: "page", num: "Search", head
     !query && (
       <p class="lede">
         Type a citation in almost any written form and you land on the provision. Type
-        anything else and it searches the text. Prefix a citation with <code>history</code> to
-        open its version history instead, with <code>from</code> and <code>to</code> dates if you
+        anything else and it searches the text. Prefix a citation with <code>history</code>, or
+        <code>v</code>, to open its version history instead, with <code>from</code> and <code>to</code> dates if you
         want to know whether it changed between them.
       </p>
     )

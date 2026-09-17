@@ -52,6 +52,8 @@ import ClassificationLookup from "../components/ClassificationLookup.astro";
 import ClassificationTable from "../components/ClassificationTable.astro";
 import CommandPalette from "../components/CommandPalette.astro";
 import CopyColumn from "../components/CopyColumn.astro";
+import Dateline from "../components/Dateline.astro";
+import FooterCurrency from "../components/FooterCurrency.astro";
 import NoResults from "../components/NoResults.astro";
 import Neighbors from "../components/Neighbors.astro";
 import Pager from "../components/Pager.astro";
@@ -62,6 +64,7 @@ import SearchFacets from "../components/SearchFacets.astro";
 import SearchResult from "../components/SearchResult.astro";
 import SectionBar from "../components/SectionBar.astro";
 import SectionContents from "../components/SectionContents.astro";
+import SiteCurrencyPanel from "../components/SiteCurrencyPanel.astro";
 import SortBar from "../components/SortBar.astro";
 import ShortcutsDialog from "../components/ShortcutsDialog.astro";
 import StatusBadge from "../components/StatusBadge.astro";
@@ -72,6 +75,7 @@ import COLOR_PAIRS from "../data/color-pairs.json";
 import { setPublicCache } from "../lib/cache";
 import { documentDiff, diffLinesHtml, diffSummary } from "../lib/diffdoc";
 import { sectionCommands } from "../lib/palette";
+import { dateline, footerCurrency } from "../lib/sitecurrency";
 import { previewFailureHtml } from "../lib/preview";
 import type {
   Citation,
@@ -79,6 +83,7 @@ import type {
   Entry,
   Release,
   SearchResultItem,
+  Status,
   VersionEntry,
 } from "../lib/types";
 import { APP, appHref } from "../lib/url";
@@ -245,6 +250,37 @@ const RP_NEW: Release = {
     "Current through Public Law 119-102, except 119-101. The text is not fully current " +
     "through 07/12/2026.",
 };
+
+/** The site's currency, twice: a mirror with nothing to load, and one a
+ *  release point behind. Specimen facts; the chrome on this page states none. */
+const STATUS_CURRENT: Status = {
+  source: {
+    url: "https://uscode.house.gov/download/priorreleasepoints.htm",
+    last_checked_at: "2026-07-14T15:00:00Z",
+    hours_since_check: 3,
+    ok: true,
+    stale: false,
+    release_points_seen: 381,
+    new_release_points: [],
+    latest_published_label: "119-102not101",
+    latest_published_date: "2026-07-12",
+    error: null,
+  },
+  corpus: {
+    latest_release: "119-102not101",
+    latest_currency_date: "2026-07-12",
+    release_points_known: 381,
+    behind_by: 0,
+    incomplete_loads: [],
+    unloaded_titles: [],
+    newest_complete_release: "119-102not101",
+  },
+};
+const STATUS_BEHIND: Status = {
+  source: { ...STATUS_CURRENT.source, latest_published_label: "119-103", latest_published_date: "2026-09-02" },
+  corpus: { ...STATUS_CURRENT.corpus, release_points_known: 382, behind_by: 1 },
+};
+const DATELINE = dateline(STATUS_CURRENT)!;
 
 const CRUMBS: Entry[] = [
   { identifier: "/us/usc/t0", level: "title", num: "Title 0", heading: "SPECIMENS" },
@@ -430,6 +466,9 @@ const RESULTS: SearchResultItem[] = [
       },
     ],
     first_release: "119-102not101",
+    text_changed_release: "118-22u1",
+    last_changed_release: "119-102not101",
+    last_change_kind: "structure",
     is_current: true,
     title_num: "0",
     status: null,
@@ -447,6 +486,9 @@ const RESULTS: SearchResultItem[] = [
       { field: "text", text: "Repealed. Pub. L. 000-00, § 2, Jan. 1, 2024, 0 Stat. 0." },
     ],
     first_release: "119-99",
+    text_changed_release: "119-99",
+    last_changed_release: "119-99",
+    last_change_kind: "text",
     is_current: true,
     title_num: "0",
     status: "repealed",
@@ -660,7 +702,7 @@ const TYPE_ROLES = [
 ];
 ---
 
-<Base title="Design system · U.S. Code">
+<Base title="Design system · U.S. Code" currency={false}>
   <h1 class="doc-title">Design system</h1>
 
   <p class="lede">
@@ -985,6 +1027,34 @@ const TYPE_ROLES = [
     <ReleaseContext served={RP_OLD} isNewest={false} newestHref={appHref("/us/usc/t0/s1")} />
   </div>
 
+  <p class="spec__label">Site currency</p>
+
+  <p>
+    The newest release point this site has loaded and the date it is current through. The
+    header carries it under the wordmark on every page. The words <em>release point</em> are read
+    by a screen reader and not shown, and below 30em neither is <em>Current</em>. The
+    footer adds the day uscode.house.gov was last checked, and leads with the warning when there
+    is one. The front page states the same facts with the caveat of a <code>not</code> release
+    point. This page reaches no data, and its own header carries none of them.
+  </p>
+
+  <div class="spec">
+    <Dateline dateline={DATELINE} />
+  </div>
+
+  <div class="spec">
+    <FooterCurrency currency={footerCurrency(STATUS_CURRENT)!} />
+    <FooterCurrency currency={footerCurrency(STATUS_BEHIND)!} />
+  </div>
+
+  <div class="spec">
+    <SiteCurrencyPanel status={STATUS_CURRENT} release={RP_NEW} headingId="spec-currency-current" />
+  </div>
+
+  <div class="spec">
+    <SiteCurrencyPanel status={STATUS_BEHIND} release={RP_NEW} headingId="spec-currency-behind" />
+  </div>
+
   {/* -------------------------------------------------------------- keyboard */}
   <h2 class="toc-group" id="keyboard">Keyboard navigation</h2>
 
@@ -1242,8 +1312,9 @@ const TYPE_ROLES = [
   <h2 class="toc-group" id="search">Search results</h2>
 
   <p>
-    A result row carries the identifier, the release point at which this exact text first
-    appeared, and — when the words are in text the section no longer holds — a link to the
+    A result row carries the identifier, the release point at which the section's text last
+    changed — with the release point of a later notes-only or metadata-only change beside it, as
+    in the first row — and, when the words are in text the section no longer holds, a link to the
     versions that did hold them. The second row shows the caveat a section carries when the
     source published more than one provision under one identifier at one release point.
   </p>
