@@ -482,12 +482,24 @@ describe("isoDate and releaseOnOrBefore", () => {
 });
 
 describe("kindsSentence", () => {
-  it("joins the kinds into one sentence", () => {
+  it("names the text first, then the notes, then the XML", () => {
     expect(kindsSentence([])).toBeNull();
-    expect(kindsSentence(["text"])).toBe("The statutory text changed.");
-    expect(kindsSentence(["text", "notes"])).toBe("The statutory text changed and the notes changed.");
-    expect(kindsSentence(["initial", "text", "structure"])).toBe(
-      "The section entered the Code, the statutory text changed and only the stored XML or metadata changed.",
+    expect(kindsSentence(["text"])).toBe("The statute text changed.");
+    expect(kindsSentence(["notes", "text"])).toBe("The statute text and notes changed.");
+    expect(kindsSentence(["structure", "notes", "text"])).toBe(
+      "The statute text, notes and XML/metadata changed.",
+    );
+    expect(kindsSentence(["structure", "notes"])).toBe("The notes and XML/metadata changed.");
+  });
+
+  it("says only when the XML or metadata is all that changed", () => {
+    expect(kindsSentence(["structure"])).toBe("Only the stored XML or metadata changed.");
+  });
+
+  it("gives the section's arrival a sentence of its own", () => {
+    expect(kindsSentence(["initial"])).toBe("The section entered the Code.");
+    expect(kindsSentence(["initial", "structure", "text"])).toBe(
+      "The section entered the Code. The statute text and XML/metadata changed.",
     );
   });
 });

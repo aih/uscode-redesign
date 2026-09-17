@@ -424,30 +424,37 @@ export function isoDate(typed: string): string | null {
   return `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
 }
 
-/** The sentence a change kind adds to the window's verdict. */
-export function kindLabel(kind: string): string {
-  switch (kind) {
-    case "initial":
-      return "the section entered the Code";
-    case "text":
-      return "the statutory text changed";
-    case "notes":
-      return "the notes changed";
-    case "structure":
-      return "only the stored XML or metadata changed";
-    default:
-      return kind;
-  }
-}
+/** What changed, named for the window's verdict. `initial` is a sentence of
+ *  its own; `structure` alone is "only". */
+const KIND_NOUNS: Record<string, string> = {
+  text: "statute text",
+  notes: "notes",
+  structure: "XML/metadata",
+};
 
-/** "The statutory text changed and the notes changed." — the kinds as one
+/** The order the kinds are named in: the text first. */
+const KIND_ORDER = ["text", "notes", "structure"];
+
+/** "The statute text, notes and XML/metadata changed." — the kinds as a
  *  sentence, or null when nothing arrived. */
 export function kindsSentence(kinds: string[]): string | null {
   if (kinds.length === 0) return null;
-  const parts = kinds.map(kindLabel);
-  const joined =
-    parts.length === 1
-      ? parts[0]
-      : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-  return `${joined.charAt(0).toUpperCase()}${joined.slice(1)}.`;
+  const sentences: string[] = [];
+  if (kinds.includes("initial")) sentences.push("The section entered the Code.");
+
+  const rank = (kind: string) => {
+    const at = KIND_ORDER.indexOf(kind);
+    return at === -1 ? KIND_ORDER.length : at;
+  };
+  const changed = [...new Set(kinds)].filter((kind) => kind !== "initial").sort((a, b) => rank(a) - rank(b));
+  if (changed.length === 1 && changed[0] === "structure") {
+    sentences.push("Only the stored XML or metadata changed.");
+  } else if (changed.length > 0) {
+    const nouns = changed.map((kind) => KIND_NOUNS[kind] ?? kind);
+    const joined =
+      nouns.length === 1 ? nouns[0] : `${nouns.slice(0, -1).join(", ")} and ${nouns[nouns.length - 1]}`;
+    sentences.push(`The ${joined} changed.`);
+  }
+  return sentences.join(" ");
 }
+

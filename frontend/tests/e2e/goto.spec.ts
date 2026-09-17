@@ -148,6 +148,16 @@ test("a history query opens the section's version history", async ({ page }) => 
   await expect(page).toHaveURL(/\/app\/versions\/us\/usc\/t16\/s2201$/u);
 });
 
+test("v is the short form of history, with or without the space", async ({ page }) => {
+  for (const typed of ["v 16 usc 2201", "v 16/2201", "v16/2201"]) {
+    await page.goto("/app/");
+    await page.fill(BOX, typed);
+    await page.press(BOX, "Enter");
+
+    await expect(page).toHaveURL(/\/app\/versions\/us\/usc\/t16\/s2201$/u);
+  }
+});
+
 test("a history query with a date range asks whether it changed", async ({ page }) => {
   await page.goto("/app/goto?q=history%2016%20usc%202201%20from%206/12/2026%20to%207/12/2026");
 

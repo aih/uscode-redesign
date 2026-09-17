@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CITES_KEYWORD, HISTORY_KEYWORD, parseCites, parseHistory } from "../src/lib/query";
+import {
+  CITES_KEYWORD,
+  HISTORY_KEYWORD,
+  HISTORY_SHORT_KEYWORD,
+  parseCites,
+  parseHistory,
+} from "../src/lib/query";
 
 describe("parseCites", () => {
   // The one routing decision the header's single box can make without asking
@@ -52,6 +58,7 @@ describe("parseHistory", () => {
 
   it("takes the citation out of a history query", () => {
     expect(parseHistory("history 16 usc 45f")).toEqual({
+      keyword: "history",
       subject: "16 usc 45f",
       from: null,
       to: null,
@@ -60,6 +67,7 @@ describe("parseHistory", () => {
 
   it("does not care about case or surrounding space", () => {
     expect(parseHistory("  HISTORY 11 U.S.C. § 523(a)(1)  ")).toEqual({
+      keyword: "history",
       subject: "11 U.S.C. § 523(a)(1)",
       from: null,
       to: null,
@@ -68,11 +76,13 @@ describe("parseHistory", () => {
 
   it("reads a date range off the end, in either date form", () => {
     expect(parseHistory("history 16 usc 2201 from 6/12/2026 to 7/12/2026")).toEqual({
+      keyword: "history",
       subject: "16 usc 2201",
       from: "6/12/2026",
       to: "7/12/2026",
     });
     expect(parseHistory("history 16 usc 2201 between 2026-06-12 and 2026-07-12")).toEqual({
+      keyword: "history",
       subject: "16 usc 2201",
       from: "2026-06-12",
       to: "2026-07-12",
@@ -81,6 +91,7 @@ describe("parseHistory", () => {
 
   it("reads a start alone, which runs to today", () => {
     expect(parseHistory("history 16 usc 2201 since 2024-01-01")).toEqual({
+      keyword: "history",
       subject: "16 usc 2201",
       from: "2024-01-01",
       to: null,
@@ -91,6 +102,7 @@ describe("parseHistory", () => {
     // `citeparse` will refuse it and the page says why; guessing at a date
     // here would send the reader somewhere with the wrong dates in the URL.
     expect(parseHistory("history 16 usc 2201 from yesterday")).toEqual({
+      keyword: "history",
       subject: "16 usc 2201 from yesterday",
       from: null,
       to: null,
@@ -103,8 +115,32 @@ describe("parseHistory", () => {
     expect(parseHistory("legislative history")).toBeNull();
   });
 
+  it("reads v as the short form, with or without a space before a digit", () => {
+    for (const typed of ["v 16 usc 2201", "V 16 usc 2201"]) {
+      expect(parseHistory(typed)).toEqual({ keyword: "v", subject: "16 usc 2201", from: null, to: null });
+    }
+    for (const typed of ["v16/2201", "v 16/2201"]) {
+      expect(parseHistory(typed)).toEqual({ keyword: "v", subject: "16/2201", from: null, to: null });
+    }
+    expect(parseHistory("v16/2201 from 6/12/2026 to 7/12/2026")).toEqual({
+      keyword: "v",
+      subject: "16/2201",
+      from: "6/12/2026",
+      to: "7/12/2026",
+    });
+  });
+
+  it("does not read a word starting with v as the short form", () => {
+    expect(parseHistory("vessels")).toBeNull();
+    expect(parseHistory("veterans 38 usc 101")).toBeNull();
+    expect(parseHistory("v")).toBeNull();
+    expect(parseHistory("history16/2201")).toBeNull();
+  });
+
   it("exports the keyword the UI shows, so the hint and the parser cannot drift", () => {
     expect(HISTORY_KEYWORD).toBe("history");
     expect(parseHistory(`${HISTORY_KEYWORD} 16 usc 45f`)).not.toBeNull();
+    expect(HISTORY_SHORT_KEYWORD).toBe("v");
+    expect(parseHistory(`${HISTORY_SHORT_KEYWORD} 16 usc 45f`)).not.toBeNull();
   });
 });

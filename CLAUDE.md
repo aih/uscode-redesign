@@ -435,7 +435,7 @@ TypeScript) from the plain timeline and two `?date=` section fetches, and diffs 
 under the diff's middleware bucket when `?from=` is present; `SectionOut` gained `content_hash` so
 the verdict compares hashes rather than redlines. The form is `VersionWindowForm`, the answer
 `VersionWindowResult`, both on `/app/design`; an empty `?from=`/`?to=` is stripped like an empty
-`?release=`. On the one search box, **`history <citation>`** lands on the history and
+`?release=`. On the one search box, **`history <citation>`** (short form `v`: `v 16/2201`, `v16/2201`) lands on the history and
 `history <citation> from <date> to <date>` on the answer (`parseHistory` beside `parseCites`; the
 citation still goes to `/api/v1/citation`); a title or chapter gets a message, not a redirect. Two
 traps: the timeline's release labels carry no dates, so the reader needs `cachedReleases` to place

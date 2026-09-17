@@ -3443,3 +3443,16 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `make test-e2e` against the rebuilt stack: **691 passed, 3 skipped, 0 failed** (694 collected), the guide's six new scenarios among them and the accessibility scan at **357 scans** (350 + the seven for `versions-window`), **8 violation/route pairs over 3,127 nodes** — the same eight pairs, the node count moved by the new route and the timeline dates; `docs/verification/a11y.json` re-committed. A first scan lost six 375px-dark routes to `ERR_NETWORK_IO_SUSPENDED` (the machine slept mid-run), which is not a violation and did not recur.
   - `make shots`: the new `versions-window` page at 375, 1280, 320 and 1280-at-200% with no horizontal overflow at any of them; the four PNGs committed, the other pages' shots left as they were.
   - `make demo-video`: `docs/demo/scenes.json` and the `.vtt` regenerated with `versions-between-dates` at order 75.
+
+## 103 — 2026-09-17 — Session 81: `v` for history, and the changed-between sentence
+
+- **Tool/model:** Claude Code, Opus 5. Branch `c5-changed-between`.
+- **Asked:** Accept `v` as a short form of the `history` prefix (`v 16 usc 2201`, `v16/2201`, `v 16/2201`); in the changed-between verdict, drop "only" when the text changed and name the text change first ("The statute text, notes and XML/metadata changed.").
+- **Decided:**
+  - `parseHistory` reads `history` followed by whitespace, or `v` followed by whitespace or a digit, so `vessels` and `veterans 38 usc 101` stay keyword searches. `HistoryQuery.keyword` carries the prefix as typed, and the goto page's "needs a citation" message uses it. `v` with a subject that is not a citation gets the same message `history` does.
+  - `kindsSentence` names the kinds in a fixed order — statute text, notes, XML/metadata — in one sentence. "Only the stored XML or metadata changed." is kept for a window where that is the sole kind. `initial` is its own sentence ahead of the rest.
+- **Produced:** `frontend/src/lib/query.ts` (`HISTORY_SHORT_KEYWORD`, `keyword`), `frontend/src/lib/versions.ts` (`kindsSentence`; `kindLabel` removed, it had no other caller), `pages/goto.astro` (message, lede, one example), `components/SiteSearch.astro` (hint), `pages/search/syntax.astro`, guide 05 (prose + `history-prefix-short`), guide 04 (`versions-between-dates`'s expectation), `tests/query.test.ts` (+2), `tests/versions.test.ts` (rewritten, 3 cases), `tests/e2e/goto.spec.ts` (+1), CLAUDE.md, this entry.
+- **Verified:**
+  - `make test-web` **498 passed**.
+  - Against the rebuilt frontend container: `/app/goto?q=v16/2201`, `v 16/2201` and `v 16 usc 2201` → 307 to `/app/versions/us/usc/t16/s2201`; `vessels` → 307 to search. `/app/versions/us/usc/t16/s2201?from=6/12/2026&to=7/12/2026` renders "The statute text changed."
+  - `make test-e2e` against the rebuilt stack: **693 passed, 3 skipped, 0 failed** (696 collected, the two new tests among them); the accessibility scan unchanged at 357 scans, 8 violation/route pairs over 3,127 nodes, so `docs/verification/a11y.json` has no diff.

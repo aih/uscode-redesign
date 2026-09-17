@@ -314,6 +314,9 @@ steps:
 Prefixing a citation with `history` — `history 16 usc 2201` — opens the section's version history
 instead of its text. A subsection citation opens the history of its section.
 
+`v` is the short form of `history`. `v 16 usc 2201`, `v 16/2201` and `v16/2201` open the same
+history; the space after `v` can be left out when a digit follows.
+
 A date range after the citation asks whether the section changed between two dates:
 `history 16 usc 2201 from 6/12/2026 to 7/12/2026`. `between … and …` reads the same way, and
 `since` with one date runs to today. Dates are MM/DD/YYYY or YYYY-MM-DD. The history page answers
@@ -327,6 +330,16 @@ title: The "history" prefix opens the version history
 steps:
   - goto: /app/
   - fill: { selector: ".navtools .sitesearch__input", value: "history 16 usc 2201" }
+  - press: Enter
+  - expect: { url: "/app/versions/us/usc/t16/s2201" }
+```
+
+```scenario
+id: history-prefix-short
+title: The v prefix is the short form of history
+steps:
+  - goto: /app/
+  - fill: { selector: ".navtools .sitesearch__input", value: "v16/2201" }
   - press: Enter
   - expect: { url: "/app/versions/us/usc/t16/s2201" }
 ```
