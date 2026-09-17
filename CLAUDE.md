@@ -449,16 +449,19 @@ under both wordmarks, "release point" read aloud and not shown — and the foote
 check (a date, since a pinned page is cached for a year) and the warning headline first when there
 is one; the front page carries `SiteCurrencyPanel` above the example citation. **No header height
 changed**: on the bar the dateline is absolutely positioned inside the home link's 44px box with
-`pointer-events: none` (bar 52px, header 104px), below 30em "Current" is visually hidden too and
-the size is 0.72rem so both parts fit the 161px a 320px bar leaves the brand, and from 64em the
-logo's margins give back the line (73.52 → 73.47px). The two parts are flex
+`pointer-events: none` (bar 52px, header 104px), below 30em "Current" is visually hidden too at
+0.72rem and below 22.5em "through" as well, so `07/12/2026 · 119-102not101` fits the 162px a 320px
+bar leaves the brand, and from 64em the logo's margins give back the line (73.52 → 73.47px) and
+the line is 0.72rem so a 13-character label fits the 238px logo. The two parts are flex
 items on a one-line clipping box, so a label too long for the bar drops out of sight and stays in
 the accessibility tree. `/app/design` passes `currency={false}` and renders the three components as
-specimens. Two traps: **a logo widened by its dateline overflows at 1280px and 200% zoom**, where
+specimens. Three traps: **a logo widened by its dateline overflows at 1280px and 200% zoom**, where
 `make shots`' CSS `zoom` lays the desktop header out in 640 CSS px (237 → 272px put the search
-button 10px past the edge), which is why "release point" is never shown; and **text split
+button 10px past the edge), which is why "release point" is never shown; **text split
 across flex items loses the spaces between them in `textContent`** (`ReleaseContext`'s line has the
-same shape), so the separators carry their own. Search results now say where the **text** last
+same shape), so the separators carry their own; and **the development corpus's newest label is `119-102`,
+CI's is `119-102not101`**, so a width check against the live label passed here and clipped there
+— `currency.spec.ts` now substitutes the 13-character label itself. Search results now say where the **text** last
 changed: `Repository.change_points(version_ids)` reads `section_version_changes` for a page of
 results in two queries, and a row reads *text unchanged since 115-442 · XML/metadata changed at
 118-274not159* when a notes-only or metadata-only change came later — ordered by the earliest

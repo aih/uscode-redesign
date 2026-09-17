@@ -155,7 +155,8 @@ when it is not, including when the last check **failed**. The API answers the sa
 
 The header shows the newest release point this site has loaded and the date it is current through,
 under the site's name: *Current through 07/12/2026 · 119-102not101*. Below 480 pixels wide it reads
-*Through 07/12/2026 · 119-102not101*. The footer of every page states the same release
+*Through 07/12/2026 · 119-102not101*, and below 360 pixels *07/12/2026 · 119-102not101*. A release
+point label longer than 13 characters may not fit on that line, and is then left off it. The footer of every page states the same release
 point and date, the day the site last checked uscode.house.gov, and a link to the release point
 list, and starts with the warning when there is one. The front page shows the same facts above the
 example citation, with the caveat of a `not` release point.

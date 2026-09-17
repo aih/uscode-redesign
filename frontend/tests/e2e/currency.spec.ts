@@ -13,13 +13,14 @@ async function newest(request: APIRequestContext): Promise<{ label: string; date
 }
 
 /** The displayed dateline, and whether each of its two parts is inside the
- *  one line it clips to. */
-function shownDateline(page: Page) {
-  return page.evaluate(() => {
+ *  one line it clips to. `label` replaces the release point first. */
+function shownDateline(page: Page, label?: string) {
+  return page.evaluate((label) => {
     const line = [...document.querySelectorAll("header .dateline")].find(
       (el) => el.getClientRects().length > 0,
     );
     if (!line) return null;
+    if (label) line.querySelector(".dateline__rp")!.lastChild!.textContent = label;
     const box = line.getBoundingClientRect();
     const inside = (selector: string) => {
       const part = line.querySelector(selector)!.getBoundingClientRect();
@@ -32,8 +33,10 @@ function shownDateline(page: Page) {
       rpWordWidth: line.querySelector(".dateline__rpword")!.getBoundingClientRect().width,
       through: inside(".dateline__through"),
       release: inside(".dateline__rp"),
+      /** Width of "through", hidden below 22.5em. */
+      throughWordWidth: line.querySelector(".dateline__word")!.getBoundingClientRect().width,
     };
-  });
+  }, label);
 }
 
 for (const { width, header } of [
@@ -55,12 +58,18 @@ for (const { width, header } of [
     expect(line!.text).toBe(`Current through ${date} · release point ${label}`);
     expect(line!.through).toBe(true);
     expect(line!.release).toBe(true);
-    // Below 30em the words are for a screen reader only.
-    // Read aloud in full; on screen "release point" is dropped, and "Current"
-    // below 30em.
+    // Read aloud in full; on screen "release point" is dropped, "Current"
+    // below 30em and "through" below 22.5em.
     expect(line!.rpWordWidth).toBeLessThanOrEqual(1);
     if (width < 480) expect(line!.currentWidth).toBeLessThanOrEqual(1);
     else expect(line!.currentWidth).toBeGreaterThan(1);
+    if (width < 360) expect(line!.throughWordWidth).toBeLessThanOrEqual(1);
+    else expect(line!.throughWordWidth).toBeGreaterThan(1);
+
+    // A `not` label fits as well, whichever label the corpus under test has.
+    const long = await shownDateline(page, "119-102not101");
+    expect(long!.through).toBe(true);
+    expect(long!.release).toBe(true);
 
     const height = await page.locator(".usa-header").evaluate((el) => el.getBoundingClientRect().height);
     expect(Math.abs(height - header)).toBeLessThan(1);

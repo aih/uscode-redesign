@@ -39,13 +39,18 @@ link, so the link's accessible name is unchanged.
 - **Below 64em** it is absolutely positioned inside the home link's 44px box, the wordmark moved to
   the top of that box, with `pointer-events: none` so a tap on it follows the link. The bar stays
   52px and the header 104px.
-- **Below 30em** *Current* is visually hidden as well: *Through 07/12/2026 · 119-102*, at 0.72rem,
-  fits the 161px a 320px bar gives the brand.
+- **Below 30em** *Current* is visually hidden as well, at 0.72rem: *Through 07/12/2026 ·
+  119-102not101*. **Below 22.5em** *through* is hidden too: *07/12/2026 · 119-102not101* fits the
+  162px a 320px bar gives the brand.
 - **The two parts are flex items on a one-line box that clips.** Where a long label does not fit,
-  the release point wraps out of sight and the date stays; a screen reader reads both.
+  the release point wraps out of sight and the date stays; a screen reader reads both. A
+  label of up to 13 characters fits at every width from 320px; 26 of the 384 labels are longer
+  (`117-17not1not2` to `116-344not260not283not315`, 113th to 118th Congresses) and may not fit at
+  320px or from 64em.
 - **From 64em** the logo's margins are reduced by the dateline's line (2rem/1rem → 1.42rem/0.64rem),
-  so the header measures 73.47px against 73.52px before. The line fits under the wordmark, so the
-  logo keeps its width. A first version showed *release point* on desktop and did not wrap there;
+  so the header measures 73.47px against 73.52px before. The line is 0.72rem, so *Current through
+  07/12/2026 · 119-102not101* is 230px under a 238px logo and the logo keeps its width. The line box
+  is 0.9375rem at every font size, so the smaller face does not change the header's height. A first version showed *release point* on desktop and did not wrap there;
   the logo widened from 237px to 272px, and at 1280px and 200% zoom — where the desktop header is
   laid out in 640 CSS px — the search button ended 10px past the edge (`make shots`).
 
@@ -70,3 +75,12 @@ and `currencyNote`'s sentence as a plain line, or `SourceCurrency`'s warning ale
   `ReleaseContext`'s "newest" badge on those pages has the same property.
 - `SourceCurrency`'s headline and detail had no space between them; both branches now carry an
   explicit `{" "}`.
+
+## Addendum (2026-09-17): a `not` label clipped in CI
+
+The first version was measured against the development corpus, whose newest release point is
+`119-102`. CI's fixture corpus ends at `119-102not101`, and there the release point wrapped out of
+sight at 320px (104 + 84px of text in 162px) and from 64em (147 + 87px in 238px), so
+`currency.spec.ts` failed in CI and passed locally. The 22.5em rule and the 0.72rem desktop size
+above are the fix, and the spec now substitutes `119-102not101` into the rendered line at each
+width, so it checks the same label on either corpus.

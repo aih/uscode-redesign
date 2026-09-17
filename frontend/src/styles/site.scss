@@ -785,19 +785,24 @@
  *
  * Its two parts are flex items on a one-line box that clips, so where the bar
  * is too narrow for both, the release point wraps out of sight and the date
- * stays. The clipped part is still read by a screen reader. */
+ * stays. The clipped part is still read by a screen reader. A label of up to
+ * 13 characters (`119-102not101`) fits at every width from 320px; 26 of 384
+ * labels are longer and may not fit at 320px or from 64em.
+ *
+ * The line box is 15px in rem at every size, so a smaller face moves nothing
+ * the header's height depends on. */
 .dateline {
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.3em;
-  height: 1.25em;
+  height: 0.9375rem;
   overflow: hidden;
   margin: 0;
   font-family: var(--ui);
   font-size: 0.75rem;
   font-style: normal;
   font-weight: 400;
-  line-height: 1.25;
+  line-height: 0.9375rem;
   color: var(--muted);
 }
 
@@ -835,19 +840,36 @@
     text-transform: capitalize;
   }
 
-  /* 0.72rem and a narrower gap keep both parts on a 320px bar. */
   .dateline {
     column-gap: 0.25em;
     font-size: 0.72rem;
   }
 }
 
+/* Below 22.5em "Through" is visually hidden as well, and the bar reads
+ * "07/12/2026 · 119-102not101" in the 162px a 320px bar leaves the brand. */
+@media (max-width: 22.49em) {
+  .dateline__word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* Above 64em the logo's margins give back the dateline's line, so the header
- * is the 73.5px it was. The block is centred on the nav row beside it. */
+ * is the 73.5px it was. The block is centred on the nav row beside it. The
+ * line is 0.72rem to fit a 13-character label in the logo's 238px. */
 @media (min-width: 64em) {
   .usa-header--basic .usa-logo--dated {
     margin-top: 1.42rem;
     margin-bottom: 0.64rem;
+  }
+
+  .dateline {
+    font-size: 0.72rem;
   }
 }
 
