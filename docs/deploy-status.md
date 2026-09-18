@@ -6,7 +6,11 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-09-16 — title 42 at release point 119-102 was half loaded on the box for six
+**Last updated:** 2026-09-18 — the root volume filled with unbounded Docker logs, the site served
+502 for about four hours, and the same full disk stopped SSM reaching the box to repair it; see
+[The full root disk](#the-full-root-disk-2026-09-18-adr-0086). The root volume is now 40 GB, disk
+metrics are published for the first time, and container logs are capped. Before that,
+2026-09-16 — title 42 at release point 119-102 was half loaded on the box for six
 days and served as if loaded; see [The half-loaded title](#the-half-loaded-title-2026-09-10-adr-0082),
 and [Still owed](#still-owed) opens with the two hand steps that finish the repair. Before that,
 2026-09-02 — the PWA phases (ADR-0079, ADR-0080, ADR-0081) are merged and not yet
@@ -44,7 +48,7 @@ Before that: the crawl that had the box pinned, and the daily check proving itse
 | Elastic IP | **52.1.30.78** |
 | Security group | `sg-028b6e6362978d1c3` — 80 and 443 only, no SSH |
 | Access | SSM only (`aws ssm start-session --target i-06b433caacd78fd96`) |
-| Volumes | 20 GB root + 120 GB gp3 at `/var/lib/uscode` (`DeleteOnTermination=false`) |
+| Volumes | 40 GB root (grown from 20 on 2026-09-18, ADR-0086) + 120 GB gp3 at `/var/lib/uscode`, mounted **by UUID** (`DeleteOnTermination=false`). A third 40 GB volume on this box is the statutes site's. |
 | Repo on box | `/home/ec2-user/uscode-redesign`, `.env` beside it (mode 600, secrets generated on the box) |
 | Logs | `/var/lib/uscode/logs/` — `deploy.log`, `backup.log`, `purge.log` |
 | AWS profile | `uscode-admin` = IAM user `linkedlegislation-deploy` |
@@ -138,6 +142,55 @@ aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
 It was in alarm after a quiet day, and the instance is not undersized: **it was serving a crawl**
 (see below). Expect it to clear as the crawlers back off; if it does not, that is when the
 undersizing reading becomes the right one.
+
+## The full root disk (2026-09-18, ADR-0086)
+
+The site served 502 from about 04:26 to 09:21 EDT. The 20 GB **root** volume was 100% full — 7.36 GB
+of unbounded Docker container logs (`edge-caddy-1` alone 4.66 GB), `overlay2` 7.6 GB,
+`/var/log/journal` 2.0 GB — so Docker could not start the containers.
+
+**The same full disk removed every way in.** The SSM agent cannot write the script for a Run Command
+document on a full filesystem, so `send-command` failed in a millisecond with no output, and the
+session worker would not start either. Cron kept running the watchdog — it writes to the *data*
+volume — which is why `SiteUp=0` published correctly the whole time and its ~20 restarts all failed.
+
+**Nothing had ever watched the root volume.** `uscode-disk-high` was dimensioned on
+`path=/var/lib/uscode` only, and that metric had published **no datapoints for the life of the box**:
+the CloudWatch agent was installed by hand with memory configured and disk never written. With
+`treat-missing-data: notBreaching`, that silence read as health.
+
+What is different now:
+
+- Root volume **20 GB → 40 GB** (not reversible — EBS volumes cannot shrink). 30 GB free.
+- Container logs capped at **50m × 3**, in `docker-compose.prod.yml` and in `/etc/docker/daemon.json`
+  so containers this repository does not define are covered too.
+- `uscode-root-disk-high` on `path=/`, and both disk alarms now `treat-missing-data: breaching`.
+- The agent's config is `deploy/cloudwatch-agent.json`, installed by
+  `deploy/install-cloudwatch-agent.sh` from `bootstrap-box.sh`.
+- `/etc/fstab` mounts the data volume **by UUID** (see below).
+
+**A full disk cannot grow itself.** The volume was resized before the repair and `growpart` never
+ran, because cloud-init dies on `ENOSPC` writing its own `status.json` before reaching the resize
+module. The repair needed the volume detached and attached to a rescue instance in the same
+availability zone, cleaned there, then reattached as `/dev/xvda`.
+
+**The repair exposed a second fault.** `/etc/fstab` named the data volume `/dev/nvme1n1`. Detaching
+and reattaching the root volume reordered the NVMe devices, so that name became the *statutes*
+volume, which then mounted at `/var/lib/uscode`. The uscode database started on the statutes
+cluster (`role "uscode" does not exist`) while the statutes database was already running on it —
+two postmasters on one data directory for about thirty seconds, which `postmaster.pid` did not
+prevent because each container has its own PID namespace. It wrote three buffers and shut down
+cleanly; the statutes database was checked afterwards and reads correctly. `bootstrap-box.sh` now
+writes the UUID and refuses to continue if the mount is not the volume it meant.
+
+**Two IAM findings.** `ssm:StartSession` authorizes against both the instance *and* the session
+document; only the instance was allowed, so Session Manager — the one remaining way in — was denied.
+The denial names the **account-owned** ARN, so granting the AWS-owned form alone is not enough. And
+`admin-grant-bootstrap-policy.json` is still attached to `linkedlegislation-deploy`; it was meant to
+be detached after setup, and detaching it is owed.
+
+Still owed from this: the five `statutes-at-large-*` containers have no log limits — that repository
+needs the same anchor, and the daemon default reaches them only when they are next recreated.
 
 ## The outage (2026-08-19, ADR-0073)
 
