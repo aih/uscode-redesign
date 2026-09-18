@@ -23,6 +23,36 @@ REPO_DIR="/home/ec2-user/uscode-redesign"
 
 echo "==> packages"
 dnf install -y docker git >/dev/null
+
+# Bound every container's logs at the daemon, before Docker first starts.
+# docker-compose.prod.yml sets the same limits per service and is the record;
+# this is what catches a container *this* repository does not define. On
+# 2026-09-18 the single largest log on the box — 4.66 GB of 7.36 GB — belonged
+# to the statutes project's edge Caddy, and the 20 GB root volume filling took
+# the site down and SSM with it (ADR-0086).
+#
+# It has to be in place before the daemon starts: log options are read when a
+# container is *created*, and `systemctl reload docker` does not pick them up.
+# A container already running when this file appears keeps its old, unbounded
+# config until it is recreated — `docker restart` is not enough.
+mkdir -p /etc/docker
+if [ ! -f /etc/docker/daemon.json ]; then
+    cat > /etc/docker/daemon.json <<'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "50m",
+    "max-file": "3"
+  }
+}
+EOF
+    echo "    wrote /etc/docker/daemon.json (50m x 3 per container)"
+else
+    echo "    /etc/docker/daemon.json exists — leaving it alone"
+    grep -q 'max-size' /etc/docker/daemon.json \
+        || echo "    WARNING: it sets no max-size; container logs are unbounded" >&2
+fi
+
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
