@@ -177,9 +177,34 @@ aws cloudwatch put-metric-alarm \
     --treat-missing-data breaching \
     --region "$REGION"
 
-# Disk needs the CloudWatch agent (it publishes CWAgent/disk_used_percent);
-# without the agent installed this alarm sits in INSUFFICIENT_DATA, which
-# treat-missing-data notBreaching keeps quiet rather than noisy.
+# Both disk alarms need the CloudWatch agent, installed and configured by
+# deploy/install-cloudwatch-agent.sh (bootstrap-box.sh runs it).
+#
+# They treat missing data as BREACHING, which is the opposite of what this file
+# said until 2026-09-18 and the same decision as uscode-site-down. The argument
+# for notBreaching was that an alarm for a metric nobody publishes should be
+# quiet rather than noisy. What it bought was fifteen months of a green alarm on
+# an unwatched disk: the agent was installed and publishing memory, so the box
+# looked monitored, and it published no disk metric at all. A disk alarm with no
+# data is not a quiet alarm, it is an unmonitored disk, and saying so is the
+# whole point of the alarm.
+echo "==> alarm uscode-root-disk-high (needs the CloudWatch agent on the box)"
+aws cloudwatch put-metric-alarm \
+    --alarm-name uscode-root-disk-high \
+    --alarm-description "Root volume over 80% full — Docker images, container layers and logs live here, and a full root disk also stops SSM reaching the box" \
+    --namespace CWAgent \
+    --metric-name disk_used_percent \
+    --statistic Average \
+    --period 300 \
+    --evaluation-periods 2 \
+    --threshold 80 \
+    --comparison-operator GreaterThanThreshold \
+    --dimensions "$DIM" "Name=path,Value=/" \
+    --alarm-actions "$TOPIC_ARN" \
+    --ok-actions "$TOPIC_ARN" \
+    --treat-missing-data breaching \
+    --region "$REGION"
+
 echo "==> alarm uscode-disk-high (needs the CloudWatch agent on the box)"
 aws cloudwatch put-metric-alarm \
     --alarm-name uscode-disk-high \
@@ -193,7 +218,8 @@ aws cloudwatch put-metric-alarm \
     --comparison-operator GreaterThanThreshold \
     --dimensions "$DIM" "Name=path,Value=/var/lib/uscode" \
     --alarm-actions "$TOPIC_ARN" \
-    --treat-missing-data notBreaching \
+    --ok-actions "$TOPIC_ARN" \
+    --treat-missing-data breaching \
     --region "$REGION"
 
 echo

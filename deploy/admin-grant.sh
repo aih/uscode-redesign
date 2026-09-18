@@ -21,6 +21,20 @@
 #     added to it (day-to-day human/CI provisioning and operational access —
 #     EC2, ECR, S3, SSM, CloudWatch/SNS, a scoped PassRole). Defaults to
 #     `linkedlegislation-deploy`; set DEPLOY_USER to point it elsewhere.
+#
+#     `ssm:StartSession` is authorized against TWO resources, and allowing only
+#     the instance denies every session: the call also checks the session
+#     document, `SSM-SessionManagerRunShell`, which is what a bare
+#     `aws ssm start-session --target` uses. Only the instance was allowed here
+#     until 2026-09-18, when the box stopped executing Run Command documents
+#     and Session Manager — the one remaining way in — turned out to be denied
+#     as well. SendCommand is scoped the same way and got this right, which is
+#     why the gap went unnoticed: every routine deploy uses SendCommand.
+#
+#     That document is named in both the AWS-owned form (no account) and the
+#     account-owned one. Which of the two the call authorizes against depends on
+#     whether session preferences have been saved in the account, and granting
+#     only the AWS-owned form still denied every session here.
 #   - role + instance profile `uscode-site` (ADR-0020's box): SSM core, S3
 #     read on the mirror plus write under usc/* (the site is now the mirror's
 #     one writer per ADR-0013's handoff), ECR pull, CloudWatch agent metrics
@@ -127,7 +141,8 @@ cat > "$DEPLOY_POLICY_DOC" <<EOF
         "ec2:AttachVolume",
         "ec2:StartInstances",
         "ec2:StopInstances",
-        "ec2:ModifyInstanceAttribute"
+        "ec2:ModifyInstanceAttribute",
+        "ec2:ModifyVolume"
       ],
       "Resource": "*"
     },
@@ -209,6 +224,25 @@ cat > "$DEPLOY_POLICY_DOC" <<EOF
       "Condition": {
         "StringEquals": { "ssm:resourceTag/Name": "uscode-site" }
       }
+    },
+    {
+      "Sid": "SsmStartSessionDocument",
+      "Effect": "Allow",
+      "Action": "ssm:StartSession",
+      "Resource": [
+        "arn:aws:ssm:${REGION}::document/SSM-SessionManagerRunShell",
+        "arn:aws:ssm:${REGION}:${ACCOUNT_ID}:document/SSM-SessionManagerRunShell"
+      ]
+    },
+    {
+      "Sid": "SsmSessionOperate",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:TerminateSession",
+        "ssm:ResumeSession",
+        "ssm:DescribeSessions"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "CloudWatchAlarms",

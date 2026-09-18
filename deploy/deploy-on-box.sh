@@ -126,6 +126,14 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps api \
     || echo "(search index rebuild failed; the previous index is still live)"
 
 echo "=== pruning old images ==="
+# `docker image prune -f` removes only *dangling* images, and every deploy tags
+# what it pulls with a sha — so the image each previous deploy ran stays tagged,
+# stays un-dangling, and is never collected. At roughly a gigabyte per pair of
+# images on a 20 GB root volume, that is a disk filling at the rate the project
+# is deployed. `-a` takes unused tagged images too; `until` keeps a week of them
+# so the rollback in docs/deploy.md §9 still has something to roll back to.
+# Neither form can touch an image a container is using.
+docker image prune -af --filter "until=168h"
 docker image prune -f
 
 # Prove it rather than assume it: what the proxy is *serving* is the only
