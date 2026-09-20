@@ -6,7 +6,12 @@ Live state of the demo deployment and what is still owed. Design lives in
 [deploy.md](deploy.md). This file is the *current* picture — delete it once the site is
 settled and the interesting parts have moved into deploy.md.
 
-**Last updated:** 2026-09-18 — the root volume filled with unbounded Docker logs, the site served
+**Last updated:** 2026-09-20 — a distributed scrape from 11,835 addresses took the site down for
+about four hours on 2026-09-19 and left it failing a probe every hour or two; the reader is now
+served only to a client that carries a cookie (ADR-0088), and the daily poll reads the *current*
+release point from its own page (ADR-0087), which is why this site was five release points behind
+the source. See [The scrape](#the-scrape-2026-09-19-adr-0088). Before that,
+2026-09-18 — the root volume filled with unbounded Docker logs, the site served
 502 for about four hours, and the same full disk stopped SSM reaching the box to repair it; see
 [The full root disk](#the-full-root-disk-2026-09-18-adr-0086). The root volume is now 40 GB, disk
 metrics are published for the first time, and container logs are capped. Before that,
@@ -142,6 +147,56 @@ aws cloudwatch set-alarm-state --alarm-name uscode-status-check-failed \
 It was in alarm after a quiet day, and the instance is not undersized: **it was serving a crawl**
 (see below). Expect it to clear as the crawlers back off; if it does not, that is when the
 undersizing reading becomes the right one.
+
+## The scrape (2026-09-19, ADR-0088)
+
+About four hours of total outage on 2026-09-19 — 232 consecutive failed watchdog probes,
+`api=000 app=000`, recovering at 14:22 UTC — then a failed probe every hour or two through
+2026-09-20. `uscode-cpu-credits-low` went into alarm at 15:37 PT on the 19th and stayed there: with
+the credit balance empty, a t4g.large runs at its 30% baseline, and the reader's renders queue
+behind that.
+
+One hour of this project's proxy log, 2026-09-20 12:22–13:22 UTC:
+
+| | |
+|---|---|
+| requests | 15,307 |
+| distinct client addresses | 11,835 (1.3 requests each) |
+| distinct /16s | 3,758 |
+| carrying `?release=` or `?date=` | 12,895 (84%) |
+| `/app` requests | 14,400 |
+| `/app` requests carrying a `Cookie` header | **0** |
+| asset requests | **21** |
+| `Accept: */*` with no `Sec-Fetch-*` headers | 9,726 |
+
+Every request presented a plausible Chrome `User-Agent`, so ADR-0037's crawler list matched none of
+it; at 1.3 requests per address, every one of ADR-0029's per-caller buckets was full when it
+arrived. It is the same ~25-million-page permutation space measured twice before, behind a rotating
+address pool.
+
+**What was deployed.** The proxy answers a request for `/app*` with no `usc_h` cookie with a 403
+that sets it and reloads once (ADR-0088). `/api/v1` is not gated; the routes that pin a release
+point carry one budget shared by every caller outside the deployment instead. The box's `.env` sets
+`USC_GATE_HOST`, `USC_GATE_COOKIE` and `USC_GATE_TOKEN`; `deploy/watchdog.sh` sends the cookie, and
+without that its probe would read the gate as an outage and recreate the containers every ten
+minutes.
+
+**Measured after the deploy**, eight minutes of the proxy log: 318 of 351 requests answered 403 at
+the proxy, `api` 3.19% → 0.95% CPU, `frontend` 1.76% → 0.02%, `db` 5.63% → 0.19%, load average
+1.09 → 0.71.
+
+Re-check it with:
+
+```bash
+curl -sD- -o /dev/null https://uscode.linkedlegislation.org/app/us/usc/t16/s45f | head -1   # 403
+curl -s -o /dev/null -w '%{http_code}\n' -b usc_h=1 \
+  https://uscode.linkedlegislation.org/app/us/usc/t16/s45f                                  # 200
+```
+
+**Not done, and deliberately** (ADR-0088): no address blocks — the top two /16s are a quarter of
+the traffic and the rest is 3,756 more; no defence against a scraper that keeps cookies, which is
+one line of their code, and the next rung is a proof-of-work interstitial or a CDN challenge in
+front of the box; no bigger instance to serve a scrape with.
 
 ## The full root disk (2026-09-18, ADR-0086)
 
@@ -530,9 +585,18 @@ mapping change forces `--recreate`.
 
 ## How the corpus keeps up (ADR-0036)
 
+**The poll reads two pages (ADR-0087).** Until 2026-09-20 it read `priorreleasepoints.htm` alone,
+where OLRC keeps the current release point as a commented-out `<li>` until its successor supersedes
+it — so this site was one release point behind at all times, 119-103 against the source's 119-108,
+with every check reporting OK and nothing new. It now reads `download.shtml` as well. Deployed and
+run on the box 2026-09-20 14:14 UTC: the poll reported `385 release points, newest 119-108
+(2026-09-11)`, the backfill fetched three title zips (26, 31, 40 — 0.01 GB), `load-all` loaded
+**3,119 sections, 131 new versions, 2,988 deduped (95.8%), 0.9 min**, and `/api/v1/status` reads
+`latest_release 119-108`, `behind_by 0`.
+
 **Daily poll on the box, weekly full sweep from Actions.** The box's cron runs
-`deploy/update-corpus.sh` with no arguments at 06:41 UTC: one request to
-uscode.house.gov's release-points page, one `source_checks` row, and — on the ~360 days a year when
+`deploy/update-corpus.sh` with no arguments at 06:41 UTC: two requests to
+uscode.house.gov, one `source_checks` row, and — on the ~360 days a year when
 OLRC has published nothing — nothing else. When the poll finds a release point this box has not seen
 (`python -m ingest check` exits 10) it runs the whole download-and-load chain there and then, so new
 law is picked up within a day rather than within a week.
