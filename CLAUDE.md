@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(83 ADRs, numbered to 0085 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(84 ADRs, numbered to 0086 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -512,6 +512,25 @@ and Caddy `dial_timeout`/`response_header_timeout` on both upstreams. **`deploy/
 every minute, probes both surfaces through the proxy, publishes `USCode/SiteUp` and restarts the HTTP
 services after three failures — deploy lock first, ten-minute cooldown — and `uscode-site-down`
 treats **missing data as breaching**, since a box too wedged to run cron publishes nothing.
+**The root disk filled and took the way in with it** (ADR-0086, 2026-09-18): Docker's default
+`json-file` driver keeps logs forever and nothing bounded them, so 7.36 GB of container logs —
+**4.66 GB of it the statutes project's `edge-caddy`** — filled the 20 GB root volume, and a full
+root filesystem *also* stops the SSM agent writing a Run Command script, so the outage and the loss
+of remote access had one cause. Nothing alarmed because `uscode-disk-high` watched only
+`/var/lib/uscode` and that metric had **never published a datapoint** — the CloudWatch agent was
+configured by hand for memory alone, and `notBreaching` read the silence as health. Now: `50m × 3`
+in `docker-compose.prod.yml` **and** in the box's `/etc/docker/daemon.json` (the daemon default is
+what reaches another project's containers), `uscode-root-disk-high` on `/`, both disk alarms
+`breaching`, the agent's config committed as `deploy/cloudwatch-agent.json`, and a 40 GB root. Three
+traps: **a full disk cannot grow itself** — cloud-init dies on `ENOSPC` before its `growpart`
+module, so a resize needs the volume attached elsewhere; **`ssm:StartSession` authorizes against the
+instance *and* the session document**, and the denial names the account-owned ARN, not the
+AWS-owned one; and **`/etc/fstab` named the data volume `/dev/nvme1n1`**, so reattaching the root
+volume reordered the devices and mounted the *statutes* volume at `/var/lib/uscode` — the uscode
+database started on the statutes cluster, two postmasters on one data directory, which
+`postmaster.pid` missed because each container has its own PID namespace. `bootstrap-box.sh` now
+writes the UUID and verifies the mount. A `docker restart` does **not** apply a new log cap; the
+container must be recreated.
 
 **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.

@@ -23,6 +23,36 @@ REPO_DIR="/home/ec2-user/uscode-redesign"
 
 echo "==> packages"
 dnf install -y docker git >/dev/null
+
+# Bound every container's logs at the daemon, before Docker first starts.
+# docker-compose.prod.yml sets the same limits per service and is the record;
+# this is what catches a container *this* repository does not define. On
+# 2026-09-18 the single largest log on the box — 4.66 GB of 7.36 GB — belonged
+# to the statutes project's edge Caddy, and the 20 GB root volume filling took
+# the site down and SSM with it (ADR-0086).
+#
+# It has to be in place before the daemon starts: log options are read when a
+# container is *created*, and `systemctl reload docker` does not pick them up.
+# A container already running when this file appears keeps its old, unbounded
+# config until it is recreated — `docker restart` is not enough.
+mkdir -p /etc/docker
+if [ ! -f /etc/docker/daemon.json ]; then
+    cat > /etc/docker/daemon.json <<'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "50m",
+    "max-file": "3"
+  }
+}
+EOF
+    echo "    wrote /etc/docker/daemon.json (50m x 3 per container)"
+else
+    echo "    /etc/docker/daemon.json exists — leaving it alone"
+    grep -q 'max-size' /etc/docker/daemon.json \
+        || echo "    WARNING: it sets no max-size; container logs are unbounded" >&2
+fi
+
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
@@ -82,10 +112,34 @@ else
 fi
 
 mkdir -p "$DATA_ROOT"
+# By UUID, never by device name. The loop above finds the device by elimination
+# precisely because NVMe order is not guaranteed — and writing the name it found
+# into fstab throws that away, freezing one boot's ordering into permanent
+# configuration. On 2026-09-18 the root volume was detached and reattached
+# during a repair; the two data volumes came back in the other order; and
+# `/dev/nvme1n1` in this line mounted the *statutes* volume at $DATA_ROOT. The
+# uscode database then started on the statutes cluster (`role "uscode" does not
+# exist`) while the statutes database was already running on it — two
+# postmasters on one data directory, which the containers' separate PID
+# namespaces let past postmaster.pid's own guard.
+DATA_UUID="$(blkid -s UUID -o value "$DATA_DEV")"
+if [ -z "$DATA_UUID" ]; then
+    echo "no UUID on $DATA_DEV — refusing to write a device-name fstab entry" >&2
+    exit 1
+fi
 if ! grep -q "$DATA_ROOT" /etc/fstab; then
-    echo "$DATA_DEV $DATA_ROOT ext4 defaults,nofail 0 2" >> /etc/fstab
+    echo "UUID=$DATA_UUID $DATA_ROOT ext4 defaults,nofail 0 2" >> /etc/fstab
 fi
 mountpoint -q "$DATA_ROOT" || mount -a
+
+# Prove the mount is the volume intended rather than whatever landed on that
+# device name: a wrong-volume mount looks like a working box until something
+# writes to it.
+if [ "$(findmnt -n -o UUID --target "$DATA_ROOT")" != "$DATA_UUID" ]; then
+    echo "$DATA_ROOT is not $DATA_UUID — refusing to continue" >&2
+    findmnt "$DATA_ROOT" >&2
+    exit 1
+fi
 
 mkdir -p "$DATA_ROOT"/{pgdata,releases,manifests,caddy,opensearch,logs}
 chown -R ec2-user:ec2-user "$DATA_ROOT"
@@ -127,6 +181,13 @@ echo "==> schedule"
 # in every way except that it has quietly stopped checking for new law.
 DATA_ROOT="$DATA_ROOT" REPO_DIR="$REPO_DIR" USC_MIRROR_BUCKET="$USC_MIRROR_BUCKET" \
     bash "$REPO_DIR/deploy/install-crons.sh"
+
+echo "==> metrics"
+# The CloudWatch agent and its config, so the disk alarms in deploy/alarms.sh
+# have a metric to read. Installed here for the same reason as the schedule: on
+# this box it was done by hand, memory was configured and disk was not, and the
+# disk alarm read OK for the life of the box while nothing watched the disk.
+bash "$REPO_DIR/deploy/install-cloudwatch-agent.sh"
 
 echo
 echo "Bootstrap complete. Next: deploy/deploy-on-box.sh <sha> to bring the"

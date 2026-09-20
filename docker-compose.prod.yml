@@ -34,8 +34,24 @@
 #                                         which `build:` still produces on `up --build`
 #   IMAGE_TAG=…                          tag to pull/build; defaults to `latest`
 #   OPENSEARCH_HEAP=2g                   -Xms/-Xmx for the opensearch JVM; defaults to 2g
+# Docker's default json-file driver keeps container logs forever, on the root
+# volume, where nothing was watching them: on 2026-09-18 they filled the 20 GB
+# root filesystem and the site served 502 for hours. A full root disk also stops
+# the SSM agent writing the script for a Run Command document, so the box could
+# not be reached to be repaired — the outage and the loss of the way in had one
+# cause. 50 MB x 3 per container bounds the lot at well under a gigabyte.
+#
+# The edge Caddy is not in this file (it belongs to the statutes repository's
+# compose project) and logs to the same disk; it needs the same limits there.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   db:
+    logging: *logging
     image: postgres:16
     environment:
       POSTGRES_USER: uscode
@@ -68,6 +84,7 @@ services:
   # with the password committed to the repository — search was simply broken in
   # production, and would have been broken insecurely.
   opensearch:
+    logging: *logging
     image: opensearchproject/opensearch:2.14.0
     environment:
       - discovery.type=single-node
@@ -106,6 +123,7 @@ services:
   # budget under `allkeys-lru`, no persistence — everything in it is
   # reconstructible, and a restart must be a cold cache rather than a stale one.
   redis:
+    logging: *logging
     image: redis:7-alpine
     command:
       [
@@ -125,6 +143,7 @@ services:
       retries: 5
 
   api:
+    logging: *logging
     image: ${ECR_REGISTRY:-local}/uscode-api:${IMAGE_TAG:-latest}
     build: .
     depends_on:
@@ -216,6 +235,7 @@ services:
       start_period: 20s
 
   frontend:
+    logging: *logging
     image: ${ECR_REGISTRY:-local}/uscode-frontend:${IMAGE_TAG:-latest}
     build: ./frontend
     depends_on:
@@ -236,6 +256,7 @@ services:
       start_period: 20s
 
   proxy:
+    logging: *logging
     image: caddy:2-alpine
     depends_on:
       api:

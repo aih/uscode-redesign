@@ -1,0 +1,30 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "metrics": {
+    "namespace": "CWAgent",
+    "append_dimensions": {
+      "InstanceId": "${aws:InstanceId}"
+    },
+    "aggregation_dimensions": [
+      ["InstanceId"],
+      ["InstanceId", "path"]
+    ],
+    "metrics_collected": {
+      "mem": {
+        "measurement": ["mem_used_percent"]
+      },
+      "swap": {
+        "measurement": ["swap_used_percent"]
+      },
+      "disk": {
+        "measurement": ["used_percent", "inodes_free"],
+        "resources": ["/", "/var/lib/uscode"],
+        "ignore_file_system_types": ["overlay", "squashfs", "tmpfs", "devtmpfs"],
+        "drop_device": true
+      }
+    }
+  }
+}

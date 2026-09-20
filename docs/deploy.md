@@ -156,11 +156,17 @@ sudo dnf install -y docker git
 sudo systemctl enable --now docker
 sudo usermod -aG docker ec2-user   # log out and back in
 
-# The data volume, mounted where docker-compose.prod.yml expects it.
+# The data volume, mounted where docker-compose.prod.yml expects it. Confirm
+# which device it is before formatting — `lsblk -o NAME,SIZE,SERIAL` prints the
+# volume id in SERIAL, and NVMe device order is not guaranteed across a stop
+# and start.
 sudo mkfs.ext4 /dev/nvme1n1        # first boot only — this erases the volume
 sudo mkdir -p /var/lib/uscode
-echo "/dev/nvme1n1 /var/lib/uscode ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
+# By UUID, never by device name: a name is one boot's ordering, and a box with
+# more than one data volume will eventually mount the wrong one under it.
+echo "UUID=$(sudo blkid -s UUID -o value /dev/nvme1n1) /var/lib/uscode ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
 sudo mount -a
+findmnt /var/lib/uscode            # check it is the volume you meant
 sudo mkdir -p /var/lib/uscode/{pgdata,releases,manifests,caddy,opensearch,logs}
 sudo chown -R ec2-user:ec2-user /var/lib/uscode
 
