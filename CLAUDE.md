@@ -468,7 +468,7 @@ results in two queries, and a row reads *text unchanged since 115-442 · XML/met
 mapped release, so it no longer repeats the index's `first_release_label`, which ADR-0066 showed
 can be later than the text's arrival.
 
-`make test` = **896** Python tests; `make test-web` = **509** frontend tests; `make test-e2e` = **706**
+`make test` = **906** Python tests; `make test-web` = **509** frontend tests; `make test-e2e` = **706**
 Playwright tests, 358 of which are the accessibility scan (**all three are required** — reader
 coverage lives in Vitest since Jinja retired), and
 **CI runs all three on every push** (`.github/workflows/ci.yml`, Postgres service container, offline
@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(84 ADRs, numbered to 0086 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(86 ADRs, numbered to 0088 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -484,7 +484,12 @@ Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore
 `source_checks` row whether it succeeds or fails, runs the full load chain only when OLRC has published
 something new, and `GET /api/v1/status` and `/app/releases` say when the site last looked — a mirror
 that has stopped updating is otherwise indistinguishable from one with nothing to update. A weekly
-`--force` sweep from Actions is the backstop. **The whole site is `Disallow: /` to crawlers**
+`--force` sweep from Actions is the backstop. **The poll reads two pages** (ADR-0087): OLRC keeps the
+*current* release point on `priorreleasepoints.htm` as a commented-out `<li>` and uncomments it only
+once its successor supersedes it, so a poll of that page alone learns of a release point only after it
+has stopped being current — the site sat at 119-103 against the source's 119-108, with every check
+reporting OK. `fetch_entries` reads `download.shtml` as well: the label from the per-title XML zip
+links, the date from the heading, the affected titles from the rows marked `usctitlechanged`. **The whole site is `Disallow: /` to crawlers**
 (ADR-0037) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
 it; blunt on purpose while the site is a demo, after two AI crawlers walking the `?release=` axis
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A
@@ -512,6 +517,28 @@ and Caddy `dial_timeout`/`response_header_timeout` on both upstreams. **`deploy/
 every minute, probes both surfaces through the proxy, publishes `USCode/SiteUp` and restarts the HTTP
 services after three failures — deploy lock first, ten-minute cooldown — and `uscode-site-down`
 treats **missing data as breaching**, since a box too wedged to run cron publishes nothing.
+**The reader is served only to a client that carries a cookie** (ADR-0088, 2026-09-19). A third
+crawl, and the first that neither `robots.txt` nor ADR-0073's declared-crawler 403 can touch: one
+hour of the proxy log is **15,307 requests from 11,835 distinct addresses** — 1.3 each, over 3,758
+/16s — every one presenting a plausible Chrome User-Agent, 84% of them on the `?release=` axis. It
+emptied the box's CPU credits, which is four hours of outage on 2026-09-19 and a failed watchdog
+probe every hour or two after. Per-caller budgets cannot see a caller that sends 1.3 requests. What
+they all share is that **0 of 14,400 `/app` requests carried a `Cookie`** and those 14,400 pages drew
+**21** asset requests, so the proxy asks for one: `/app*` with no `usc_h` gets a 403 that sets the
+cookie and reloads once, before Astro renders and calls the API four times. It is keyed on the
+hostname — `USC_GATE_HOST`, default `gate.invalid` — so `make dev-all`, Playwright and `make shots`
+never meet it, and **`deploy/watchdog.sh` sends the cookie**, or its probe of `/app` reads the gate as
+an outage and recreates the containers every ten minutes for ever. `/api/v1` is **not** gated —
+programmatic use is the point of the API — and carries a second kind of limit instead:
+`global_rate_limit` in `params.py` is one bucket for **every caller outside the deployment at once**,
+on the routes that pin a release point (`?release=`/`?date=`/`?id=`, burst 120, 6/s), with the
+reader's own server-side calls exempt by address. Measured after the deploy: 318 of 351 requests
+answered 403 at the proxy, api 3.19% → 0.95% CPU, frontend 1.76% → 0.02%. Not done, and recorded as
+such: no address blocks (3,758 /16s), and nothing defends against a scraper that keeps cookies —
+the next rung is a proof-of-work interstitial or a CDN challenge. One trap: **Python's `ipaddress`
+counts the documentation ranges (`203.0.113.0/24` and friends) as private**, so they are not
+stand-ins for an outside caller in a test.
+
 **The root disk filled and took the way in with it** (ADR-0086, 2026-09-18): Docker's default
 `json-file` driver keeps logs forever and nothing bounded them, so 7.36 GB of container logs —
 **4.66 GB of it the statutes project's `edge-caddy`** — filled the 20 GB root volume, and a full
