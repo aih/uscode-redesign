@@ -13,9 +13,11 @@ from ingest.inventory import (
     ReleasePointEntry,
     latest_release_affecting,
     normalize_title_num,
+    parse_current_release_point,
     parse_inventory,
     read_inventory,
     title_zip_url,
+    with_current_release_point,
     write_inventory,
 )
 from tests.conftest import FIXTURES
@@ -32,8 +34,8 @@ def by_label(entries: list[ReleasePointEntry]) -> dict[str, ReleasePointEntry]:
 
 
 def test_skips_commented_out_release_points(by_label):
-    """`119-102` is in the markup but commented out — it was never published; only
-    `119-102not101` was."""
+    """`119-102` is in the markup but commented out: OLRC comments out the current
+    release point on this page (`parse_current_release_point` reads it)."""
     assert "119-102" not in by_label
     assert "119-102not101" in by_label
 
@@ -157,3 +159,54 @@ def test_latest_release_affecting_returns_none_when_nothing_matches(entries):
 def test_inventory_round_trips_through_json(entries, tmp_path):
     path = write_inventory(entries, tmp_path / "uscreleasepoints.json")
     assert read_inventory(path) == entries
+
+
+# ------------------------------------------------------- the current release point
+
+
+@pytest.fixture(scope="module")
+def current() -> ReleasePointEntry:
+    return parse_current_release_point(
+        (FIXTURES / "download_current_slice.htm").read_text()
+    )
+
+
+def test_current_release_point_label_and_date(current):
+    assert current.label == "119-108"
+    assert current.currency_date == date(2026, 9, 11)
+    assert current.url.endswith("/releasepoints/us/pl/119/108/usc-rp@119-108.htm")
+
+
+def test_current_release_point_titles_are_the_changed_rows(current):
+    """Titles 26 and 31 are marked `usctitlechanged` in the slice; 1 and 5a are not."""
+    assert current.titles_affected == ("26", "31")
+    assert current.description == "Public Law 119-108 (09/11/2026), affecting titles 26, 31."
+
+
+def test_current_release_point_rejects_a_page_without_xml_links():
+    with pytest.raises(InventoryParseError):
+        parse_current_release_point("<html><body>the page moved</body></html>")
+
+
+def test_current_release_point_is_appended_as_newest(entries, current):
+    merged = with_current_release_point(entries, current)
+    assert merged[-1].label == "119-108"
+    assert merged[-1].seq == len(entries)
+    assert merged[:-1] == entries
+
+
+def test_current_release_point_already_listed_changes_nothing(entries):
+    listed = entries[-1]
+    assert with_current_release_point(entries, listed) is entries
+
+
+def test_current_release_point_older_than_the_list_is_refused(entries):
+    stale = ReleasePointEntry(
+        label="999-1",
+        currency_date=date(2000, 1, 1),
+        titles_affected=(),
+        url="",
+        description="",
+    )
+    with pytest.raises(InventoryParseError):
+        with_current_release_point(entries, stale)

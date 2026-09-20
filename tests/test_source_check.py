@@ -111,7 +111,7 @@ def test_a_successful_poll_records_the_check(session, monkeypatch):
     page = _page_of_known(session)
     monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: page)
 
-    result = inventory_mod.poll_source(session, out_path=None, seed=False)
+    result = inventory_mod.poll_source(session, current_url=None, out_path=None, seed=False)
     session.flush()
 
     assert result.ok
@@ -134,10 +134,33 @@ def test_a_poll_reports_release_points_the_database_has_never_seen(session, monk
     page = _page_of_known(session, "999-1")
     monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: page)
 
-    result = inventory_mod.poll_source(session, out_path=None, seed=False)
+    result = inventory_mod.poll_source(session, current_url=None, out_path=None, seed=False)
 
     assert result.new_labels == ("999-1",)
     assert result.has_new_release_points
+
+
+@pytest.mark.integration
+def test_a_poll_reads_the_current_release_point_from_its_own_page(session, monkeypatch):
+    """The prior-release-points page leaves the current release point out; the
+    poll takes it from download.shtml and reports it as new."""
+    prior = _page_of_known(session)
+    current = (
+        '<h3 class="releasepointinformation">Public Law 999-2 (01/03/2099)</h3>'
+        '<div class="usctitlechanged" id="us/usc/t16">Title 16</div>'
+        '<a href="releasepoints/us/pl/999/2/xml_usc16@999-2.zip">[XML]</a>'
+    )
+    pages = {
+        inventory_mod.PRIOR_RELEASE_POINTS_URL: prior,
+        inventory_mod.CURRENT_RELEASE_POINT_URL: current,
+    }
+    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: pages[url])
+
+    result = inventory_mod.poll_source(session, out_path=None, seed=False)
+
+    assert result.ok
+    assert result.new_labels == ("999-2",)
+    assert result.entries[-1].titles_affected == ("16",)
 
 
 @pytest.mark.integration
@@ -147,7 +170,7 @@ def test_a_failed_poll_still_records_the_attempt(session, monkeypatch):
 
     monkeypatch.setattr(inventory_mod, "fetch_inventory_html", explode)
 
-    result = inventory_mod.poll_source(session, out_path=None, seed=False)
+    result = inventory_mod.poll_source(session, current_url=None, out_path=None, seed=False)
     session.flush()
 
     assert not result.ok
@@ -178,7 +201,7 @@ def test_a_page_missing_release_points_we_already_hold_is_refused(session, monke
         inventory_mod, "fetch_inventory_html", lambda url, **kw: _entry("999-1")
     )
 
-    result = inventory_mod.poll_source(session, out_path=None, seed=True)
+    result = inventory_mod.poll_source(session, current_url=None, out_path=None, seed=True)
     session.flush()
 
     assert not result.ok
@@ -195,7 +218,7 @@ def test_an_unparseable_page_is_a_failed_check_not_an_empty_inventory(session, m
     """OLRC changing its markup must not read as "there are no release points"."""
     monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: "<html/>")
 
-    result = inventory_mod.poll_source(session, out_path=None, seed=False)
+    result = inventory_mod.poll_source(session, current_url=None, out_path=None, seed=False)
 
     assert not result.ok
     assert "InventoryParseError" in (result.error or "")

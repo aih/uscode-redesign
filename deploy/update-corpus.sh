@@ -8,8 +8,9 @@
 # Two schedules call it, on purpose (ADR-0036):
 #
 #   * daily, from /etc/cron.d/uscode (deploy/install-crons.sh) with no
-#     arguments. That is one HTTP request to uscode.house.gov's release-points
-#     page, a `source_checks` row, and — on the ~360 days a year when OLRC has
+#     arguments. That is two HTTP requests to uscode.house.gov — the prior
+#     release points page and the current release point's page (ADR-0087) —
+#     a `source_checks` row, and — on the ~360 days a year when OLRC has
 #     published nothing new — nothing else at all.
 #   * weekly, from .github/workflows/update-corpus.yml with --force. A full
 #     sweep whether or not the daily poll saw anything: it re-pulls the mirror,

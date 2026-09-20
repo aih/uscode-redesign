@@ -14,8 +14,8 @@
 #
 #   * DAILY, the source check. Polls uscode.house.gov's release-points page,
 #     records the attempt in `source_checks`, and runs the full download-and-load
-#     chain only if something new was published. On an ordinary day that is one
-#     HTTP request and one row. Daily is the *upper* bound on how often this
+#     chain only if something new was published. On an ordinary day that is two
+#     HTTP requests (ADR-0087) and one row. Daily is the *upper* bound on how often this
 #     site asks — the source publishes release points a few dozen times a year,
 #     and pulling a static page more often than that would be rude for no gain.
 #   * WEEKLY, purge_login_failures — the login-throttle table's only reaper.

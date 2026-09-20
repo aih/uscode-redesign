@@ -30,6 +30,11 @@ def main(argv: list[str] | None = None) -> int:
         "--url", default=inventory_mod.PRIOR_RELEASE_POINTS_URL, help="Source page"
     )
     inventory_parser.add_argument(
+        "--current-url",
+        default=inventory_mod.CURRENT_RELEASE_POINT_URL,
+        help="Page carrying the current release point, which the source page omits",
+    )
+    inventory_parser.add_argument(
         "--out", type=Path, default=inventory_mod.INVENTORY_PATH, help="Inventory JSON path"
     )
     inventory_parser.add_argument(
@@ -49,6 +54,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     check_parser.add_argument(
         "--url", default=inventory_mod.PRIOR_RELEASE_POINTS_URL, help="Source page"
+    )
+    check_parser.add_argument(
+        "--current-url",
+        default=inventory_mod.CURRENT_RELEASE_POINT_URL,
+        help="Page carrying the current release point, which the source page omits",
     )
     check_parser.add_argument(
         "--out", type=Path, default=inventory_mod.INVENTORY_PATH, help="Inventory JSON path"
@@ -415,14 +425,13 @@ def _cmd_inventory(args: argparse.Namespace) -> int:
         return 0
 
     if args.no_seed:
-        html = inventory_mod.fetch_inventory_html(args.url)
-        entries = inventory_mod.parse_inventory(html)
+        entries = inventory_mod.fetch_entries(args.url, args.current_url)
         path = inventory_mod.write_inventory(entries, args.out, source_url=args.url)
         print(f"wrote {len(entries)} release points to {path}")
         _print_span(entries)
         return 0
 
-    result = _poll(url=args.url, out_path=args.out)
+    result = _poll(url=args.url, current_url=args.current_url, out_path=args.out)
     if not result.ok:
         print(f"inventory failed: {result.error}", file=sys.stderr)
         return 1
@@ -444,7 +453,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
 
     The `source_checks` row is written in all three cases.
     """
-    result = _poll(url=args.url, out_path=args.out)
+    result = _poll(url=args.url, current_url=args.current_url, out_path=args.out)
     if not result.ok:
         print(f"check failed: {result.error}", file=sys.stderr)
         return 1
@@ -461,11 +470,13 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return 10
 
 
-def _poll(*, url: str, out_path: Path) -> inventory_mod.CheckResult:
+def _poll(*, url: str, current_url: str, out_path: Path) -> inventory_mod.CheckResult:
     """Run one poll in its own transaction, committing the check row either way."""
     session = SessionLocal()
     try:
-        result = inventory_mod.poll_source(session, url=url, out_path=out_path)
+        result = inventory_mod.poll_source(
+            session, url=url, current_url=current_url, out_path=out_path
+        )
         session.commit()
         return result
     except Exception as exc:
