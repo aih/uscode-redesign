@@ -271,6 +271,14 @@ services:
       # need publishing again); the Caddyfile's default of :8000 is the dev
       # stack.
       SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+      # The reader's cookie gate (ADR-0088). It is keyed on the hostname so
+      # that it is off everywhere it was not measured: unset, it defaults to
+      # `gate.invalid` and matches no request, which is what keeps the dev
+      # stack and the Playwright suite unaffected. `deploy/watchdog.sh` reads
+      # the cookie and token from the same .env, and its probe sends them.
+      USC_GATE_HOST: ${USC_GATE_HOST:-gate.invalid}
+      USC_GATE_COOKIE: ${USC_GATE_COOKIE:-usc_h}
+      USC_GATE_TOKEN: ${USC_GATE_TOKEN:-1}
     # No published ports. The edge reaches this service as `uscode-proxy` on
     # the `edge` network; `default` keeps it on this project's network for
     # api and frontend.

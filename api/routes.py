@@ -61,6 +61,7 @@ from params import (
     ReleaseParam,
     RepositoryDep,
     cache_control,
+    global_rate_limit,
     if_none_match,
     negotiated_format,
     normalize_identifier,
@@ -115,6 +116,35 @@ and `docs/verification/loadtest.json` measured ~0.45 rps failing entirely past
 reader onto its own text redline — so this budget is a person's, and 12/minute
 after a burst of 5 is more than a person reading redlines will ever want."""
 
+
+
+_limit_axis = global_rate_limit("axis", capacity=120, per_second=6.0)
+"""The permutation axis, budgeted for everyone outside the deployment at once
+(ADR-0088).
+
+A pinned request — `?release=`, `?date=` or `?id=` — is what a scrape of the
+~25-million-page space behind this site is made of, and the scrape measured on
+2026-09-19 spread itself over 11,835 addresses so that no per-caller budget
+ever saw a second request. This one is not per caller: six a second, sustained,
+for the whole outside world, above a burst of 120. The reader's own server-side
+calls are exempt (`is_internal_caller`); its readers are bounded by the cookie
+gate at the proxy and by `frontend/src/middleware.ts`.
+
+Six a second is above anything this box can render and well above measured
+human use; what it bounds is the case where the reader is being consumed by
+something that is not reading it."""
+
+
+def _limit_pinned(request: Request) -> None:
+    """Apply the axis budget only to a request that pins a release point.
+
+    An unpinned request is the current text of one section — the thing a person
+    or a search engine asks for, and the thing the corpus cache answers from
+    (ADR-0078). It is the pinned forms that multiply out into the permutation
+    space, so they are what carries the budget."""
+    params = request.query_params
+    if params.get("release") or params.get("date") or params.get("id"):
+        _limit_axis(request)
 
 
 def _limit_versions_window(request: Request) -> None:
@@ -727,6 +757,7 @@ def diff(
 @api.get(
     "/us/usc/",
     response_model=GuidOut,
+    dependencies=[Depends(_limit_pinned)],
     tags=["us code"],
     summary="Look a provision up by its XML @id",
     responses={404: {"model": ErrorOut}},
@@ -750,6 +781,7 @@ def lookup_by_guid(
 
 @api.get(
     "/us/usc/{identifier:path}",
+    dependencies=[Depends(_limit_pinned)],
     tags=["us code"],
     summary="A provision, section, or table-of-contents node by identifier",
     response_model=None,

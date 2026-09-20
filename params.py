@@ -17,6 +17,7 @@ dependency, per CLAUDE.md architecture rule 1.
 from __future__ import annotations
 
 import datetime
+import ipaddress
 import re
 import threading
 import time
@@ -363,6 +364,60 @@ def rate_limit(
             raise HTTPException(
                 status_code=429,
                 detail="too many requests; try again shortly",
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+
+    return dependency
+
+
+def is_internal_caller(request: Request) -> bool:
+    """Whether this request came from inside the deployment rather than the net.
+
+    The reader renders server-side and calls `/api/v1` over HTTP from the
+    compose network, so its calls arrive from a private address. Through the
+    proxy, `deploy/Caddyfile` overwrites `X-Forwarded-For` with the real peer
+    and uvicorn fills `request.client` from it, so an outside caller is never
+    private and cannot make itself so.
+    """
+    host = request.client.host if request.client else ""
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return address.is_private or address.is_loopback
+
+
+def global_rate_limit(
+    name: str, *, capacity: int, per_second: float
+) -> Callable[[Request], None]:
+    """One budget for everyone outside the deployment, not one per caller.
+
+    ADR-0029's limiters key on the caller's address, which is the right shape
+    for a caller that has one. The scrape measured on 2026-09-19 (ADR-0088) did
+    not: 15,307 requests an hour from 11,835 addresses, 1.3 requests each, so
+    every per-caller bucket it met was full. What it consumed was not one
+    caller's share, it was the box, and the only budget that can see that is a
+    budget the whole outside world shares.
+
+    So this is deliberately a tool of last resort, and it is sized to sit above
+    real use: a reader reaching it means the site is already being consumed
+    faster than it can answer, and shedding with 429 is the better of the two
+    ways that ends. `is_internal_caller` exempts the reader's own server-side
+    calls, which arrive from the compose network and are themselves bounded by
+    the reader's cookie gate and by ADR-0029's per-person limits in
+    `frontend/src/middleware.ts`.
+    """
+    limiter = RateLimiter(name=name, capacity=capacity, per_second=per_second)
+    LIMITERS[name] = limiter
+
+    def dependency(request: Request) -> None:
+        if is_internal_caller(request):
+            return
+        retry_after = limiter.check("*")
+        if retry_after is not None:
+            raise HTTPException(
+                status_code=429,
+                detail="the site is shedding automated load; try again shortly",
                 headers={"Retry-After": str(int(retry_after) + 1)},
             )
 

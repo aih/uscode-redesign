@@ -102,6 +102,80 @@ def test_a_request_with_no_client_still_gets_a_key():
     assert client_key(_NoClient()) == "-"
 
 
+# --------------------------------------------- the budget everyone shares
+
+
+def _request(query: str = "", client: tuple[str, int] | None = ("47.82.52.29", 1234)):
+    """A Request with just enough scope for a limiter dependency to read."""
+    from fastapi import Request
+
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/us/usc/t16/s45f",
+            "query_string": query.encode(),
+            "headers": [],
+            "client": client,
+        }
+    )
+
+
+def test_the_axis_budget_is_one_bucket_for_every_outside_caller():
+    """ADR-0088's scrape came from 11,835 addresses, so a per-address bucket
+    never saw a second request from any of them."""
+    from fastapi import HTTPException
+
+    from params import global_rate_limit
+
+    limit = global_rate_limit("t-global", capacity=2, per_second=0.01)
+
+    limit(_request(client=("47.82.52.29", 1)))
+    limit(_request(client=("47.79.11.4", 1)))
+    with pytest.raises(HTTPException) as refused:
+        limit(_request(client=("39.109.2.7", 1)))
+
+    assert refused.value.status_code == 429
+    assert int(refused.value.headers["Retry-After"]) >= 1
+
+
+def test_the_reader_is_exempt_from_the_axis_budget():
+    """The reader renders server-side and calls the API from the compose
+    network; its readers are bounded at the proxy and in its own middleware."""
+    from params import global_rate_limit, is_internal_caller
+
+    assert is_internal_caller(_request(client=("172.18.0.4", 1)))
+    # Python's ipaddress counts the documentation ranges (203.0.113.0/24 and
+    # friends) as private, so an address from one of those is not a usable
+    # stand-in for an outside caller here.
+    assert is_internal_caller(_request(client=("127.0.0.1", 1)))
+    assert not is_internal_caller(_request(client=("47.82.52.29", 1)))
+    assert not is_internal_caller(_request(client=None))
+    assert not is_internal_caller(_request(client=("testclient", 1)))
+
+    limit = global_rate_limit("t-internal", capacity=1, per_second=0.01)
+    for _ in range(5):
+        limit(_request(client=("10.83.0.4", 1)))  # never refused
+
+
+def test_only_a_pinned_request_is_charged_to_the_axis_budget():
+    """An unpinned request is the current text of one section — what a person
+    asks for. The pinned forms are the ones that multiply out."""
+    from fastapi import HTTPException
+
+    from api.routes import _limit_pinned
+    from params import LIMITERS
+
+    LIMITERS["axis"].reset()
+    for _ in range(200):
+        _limit_pinned(_request())  # no release, date or id: not charged
+
+    with pytest.raises(HTTPException):
+        for _ in range(200):
+            _limit_pinned(_request("release=119-99"))
+    LIMITERS["axis"].reset()
+
+
 # ------------------------------------------------------------- the wiring
 
 
