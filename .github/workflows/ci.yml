@@ -223,6 +223,18 @@ jobs:
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
+      # Again with the reader's cookie gate on (ADR-0088). The gate's matcher
+      # and its response are inside a block that no request reaches while
+      # USC_GATE_HOST is the default, so the pass above provisions everything
+      # except the part that only the box runs.
+      - name: deploy/Caddyfile validates with the gate on
+        env:
+          USC_GATE_HOST: gate.example
+        run: |
+          docker run --rm -e SITE_ADDRESS -e USC_GATE_HOST \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
   # What the slow suite covers. It is off the per-push path by design — it
   # parses the 32 MB usc16.xml — but a parser change should be measured before
   # it merges rather than at 06:17 the next morning.

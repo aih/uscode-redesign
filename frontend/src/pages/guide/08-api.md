@@ -5,7 +5,7 @@ order: 8
 summary: The same answers as JSON or as the source XML, at the same addresses, for anyone who would rather ask a program than a browser.
 covers:
   routes: ["/app/docs"]
-  adrs: [29, 32, 57, 73, 84]
+  adrs: [29, 32, 57, 73, 84, 88]
 ---
 
 Everything the reader shows comes from a public API at `/api/v1`. The reader calls the same routes
@@ -118,9 +118,19 @@ address, or fifty from one caller, and further attempts answer `429`.
 request. This is separate from the per-caller limits above: a `429` means you asked too often, a
 `503` means the site as a whole is at capacity. Retry after a moment.
 
+**A shared budget for pinned lookups.** Beyond the per-caller limits, requests that pin a release
+point — `?release=`, `?date=`, or `?id=` — draw on one budget shared by every caller outside the
+site: a burst of 120, refilled at 6 a second. Over it, `429` with `Retry-After`. Requests for the
+current text of a section are not counted against it.
+
 **Automated crawling.** `robots.txt` is `Disallow: /`. An agent that identifies itself as a crawler
 gets `403` on every path. Scripted use of `/api/v1` is not affected — the block is on self-declared
 crawlers, not on programmatic callers.
+
+**The reader needs cookies; the API does not.** Pages under `/app` are served only to a client that
+carries the site's cookie. A browser gets it on its first visit, from a page that says *Checking
+your browser* and reloads itself once. A client with no cookie store gets `403` there. `/api/v1`,
+the citation URL at `/us/usc/…`, and `robots.txt` are served without it.
 
 **`HEAD` is not routed.** Every `/api/v1` route is registered for its own method alone, so a `HEAD`
 request answers `405`.

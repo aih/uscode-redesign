@@ -47,6 +47,16 @@ SITE_HOST="${SITE_HOST%%/*}"
 SITE_HOST="${SITE_HOST%%:*}"
 REGION="${AWS_REGION:-us-east-1}"
 
+# The reader's cookie gate (ADR-0088) answers 403 to a request for /app that
+# carries no cookie, which is what this probe is. Without these two lines the
+# watchdog would read the gate as the site being down and recreate the
+# containers every ten minutes, for ever. The values are the proxy's own, from
+# the same .env the proxy reads them from.
+GATE_COOKIE="$(grep -E '^USC_GATE_COOKIE=' .env 2>/dev/null | cut -d= -f2- || true)"
+GATE_COOKIE="${GATE_COOKIE:-usc_h}"
+GATE_TOKEN="$(grep -E '^USC_GATE_TOKEN=' .env 2>/dev/null | cut -d= -f2- || true)"
+GATE_TOKEN="${GATE_TOKEN:-1}"
+
 STATE_DIR="${DATA_ROOT}/watchdog"
 STATE_FILE="${STATE_DIR}/consecutive-failures"
 LAST_RESTART_FILE="${STATE_DIR}/last-restart"
@@ -82,6 +92,7 @@ probe() {
     local path="$1" code
     code="$(curl -sS -o /dev/null --max-time "$PROBE_TIMEOUT" \
         --resolve "${SITE_HOST}:443:127.0.0.1" \
+        -b "${GATE_COOKIE}=${GATE_TOKEN}" \
         -w '%{http_code}' "https://${SITE_HOST}${path}" 2>/dev/null)"
     if [ "$?" -eq 7 ]; then
         echo refused
