@@ -20,11 +20,15 @@ guessed parser would get wrong, all covered by tests:
   * **Duplicate entries.** Three labels are listed twice, and `113-165` carries
     *different* affected titles in its two entries (25 vs 39, 49). Duplicates merge
     and their title lists union; taking the first would silently drop titles.
+  * **The current release point is not on this page.** OLRC keeps it as a
+    commented-out `<li>` at the top and uncomments it only when the next one
+    supersedes it, so this page alone always runs one release point behind.
+    The current one is read from <https://uscode.house.gov/download/download.shtml>
+    (`parse_current_release_point`) and appended as the newest entry.
   * **Prose drift.** "affecting title 47" (singular), "…, 47, and 50" (Oxford
     "and"), "Pub. L. 116-155 (8/8/2020)" (unpadded date, no "Public Law"),
     "…, and including Public Law 119-1 (January 29, 2025)" (a second date that is
-    *not* the currency date — the first `MM/DD/YYYY` wins), and commented-out `<li>`
-    entries for release points that were never published (`119-102` itself).
+    *not* the currency date — the first `MM/DD/YYYY` wins).
   * **Appendix titles** appear as `18A`, normalized here to `18a` to match the
     `usc18a.xml` / `xml_usc18a@…zip` file naming (CLAUDE.md gotcha 7).
 """
@@ -35,7 +39,7 @@ import json
 import re
 import urllib.request
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -51,6 +55,9 @@ PRIOR_RELEASE_POINTS_URL = SOURCE_URL
 without importing the ingest layer. Re-exported under this name because that is
 what the CLI and the tests have always called it."""
 DOWNLOAD_BASE_URL = "https://uscode.house.gov/download/"
+CURRENT_RELEASE_POINT_URL = DOWNLOAD_BASE_URL + "download.shtml"
+"""The page carrying the current release point, which the prior-release-points
+page lists only once it has been superseded."""
 INVENTORY_PATH = Path("data/uscreleasepoints.json")
 
 USER_AGENT = (
@@ -80,6 +87,15 @@ _MONTHS = {
         start=1,
     )
 }
+_CURRENT_ZIP_RE = re.compile(
+    r'href="releasepoints/us/pl/\d+/[^/"]+/xml_usc[0-9a-zA-Z]+@(?P<label>[^"/]+)\.zip"'
+)
+_CURRENT_HEADING_RE = re.compile(
+    r'<h3 class="releasepointinformation">(?P<text>.*?)</h3>', re.DOTALL
+)
+_CHANGED_TITLE_RE = re.compile(
+    r'<div class="usctitle(?:appendix)?changed" id="us/usc/t(?P<num>[0-9a-zA-Z]+)"'
+)
 _TITLES_RE = re.compile(r"affecting titles?\s+(?P<titles>[^.]+)", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -244,6 +260,79 @@ def parse_inventory(html: str) -> list[ReleasePointEntry]:
     ]
 
 
+def parse_current_release_point(html: str) -> ReleasePointEntry:
+    """The current release point, from download.shtml. `seq` is left unset.
+
+    The label comes from the per-title XML zip links (`xml_usc26@119-108.zip`),
+    which must all name one label; the date from the page heading; the affected
+    titles from the rows OLRC marks changed (`usctitlechanged`,
+    `usctitleappendixchanged`), which it renders in bold.
+    """
+    labels = set(_CURRENT_ZIP_RE.findall(html))
+    if len(labels) != 1:
+        raise InventoryParseError(
+            f"expected one release point in the XML links at {CURRENT_RELEASE_POINT_URL}, "
+            f"found {sorted(labels) or 'none'}"
+        )
+    (label,) = labels
+    parse_label(label)
+
+    heading = _CURRENT_HEADING_RE.search(html)
+    heading_text = _clean_text(heading.group("text")) if heading else ""
+    currency_date = _parse_date(heading_text)
+    if currency_date is None:
+        raise InventoryParseError(
+            f"no currency date in the heading at {CURRENT_RELEASE_POINT_URL}: {heading_text!r}"
+        )
+
+    titles: list[str] = []
+    for num in _CHANGED_TITLE_RE.findall(html):
+        normalized = normalize_title_num(num)
+        if normalized not in titles:
+            titles.append(normalized)
+
+    congress, remainder = label.split("-", 1)
+    listed = ", ".join(t.lstrip("0").upper() for t in titles)
+    affecting = f", affecting title{'s' if len(titles) != 1 else ''} {listed}" if titles else ""
+    return ReleasePointEntry(
+        label=label,
+        currency_date=currency_date,
+        titles_affected=tuple(titles),
+        url=f"{DOWNLOAD_BASE_URL}releasepoints/us/pl/{congress}/{remainder}/usc-rp@{label}.htm",
+        description=f"{heading_text}{affecting}.",
+    )
+
+
+def with_current_release_point(
+    entries: list[ReleasePointEntry], current: ReleasePointEntry
+) -> list[ReleasePointEntry]:
+    """`entries` (oldest first) with the current release point appended as the
+    newest, unless the prior-release-points page already lists it."""
+    if any(entry.label == current.label for entry in entries):
+        return entries
+    if entries and current.currency_date < entries[-1].currency_date:
+        raise InventoryParseError(
+            f"the current release point {current.label} ({current.currency_date}) is "
+            f"older than the newest prior one, {entries[-1].label} "
+            f"({entries[-1].currency_date})"
+        )
+    return [*entries, replace(current, seq=len(entries))]
+
+
+def fetch_entries(
+    url: str = PRIOR_RELEASE_POINTS_URL,
+    current_url: str | None = CURRENT_RELEASE_POINT_URL,
+) -> list[ReleasePointEntry]:
+    """Every published release point, oldest first: the prior-release-points
+    page plus the current release point. Two requests; `current_url=None` skips
+    the second."""
+    entries = parse_inventory(fetch_inventory_html(url))
+    if current_url is None:
+        return entries
+    current = parse_current_release_point(fetch_inventory_html(current_url))
+    return with_current_release_point(entries, current)
+
+
 def write_inventory(
     entries: list[ReleasePointEntry],
     path: Path = INVENTORY_PATH,
@@ -391,19 +480,19 @@ def poll_source(
     session: Session,
     *,
     url: str = PRIOR_RELEASE_POINTS_URL,
+    current_url: str | None = CURRENT_RELEASE_POINT_URL,
     out_path: Path | None = INVENTORY_PATH,
     seed: bool = True,
 ) -> CheckResult:
-    """Fetch the release-points page, seed what is new, and record the check.
+    """Fetch the release-point pages, seed what is new, and record the check.
 
-    One network request (CLAUDE.md's source etiquette) and one `source_checks`
-    row per call, whatever happens. Commits nothing — the caller owns the
+    Two network requests (the prior-release-points page and the current release
+    point's page) and one `source_checks` row per call, whatever happens. Commits nothing — the caller owns the
     transaction, because on the success path the check row and the release
     points it describes should land together or not at all.
     """
     try:
-        html = fetch_inventory_html(url)
-        entries = parse_inventory(html)
+        entries = fetch_entries(url, current_url)
     except Exception as exc:  # network, HTTP, or InventoryParseError
         record_source_check(session, source_url=url, ok=False, error=f"{type(exc).__name__}: {exc}")
         return CheckResult(ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}")
