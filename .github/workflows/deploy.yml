@@ -84,6 +84,24 @@ jobs:
           cache-from: type=gha,scope=uscode-frontend
           cache-to: type=gha,mode=max,scope=uscode-frontend
 
+      # The Grafana Cloud OTLP endpoint and header (ADR-0089), from this
+      # repository's secrets into SSM Parameter Store, where the box reads them
+      # (deploy/otel-env.sh). Skipped while the secrets are unset.
+      - name: Store the telemetry settings
+        env:
+          OTLP_ENDPOINT: ${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}
+          OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
+        run: |
+          if [ -z "$OTLP_ENDPOINT" ] || [ -z "$OTLP_HEADERS" ]; then
+            echo "telemetry secrets not set; skipping"
+            exit 0
+          fi
+          aws ssm put-parameter --name /uscode/otel/endpoint --type SecureString \
+            --value "$OTLP_ENDPOINT" --overwrite >/dev/null
+          aws ssm put-parameter --name /uscode/otel/headers --type SecureString \
+            --value "$OTLP_HEADERS" --overwrite >/dev/null
+          echo "stored /uscode/otel/endpoint and /uscode/otel/headers"
+
       - name: Deploy on the box via SSM
         id: dispatch
         run: |

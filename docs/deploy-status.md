@@ -83,9 +83,14 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
-- **Telemetry (ADR-0089).** Add the two lines from the Grafana Cloud stack's OpenTelemetry tile
-  (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`) to `~/uscode-redesign/.env`, then
-  `docker compose -f docker-compose.prod.yml up -d api`. Until then the api exports nothing.
+- **Telemetry (ADR-0089).** Three steps, once:
+  1. Add the two values from the Grafana Cloud stack's OpenTelemetry tile as GitHub secrets of
+     this repository, `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS` (the value
+     after the `=`, without quotes).
+  2. Re-run `deploy/admin-grant.sh` under the admin profile, which adds `ssm:PutParameter` on
+     `/uscode/otel/*` to the GitHub role and `ssm:GetParameter` on it to the site role.
+  3. Deploy (merge, or run the Deploy workflow). The deploy stores the secrets in Parameter Store
+     and `deploy/otel-env.sh` writes them into `.env`. Until then the api exports nothing.
 
 **One thing.** The manual install pass on real devices, once the PWA phases deploy — the first
 item under [Still owed](#still-owed), which is otherwise a record of finished work as of

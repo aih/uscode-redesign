@@ -412,6 +412,12 @@ cat > "$SITE_INLINE_DOC" <<EOF
       "Effect": "Allow",
       "Action": "cloudwatch:PutMetricData",
       "Resource": "*"
+    },
+    {
+      "Sid": "OtelSettingsRead",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:${REGION}:${ACCOUNT_ID}:parameter/uscode/otel/*"
     }
   ]
 }
@@ -561,6 +567,12 @@ cat > "$GITHUB_PERMISSIONS_DOC" <<EOF
       "Effect": "Allow",
       "Action": "ec2:DescribeInstances",
       "Resource": "*"
+    },
+    {
+      "Sid": "OtelSettingsWrite",
+      "Effect": "Allow",
+      "Action": "ssm:PutParameter",
+      "Resource": "arn:aws:ssm:${REGION}:${ACCOUNT_ID}:parameter/uscode/otel/*"
     }
   ]
 }
