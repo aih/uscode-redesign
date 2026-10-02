@@ -29,10 +29,18 @@ has no `fastapi.telemetry` module; this repository locked 0.140.7.
    and the image tag as resource attributes, `parentbased_traceidratio` at 0.25, and a 60 s metric
    interval; the endpoint and its `Authorization` header come from `.env`.
 3. Traces are sampled at 25%. Metrics and logs are not sampled.
-4. The dashboard, alert rules and weekly summary are separate changes (the plan's phases 2 and 3).
+4. The endpoint and header are GitHub secrets of this repository (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+   `OTEL_EXPORTER_OTLP_HEADERS`). `deploy.yml` writes them to SSM Parameter Store as SecureStrings
+   at `/uscode/otel/endpoint` and `/uscode/otel/headers`; `deploy/otel-env.sh`, run by
+   `deploy-on-box.sh`, reads them with the instance role and rewrites the two lines in `.env`. The
+   GitHub role may only `ssm:PutParameter` and the site role only `ssm:GetParameter` under
+   `/uscode/otel/*` (`deploy/admin-grant.sh`). statutes-at-large reads the same two parameters.
 
 ## Consequences
 
+- The dashboard, alert rules and weekly summary are separate changes (the plan's phases 2 and 3).
+- The token passes through SSM Parameter Store, not through `send-command` parameters, which
+  are kept in the command history in plain text.
 - The dev stack, CI and `make test` export nothing; `tests/test_telemetry.py` checks the route
   template on the server span and the `/health` exclusion against an in-memory exporter.
 - Free-tier limits as reported at the time: 10,000 active series, 50 GB traces, 50 GB logs, 14-day
