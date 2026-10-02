@@ -96,11 +96,16 @@ jobs:
             echo "telemetry secrets not set; skipping"
             exit 0
           fi
-          aws ssm put-parameter --name /uscode/otel/endpoint --type SecureString \
-            --value "$OTLP_ENDPOINT" --overwrite >/dev/null
-          aws ssm put-parameter --name /uscode/otel/headers --type SecureString \
-            --value "$OTLP_HEADERS" --overwrite >/dev/null
-          echo "stored /uscode/otel/endpoint and /uscode/otel/headers"
+          # Never fails the deploy: without the grant (deploy/admin-grant.sh)
+          # the box keeps whatever .env already has.
+          if aws ssm put-parameter --name /uscode/otel/endpoint --type SecureString \
+                --value "$OTLP_ENDPOINT" --overwrite >/dev/null &&
+             aws ssm put-parameter --name /uscode/otel/headers --type SecureString \
+                --value "$OTLP_HEADERS" --overwrite >/dev/null; then
+            echo "stored /uscode/otel/endpoint and /uscode/otel/headers"
+          else
+            echo "::warning::could not store the telemetry settings; re-run deploy/admin-grant.sh"
+          fi
 
       - name: Deploy on the box via SSM
         id: dispatch
