@@ -83,6 +83,10 @@ because both probe with HEAD by default.
 
 ## What is left for you
 
+- **Telemetry (ADR-0089).** Add the two lines from the Grafana Cloud stack's OpenTelemetry tile
+  (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`) to `~/uscode-redesign/.env`, then
+  `docker compose -f docker-compose.prod.yml up -d api`. Until then the api exports nothing.
+
 **One thing.** The manual install pass on real devices, once the PWA phases deploy — the first
 item under [Still owed](#still-owed), which is otherwise a record of finished work as of
 2026-09-01: the classification tables and the pages that serve them, and the ADR-0074

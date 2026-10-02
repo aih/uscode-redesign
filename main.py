@@ -21,9 +21,10 @@ Every question about *which text* belongs to *which release point* is answered b
 the `Repository` behind `storage/` (CLAUDE.md architecture rule 1).
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, MutableMapping
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.docs import (
@@ -33,6 +34,7 @@ from fastapi.openapi.docs import (
 )
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.telemetry import TelemetryConfig
 
 from api.auth import auth
 from api.classification import router as classification_router
@@ -110,6 +112,18 @@ STATIC = Path(__file__).resolve().parent / "static"
 APIDOCS = "/static/apidocs"
 FAVICON = "/favicon.svg"
 
+def _untraced(scope: MutableMapping[str, Any]) -> bool:
+    """`/health` is polled every 10s by Docker and by the watchdog (ADR-0073)."""
+    return scope["path"] == "/health"
+
+
+# FastAPI's built-in OpenTelemetry (ADR-0089). It exports only when
+# OTEL_EXPORTER_OTLP_ENDPOINT is set, which it is on the box alone; everything
+# else about the export (service name, sampler, credentials) is OTEL_* in the
+# environment.
+TELEMETRY: TelemetryConfig = {"exclude": _untraced}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Close the corpus cache's connection pool on shutdown (ADR-0078).
@@ -134,6 +148,7 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     lifespan=lifespan,
+    telemetry=TELEMETRY,
 )
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

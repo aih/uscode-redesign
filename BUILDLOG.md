@@ -3519,3 +3519,13 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - The gate, live: `/app/us/usc/t16/s45f` → 403 with the `Set-Cookie` and `Cache-Control: no-store`; with `-b usc_h=1` → 200; `/app/preview/us/usc/t16/s45f` → 403 without the cookie and 200 with it (a browser's own island fetch is same-origin, so it carries it); `/app/offline`, `/app/sw.js`, `/robots.txt`, `/health`, `/api/v1/status` and `/api/v1/us/usc/t16/s45f?release=119-99` → 200 with no cookie at all.
   - Eight minutes of the proxy log after the deploy: **318 of 351 requests answered 403 at the proxy**; `api` 3.19% → 0.95% CPU, `frontend` 1.76% → 0.02%, `db` 5.63% → 0.19%, load average 1.09 → 0.71. No watchdog failure since 12:44 UTC, before the deploy.
   - `deploy/update-corpus.sh` run by hand on the box: the poll saw **385 release points, newest 119-108 (2026-09-11)**, the backfill fetched three title zips (26, 31, 40), `load-all` stored **3,119 sections — 131 new versions, 2,988 deduped (95.8%) — in 0.9 min**, and `/api/v1/status` now reads `latest_release 119-108`, `latest_currency_date 2026-09-11`, `behind_by 0`. `/app/us/usc/t26/s1` renders *§ 1 Tax imposed · 119-108*.
+
+## 107 — 2026-10-02 — Session 85: OpenTelemetry to Grafana Cloud (ADR-0089)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Review FastAPI's new built-in OpenTelemetry for this site and statutes-at-large, plan telemetry with a dashboard behind a GitHub login, a weekly email and spike alerts if cheap; then, plan approved, carry out phase 1.
+- **Decided:** ADR-0089. `fastapi[opentelemetry]>=0.142.2` (0.142.0 is the first release with `fastapi.telemetry`; 0.141.1 has none). Export directly to a Grafana Cloud free stack over OTLP/HTTP, no collector on the box; `/health` excluded; traces sampled at 25%. Dashboard, alert rules and the weekly SNS summary are later PRs.
+- **Produced:** `pyproject.toml`, `uv.lock` (FastAPI 0.140.7 → 0.142.2, OpenTelemetry SDK and OTLP/HTTP exporter 1.45.0), `main.py` (`TELEMETRY`), `docker-compose.prod.yml` (`OTEL_*` on `api`), `.env.example`, `tests/test_telemetry.py` (+3), `frontend/tests/guide.test.ts` (ADR-0089 as infrastructure), `docs/adr/0089-…`, `docs/deploy-status.md`.
+- **Verified:**
+  - `tests/test_telemetry.py`: the server span is named for the route template (`/api/v1/us/usc/{identifier}`) and `/health` produces no span.
+  - The real `main:app` against a local OTLP receiver with the compose variables set: POSTs to `/v1/traces` and `/v1/metrics`, the `Authorization` header decoded to `Basic abc`, `uscode-api` in the resource, no `/health` span, and the sampler `ParentBased{root:TraceIdRatioBased{0.25}}` — the SDK reads `OTEL_TRACES_SAMPLER` when FastAPI builds the provider.
