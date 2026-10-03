@@ -1,0 +1,36 @@
+# Applies deploy/grafana/ — the dashboard and alert rules for both sites'
+# telemetry — to the Grafana Cloud stack (ADR-0090). Runs when those files
+# change on main, and on demand.
+name: Grafana
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/grafana/**"
+      - ".github/workflows/grafana.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grafana
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply the dashboard and alert rules
+        env:
+          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+          ALERT_EMAIL: ${{ vars.ALERT_EMAIL || 'arihershowitz@gmail.com' }}
+        run: |
+          if [ -z "$GRAFANA_URL" ] || [ -z "$GRAFANA_TOKEN" ]; then
+            echo "::warning::GRAFANA_URL and GRAFANA_TOKEN are not set; nothing applied"
+            exit 0
+          fi
+          python3 deploy/grafana/apply.py
