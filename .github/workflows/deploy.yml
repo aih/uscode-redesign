@@ -96,6 +96,7 @@ jobs:
             echo "telemetry secrets not set; skipping"
             exit 0
           fi
+          python3 deploy/otel-check.py || true
           # Never fails the deploy: without the grant (deploy/admin-grant.sh)
           # the box keeps whatever .env already has.
           if aws ssm put-parameter --name /uscode/otel/endpoint --type SecureString \

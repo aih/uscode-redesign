@@ -50,3 +50,6 @@ has no `fastapi.telemetry` module; this repository locked 0.140.7.
   counted. Database, Redis and OpenSearch calls appear only as time inside the endpoint span.
 - Exception records carry stack traces to a third party. Validation-failure records carry the
   route and an error count, not the request body.
+- `deploy/otel-check.py` runs in the deploy before the two secrets are stored. It prints the
+  header's length and form, the decoded instance id, and the token's prefix and length, never
+  the token itself. It also prints Grafana's status for one empty metrics request.
