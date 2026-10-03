@@ -2,9 +2,9 @@
 
 While OLRC maintains the site its pages answer with a notice, and every parser
 that reads one used to report that the markup had probably changed. The notice
-pages below are composed for the test: the container this was written in could
-not reach uscode.house.gov to capture the live one. Each is the shape such a
-notice takes — a sentence in an otherwise empty page, or the body of a 503.
+page OLRC served on 2026-10-03 is `tests/fixtures/maintenance_notice.htm`;
+the others are composed variants of the same shape, a sentence in an otherwise
+empty page or the body of a 503.
 """
 
 import datetime
@@ -70,6 +70,26 @@ SOURCE_PAGES = [
 @pytest.mark.parametrize(("page", "sentence"), NOTICES)
 def test_finds_the_sentence_that_announces_maintenance(page, sentence):
     assert maintenance_notice(page) == sentence
+
+
+LIVE_NOTICE = (FIXTURES / "maintenance_notice.htm").read_text()
+
+
+def test_finds_the_notice_uscode_house_gov_served():
+    """The page's text as served on 2026-10-03, in reconstructed markup."""
+    assert maintenance_notice(LIVE_NOTICE) == "Site is currently under maintenance"
+
+
+@pytest.mark.parametrize(
+    "parse",
+    [parse_inventory, parse_current_release_point, parse_tables_index],
+    ids=["prior release points", "current release point", "classification index"],
+)
+def test_every_poll_reports_the_notice_uscode_house_gov_served(parse):
+    with pytest.raises(
+        SourceUnderMaintenance, match="Site is currently under maintenance"
+    ):
+        parse(LIVE_NOTICE)
 
 
 @pytest.mark.parametrize("name", SOURCE_PAGES)
