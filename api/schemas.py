@@ -575,6 +575,15 @@ class TitleOut(BaseModel):
         )
 
 
+MAINTENANCE_ERROR_PREFIX = "SourceUnderMaintenance:"
+"""How a check row's `error` begins when the source showed its maintenance
+notice: the exception's class name, as `poll_source` records every failure."""
+
+
+def is_maintenance_error(error: str | None) -> bool:
+    return bool(error) and error.startswith(MAINTENANCE_ERROR_PREFIX)
+
+
 class SourceCheckOut(BaseModel):
     """When this mirror last asked uscode.house.gov what exists."""
 
@@ -607,6 +616,11 @@ class SourceCheckOut(BaseModel):
     error: str | None = Field(
         default=None, description="Why the last check failed, if it did."
     )
+    under_maintenance: bool = Field(
+        default=False,
+        description="True when the last check failed because uscode.house.gov "
+        "answered with its maintenance notice instead of the page.",
+    )
 
     @classmethod
     def of(cls, check: SourceCheckInfo | None, *, url: str) -> "SourceCheckOut":
@@ -626,6 +640,7 @@ class SourceCheckOut(BaseModel):
             latest_published_label=check.latest_label,
             latest_published_date=check.latest_currency_date,
             error=check.error,
+            under_maintenance=is_maintenance_error(check.error),
         )
 
 
@@ -859,6 +874,11 @@ class ClassificationCheckOut(BaseModel):
     )
     latest_covered_text: str | None = None
     error: str | None = None
+    under_maintenance: bool = Field(
+        default=False,
+        description="True when the last check failed because uscode.house.gov "
+        "answered with its maintenance notice instead of the page.",
+    )
 
     @classmethod
     def of(
@@ -891,6 +911,7 @@ class ClassificationCheckOut(BaseModel):
             changed_files=list(check.changed_files),
             latest_covered_text=check.latest_covered_text,
             error=check.error,
+            under_maintenance=is_maintenance_error(check.error),
         )
 
 

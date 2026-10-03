@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.error
 import urllib.request
 import warnings
 from dataclasses import dataclass, field, replace
@@ -47,6 +48,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db.models import ReleasePoint, SourceCheck
+from ingest.maintenance import raise_if_maintenance, raise_if_maintenance_response
 from ingest.release_label import parse_label
 from storage.repository import SOURCE_URL
 
@@ -190,9 +192,13 @@ def normalize_title_num(title_num: str) -> str:
 def fetch_inventory_html(url: str = PRIOR_RELEASE_POINTS_URL, *, timeout: int = 60) -> str:
     """GET the release-points page. One request, descriptive UA (CLAUDE.md etiquette)."""
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed https host
-        charset = response.headers.get_content_charset() or "utf-8"
-        return response.read().decode(charset)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed https host
+            charset = response.headers.get_content_charset() or "utf-8"
+            return response.read().decode(charset)
+    except urllib.error.HTTPError as error:
+        raise_if_maintenance_response(error, url)
+        raise
 
 
 def parse_inventory(html: str) -> list[ReleasePointEntry]:
@@ -241,6 +247,7 @@ def parse_inventory(html: str) -> list[ReleasePointEntry]:
                     draft.titles.append(title)
 
     if not drafts:
+        raise_if_maintenance(html, PRIOR_RELEASE_POINTS_URL)
         raise InventoryParseError(
             f"no release points found — the markup at {PRIOR_RELEASE_POINTS_URL} "
             "has probably changed"
@@ -270,6 +277,8 @@ def parse_current_release_point(html: str) -> ReleasePointEntry:
     """
     labels = set(_CURRENT_ZIP_RE.findall(html))
     if len(labels) != 1:
+        if not labels:
+            raise_if_maintenance(html, CURRENT_RELEASE_POINT_URL)
         raise InventoryParseError(
             f"expected one release point in the XML links at {CURRENT_RELEASE_POINT_URL}, "
             f"found {sorted(labels) or 'none'}"
@@ -493,7 +502,7 @@ def poll_source(
     """
     try:
         entries = fetch_entries(url, current_url)
-    except Exception as exc:  # network, HTTP, or InventoryParseError
+    except Exception as exc:  # network, HTTP, InventoryParseError, or SourceUnderMaintenance
         record_source_check(session, source_url=url, ok=False, error=f"{type(exc).__name__}: {exc}")
         return CheckResult(ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}")
 

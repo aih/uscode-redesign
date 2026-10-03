@@ -38,6 +38,9 @@ export interface SourceCheck {
   latest_published_label: string | null;
   latest_published_date: string | null;
   error: string | null;
+  /** The last check failed because uscode.house.gov showed its maintenance
+   * notice. Absent from an API older than the field. */
+  under_maintenance?: boolean;
 }
 
 export interface CorpusStatus {
@@ -419,6 +422,9 @@ export interface ClassificationSource {
   changed_files: string[];
   latest_covered_text: string | null;
   error: string | null;
+  /** The last check failed because uscode.house.gov showed its maintenance
+   * notice. Absent from an API older than the field. */
+  under_maintenance?: boolean;
 }
 
 /** Route 1: the registry, its freshness, and the two totals the index page

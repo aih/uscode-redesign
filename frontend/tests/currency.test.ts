@@ -114,6 +114,19 @@ describe("currencyNote", () => {
     expect(note.detail).toContain("URLError: timed out");
   });
 
+  it("says the official site is under maintenance when that is why the check failed", () => {
+    const error =
+      "SourceUnderMaintenance: uscode.house.gov is under maintenance — " +
+      "https://uscode.house.gov/download/priorreleasepoints.htm returned its maintenance notice";
+    const note = currencyNote(
+      status({ ok: false, stale: true, error, under_maintenance: true }),
+    )!;
+    expect(note.tone).toBe("warning");
+    expect(note.text).toContain("uscode.house.gov is under maintenance");
+    expect(note.text).not.toContain("failed");
+    expect(note.detail).toContain(error);
+  });
+
   it("reports being behind before reporting being stale — it is the actionable one", () => {
     const note = currencyNote(
       status({ stale: true, hours_since_check: 24 * 9 }, { behind_by: 4 }),
@@ -228,6 +241,20 @@ describe("classificationNote", () => {
     )!;
     expect(note.text).toContain("failed");
     expect(note.detail).toContain("HTTP 503");
+  });
+
+  it("says the official site is under maintenance when that is why the check failed", () => {
+    const note = classificationNote(
+      classification({
+        ok: false,
+        stale: true,
+        error: "SourceUnderMaintenance: uscode.house.gov is under maintenance",
+        under_maintenance: true,
+      }),
+    )!;
+    expect(note.tone).toBe("warning");
+    expect(note.text).toContain("uscode.house.gov is under maintenance");
+    expect(note.text).not.toContain("failed");
   });
 
   it("warns when the last successful check is older than the site's own bound", () => {
