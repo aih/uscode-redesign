@@ -154,10 +154,15 @@ def apply(grafana: Grafana, prom_uid: str, email: str) -> None:
     print(f"alert rules: {', '.join(rule['title'] for rule in rules)}")
 
 
-def main() -> None:
+def require_env() -> tuple[str, str]:
     url, token = os.environ.get("GRAFANA_URL", ""), os.environ.get("GRAFANA_TOKEN", "")
     if not url or not token:
         sys.exit("GRAFANA_URL and GRAFANA_TOKEN must be set")
+    return url, token
+
+
+def main() -> None:
+    url, token = require_env()
     grafana = Grafana(url, token)
     prom_uid = discover(grafana)
     if "--discover-only" not in sys.argv:

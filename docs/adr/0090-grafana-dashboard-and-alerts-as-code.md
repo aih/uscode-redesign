@@ -28,6 +28,12 @@ dashboard or an alert rule made in its UI only in that stack, with no history an
    email contact point for `ALERT_EMAIL` and the rule group.
 4. Rules are written with `X-Disable-Provenance`, so they stay editable in the UI. The next run of
    the workflow overwrites edits made there.
+5. `.github/workflows/weekly-summary.yml` runs `deploy/grafana/weekly.py` on Mondays at 13:07 UTC
+   and on demand. It reads the past seven days from the Prometheus data source through Grafana with
+   the same token: requests per site and the change on the week before, 5xx responses, p95
+   latency, the peak rate over 5-minute windows and the five busiest routes. The text is published
+   to the `uscode-alerts` SNS topic, under the GitHub deploy role's `sns:Publish` grant in
+   `deploy/admin-grant.sh`.
 
 ## Consequences
 
@@ -39,3 +45,5 @@ dashboard or an alert rule made in its UI only in that stack, with no history an
   CloudWatch alarms still go through SNS.
 - The service account needs the Admin role. With Editor, the first run was refused
   `GET /api/datasources` (403, `datasources:read`).
+- The weekly summary needs `deploy/admin-grant.sh` re-run once, for `sns:Publish`. Its subject
+  and body are plain text, since SNS email carries no formatting.

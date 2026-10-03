@@ -74,3 +74,56 @@ def test_without_an_email_the_default_contact_point_is_used() -> None:
         for rule in group["rules"]
     )
     assert not any("contact-points" in path for _, path, _ in grafana.calls)
+
+
+def _load_weekly():
+    spec = importlib.util.spec_from_file_location(
+        "grafana_weekly", GRAFANA / "weekly.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _Prometheus:
+    url = "https://example.grafana.net"
+
+    def __init__(self, answers: dict[str, list[dict]]) -> None:
+        self.answers = answers
+
+    def prom(self, uid, path, params):
+        return {"result": self.answers.get(params["query"], [])}
+
+
+def test_weekly_summary_reports_each_site() -> None:
+    import datetime
+
+    weekly = _load_weekly()
+
+    def row(job, value, **labels):
+        return {"metric": {"job": job, **labels}, "value": [0, str(value)]}
+
+    grafana = _Prometheus(
+        {
+            weekly.QUERIES["requests"]: [row("uscode-api", 1200)],
+            weekly.QUERIES["previous"]: [row("uscode-api", 1000)],
+            weekly.QUERIES["p95"]: [row("uscode-api", 0.25)],
+            weekly.QUERIES["peak"]: [row("uscode-api", 1.5)],
+            weekly.ROUTES: [
+                row("uscode-api", 40, http_route="/api/v1/status"),
+                row("uscode-api", 900, http_route="/api/v1/us/usc/{identifier:path}"),
+            ],
+        }
+    )
+    text = weekly.summary(grafana, datetime.date(2026, 10, 5))
+    lines = text.splitlines()
+    assert lines[0] == "US Code sites: the week to 2026-10-05"
+    assert "  Requests: 1,200 (+20% on the week before)" in lines
+    assert "  Server errors (5xx): 0" in lines
+    assert "  Latency p95: 250 ms" in lines
+    assert "  Peak: 1.50 requests a second" in lines
+    routes = [line for line in lines if line.startswith("    ")]
+    assert routes[0].endswith("/api/v1/us/usc/{identifier:path}")
+    statutes = lines[lines.index("statutes-api") + 1 :]
+    assert statutes[0] == "  Requests: no data"
+    assert "Dashboard: https://example.grafana.net/d/uscode-sites" in lines

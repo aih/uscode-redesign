@@ -88,6 +88,8 @@ because both probe with HEAD by default.
   `Authorization=Basic%20<base64 of instance-id:glc_token>`, the whole string, without quotes.
   The dashboard and alert rules are applied by the Grafana workflow from `deploy/grafana/`, with
   the `GRAFANA_URL` and `GRAFANA_TOKEN` secrets (a service account with the Admin role; Editor is refused `datasources:read`).
+  The weekly summary (`.github/workflows/weekly-summary.yml`, Mondays 13:07 UTC) mails through
+  `uscode-alerts` and needs `deploy/admin-grant.sh` re-run once for `sns:Publish`.
 
 **One thing.** The manual install pass on real devices, once the PWA phases deploy — the first
 item under [Still owed](#still-owed), which is otherwise a record of finished work as of
