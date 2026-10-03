@@ -103,6 +103,14 @@ export function currencyNote(status: Status | null): CurrencyNote | null {
 
   const ago = humanizeAge(source.hours_since_check);
 
+  if (!source.ok && source.under_maintenance) {
+    return {
+      tone: "warning",
+      text: `uscode.house.gov is under maintenance, so the last check for new release points could not read it (${ago}).`,
+      detail: `${held}${source.error ? ` The check reported: ${source.error}` : ""}`,
+    };
+  }
+
   if (!source.ok) {
     return {
       tone: "warning",
@@ -196,6 +204,14 @@ export function classificationNote(source: ClassificationSource | null): Currenc
   }
 
   const ago = humanizeAge(source.hours_since_check);
+
+  if (!source.ok && source.under_maintenance) {
+    return {
+      tone: "warning",
+      text: `uscode.house.gov is under maintenance, so the last check for new classification tables could not read it (${ago}).`,
+      detail: `${held}${source.error ? ` The check reported: ${source.error}` : ""}`,
+    };
+  }
 
   if (!source.ok) {
     return {

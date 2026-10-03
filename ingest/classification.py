@@ -65,6 +65,7 @@ import html as htmllib
 import json
 import re
 import time
+import urllib.error
 import urllib.request
 import warnings
 from collections.abc import Callable, Iterable, Sequence
@@ -82,6 +83,7 @@ from db.models import ClassificationSourceCheck
 from db.models import EcctEntry as EcctEntryRow
 from ingest.download import Opener, throttle
 from ingest.inventory import USER_AGENT
+from ingest.maintenance import raise_if_maintenance, raise_if_maintenance_response
 from ingest.verification import VERIFICATION_DIR, write_verification_json
 from storage.classification import CLASSIFICATION_SOURCE_URL, law_in_ranges
 
@@ -342,6 +344,7 @@ def parse_tables_index(html: str, *, base_url: str = CLASSIFICATION_BASE_URL) ->
         )
 
     if not links:
+        raise_if_maintenance(html, CLASSIFICATION_SOURCE_URL)
         raise ClassificationParseError(
             "no classification tables found on the entry page — the markup at "
             f"{CLASSIFICATION_SOURCE_URL} has probably changed"
@@ -1217,6 +1220,7 @@ def _extract_pre(html: str, filename: str) -> tuple[str, int]:
     `<pre>`, so the enclosing `</div>` ends it instead."""
     opening = _PRE_OPEN_RE.search(html)
     if opening is None:
+        raise_if_maintenance(html, filename)
         raise ClassificationParseError(f"{filename}: no <pre> block — this is not a table page")
     rest = html[opening.end() :]
     closing = _PRE_CLOSE_RE.search(rest)
@@ -1512,9 +1516,13 @@ def fetch_classification_page(
     """
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     throttle()
-    with (opener or _default_opener)(request, timeout) as response:
-        charset = getattr(response.headers, "get_content_charset", lambda: None)() or "utf-8"
-        html = response.read().decode(charset, errors="replace")
+    try:
+        with (opener or _default_opener)(request, timeout) as response:
+            charset = getattr(response.headers, "get_content_charset", lambda: None)() or "utf-8"
+            html = response.read().decode(charset, errors="replace")
+    except urllib.error.HTTPError as error:
+        raise_if_maintenance_response(error, url)
+        raise
 
     if cache_dir is not None:
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -2179,7 +2187,7 @@ def poll_classification(
     try:
         html = fetch_classification_page(url, cache_dir=cache_dir, opener=opener)
         links = parse_tables_index(html)
-    except Exception as exc:  # network, HTTP, or ClassificationParseError
+    except Exception as exc:  # network, HTTP, ClassificationParseError, SourceUnderMaintenance
         error = f"{type(exc).__name__}: {exc}"
         record_classification_check(session, source_url=url, ok=False, error=error)
         return ClassificationCheckResult(ok=False, links=(), changed_files=(), error=error)

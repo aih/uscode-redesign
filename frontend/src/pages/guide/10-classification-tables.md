@@ -279,7 +279,8 @@ last-checked date shown is the date the tables were loaded from uscode.house.gov
 that updates it.
 
 Two states get a warning instead: the last check failed, or the last check succeeded longer ago
-than the daily schedule intends. The tables shown are the ones this site holds; a warning means
+than the daily schedule intends. When the check failed because uscode.house.gov was showing its
+maintenance notice, the warning says so. The tables shown are the ones this site holds; a warning means
 OLRC may have published a newer one since anybody asked.
 
 ## Limitations

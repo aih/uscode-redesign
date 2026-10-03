@@ -153,8 +153,10 @@ release point the OLRC has published as current at the next check.
 
 The release point list also says when the site last looked for a new release point — *“Checked uscode.house.gov
 for new release points 3 hours ago.”* It is a plain line when everything is current and a warning
-when it is not, including when the last check **failed**. The API answers the same question at
-`/api/v1/status`.
+when it is not, including when the last check **failed**. When uscode.house.gov answered the check
+with its maintenance notice, the warning says that the official site is under maintenance and quotes
+the notice. The API answers the same question at `/api/v1/status`, where `under_maintenance` is
+`true` in that case.
 
 The header shows the newest release point this site has loaded and the date it is current through,
 under the site's name: *Current through 07/12/2026 · 119-102not101*. Below 480 pixels wide it reads
