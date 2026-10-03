@@ -87,7 +87,7 @@ because both probe with HEAD by default.
   `otel-check` lines report `grafana: 200`. `OTEL_EXPORTER_OTLP_HEADERS` is
   `Authorization=Basic%20<base64 of instance-id:glc_token>`, the whole string, without quotes.
   The dashboard and alert rules are applied by the Grafana workflow from `deploy/grafana/`, with
-  the `GRAFANA_URL` and `GRAFANA_TOKEN` secrets (a service account with the Admin role; Editor is refused `datasources:read` and the alerting provisioning API).
+  the `GRAFANA_URL` and `GRAFANA_TOKEN` secrets (a service account with the Admin role; Editor is refused `datasources:read`).
 
 **One thing.** The manual install pass on real devices, once the PWA phases deploy — the first
 item under [Still owed](#still-owed), which is otherwise a record of finished work as of
