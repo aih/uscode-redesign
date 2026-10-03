@@ -89,6 +89,7 @@ const INFRASTRUCTURE_ADRS = new Set([
   78, // the corpus cache under a generation counter — origin-side, invisible
   86, // container log limits and the root-disk alarm — host operations
   89, // OpenTelemetry export to Grafana Cloud — operations, no reader change
+  90, // Grafana dashboard and alert rules as code — operations, no reader change
 ]);
 
 const chapters = readChapters();

@@ -1,0 +1,138 @@
+{
+  "folder": {
+    "uid": "uscode",
+    "title": "US Code sites"
+  },
+  "group": "uscode",
+  "interval": 60,
+  "rules": [
+    {
+      "uid": "uscode-traffic-spike",
+      "title": "Traffic spike",
+      "condition": "C",
+      "for": "10m",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 900,
+            "to": 0
+          },
+          "datasourceUid": "${PROM}",
+          "model": {
+            "refId": "A",
+            "expr": "sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 3 * (sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m] offset 1w)) or sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) * 0) and sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 2",
+            "instant": true,
+            "intervalMs": 60000,
+            "maxDataPoints": 43200
+          }
+        },
+        {
+          "refId": "B",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "B",
+            "type": "reduce",
+            "expression": "A",
+            "reducer": "last"
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "B",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "annotations": {
+        "summary": "{{ $labels.job }} is serving {{ humanize $values.B.Value }} requests a second",
+        "description": "Over three times the rate at the same time last week, and over 2 requests a second, for 10 minutes."
+      },
+      "labels": {
+        "team": "uscode"
+      },
+      "notification_settings": {
+        "receiver": "${RECEIVER}"
+      }
+    },
+    {
+      "uid": "uscode-server-errors",
+      "title": "Server errors",
+      "condition": "C",
+      "for": "10m",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 900,
+            "to": 0
+          },
+          "datasourceUid": "${PROM}",
+          "model": {
+            "refId": "A",
+            "expr": "sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\", http_response_status_code=~\"5..\"}[10m])) / sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 0.05 and sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 0.1",
+            "instant": true,
+            "intervalMs": 60000,
+            "maxDataPoints": 43200
+          }
+        },
+        {
+          "refId": "B",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "B",
+            "type": "reduce",
+            "expression": "A",
+            "reducer": "last"
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "B",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "annotations": {
+        "summary": "{{ $labels.job }}: {{ humanizePercentage $values.B.Value }} of responses are 5xx",
+        "description": "Over 5% of responses were server errors for 10 minutes."
+      },
+      "labels": {
+        "team": "uscode"
+      },
+      "notification_settings": {
+        "receiver": "${RECEIVER}"
+      }
+    }
+  ]
+}
