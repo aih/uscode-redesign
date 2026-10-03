@@ -79,6 +79,8 @@ def summary(grafana: Grafana, today: datetime.date) -> str:
                 row
                 for row in (routes or {}).get("result", [])
                 if row["metric"].get("job") == site
+                and row["metric"].get("http_route")
+                and float(row["value"][1]) >= 0.5
             ),
             key=lambda row: -float(row["value"][1]),
         )
