@@ -1,0 +1,45 @@
+# Mails a weekly summary of both sites' telemetry (ADR-0090): requests and the
+# change on the week before, server errors, p95 latency, the peak rate and the
+# busiest routes, read from Grafana Cloud by deploy/grafana/weekly.py and
+# published to the uscode-alerts SNS topic, which mails the site's owner.
+name: Weekly summary
+
+on:
+  schedule:
+    # Monday 13:07 UTC.
+    - cron: "7 13 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  TOPIC_ARN: arn:aws:sns:us-east-1:739065237548:uscode-alerts
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write the summary
+        env:
+          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+        run: python3 deploy/grafana/weekly.py "$RUNNER_TEMP/summary.txt"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # sns:Publish on uscode-alerts comes from deploy/admin-grant.sh.
+      - name: Mail it through SNS
+        run: |
+          SUBJECT="$(head -n 1 "$RUNNER_TEMP/summary.txt")"
+          tail -n +3 "$RUNNER_TEMP/summary.txt" > "$RUNNER_TEMP/body.txt"
+          aws sns publish --topic-arn "$TOPIC_ARN" --subject "$SUBJECT" \
+              --message "file://$RUNNER_TEMP/body.txt" --query MessageId --output text

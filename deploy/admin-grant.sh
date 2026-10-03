@@ -573,6 +573,12 @@ cat > "$GITHUB_PERMISSIONS_DOC" <<EOF
       "Effect": "Allow",
       "Action": "ssm:PutParameter",
       "Resource": "arn:aws:ssm:${REGION}:${ACCOUNT_ID}:parameter/uscode/otel/*"
+    },
+    {
+      "Sid": "WeeklySummaryPublish",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:${REGION}:${ACCOUNT_ID}:uscode-alerts"
     }
   ]
 }
