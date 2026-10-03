@@ -37,3 +37,5 @@ dashboard or an alert rule made in its UI only in that stack, with no history an
   second for outside callers, which bounds what a spike from outside can reach.
 - Grafana's alert email goes directly to `ALERT_EMAIL`, not through the `uscode-alerts` SNS topic.
   CloudWatch alarms still go through SNS.
+- The service account needs the Admin role. With Editor, the first run was refused
+  `GET /api/datasources` (403, `datasources:read`).
