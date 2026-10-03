@@ -111,6 +111,7 @@ def test_weekly_summary_reports_each_site() -> None:
             weekly.QUERIES["peak"]: [row("uscode-api", 1.5)],
             weekly.ROUTES: [
                 row("uscode-api", 40, http_route="/api/v1/status"),
+                row("uscode-api", 0),
                 row("uscode-api", 900, http_route="/api/v1/us/usc/{identifier:path}"),
             ],
         }
@@ -123,6 +124,7 @@ def test_weekly_summary_reports_each_site() -> None:
     assert "  Latency p95: 250 ms" in lines
     assert "  Peak: 1.50 requests a second" in lines
     routes = [line for line in lines if line.startswith("    ")]
+    assert len(routes) == 2
     assert routes[0].endswith("/api/v1/us/usc/{identifier:path}")
     statutes = lines[lines.index("statutes-api") + 1 :]
     assert statutes[0] == "  Requests: no data"
