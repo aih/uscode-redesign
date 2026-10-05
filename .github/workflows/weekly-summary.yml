@@ -8,7 +8,12 @@ on:
   schedule:
     # Monday 13:07 UTC.
     - cron: "7 13 * * 1"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      send:
+        description: "Mail the summary (off: write it to the log only)"
+        type: boolean
+        default: true
 
 permissions:
   id-token: write
@@ -31,6 +36,7 @@ jobs:
         run: python3 deploy/grafana/weekly.py "$RUNNER_TEMP/summary.txt"
 
       - name: Configure AWS credentials
+        if: github.event_name != 'workflow_dispatch' || inputs.send
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
@@ -38,6 +44,7 @@ jobs:
 
       # sns:Publish on uscode-alerts comes from deploy/admin-grant.sh.
       - name: Mail it through SNS
+        if: github.event_name != 'workflow_dispatch' || inputs.send
         run: |
           SUBJECT="$(head -n 1 "$RUNNER_TEMP/summary.txt")"
           tail -n +3 "$RUNNER_TEMP/summary.txt" > "$RUNNER_TEMP/body.txt"

@@ -36,7 +36,7 @@ ROUTES = f"topk by (job) (5, sum by (job, http_route) (increase({COUNT}[7d])))"
 
 
 def by_job(grafana: Grafana, query: str) -> dict[str, float]:
-    data = grafana.prom(PROM_UID, "query", {"query": query})
+    data = grafana.instant(PROM_UID, query)
     return {
         row["metric"].get("job", ""): float(row["value"][1])
         for row in (data or {}).get("result", [])
@@ -55,7 +55,7 @@ def change(now: float | None, before: float | None) -> str:
 
 def summary(grafana: Grafana, today: datetime.date) -> str:
     values = {name: by_job(grafana, query) for name, query in QUERIES.items()}
-    routes = grafana.prom(PROM_UID, "query", {"query": ROUTES})
+    routes = grafana.instant(PROM_UID, ROUTES)
     lines = [
         f"US Code sites: the week to {today:%Y-%m-%d}",
         "",

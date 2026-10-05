@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -26,6 +27,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 JOBS = 'job=~"uscode-api|statutes-api"'
 HISTOGRAM = "http_server_request_duration_seconds_count"
+# A GET that meets a 5xx or no answer at all is tried again after each of
+# these pauses: Grafana Cloud's data source proxy answers 503 DatasourceError
+# for minutes at a time (the weekly summary of 2026-10-05).
+RETRY_PAUSES = (15, 60, 180, 600)
 
 
 class Grafana:
@@ -39,6 +44,7 @@ class Grafana:
         path: str,
         body: object | None = None,
         ok: tuple[int, ...] = (),
+        retry: bool | None = None,
     ) -> tuple[int, object]:
         data = None if body is None else json.dumps(body).encode()
         request = urllib.request.Request(
@@ -52,11 +58,25 @@ class Grafana:
                 "X-Disable-Provenance": "true",
             },
         )
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                status, raw = response.status, response.read()
-        except urllib.error.HTTPError as error:
-            status, raw = error.code, error.read()
+        if retry is None:
+            retry = method == "GET"
+        pauses = list(RETRY_PAUSES) if retry else []
+        while True:
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    status, raw = response.status, response.read()
+            except urllib.error.HTTPError as error:
+                status, raw = error.code, error.read()
+            except (urllib.error.URLError, TimeoutError) as error:
+                if not pauses:
+                    sys.exit(f"{method} {path}: {error}")
+                status, raw = 0, str(error).encode()
+            if (status == 0 or status >= 500) and pauses:
+                pause = pauses.pop(0)
+                print(f"{method} {path}: {status or raw.decode()}; again in {pause}s")
+                time.sleep(pause)
+                continue
+            break
         try:
             payload: object = json.loads(raw) if raw else None
         except ValueError:
@@ -71,6 +91,49 @@ class Grafana:
             "GET", f"/api/datasources/proxy/uid/{uid}/api/v1/{path}?{query}"
         )
         return payload.get("data") if isinstance(payload, dict) else payload
+
+    def instant(self, uid: str, expr: str) -> dict[str, list[dict]]:
+        """One instant PromQL query through `/api/ds/query`, in Prometheus's shape.
+
+        `/api/ds/query` is the path Grafana's own dashboards and alert rules
+        query through; the data source proxy `prom()` uses answered 503
+        DatasourceError on every query from 2026-10-05 while it kept working.
+        The frames are turned back into `{"result": [{"metric", "value"}]}`.
+        """
+        _, payload = self.call(
+            "POST",
+            "/api/ds/query",
+            {
+                "from": "now-5m",
+                "to": "now",
+                "queries": [
+                    {
+                        "refId": "A",
+                        "datasource": {"type": "prometheus", "uid": uid},
+                        "expr": expr,
+                        "instant": True,
+                        "range": False,
+                    }
+                ],
+            },
+            retry=True,
+        )
+        answer = (payload or {}).get("results", {}).get("A", {})
+        if answer.get("error"):
+            sys.exit(f"query failed: {answer['error']}\n  {expr}")
+        result = []
+        for frame in answer.get("frames", []):
+            fields = frame.get("schema", {}).get("fields", [])
+            values = frame.get("data", {}).get("values", [])
+            for index, field in enumerate(fields):
+                if field.get("type") != "number" or index >= len(values):
+                    continue
+                for value in values[index]:
+                    if value is not None:
+                        result.append(
+                            {"metric": field.get("labels") or {}, "value": [0, str(value)]}
+                        )
+        return {"result": result}
 
 
 def discover(grafana: Grafana) -> str:

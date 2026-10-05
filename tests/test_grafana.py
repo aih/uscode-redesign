@@ -91,8 +91,8 @@ class _Prometheus:
     def __init__(self, answers: dict[str, list[dict]]) -> None:
         self.answers = answers
 
-    def prom(self, uid, path, params):
-        return {"result": self.answers.get(params["query"], [])}
+    def instant(self, uid, expr):
+        return {"result": self.answers.get(expr, [])}
 
 
 def test_weekly_summary_reports_each_site() -> None:
@@ -129,3 +129,98 @@ def test_weekly_summary_reports_each_site() -> None:
     statutes = lines[lines.index("statutes-api") + 1 :]
     assert statutes[0] == "  Requests: no data"
     assert "Dashboard: https://example.grafana.net/d/uscode-sites" in lines
+
+
+def test_a_get_is_retried_through_a_datasource_503(monkeypatch) -> None:
+    import io
+    import urllib.error
+
+    apply = _load_apply()
+    monkeypatch.setattr(apply.time, "sleep", lambda _: None)
+    answers = [
+        urllib.error.HTTPError(
+            "u", 503, "x", {}, io.BytesIO(b'{"code": "DatasourceError"}')
+        ),
+        urllib.error.URLError("timed out"),
+    ]
+
+    class _Response(io.BytesIO):
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def urlopen(request, timeout):
+        if answers:
+            raise answers.pop(0)
+        return _Response(b'{"data": {"result": []}}')
+
+    monkeypatch.setattr(apply.urllib.request, "urlopen", urlopen)
+    grafana = apply.Grafana("https://example.grafana.net", "token")
+    assert grafana.prom("prom", "query", {"query": "up"}) == {"result": []}
+    assert answers == []
+
+
+def test_a_get_gives_up_after_the_last_pause(monkeypatch) -> None:
+    import io
+    import urllib.error
+
+    import pytest
+
+    apply = _load_apply()
+    monkeypatch.setattr(apply.time, "sleep", lambda _: None)
+    tries = []
+
+    def urlopen(request, timeout):
+        tries.append(1)
+        raise urllib.error.HTTPError("u", 503, "x", {}, io.BytesIO(b"{}"))
+
+    monkeypatch.setattr(apply.urllib.request, "urlopen", urlopen)
+    with pytest.raises(SystemExit):
+        apply.Grafana("https://example.grafana.net", "t").call("GET", "/api/health")
+    assert len(tries) == len(apply.RETRY_PAUSES) + 1
+
+
+def test_instant_reads_the_frames_ds_query_returns(monkeypatch) -> None:
+    apply = _load_apply()
+    sent = []
+
+    def call(method, path, body=None, ok=(), retry=None):
+        sent.append((method, path, body, retry))
+        frame = {
+            "schema": {
+                "fields": [
+                    {"name": "Time", "type": "time"},
+                    {"name": "Value", "type": "number", "labels": {"job": "uscode-api"}},
+                ]
+            },
+            "data": {"values": [[1759680000000], [1200.5]]},
+        }
+        return 200, {"results": {"A": {"status": 200, "frames": [frame]}}}
+
+    grafana = apply.Grafana("https://example.grafana.net", "t")
+    monkeypatch.setattr(grafana, "call", call)
+    assert grafana.instant("prom", "up") == {
+        "result": [{"metric": {"job": "uscode-api"}, "value": [0, "1200.5"]}]
+    }
+    method, path, body, retry = sent[0]
+    assert (method, path, retry) == ("POST", "/api/ds/query", True)
+    assert body["queries"][0]["datasource"]["uid"] == "prom"
+    assert body["queries"][0]["instant"] is True
+
+
+def test_instant_stops_on_a_query_error(monkeypatch) -> None:
+    import pytest
+
+    apply = _load_apply()
+    grafana = apply.Grafana("https://example.grafana.net", "t")
+    monkeypatch.setattr(
+        grafana,
+        "call",
+        lambda *a, **k: (200, {"results": {"A": {"error": "bad_data: parse error"}}}),
+    )
+    with pytest.raises(SystemExit, match="bad_data"):
+        grafana.instant("prom", "up(")
