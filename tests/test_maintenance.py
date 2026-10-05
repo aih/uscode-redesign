@@ -254,3 +254,69 @@ def test_the_classification_status_says_when_the_source_was_under_maintenance():
     )
     out = ClassificationCheckOut.of(check, url=check.source_url)
     assert out.under_maintenance
+
+
+# ---------------------------------------------------- the CLI's exit codes
+
+
+def test_the_prefix_ingest_reads_is_the_one_the_api_reads():
+    from ingest.maintenance import is_maintenance_error
+
+    assert is_maintenance_error(f"{MAINTENANCE_ERROR_PREFIX} down")
+    assert not is_maintenance_error("URLError: timed out")
+    assert not is_maintenance_error(None)
+
+
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        ("SourceUnderMaintenance: uscode.house.gov is under maintenance", 75),
+        ("URLError: timed out", 1),
+    ],
+)
+@pytest.mark.parametrize("command", ["check", "inventory"])
+def test_check_and_inventory_exit_75_under_maintenance(
+    monkeypatch, tmp_path, command, error, code
+):
+    """deploy/update-corpus.sh reads 75 as "the source is down", not a failure."""
+    from ingest import __main__ as cli
+
+    monkeypatch.setattr(
+        cli,
+        "_poll",
+        lambda **_: inventory_mod.CheckResult(
+            ok=False, entries=[], new_labels=(), error=error
+        ),
+    )
+    assert cli.main([command, "--out", str(tmp_path / "inventory.json")]) == code
+
+
+def test_classification_exits_75_under_maintenance(monkeypatch):
+    from ingest import __main__ as cli
+
+    def down(*_, **__):
+        raise SourceUnderMaintenance(classification_mod.CLASSIFICATION_SOURCE_URL, "Down")
+
+    monkeypatch.setattr(classification_mod, "run_classification_load", down)
+    assert cli.main(["classification", "--force", "--quiet"]) == 75
+
+
+def test_classification_check_exits_75_under_maintenance(monkeypatch):
+    from ingest import __main__ as cli
+
+    def down(session, **_):
+        return classification_mod.ClassificationCheckResult(
+            ok=False,
+            links=(),
+            changed_files=(),
+            error="SourceUnderMaintenance: uscode.house.gov is under maintenance",
+        )
+
+    class _Session:
+        def commit(self): ...
+        def rollback(self): ...
+        def close(self): ...
+
+    monkeypatch.setattr(cli, "SessionLocal", _Session)
+    monkeypatch.setattr(classification_mod, "poll_classification", down)
+    assert cli.main(["classification-check"]) == 75

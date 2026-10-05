@@ -27,9 +27,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 JOBS = 'job=~"uscode-api|statutes-api"'
 HISTOGRAM = "http_server_request_duration_seconds_count"
-# A GET that meets a 5xx or no answer at all is tried again after each of
-# these pauses: Grafana Cloud's data source proxy answers 503 DatasourceError
-# for minutes at a time (the weekly summary of 2026-10-05).
+# A GET (or a query) that meets a 5xx or no answer at all is tried again after
+# each of these pauses: Grafana Cloud answered 503 DatasourceError to the
+# weekly summary's first query at 13:31 and 15:43 on 2026-10-05, and to its
+# first /api/ds/query at 15:45, which the next try answered.
 RETRY_PAUSES = (15, 60, 180, 600)
 
 
@@ -96,8 +97,8 @@ class Grafana:
         """One instant PromQL query through `/api/ds/query`, in Prometheus's shape.
 
         `/api/ds/query` is the path Grafana's own dashboards and alert rules
-        query through; the data source proxy `prom()` uses answered 503
-        DatasourceError on every query from 2026-10-05 while it kept working.
+        query through. Both it and the data source proxy `prom()` uses answer
+        503 DatasourceError now and then, so the POST is retried like a GET.
         The frames are turned back into `{"result": [{"metric", "value"}]}`.
         """
         _, payload = self.call(

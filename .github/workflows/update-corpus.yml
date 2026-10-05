@@ -97,6 +97,18 @@ jobs:
             --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID")
           STDOUT=$(echo "$INVOCATION" | jq -r ".StandardOutputContent")
           STDERR=$(echo "$INVOCATION" | jq -r ".StandardErrorContent")
+          CODE=$(echo "$INVOCATION" | jq -r ".ResponseCode")
+
+          # 75: uscode.house.gov answered with its maintenance notice and
+          # nothing else failed. The script skipped the steps that read it
+          # and loaded what the mirror holds; the daily poll on the box picks
+          # the source up again once it answers.
+          if [ "$STATUS" = "Failed" ] && [ "$CODE" = "75" ]; then
+            echo "=== stdout ==="
+            echo "$STDOUT"
+            echo "::warning::uscode.house.gov was under maintenance; the steps that read it were skipped this week"
+            exit 0
+          fi
 
           case "$STATUS" in
             Success)

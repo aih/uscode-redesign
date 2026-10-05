@@ -36,6 +36,15 @@
 # The classification tables (ADR-0067) are a second source with its own poll and
 # its own check table, run first and independently of all of that.
 #
+# While uscode.house.gov answers with its maintenance notice, the ingest
+# commands exit 75 (ingest/maintenance.py). The steps that need the source —
+# the two polls, the classification sweep, inventory, backfill, mirror push —
+# are skipped; the ones that do not — mirror pull, load-all, version-changes,
+# verify — still run on a forced sweep. If nothing else failed the run exits
+# 75 too, and .github/workflows/update-corpus.yml reports that as a warning
+# rather than a failure. The SourceCheckStale alarm is what says the source
+# has been down too long.
+#
 # data/uscreleasepoints.json is ephemeral inside the container: only
 # data/releases and data/manifests are volume-mounted (docker-compose.prod.yml),
 # not the inventory JSON. That means the chain has to happen as one script run,
@@ -60,7 +69,7 @@ case "${1:-}" in
     *) echo "usage: $0 [--check-only|--force]" >&2; exit 2 ;;
 esac
 
-DATA_ROOT="$(grep -E '^DATA_ROOT=' .env 2>/dev/null | cut -d= -f2- || true)"
+DATA_ROOT="${DATA_ROOT:-$(grep -E '^DATA_ROOT=' .env 2>/dev/null | cut -d= -f2- || true)}"
 DATA_ROOT="${DATA_ROOT:-/var/lib/uscode}"
 MIRROR_BUCKET="$(grep -E '^USC_MIRROR_BUCKET=' .env 2>/dev/null | cut -d= -f2- || true)"
 MIRROR_BUCKET="${MIRROR_BUCKET:-uscode-mirror-dreamproit}"
@@ -235,6 +244,10 @@ run_classification() {
     out="$($COMPOSE exec -T api uv run python -m ingest classification "$@" 2>&1)"
     status=$?
     echo "$out"
+    if [ "$status" -eq 75 ]; then
+        SOURCE_DOWN=1
+        return 75
+    fi
     changed="$(printf '%s\n' "$out" \
         | sed -n 's/.*, \([0-9][0-9]*\) with new content.*/\1/p' | tail -1)"
     # An unreadable summary must not read as "nothing changed" — that is the
@@ -312,6 +325,22 @@ CLASSIFICATION_CHANGED=0
 # (`--recompute` / `--reattribute`), so a failure warns and the chain goes on;
 # it still exits non-zero at the bottom so the run shows up red.
 VERSION_CHANGES_STATUS=0
+# Set when uscode.house.gov answered with its maintenance notice (exit 75).
+SOURCE_DOWN=0
+
+# How the run ends once the source-independent work is done: a real failure
+# exits 1, the source being under maintenance and nothing else exits 75.
+finish() {
+    if [ "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))" -ne 0 ]; then
+        exit 1
+    fi
+    if [ "$SOURCE_DOWN" -eq 1 ]; then
+        echo "uscode.house.gov was under maintenance — the steps that read it were skipped"
+        exit 75
+    fi
+    exit 0
+}
+
 run classification-check
 case "$?" in
     0)  echo "no classification table has changed" ;;
@@ -320,9 +349,17 @@ case "$?" in
         if [ "$MODE" = "check-only" ]; then
             echo "check-only: not loading"
         elif ! run_classification --quiet; then
-            echo "the classification load failed — see above"
-            CLASSIFICATION_STATUS=1
+            if [ "$SOURCE_DOWN" -eq 1 ]; then
+                echo "uscode.house.gov is under maintenance — the classification load is skipped"
+            else
+                echo "the classification load failed — see above"
+                CLASSIFICATION_STATUS=1
+            fi
         fi
+        ;;
+    75)
+        echo "uscode.house.gov is under maintenance — no classification poll this run"
+        SOURCE_DOWN=1
         ;;
     *)
         echo "the classification check failed — see above"
@@ -333,10 +370,14 @@ esac
 # A forced sweep re-fetches and re-loads every table, ignoring both the
 # covered-text gate and the content hash. The check above has already run and
 # recorded; this is the repair pass behind it.
-if [ "$MODE" = "force" ]; then
+if [ "$MODE" = "force" ] && [ "$SOURCE_DOWN" -eq 0 ]; then
     if ! run_classification --force --quiet; then
-        echo "the forced classification sweep failed — see above"
-        CLASSIFICATION_STATUS=1
+        if [ "$SOURCE_DOWN" -eq 1 ]; then
+            echo "uscode.house.gov is under maintenance — the forced classification sweep is skipped"
+        else
+            echo "the forced classification sweep failed — see above"
+            CLASSIFICATION_STATUS=1
+        fi
     fi
 fi
 
@@ -360,6 +401,13 @@ publish_staleness
 case "$CHECK_STATUS" in
     0)  echo "no new release points" ;;
     10) echo "new release points published" ;;
+    75)
+        echo "uscode.house.gov is under maintenance — no release-point poll this run"
+        SOURCE_DOWN=1
+        # A forced sweep goes on without the source; the automatic path has
+        # nothing to act on.
+        [ "$MODE" = "force" ] || [ "$MODE" = "check-only" ] || finish
+        ;;
     *)
         echo "the check failed — see above"
         # A failed poll is not a reason to skip a forced sweep: the sweep
@@ -375,11 +423,11 @@ esac
 # same reason a failed dump exits non-zero at the bottom of this script.
 if [ "$MODE" = "check-only" ]; then
     echo "=== $(date -u +%FT%TZ) check complete (check-only) ==="
-    exit "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))"
+    finish
 fi
 if [ "$MODE" != "force" ] && [ "$CHECK_STATUS" -eq 0 ]; then
     echo "=== $(date -u +%FT%TZ) nothing to do ==="
-    exit "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))"
+    finish
 fi
 
 # Pull BEFORE anything else, exactly as scripts/run-backfill-ec2.sh does, and
@@ -400,9 +448,33 @@ run mirror pull || { echo "mirror pull failed"; exit 1; }
 # just overwritten data/uscreleasepoints.json with S3's, and this is the step
 # that puts the current one back — both on disk and in `release_points`. It
 # records a second source_check, which is correct; it is a second real request.
-run inventory || { echo "inventory failed"; exit 1; }
-run backfill --quiet || { echo "backfill failed"; exit 1; }
-run mirror push || { echo "mirror push failed"; exit 1; }
+#
+# inventory, backfill and mirror push read uscode.house.gov, so they wait for
+# the next run while it is under maintenance; what the mirror already holds
+# still loads below.
+#
+# Keyed on the release-point poll rather than on SOURCE_DOWN: the
+# classification pages can be down while the download pages answer.
+SKIP_DOWNLOADS=0
+[ "$CHECK_STATUS" -eq 75 ] && SKIP_DOWNLOADS=1
+if [ "$SKIP_DOWNLOADS" -eq 0 ]; then
+    run inventory
+    INVENTORY_STATUS=$?
+    if [ "$INVENTORY_STATUS" -eq 75 ]; then
+        echo "uscode.house.gov went into maintenance — inventory, backfill and mirror push are skipped"
+        SOURCE_DOWN=1
+        SKIP_DOWNLOADS=1
+    elif [ "$INVENTORY_STATUS" -ne 0 ]; then
+        echo "inventory failed"
+        exit 1
+    fi
+fi
+if [ "$SKIP_DOWNLOADS" -eq 0 ]; then
+    run backfill --quiet || { echo "backfill failed"; exit 1; }
+    run mirror push || { echo "mirror push failed"; exit 1; }
+else
+    echo "=== uscode.house.gov is under maintenance — loading what the mirror holds ==="
+fi
 # Incremental: resume state is the database (title_versions.sections_loaded),
 # not a second ledger. Search stays in step automatically inside
 # ingest/load.py (sync_sections + retire_versions) — no separate reindex step.
@@ -483,4 +555,4 @@ echo "=== $(date -u +%FT%TZ) corpus update complete ==="
 if [ "$DUMP_STATUS" -ne 0 ]; then
     exit "$DUMP_STATUS"
 fi
-exit "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))"
+finish

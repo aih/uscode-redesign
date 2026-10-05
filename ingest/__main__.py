@@ -16,6 +16,7 @@ from ingest import mirror as mirror_mod
 from ingest import verify as verify_mod
 from ingest.download import DOWNLOAD_DIR, download_title_zip, extract_title_xml, sha256_file
 from ingest.load import LoadStats, load_release
+from ingest.maintenance import EXIT_MAINTENANCE, SourceUnderMaintenance, is_maintenance_error
 from ingest.manifest import write_manifest
 
 
@@ -434,7 +435,7 @@ def _cmd_inventory(args: argparse.Namespace) -> int:
     result = _poll(url=args.url, current_url=args.current_url, out_path=args.out)
     if not result.ok:
         print(f"inventory failed: {result.error}", file=sys.stderr)
-        return 1
+        return EXIT_MAINTENANCE if is_maintenance_error(result.error) else 1
     print(f"wrote {len(result.entries)} release points to {args.out}")
     _print_span(result.entries)
     print(f"release_points seeded: {result.inserted} inserted, {result.updated} updated")
@@ -450,13 +451,14 @@ def _cmd_check(args: argparse.Namespace) -> int:
         0   checked; nothing new
         10  checked; new release points published — run the full update
         1   the check itself failed
+        75  uscode.house.gov answered with its maintenance notice
 
-    The `source_checks` row is written in all three cases.
+    The `source_checks` row is written in every case.
     """
     result = _poll(url=args.url, current_url=args.current_url, out_path=args.out)
     if not result.ok:
         print(f"check failed: {result.error}", file=sys.stderr)
-        return 1
+        return EXIT_MAINTENANCE if is_maintenance_error(result.error) else 1
 
     newest = result.entries[-1]
     print(
@@ -729,18 +731,22 @@ def _cmd_classification(args: argparse.Namespace) -> int:
     and one that is fetched is skipped anyway if its `<PRE>` text hashes the
     same. A re-run over an up-to-date database is two requests and no writes.
     """
-    report = classification_mod.run_classification_load(
-        SessionLocal,
-        congress=args.congress,
-        session_num=args.session,
-        force=args.force,
-        from_dir=args.from_file,
-        cache_dir=args.cache_dir,
-        load=not args.no_load,
-        verification_dir=args.out,
-        manifest_path=args.manifest,
-        on_event=None if args.quiet else print,
-    )
+    try:
+        report = classification_mod.run_classification_load(
+            SessionLocal,
+            congress=args.congress,
+            session_num=args.session,
+            force=args.force,
+            from_dir=args.from_file,
+            cache_dir=args.cache_dir,
+            load=not args.no_load,
+            verification_dir=args.out,
+            manifest_path=args.manifest,
+            on_event=None if args.quiet else print,
+        )
+    except SourceUnderMaintenance as exc:
+        print(f"classification failed: SourceUnderMaintenance: {exc}", file=sys.stderr)
+        return EXIT_MAINTENANCE
 
     # `changed` is the count deploy/update-corpus.sh reads: under --force every
     # fetched document is "loaded" whether or not OLRC edited it, and
@@ -772,8 +778,9 @@ def _cmd_classification_check(args: argparse.Namespace) -> int:
         0   checked; no table has changed
         10  checked; a table has changed — run `python -m ingest classification`
         1   the check itself failed
+        75  uscode.house.gov answered with its maintenance notice
 
-    The `classification_source_checks` row is written in all three cases.
+    The `classification_source_checks` row is written in every case.
     """
     session = SessionLocal()
     try:
@@ -793,7 +800,7 @@ def _cmd_classification_check(args: argparse.Namespace) -> int:
 
     if not result.ok:
         print(f"classification check failed: {result.error}", file=sys.stderr)
-        return 1
+        return EXIT_MAINTENANCE if is_maintenance_error(result.error) else 1
 
     print(f"checked {args.url}: {len(result.links)} documents linked")
     if result.latest_covered_text:
