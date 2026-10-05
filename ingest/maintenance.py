@@ -40,6 +40,18 @@ NOTICE_LIMIT = 300
 truncates to 500 with the URL in front of it."""
 
 
+# The exit code `check`, `classification-check`, `inventory` and
+# `classification` return when the source answered with its maintenance
+# notice: sysexits.h's EX_TEMPFAIL. deploy/update-corpus.sh reads it to skip
+# the steps that need the source instead of failing the run.
+EXIT_MAINTENANCE = 75
+
+
+def is_maintenance_error(error: str | None) -> bool:
+    """Whether a recorded error string is a SourceUnderMaintenance."""
+    return bool(error) and error.startswith("SourceUnderMaintenance:")
+
+
 class SourceUnderMaintenance(RuntimeError):
     """uscode.house.gov answered with its maintenance notice instead of the page.
 
