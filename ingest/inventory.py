@@ -6,11 +6,21 @@ PLAN §1 calls it "the RP inventory JSON" after `uscreleasepoints.json` from
 shape kept here — `{name, date, titlesAffected, url}` per RP — is deliberately
 that one's, so the existing tooling and this project can read each other's files.
 
-Source: <https://uscode.house.gov/download/priorreleasepoints.htm>, one `<li>` per
-release point, newest first. Everything structured comes out of the link href
-(`releasepoints/us/pl/119/102not101/usc-rp@119-102not101.htm` → label
-`119-102not101`); the link *text* is prose written by a human and is only mined
-for the currency date and the affected titles. Things the real page does that a
+Source: two pages of uscode.house.gov, read in one of two markups.
+
+  * **Since 2026-10-12** (ADR-0091) the site is `priorreleasepoints.html`, which
+    lists only a window of recent release points (one, on the day it relaunched),
+    and `download.html`, the current one. Each release point is a section headed
+    `<h3 class="releasepointinformation">Public Law 119-118 (09/30/2026)</h3>`
+    with one download row per title; the label comes from the zip links and the
+    changed titles from the rows marked `usctitlechanged`, which the prior page
+    does not mark. Because the window does not hold the history, a poll merges it
+    into the inventory this site already holds (`merge_inventory`).
+  * **Before then** the prior page was `download/priorreleasepoints.htm`, one `<li>`
+    per release point back to 2013, newest first. Everything structured comes out
+    of the link href (`releasepoints/us/pl/119/102not101/usc-rp@119-102not101.htm`
+    → label `119-102not101`); the link *text* is prose written by a human and is
+    only mined for the currency date and the affected titles. Things the real page does that a
 guessed parser would get wrong, all covered by tests:
 
   * **Page order is the ordering.** Labels don't sort (gotcha 4) and dates tie, but
@@ -57,9 +67,12 @@ PRIOR_RELEASE_POINTS_URL = SOURCE_URL
 without importing the ingest layer. Re-exported under this name because that is
 what the CLI and the tests have always called it."""
 DOWNLOAD_BASE_URL = "https://uscode.house.gov/download/"
-CURRENT_RELEASE_POINT_URL = DOWNLOAD_BASE_URL + "download.shtml"
+"""Where the zips are. Unchanged by the 2026-10-12 relaunch, which moved the pages
+that link to them (ADR-0091)."""
+CURRENT_RELEASE_POINT_URL = "https://uscode.house.gov/download.html"
 """The page carrying the current release point, which the prior-release-points
-page lists only once it has been superseded."""
+page lists only once it has been superseded. `download/download.shtml` before
+2026-10-12."""
 INVENTORY_PATH = Path("data/uscreleasepoints.json")
 
 USER_AGENT = (
@@ -90,11 +103,12 @@ _MONTHS = {
     )
 }
 _CURRENT_ZIP_RE = re.compile(
-    r'href="releasepoints/us/pl/\d+/[^/"]+/xml_usc[0-9a-zA-Z]+@(?P<label>[^"/]+)\.zip"'
+    r'href="(?:download/)?releasepoints/us/pl/\d+/[^/"]+/xml_usc[0-9a-zA-Z]+@(?P<label>[^"/]+)\.zip"'
 )
 _CURRENT_HEADING_RE = re.compile(
     r'<h3 class="releasepointinformation">(?P<text>.*?)</h3>', re.DOTALL
 )
+_SECTION_START_RE = re.compile(r'<h3 class="releasepointinformation">')
 _CHANGED_TITLE_RE = re.compile(
     r'<div class="usctitle(?:appendix)?changed" id="us/usc/t(?P<num>[0-9a-zA-Z]+)"'
 )
@@ -247,6 +261,9 @@ def parse_inventory(html: str) -> list[ReleasePointEntry]:
                     draft.titles.append(title)
 
     if not drafts:
+        sections = parse_release_point_sections(html)
+        if sections:
+            return sections
         raise_if_maintenance(html, PRIOR_RELEASE_POINTS_URL)
         raise InventoryParseError(
             f"no release points found — the markup at {PRIOR_RELEASE_POINTS_URL} "
@@ -268,19 +285,54 @@ def parse_inventory(html: str) -> list[ReleasePointEntry]:
 
 
 def parse_current_release_point(html: str) -> ReleasePointEntry:
-    """The current release point, from download.shtml. `seq` is left unset.
+    """The current release point, from `download.html`. `seq` is left unset.
 
     The label comes from the per-title XML zip links (`xml_usc26@119-108.zip`),
     which must all name one label; the date from the page heading; the affected
     titles from the rows OLRC marks changed (`usctitlechanged`,
     `usctitleappendixchanged`), which it renders in bold.
     """
+    return _parse_section(html, CURRENT_RELEASE_POINT_URL)
+
+
+def parse_release_point_sections(html: str) -> list[ReleasePointEntry]:
+    """The release points on the relaunched `priorreleasepoints.html` (ADR-0091),
+    oldest first, `seq` assigned from page order.
+
+    One section per release point, each opened by its
+    `<h3 class="releasepointinformation">` heading and laid out like the current
+    release point's page. The prior page marks no changed titles, so an entry from
+    it carries none; `merge_inventory` decides what that means. An empty list when
+    the page has no such heading.
+    """
+    starts = [match.start() for match in _SECTION_START_RE.finditer(html)]
+    entries: list[ReleasePointEntry] = []
+    seen: set[str] = set()
+    for index, start in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else len(html)
+        entry = _parse_section(html[start:end], PRIOR_RELEASE_POINTS_URL)
+        if entry.label not in seen:
+            seen.add(entry.label)
+            entries.append(entry)
+    oldest_first = list(reversed(entries))
+    for later, earlier in zip(oldest_first[1:], oldest_first):
+        if later.currency_date < earlier.currency_date:
+            raise InventoryParseError(
+                f"{PRIOR_RELEASE_POINTS_URL} lists {later.label} ({later.currency_date}) "
+                f"above {earlier.label} ({earlier.currency_date})"
+            )
+    return [replace(entry, seq=seq) for seq, entry in enumerate(oldest_first)]
+
+
+def _parse_section(html: str, url: str) -> ReleasePointEntry:
+    """One release point's heading and download rows, as `download.html` lays
+    them out and as each section of the relaunched prior page does."""
     labels = set(_CURRENT_ZIP_RE.findall(html))
     if len(labels) != 1:
         if not labels:
-            raise_if_maintenance(html, CURRENT_RELEASE_POINT_URL)
+            raise_if_maintenance(html, url)
         raise InventoryParseError(
-            f"expected one release point in the XML links at {CURRENT_RELEASE_POINT_URL}, "
+            f"expected one release point in the XML links at {url}, "
             f"found {sorted(labels) or 'none'}"
         )
     (label,) = labels
@@ -291,7 +343,7 @@ def parse_current_release_point(html: str) -> ReleasePointEntry:
     currency_date = _parse_date(heading_text)
     if currency_date is None:
         raise InventoryParseError(
-            f"no currency date in the heading at {CURRENT_RELEASE_POINT_URL}: {heading_text!r}"
+            f"no currency date in the heading at {url}: {heading_text!r}"
         )
 
     titles: list[str] = []
@@ -301,15 +353,21 @@ def parse_current_release_point(html: str) -> ReleasePointEntry:
             titles.append(normalized)
 
     congress, remainder = label.split("-", 1)
-    listed = ", ".join(t.lstrip("0").upper() for t in titles)
-    affecting = f", affecting title{'s' if len(titles) != 1 else ''} {listed}" if titles else ""
     return ReleasePointEntry(
         label=label,
         currency_date=currency_date,
         titles_affected=tuple(titles),
         url=f"{DOWNLOAD_BASE_URL}releasepoints/us/pl/{congress}/{remainder}/usc-rp@{label}.htm",
-        description=f"{heading_text}{affecting}.",
+        description=f"{heading_text}{_affecting(tuple(titles))}.",
     )
+
+
+def _affecting(titles: tuple[str, ...]) -> str:
+    """`, affecting titles 26, 31` — the old prior page's own phrasing."""
+    if not titles:
+        return ""
+    listed = ", ".join(t.lstrip("0").upper() for t in titles)
+    return f", affecting title{'s' if len(titles) != 1 else ''} {listed}"
 
 
 def with_current_release_point(
@@ -328,18 +386,98 @@ def with_current_release_point(
     return [*entries, replace(current, seq=len(entries))]
 
 
+def merge_inventory(
+    known: list[ReleasePointEntry], published: list[ReleasePointEntry]
+) -> list[ReleasePointEntry]:
+    """The inventory this site holds, oldest first, with what the source now
+    publishes appended to it (ADR-0091).
+
+    `known` is never rewritten: its entries keep their order, dates and titles,
+    so a release point read from `download.html` while it was current keeps the
+    changed titles the prior page no longer marks. `published` may hold the whole
+    history (the pre-2026-10-12 page) or only a window of it (the relaunched one).
+
+    A new release point is fetched in full — every title the inventory has ever
+    seen marked as changed — when the source does not say which titles changed,
+    or when the release point before it on the source is not the newest one this
+    site holds: release points published in between are no longer listed, so its
+    changed titles are a delta from text this site never saw.
+
+    Raises `InventoryParseError` when the source orders release points this site
+    holds differently, or lists a new one before or earlier than one it holds.
+    Appending is the only change a poll may make to the ordering every release
+    comparison depends on (gotcha 4).
+    """
+    ordered = sorted(published, key=lambda entry: entry.seq)
+    if not known:
+        return [replace(entry, seq=seq) for seq, entry in enumerate(ordered)]
+
+    known = sorted(known, key=lambda entry: entry.seq)
+    position = {entry.label: index for index, entry in enumerate(known)}
+    newest = known[-1]
+
+    previous = -1
+    first_new: int | None = None
+    for index, entry in enumerate(ordered):
+        if entry.label in position:
+            if first_new is not None:
+                raise InventoryParseError(
+                    f"the source lists {ordered[first_new].label}, which this site does not "
+                    f"hold, before {entry.label}, which it does"
+                )
+            if position[entry.label] < previous:
+                raise InventoryParseError(
+                    f"the source orders {entry.label} differently from this site's inventory"
+                )
+            previous = position[entry.label]
+        elif first_new is None:
+            first_new = index
+
+    if first_new is None:
+        return list(known)
+
+    all_titles = tuple(
+        sorted({normalize_title_num(t) for entry in known for t in entry.titles_affected})
+    )
+    predecessor = ordered[first_new - 1].label if first_new > 0 else None
+    merged = list(known)
+    for index, entry in enumerate(ordered[first_new:], start=first_new):
+        if entry.currency_date < newest.currency_date:
+            raise InventoryParseError(
+                f"the source's new release point {entry.label} ({entry.currency_date}) is "
+                f"older than {newest.label} ({newest.currency_date}), the newest this site holds"
+            )
+        note = None
+        if index == first_new and predecessor != newest.label:
+            note = (
+                f"The source lists no release point between {newest.label} and this one, "
+                "so every title is treated as changed."
+            )
+        elif not entry.titles_affected:
+            note = "The source does not mark the titles changed, so every title is treated as changed."
+        if note is not None:
+            entry = replace(
+                entry, titles_affected=all_titles, description=f"{entry.description} {note}"
+            )
+        merged.append(entry)
+    return [replace(entry, seq=seq) for seq, entry in enumerate(merged)]
+
+
 def fetch_entries(
     url: str = PRIOR_RELEASE_POINTS_URL,
     current_url: str | None = CURRENT_RELEASE_POINT_URL,
+    known: list[ReleasePointEntry] | None = None,
 ) -> list[ReleasePointEntry]:
-    """Every published release point, oldest first: the prior-release-points
-    page plus the current release point. Two requests; `current_url=None` skips
-    the second."""
+    """Every release point, oldest first: the prior-release-points page plus the
+    current release point, merged into `known` when it is given. Two requests;
+    `current_url=None` skips the second."""
     entries = parse_inventory(fetch_inventory_html(url))
-    if current_url is None:
-        return entries
-    current = parse_current_release_point(fetch_inventory_html(current_url))
-    return with_current_release_point(entries, current)
+    if current_url is not None:
+        current = parse_current_release_point(fetch_inventory_html(current_url))
+        entries = with_current_release_point(entries, current)
+    if known:
+        entries = merge_inventory(known, entries)
+    return entries
 
 
 def write_inventory(
@@ -485,6 +623,44 @@ def record_source_check(
     return row
 
 
+def known_entries(
+    session: Session, base_path: Path | None = INVENTORY_PATH
+) -> list[ReleasePointEntry]:
+    """The release points `release_points` holds, oldest first, as inventory
+    entries. The table has no URL or description, so those come from the
+    inventory file at `base_path` when it names the label, and are rebuilt from
+    the label and date when it does not."""
+    base: dict[str, ReleasePointEntry] = {}
+    if base_path is not None and base_path.exists():
+        try:
+            base = {entry.label: entry for entry in read_inventory(base_path)}
+        except (OSError, ValueError, KeyError) as exc:
+            warnings.warn(f"could not read {base_path}: {exc}", stacklevel=2)
+    entries: list[ReleasePointEntry] = []
+    for row in session.scalars(select(ReleasePoint).order_by(ReleasePoint.seq)):
+        congress, remainder = row.label.split("-", 1)
+        prior = base.get(row.label)
+        entries.append(
+            ReleasePointEntry(
+                label=row.label,
+                currency_date=row.currency_date,
+                titles_affected=tuple(row.titles_affected or ()),
+                url=prior.url
+                if prior
+                else f"{DOWNLOAD_BASE_URL}releasepoints/us/pl/{congress}/{remainder}/"
+                f"usc-rp@{row.label}.htm",
+                description=prior.description
+                if prior
+                else f"Public Law {row.label} ({row.currency_date:%m/%d/%Y})"
+                f"{_affecting(tuple(row.titles_affected or ()))}.",
+                seq=row.seq,
+            )
+        )
+    if not entries:
+        return sorted(base.values(), key=lambda entry: entry.seq)
+    return entries
+
+
 def poll_source(
     session: Session,
     *,
@@ -492,6 +668,7 @@ def poll_source(
     current_url: str | None = CURRENT_RELEASE_POINT_URL,
     out_path: Path | None = INVENTORY_PATH,
     seed: bool = True,
+    base_path: Path | None = INVENTORY_PATH,
 ) -> CheckResult:
     """Fetch the release-point pages, seed what is new, and record the check.
 
@@ -499,9 +676,14 @@ def poll_source(
     point's page) and one `source_checks` row per call, whatever happens. Commits nothing — the caller owns the
     transaction, because on the success path the check row and the release
     points it describes should land together or not at all.
+
+    What the pages list is merged into the release points `release_points`
+    already holds (`merge_inventory`), with the descriptions and URLs of the
+    inventory file at `base_path` where it has them, because the relaunched
+    prior page lists only a window of recent release points (ADR-0091).
     """
     try:
-        entries = fetch_entries(url, current_url)
+        entries = fetch_entries(url, current_url, known=known_entries(session, base_path))
     except Exception as exc:  # network, HTTP, InventoryParseError, or SourceUnderMaintenance
         record_source_check(session, source_url=url, ok=False, error=f"{type(exc).__name__}: {exc}")
         return CheckResult(ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}")
@@ -509,9 +691,10 @@ def poll_source(
     # Computed BEFORE seeding, or seeding would make every label look known.
     known = {label for label in session.scalars(select(ReleasePoint.label))}
 
-    # A release point never leaves the page. If one we already hold is missing,
-    # this is a truncated response or a changed page — not news — and acting on
-    # it would be destructive rather than merely wrong: `seed_release_points`
+    # `merge_inventory` keeps every release point we already hold, so this holds
+    # by construction; it stays as the backstop for a table that changed under
+    # the poll. Acting on an inventory missing one we hold would be destructive
+    # rather than merely wrong: `seed_release_points`
     # renumbers `seq` across the whole table, and a row absent from `entries`
     # keeps the large temporary offset it was given to avoid a unique-constraint
     # collision. That silently breaks the global ordering every release
@@ -523,9 +706,8 @@ def poll_source(
     if vanished:
         error = (
             f"{len(vanished)} release point(s) this database holds are missing from "
-            f"the page ({', '.join(vanished[:5])}"
-            f"{', …' if len(vanished) > 5 else ''}) — refusing to reseed from a "
-            "page that looks truncated"
+            f"the inventory ({', '.join(vanished[:5])}"
+            f"{', …' if len(vanished) > 5 else ''}) — refusing to reseed from it"
         )
         record_source_check(session, source_url=url, ok=False, error=error)
         return CheckResult(ok=False, entries=[], new_labels=(), error=error)

@@ -426,7 +426,10 @@ def _cmd_inventory(args: argparse.Namespace) -> int:
         return 0
 
     if args.no_seed:
-        entries = inventory_mod.fetch_entries(args.url, args.current_url)
+        # The relaunched prior page lists only recent release points (ADR-0091),
+        # so the file already at --out is the history the page is merged into.
+        known = inventory_mod.read_inventory(args.out) if args.out.exists() else None
+        entries = inventory_mod.fetch_entries(args.url, args.current_url, known=known)
         path = inventory_mod.write_inventory(entries, args.out, source_url=args.url)
         print(f"wrote {len(entries)} release points to {path}")
         _print_span(entries)

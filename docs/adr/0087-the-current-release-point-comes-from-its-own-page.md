@@ -1,6 +1,6 @@
 # ADR-0087 — The current release point comes from its own page
 
-**Status:** accepted (2026-09-18)
+**Status:** accepted (2026-09-18); amended by ADR-0091, which moves both pages
 
 **Amends:** ADR-0036 (the daily poll). **Related:** ADR-0012 (the backfill the poll drives).
 

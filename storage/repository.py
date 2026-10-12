@@ -453,7 +453,7 @@ class TitleInfo:
     ingested_releases: tuple[str, ...] = field(default=())
 
 
-SOURCE_URL = "https://uscode.house.gov/download/priorreleasepoints.htm"
+SOURCE_URL = "https://uscode.house.gov/priorreleasepoints.html"
 """The page this mirror polls, and the only thing `/api/v1/status` can say
 about the source when no check has ever run. Defined here rather than in
 `ingest` so the API can name it without importing the ingest layer;
