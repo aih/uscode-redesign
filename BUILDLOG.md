@@ -3573,3 +3573,14 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - The classification poll is left reading the retired `classification/tables.shtml`; the tables moved to `.html` pages and are a separate change.
 - **Produced:** `ingest/inventory.py`, `ingest/__main__.py`, `storage/repository.py` (`SOURCE_URL`), `tests/test_inventory.py`, `tests/test_source_check.py`, `tests/test_maintenance.py`, three fixtures cut from the live pages (`download_relaunch_slice.html`, `priorreleasepoints_relaunch_slice.html`, `olrc_page_not_found.html`), ADR-0091, guide chapter 03, `deploy/update-corpus.sh` (comment).
 - **Verified:** the pages were captured from a GitHub Actions runner on 2026-10-12, since this session's network reaches neither uscode.house.gov nor the site. `uv run pytest` (710 passed); `tests/test_source_check.py` against a local `make ci-data` database (91 passed with `USC_REQUIRE_INTEGRATION=1`). Against that database, `python -m ingest check --url file://…/priorreleasepoints_relaunch_slice.html --current-url file://…/download_relaunch_slice.html` exits 10 with `NEW release points (2): 119-118, 119-120`, and `backfill --plan-only` on the written inventory plans 58 zips at 119-118 and titles 31 and 42 at 119-120.
+
+## 112 — 2026-10-12 — Session 88, continued: the deploy of PR #94 took the site down for its own length (ADR-0092)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** after merging PR #94 the site seemed down. Find what is wrong, fix it for the future, and say what to change in AWS if capacity is the cause.
+- **Decided:**
+  - Cause: the deploy. `docker compose up -d --wait` removed both backends, waited for the new api's first healthcheck (10s after start), then started the frontend; Node as PID 1 also ignored SIGTERM, so the stop waited 10s. The proxy answered 502 for the whole window, and the deploy's robots.txt check, which the proxy answers itself, passed. Not capacity.
+  - The proxy retries a failed dial for up to 25s; `api` and `frontend` run under `init`; the proxy is recreated only when the Caddyfile changed; the deploy fails unless `/health` and a reader page answer 200 through the edge (ADR-0092).
+- **Produced:** `deploy/Caddyfile`, `docker-compose.prod.yml`, `deploy/deploy-on-box.sh`, ADR-0092, `frontend/tests/guide.test.ts` (ADR-0092 exempt as host operations).
+- **Verified:** a GitHub Actions probe from 20:32:51 UTC found `/health`, `/api/v1/status` and `/app/` (with the gate cookie) answering 200 within a minute of the deploy finishing. `bash -n deploy/deploy-on-box.sh`; CI's `caddy validate` step covers the Caddyfile.
+

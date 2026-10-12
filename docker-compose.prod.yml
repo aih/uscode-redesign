@@ -145,6 +145,11 @@ services:
   api:
     logging: *logging
     image: ${ECR_REGISTRY:-local}/uscode-api:${IMAGE_TAG:-latest}
+    # A process as PID 1 gets no default signal handlers, so Node ignored the
+    # SIGTERM a recreate sends and Docker waited out its 10s before SIGKILL: a
+    # deploy's gap with no reader in it (ADR-0092). `init` runs tini as PID 1,
+    # which passes SIGTERM on to a process that acts on it.
+    init: true
     build: .
     depends_on:
       db:
@@ -247,6 +252,8 @@ services:
   frontend:
     logging: *logging
     image: ${ECR_REGISTRY:-local}/uscode-frontend:${IMAGE_TAG:-latest}
+    # See api: SIGTERM reaches Node through tini (ADR-0092).
+    init: true
     build: ./frontend
     depends_on:
       api:
