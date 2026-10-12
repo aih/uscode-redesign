@@ -9,7 +9,8 @@
 #
 #   * daily, from /etc/cron.d/uscode (deploy/install-crons.sh) with no
 #     arguments. That is two HTTP requests to uscode.house.gov — the prior
-#     release points page and the current release point's page (ADR-0087) —
+#     release points page and the current release point's page (ADR-0087,
+#     ADR-0091) —
 #     a `source_checks` row, and — on the ~360 days a year when OLRC has
 #     published nothing new — nothing else at all.
 #   * weekly, from .github/workflows/update-corpus.yml with --force. A full

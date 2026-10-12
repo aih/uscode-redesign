@@ -143,7 +143,7 @@ def test_a_poll_reports_release_points_the_database_has_never_seen(session, monk
 @pytest.mark.integration
 def test_a_poll_reads_the_current_release_point_from_its_own_page(session, monkeypatch):
     """The prior-release-points page leaves the current release point out; the
-    poll takes it from download.shtml and reports it as new."""
+    poll takes it from download.html and reports it as new."""
     prior = _page_of_known(session)
     current = (
         '<h3 class="releasepointinformation">Public Law 999-2 (01/03/2099)</h3>'
@@ -187,30 +187,63 @@ def test_a_failed_poll_still_records_the_attempt(session, monkeypatch):
 
 
 @pytest.mark.integration
-def test_a_page_missing_release_points_we_already_hold_is_refused(session, monkeypatch):
-    """A release point never leaves OLRC's page, so one going missing means a
-    truncated response — and acting on it is destructive, not merely wrong.
+def test_a_page_listing_only_recent_release_points_is_merged(session, monkeypatch):
+    """The relaunched prior page lists a window of recent release points, not
+    the history (ADR-0091). The poll keeps every release point it holds, in its
+    order, and appends what is new.
 
-    `seed_release_points` renumbers `seq` across the whole table; a row absent
-    from the entries keeps the large temporary offset it was given to dodge the
-    unique constraint, which silently breaks the global ordering every release
-    comparison depends on. The fabricated page below lists one release point and
-    the database holds hundreds, which is exactly that shape.
+    `seed_release_points` renumbers `seq` across the whole table, so an inventory
+    missing a held release point would leave that row at the temporary offset and
+    break the ordering every release comparison depends on.
     """
+    from sqlalchemy import select
+
+    from db.models import ReleasePoint
+
+    held = list(session.scalars(select(ReleasePoint.label).order_by(ReleasePoint.seq)))
     monkeypatch.setattr(
         inventory_mod, "fetch_inventory_html", lambda url, **kw: _entry("999-1")
     )
 
-    result = inventory_mod.poll_source(session, current_url=None, out_path=None, seed=True)
+    result = inventory_mod.poll_source(
+        session, current_url=None, out_path=None, base_path=None, seed=True
+    )
     session.flush()
 
-    assert not result.ok
-    assert "missing from the page" in (result.error or "")
+    assert result.ok
+    assert result.new_labels == ("999-1",)
+    after = list(session.scalars(select(ReleasePoint.label).order_by(ReleasePoint.seq)))
+    assert after == [*held, "999-1"]
+    seqs = list(session.scalars(select(ReleasePoint.seq).order_by(ReleasePoint.seq)))
+    assert seqs == list(range(len(after)))
 
-    from storage.postgres import PostgresRepository
 
-    check = PostgresRepository(session).last_source_check()
-    assert check is not None and not check.ok
+@pytest.mark.integration
+def test_a_poll_of_the_relaunched_pages_fetches_the_first_new_release_point_in_full(
+    session, monkeypatch
+):
+    """The fixture corpus ends at 119-102not101; the relaunched pages list 119-118
+    and 119-120. Nothing between is listed, so 119-118's changed titles are
+    unknown and every title is planned; 119-120's are the two the page marks."""
+    from tests.conftest import FIXTURES
+
+    pages = {
+        inventory_mod.PRIOR_RELEASE_POINTS_URL: (
+            FIXTURES / "priorreleasepoints_relaunch_slice.html"
+        ).read_text(),
+        inventory_mod.CURRENT_RELEASE_POINT_URL: (
+            FIXTURES / "download_relaunch_slice.html"
+        ).read_text(),
+    }
+    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: pages[url])
+
+    result = inventory_mod.poll_source(session, out_path=None, base_path=None, seed=False)
+
+    assert result.ok
+    assert result.new_labels == ("119-118", "119-120")
+    by_label = {entry.label: entry for entry in result.entries}
+    assert len(by_label["119-118"].titles_affected) > 2
+    assert by_label["119-120"].titles_affected == ("31", "42")
 
 
 @pytest.mark.integration

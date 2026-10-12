@@ -12,9 +12,11 @@ from ingest.inventory import (
     InventoryParseError,
     ReleasePointEntry,
     latest_release_affecting,
+    merge_inventory,
     normalize_title_num,
     parse_current_release_point,
     parse_inventory,
+    parse_release_point_sections,
     read_inventory,
     title_zip_url,
     with_current_release_point,
@@ -210,3 +212,133 @@ def test_current_release_point_older_than_the_list_is_refused(entries):
     )
     with pytest.raises(InventoryParseError):
         with_current_release_point(entries, stale)
+
+
+# --------------------------------------------- the relaunched site (ADR-0091)
+
+
+@pytest.fixture(scope="module")
+def relaunched_current() -> ReleasePointEntry:
+    return parse_current_release_point(
+        (FIXTURES / "download_relaunch_slice.html").read_text()
+    )
+
+
+@pytest.fixture(scope="module")
+def relaunched_prior() -> list[ReleasePointEntry]:
+    return parse_inventory((FIXTURES / "priorreleasepoints_relaunch_slice.html").read_text())
+
+
+def test_relaunched_current_page_reads_label_date_and_changed_titles(relaunched_current):
+    """download.html's links are rooted at the site (`download/releasepoints/…`)."""
+    assert relaunched_current.label == "119-120"
+    assert relaunched_current.currency_date == date(2026, 10, 7)
+    assert relaunched_current.titles_affected == ("31", "42")
+
+
+def test_relaunched_prior_page_is_one_section_per_release_point(relaunched_prior):
+    assert [entry.label for entry in relaunched_prior] == ["119-118"]
+    assert relaunched_prior[0].currency_date == date(2026, 9, 30)
+    assert relaunched_prior[0].seq == 0
+
+
+def test_relaunched_prior_page_marks_no_changed_titles(relaunched_prior):
+    assert relaunched_prior[0].titles_affected == ()
+
+
+def test_sections_are_read_newest_first():
+    page = "".join(
+        f'<h3 class="releasepointinformation">Public Law {label} ({day})</h3>'
+        f'<a href="download/releasepoints/us/pl/119/{label[4:]}/xml_usc01@{label}.zip">[XML]</a>'
+        for label, day in (("119-118", "09/30/2026"), ("119-115", "09/25/2026"))
+    )
+    assert [entry.label for entry in parse_release_point_sections(page)] == ["119-115", "119-118"]
+
+
+def test_the_retired_pages_are_a_parse_failure_not_maintenance():
+    """The old addresses answer 200 with a "Page Not Found" page."""
+    page = (FIXTURES / "olrc_page_not_found.html").read_text()
+    with pytest.raises(InventoryParseError):
+        parse_inventory(page)
+    with pytest.raises(InventoryParseError):
+        parse_current_release_point(page)
+
+
+def _known(*labels_and_days: tuple[str, date, tuple[str, ...]]) -> list[ReleasePointEntry]:
+    return [
+        ReleasePointEntry(
+            label=label, currency_date=day, titles_affected=titles, url="", description=label, seq=seq
+        )
+        for seq, (label, day, titles) in enumerate(labels_and_days)
+    ]
+
+
+KNOWN = _known(
+    ("119-108", date(2026, 9, 11), ("26", "31", "40")),
+    ("119-110", date(2026, 9, 16), ("18", "28")),
+    ("119-111", date(2026, 9, 18), ("05a", "22", "42")),
+)
+ALL_KNOWN_TITLES = ("05a", "18", "22", "26", "28", "31", "40", "42")
+
+
+def test_merge_appends_the_window_after_a_gap_and_fetches_it_in_full(
+    relaunched_prior, relaunched_current
+):
+    published = with_current_release_point(relaunched_prior, relaunched_current)
+    merged = merge_inventory(KNOWN, published)
+
+    assert [entry.label for entry in merged] == [
+        "119-108", "119-110", "119-111", "119-118", "119-120"
+    ]
+    assert [entry.seq for entry in merged] == [0, 1, 2, 3, 4]
+    assert merged[:3] == KNOWN
+    # 119-118 follows release points the source no longer lists.
+    assert merged[3].titles_affected == ALL_KNOWN_TITLES
+    assert "between 119-111 and this one" in merged[3].description
+    # 119-120's changed titles are a delta from 119-118, which is now held.
+    assert merged[4].titles_affected == ("31", "42")
+
+
+def test_merge_without_a_gap_keeps_the_sources_changed_titles(relaunched_current):
+    known = _known(*[(e.label, e.currency_date, e.titles_affected) for e in KNOWN],
+                   ("119-118", date(2026, 9, 30), ("10",)))
+    prior = _known(("119-118", date(2026, 9, 30), ()))
+    merged = merge_inventory(known, with_current_release_point(prior, relaunched_current))
+    assert merged[-1].label == "119-120"
+    assert merged[-1].titles_affected == ("31", "42")
+    # What this site recorded for 119-118 stands over the prior page's blank.
+    assert merged[-2].titles_affected == ("10",)
+
+
+def test_merge_fetches_in_full_a_new_release_point_with_no_changed_titles():
+    prior = _known(("119-111", date(2026, 9, 18), ()), ("119-118", date(2026, 9, 30), ()))
+    merged = merge_inventory(KNOWN, prior)
+    assert merged[-1].titles_affected == ALL_KNOWN_TITLES
+    assert "does not mark" in merged[-1].description
+
+
+def test_merge_with_nothing_new_is_the_known_inventory():
+    assert merge_inventory(KNOWN, _known(("119-111", date(2026, 9, 18), ()))) == KNOWN
+
+
+def test_merge_with_the_full_history_page_matches_appending(entries, current):
+    published = with_current_release_point(entries, current)
+    assert merge_inventory(entries, published) == published
+
+
+def test_merge_refuses_a_new_release_point_older_than_the_newest_held():
+    stale = _known(("119-109", date(2026, 9, 12), ("01",)))
+    with pytest.raises(InventoryParseError):
+        merge_inventory(KNOWN, stale)
+
+
+def test_merge_refuses_a_new_release_point_listed_before_a_held_one():
+    published = _known(("119-112", date(2026, 9, 19), ("01",)), ("119-111", date(2026, 9, 18), ()))
+    with pytest.raises(InventoryParseError):
+        merge_inventory(KNOWN, published)
+
+
+def test_merge_refuses_held_release_points_in_another_order():
+    published = _known(("119-111", date(2026, 9, 18), ()), ("119-110", date(2026, 9, 16), ()))
+    with pytest.raises(InventoryParseError):
+        merge_inventory(KNOWN, published)

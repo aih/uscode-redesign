@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(88 ADRs, numbered to 0090 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(89 ADRs, numbered to 0091 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -489,7 +489,14 @@ that has stopped updating is otherwise indistinguishable from one with nothing t
 once its successor supersedes it, so a poll of that page alone learns of a release point only after it
 has stopped being current — the site sat at 119-103 against the source's 119-108, with every check
 reporting OK. `fetch_entries` reads `download.shtml` as well: the label from the per-title XML zip
-links, the date from the heading, the affected titles from the rows marked `usctitlechanged`. **The whole site is `Disallow: /` to crawlers**
+links, the date from the heading, the affected titles from the rows marked `usctitlechanged`. **On
+2026-10-12 OLRC relaunched at new addresses** (ADR-0091): the poll reads `priorreleasepoints.html`
+and `download.html`, the old `.htm`/`.shtml` addresses answer HTTP 200 with "Page Not Found", and the
+prior page lists a window of recent release points (one, that day) instead of the history, so
+`merge_inventory` appends what it lists to `release_points` rather than reseeding from it. A new
+release point after a gap, or one with no changed titles marked, is planned in full. Release points
+between 119-111 and 119-118 are no longer published and are not loaded. The classification poll
+still reads the retired `classification/tables.shtml`. **The whole site is `Disallow: /` to crawlers**
 (ADR-0037) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
 it; blunt on purpose while the site is a demo, after two AI crawlers walking the `?release=` axis
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A

@@ -64,6 +64,9 @@ SOURCE_PAGES = [
     "priortables_slice.shtml",
     "tbl118pl_2nd_slice.htm",
     "ecct.html",
+    "priorreleasepoints_relaunch_slice.html",
+    "download_relaunch_slice.html",
+    "olrc_page_not_found.html",
 ]
 
 
