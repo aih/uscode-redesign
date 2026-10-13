@@ -229,9 +229,19 @@
 	# was still working. `response_header_timeout` is generous enough for the
 	# slowest legitimate render and short enough that a hang is reported as a
 	# 502 rather than absorbed.
+	#
+	# `lb_try_duration` covers a deploy (ADR-0092). Recreating a backend leaves
+	# its name unresolvable until the new container starts, and each request in
+	# that window failed at the dial and answered 502. Caddy now retries a
+	# failed dial every 250ms for up to 25s, so the request waits for the new
+	# container instead. Only a dial is retried: a backend that accepted the
+	# connection and then hung still meets `response_header_timeout`. 25s
+	# stays under the edge's own 30s `response_header_timeout`.
 	handle /app* {
 		reverse_proxy frontend:4321 {
 			header_up X-Forwarded-For {client_ip}
+			lb_try_duration 25s
+			lb_try_interval 250ms
 			transport http {
 				dial_timeout 5s
 				response_header_timeout 30s
@@ -244,6 +254,8 @@
 	handle {
 		reverse_proxy api:8001 {
 			header_up X-Forwarded-For {client_ip}
+			lb_try_duration 25s
+			lb_try_interval 250ms
 			transport http {
 				dial_timeout 5s
 				response_header_timeout 30s

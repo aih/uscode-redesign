@@ -97,11 +97,21 @@ docker compose -f docker-compose.prod.yml up -d --wait
 # now with a reassuring log line over it. Recreating the container remounts
 # the path and is the only thing that reliably picks up the edit.
 #
-# The cost is real and small: recreating the proxy drops in-flight connections
-# for about a second, on a deploy that has already restarted both backends.
-# Certificates live on the /data volume, so nothing re-does ACME.
-echo "=== recreating the proxy so it picks up deploy/Caddyfile ==="
-docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate proxy
+# Only when the file changed (ADR-0092). Recreating the proxy leaves the edge
+# with nothing to dial until the new container starts, and every request in
+# that moment is a 502 from the edge. The comparison is against the file the
+# running container sees: after `git checkout --force` replaced the file, that
+# is either the old bytes or nothing, and both differ from the repository's.
+# Certificates live on the edge, so nothing re-does ACME.
+echo "=== recreating the proxy if deploy/Caddyfile changed ==="
+REPO_CADDYFILE_SUM="$(sha256sum deploy/Caddyfile | awk '{print $1}')"
+LIVE_CADDYFILE_SUM="$(docker compose -f docker-compose.prod.yml exec -T proxy \
+    sha256sum /etc/caddy/Caddyfile 2>/dev/null | awk '{print $1}' || true)"
+if [ "$LIVE_CADDYFILE_SUM" = "$REPO_CADDYFILE_SUM" ]; then
+    echo "the running proxy has the current Caddyfile; left running"
+else
+    docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate proxy
+fi
 
 # The search index, when and only when the mapping this image declares differs
 # from the one the live index was built with (ADR-0049).
@@ -180,6 +190,27 @@ if [ -n "$SITE_HOST" ]; then
         exit 1
     fi
     echo "robots.txt served as expected"
+
+    # robots.txt is answered by the proxy alone, so it says nothing about the
+    # two backends behind it. Both have to answer through the edge before the
+    # deploy reports success (ADR-0092): the API's /health and a reader page,
+    # carrying the cookie the reader's gate asks for (ADR-0088), as
+    # deploy/watchdog.sh does.
+    GATE_COOKIE="$(grep -E '^USC_GATE_COOKIE=' .env 2>/dev/null | cut -d= -f2- || true)"
+    GATE_TOKEN="$(grep -E '^USC_GATE_TOKEN=' .env 2>/dev/null | cut -d= -f2- || true)"
+    echo "=== checking the API and the reader answer, through the edge ==="
+    for path in /health /app/us/usc/t16/s45f; do
+        if ! curl -sSf -o /dev/null --max-time 30 \
+                --retry 10 --retry-delay 3 --retry-all-errors \
+                --resolve "${SITE_HOST}:443:127.0.0.1" \
+                -b "${GATE_COOKIE:-usc_h}=${GATE_TOKEN:-1}" \
+                "https://${SITE_HOST}${path}"; then
+            echo "https://${SITE_HOST}${path} did not answer 200 after the deploy." >&2
+            docker compose -f docker-compose.prod.yml ps >&2
+            exit 1
+        fi
+        echo "${path} answered 200"
+    done
 fi
 
 echo "=== $(date -u +%FT%TZ) deploy of $TAG complete ==="
