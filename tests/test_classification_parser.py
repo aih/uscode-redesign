@@ -18,6 +18,7 @@ import pytest
 from ingest.classification import (
     ClassificationEntry,
     ClassificationParseError,
+    ClassificationTableUnavailable,
     ParsedClassificationFile,
     TableLink,
     column_offsets,
@@ -796,3 +797,76 @@ def test_ecct_entries_round_trip_through_json(ecct):
 
     assert ParsedEcctFile.from_json(ecct.as_json()) == ecct
     assert EcctEntry.from_json(ecct.entries[0].as_json()) == ecct.entries[0]
+
+
+# --- the relaunched site (ADR-0093) -----------------------------------------------
+
+
+def test_the_relaunched_entry_page_links_html_tables():
+    links = parse_tables_index((FIXTURES / "tables_relaunch.html").read_text())
+    assert [(link.kind, link.filename) for link in links] == [
+        ("pl", "tbl119pl_2nd.html"),
+        ("pl", "tbl119pl_1st.html"),
+        ("ecct", "ECCT.html"),
+        ("ecct", "ECCT_119-1.html"),
+    ]
+    current, previous, ecct, _ = links
+    assert current.url == "https://uscode.house.gov/classification/tbl119pl_2nd.html"
+    assert current.covered_laws_text == "Public Law 119-70 and Public Laws 119-74 through 119-118"
+    assert (current.first_law, current.last_law) == (70, 118)
+    # The `<br />` inside the sentence is a word break.
+    assert previous.covered_laws_text == "Public Laws 119-1 through 119-69 and 119-71 through 119-73"
+    assert previous.covered_ranges == ("1-69", "71-73")
+    assert (ecct.congress, ecct.session) == (119, 2)
+
+
+def test_the_relaunched_prior_page_links_every_closed_session():
+    links = parse_tables_index((FIXTURES / "priortables_relaunch.html").read_text())
+    assert len(links) == 29
+    assert all(link.kind == "pl" and link.filename.endswith(".html") for link in links)
+    assert links[0].filename == "tbl118pl_2nd.html"
+    assert links[0].covered_laws_text == "Public Laws 118-35 to 118-274"
+    assert (links[-1].filename, links[-1].session) == ("tbl104pl.html", 0)
+
+
+def test_a_page_not_found_index_names_the_page_it_read():
+    with pytest.raises(ClassificationParseError, match="tables.shtml"):
+        parse_tables_index(
+            (FIXTURES / "olrc_page_not_found.html").read_text(),
+            source_url="https://uscode.house.gov/classification/tables.shtml",
+        )
+
+
+def test_stat_image_links_carry_the_volume_and_the_page():
+    parsed = _parse("tbl119pl_2nd_relaunch_slice.html", "tbl119pl_2nd.html")
+    assert (parsed.congress, parsed.session, parsed.row_count) == (119, 2, 6)
+    first = parsed.entries[0]
+    assert (first.pl_congress, first.pl_num, first.stat_volume, first.stat_pages) == (
+        119, 70, 140, (3,)
+    )
+    assert "<a" not in first.raw_line
+    assert {entry.stat_volume for entry in parsed.entries} == {140}
+
+
+def test_an_image_link_splits_a_quote_butted_against_its_page():
+    """`7201(c)(1) "Subchapter I"1677` has no space for the column split to use;
+    the link's page number is where the Stat. cell starts."""
+    parsed = _parse("tbl119pl_1st_relaunch_slice.html", "tbl119pl_1st.html")
+    row = _row(parsed, '7201(c)(3) "Subchapter III"')
+    assert row.pl_section_raw == "7201(c)(3)"
+    assert row.new_section_quote == "Subchapter III"
+    assert (row.stat_volume, row.stat_pages) == (139, (1677,))
+
+
+def test_an_empty_table_viewer_is_unavailable_rather_than_malformed():
+    with pytest.raises(ClassificationTableUnavailable, match="carries no rows"):
+        parse_classification_file(
+            (FIXTURES / "tbl118pl_2nd_relaunch.html").read_text(), filename="tbl118pl_2nd.html"
+        )
+
+
+def test_the_relaunched_ecct_parses():
+    parsed = parse_ecct(
+        (FIXTURES / "ecct_relaunch.html").read_text(), filename="ECCT.html", congress=119, session=2
+    )
+    assert parsed.row_count == 1

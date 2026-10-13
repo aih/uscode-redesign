@@ -36,8 +36,8 @@ from tests.conftest import FIXTURES
 #: The committed slices under the filenames OLRC publishes them at — the same
 #: mapping `make ci-data` copies, and the reason `--from-file` needs no network.
 FIXTURE_PAGES = {
-    "tables.shtml": "tables_slice.shtml",
-    "priortables.shtml": "priortables_slice.shtml",
+    "tables.html": "tables_slice.shtml",
+    "priortables.html": "priortables_slice.shtml",
     "tbl118pl_2nd.htm": "tbl118pl_2nd_slice.htm",
     "tbl110pl_1st.htm": "tbl110pl_1st_slice.htm",
     "tbl104pl.htm": "tbl104pl_slice.htm",
@@ -92,7 +92,7 @@ def _served(directory: Path, *names: str) -> dict[str, str]:
 
 
 def _index_page(*entries: tuple[str, str]) -> str:
-    """A `tables.shtml`-shaped page: one cell per document, the covered-law
+    """A `tables.html`-shaped page: one cell per document, the covered-law
     sentence above the link and the "Sorted in Public Law order" run between
     them, which is how OLRC writes it (`tests/fixtures/tables_slice.shtml`)."""
     cells = "\n".join(
@@ -141,7 +141,7 @@ def test_the_fetch_can_be_told_not_to_cache(tmp_path):
     cls.fetch_classification_page(
         cls.CLASSIFICATION_SOURCE_URL,
         cache_dir=None,
-        opener=_opener({"tables.shtml": _index_page(("tbl118pl_2nd.htm", COVERED_118))}),
+        opener=_opener({"tables.html": _index_page(("tbl118pl_2nd.htm", COVERED_118))}),
     )
     assert list(tmp_path.iterdir()) == []
 
@@ -161,8 +161,8 @@ def test_a_table_on_disk_is_named_by_its_filename(pages):
     assert (links["tbl104pl.htm"].congress, links["tbl104pl.htm"].session) == (104, 0)
     assert links["tbl118pl_2nd.htm"].kind == "pl"
     # The index pages are not documents, and neither is anything else in there.
-    assert "tables.shtml" not in links
-    assert "priortables.shtml" not in links
+    assert "tables.html" not in links
+    assert "priortables.html" not in links
 
 
 def test_an_unsuffixed_ecct_on_disk_has_no_congress_to_belong_to(pages):
@@ -294,13 +294,32 @@ def test_an_index_page_that_will_not_load_is_a_failure_and_not_a_crash(tmp_path,
         cache_dir=None,
         verification_dir=tmp_path,
         manifest_path=tmp_path / "classification.json",
-        opener=_opener(_served(pages, "priortables.shtml", "tbl104pl.htm")),
+        opener=_opener(_served(pages, "priortables.html", "tbl104pl.htm")),
     )
 
     failed = {filename for filename, _detail in report.failures}
-    assert "tables.shtml" in failed
+    assert "tables.html" in failed
     assert not report.sound
     assert (tmp_path / "classification-104-0.json").exists()
+
+
+def test_an_empty_table_viewer_is_skipped_rather_than_failed(tmp_path):
+    """Several prior tables on the relaunched site are a viewer with no rows. The
+    run stays sound and reports the file as skipped (ADR-0093)."""
+    shell = (FIXTURES / "tbl118pl_2nd_relaunch.html").read_text()
+    index = _index_page(("tbl118pl_2nd.html", COVERED_118))
+    report = cls.run_classification_load(
+        _no_database,
+        load=False,
+        urls=(cls.CLASSIFICATION_SOURCE_URL,),
+        cache_dir=None,
+        verification_dir=tmp_path,
+        manifest_path=tmp_path / "classification.json",
+        opener=_opener({"tables.html": index, "tbl118pl_2nd.html": shell}),
+    )
+    assert report.sound
+    assert report.skipped == (("tbl118pl_2nd.html", "the source page carries no rows"),)
+    assert not (tmp_path / "classification-118-2.json").exists()
 
 
 # --------------------------------------------------------------- the loader
@@ -559,8 +578,8 @@ def test_the_covered_law_gate_skips_a_file_without_asking_for_it(factory, pages,
     re-run at two requests rather than 33 (ADR-0067 decision 5). The opener here
     serves the index page and 404s the table, so a fetch would fail the run."""
     index = _index_page(("tbl118pl_2nd.htm", COVERED_118))
-    everything = _opener({"tables.shtml": index, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()})
-    index_only = _opener({"tables.shtml": index})
+    everything = _opener({"tables.html": index, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()})
+    index_only = _opener({"tables.html": index})
     common = dict(
         urls=(cls.CLASSIFICATION_SOURCE_URL,),
         cache_dir=None,
@@ -615,7 +634,7 @@ def test_a_poll_after_the_load_reports_nothing_changed(factory, pages, tmp_path)
         verification_dir=tmp_path,
         manifest_path=tmp_path / "classification.json",
         opener=_opener(
-            {"tables.shtml": page, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()}
+            {"tables.html": page, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()}
         ),
     )
 
@@ -638,7 +657,7 @@ def test_a_reworded_covered_range_is_what_the_poll_notices(factory, pages, tmp_p
         verification_dir=tmp_path,
         manifest_path=tmp_path / "classification.json",
         opener=_opener(
-            {"tables.shtml": page, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()}
+            {"tables.html": page, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()}
         ),
     )
 
@@ -689,22 +708,22 @@ def test_a_page_missing_a_document_we_hold_is_refused(factory, pages, tmp_path):
         verification_dir=tmp_path,
         manifest_path=tmp_path / "classification.json",
         opener=_opener(
-            {"tables.shtml": both, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()}
+            {"tables.html": both, "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text()}
         ),
     )
 
     result, check = _poll(factory, _index_page(("tbl118pl_1st.htm", "Public Laws 118-1")))
 
     assert not result.ok
-    assert "missing from tables.shtml" in (result.error or "")
+    assert "missing from tables.html" in (result.error or "")
     assert "tbl118pl_2nd.htm" in (result.error or "")
     assert check is not None and not check.ok
 
 
 @pytest.mark.integration
 def test_another_congresss_tables_are_not_expected_on_this_page(factory, pages, tmp_path):
-    """`tables.shtml` lists the current congress alone, so the thirty files
-    `priortables.shtml` links must not read as vanished."""
+    """`tables.html` lists the current congress alone, so the thirty files
+    `priortables.html` links must not read as vanished."""
     with factory() as session:
         cls.load_file(session, _parse(pages, "tbl104pl.htm"))
         session.commit()
@@ -733,3 +752,45 @@ def test_the_check_says_what_it_found_in_its_exit_code(monkeypatch, result, expe
 
     monkeypatch.setattr(cls, "poll_classification", lambda session, **kwargs: result)
     assert main(["classification-check"]) == expected
+
+
+@pytest.mark.integration
+def test_an_empty_table_viewer_keeps_the_rows_already_stored(factory, pages, tmp_path):
+    """A forced sweep that meets the empty viewer leaves the stored table alone."""
+    common = dict(
+        urls=(cls.CLASSIFICATION_SOURCE_URL,),
+        cache_dir=None,
+        verification_dir=tmp_path,
+        manifest_path=tmp_path / "classification.json",
+    )
+    first = cls.run_classification_load(
+        factory,
+        opener=_opener(
+            {
+                "tables.html": _index_page(("tbl118pl_2nd.htm", COVERED_118)),
+                "tbl118pl_2nd.htm": (pages / "tbl118pl_2nd.htm").read_text(),
+            }
+        ),
+        **common,
+    )
+    with factory() as session:
+        before = _counts(session)
+
+    swept = cls.run_classification_load(
+        factory,
+        force=True,
+        opener=_opener(
+            {
+                "tables.html": _index_page(("tbl118pl_2nd.html", COVERED_118)),
+                "tbl118pl_2nd.html": (FIXTURES / "tbl118pl_2nd_relaunch.html").read_text(),
+            }
+        ),
+        **common,
+    )
+
+    assert first.loaded == 1
+    assert swept.sound
+    assert swept.skipped == (("tbl118pl_2nd.html", "the source page carries no rows"),)
+    with factory() as session:
+        assert _counts(session) == before
+        assert session.scalars(select(ClassificationFile)).one().source_filename == "tbl118pl_2nd.htm"

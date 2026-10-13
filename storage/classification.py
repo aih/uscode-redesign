@@ -35,7 +35,7 @@ from typing import Protocol
 
 from storage.repository import SOURCE_CHECK_STALE_AFTER
 
-CLASSIFICATION_SOURCE_URL = "https://uscode.house.gov/classification/tables.shtml"
+CLASSIFICATION_SOURCE_URL = "https://uscode.house.gov/classification/tables.html"
 """The Classification Tables entry page, and the only thing
 `/api/v1/classifications/tables` can name as the source when no check has ever
 run. Defined here rather than in `ingest` so the API can name it without
@@ -203,7 +203,7 @@ class ClassificationEntryRef:
       * `stat_pages` is empty for 6,053 rows that do cite a page, because a page
         of the Statutes at Large is not always a number: `110 Stat. 3009-587`
         and `113 Stat. 1501A-594` are single pages. **`stat_page_labels` is the
-        column to display**; `stat_pages` is what a statviewer link can be built
+        column to display**; `stat_pages` is what a Stat. page link can be built
         from, and only alongside a `stat_volume`.
     """
 

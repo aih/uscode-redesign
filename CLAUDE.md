@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(90 ADRs, numbered to 0092 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(91 ADRs, numbered to 0093 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -496,7 +496,9 @@ prior page lists a window of recent release points (one, that day) instead of th
 `merge_inventory` appends what it lists to `release_points` rather than reseeding from it. A new
 release point after a gap, or one with no changed titles marked, is planned in full. Release points
 between 119-111 and 119-118 are no longer published and are not loaded. The classification poll
-still reads the retired `classification/tables.shtml`. **The whole site is `Disallow: /` to crawlers**
+reads `classification/tables.html` and `priortables.html` (ADR-0093): Stat. pages link
+`/images/stat/{v}/{p}.png` instead of `statviewer.htm`, and a prior table served as an empty
+viewer with no `<pre>` is skipped with its stored rows kept. **The whole site is `Disallow: /` to crawlers**
 (ADR-0037) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
 it; blunt on purpose while the site is a demo, after two AI crawlers walking the `?release=` axis
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A

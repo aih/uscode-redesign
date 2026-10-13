@@ -162,7 +162,7 @@ describe("classificationNote", () => {
     overrides: Partial<ClassificationSource> = {},
   ): ClassificationSource {
     return {
-      url: "https://uscode.house.gov/classification/tables.shtml",
+      url: "https://uscode.house.gov/classification/tables.html",
       last_checked_at: "2026-08-14T09:00:00Z",
       hours_since_check: 3,
       ok: true,
