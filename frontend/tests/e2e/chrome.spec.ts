@@ -391,7 +391,7 @@ test("the footer's eleven links are in four named groups (ADR-0063)", async ({ p
     "/app/search/syntax",
     "/app/guide/02-reading#keyboard-shortcuts",
     "/app/docs",
-    "https://uscode.house.gov/download/download.shtml",
+    "https://uscode.house.gov/download.html",
     "/app/design",
     "/app/data/version-changes",
     "/app/about",

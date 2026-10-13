@@ -662,11 +662,20 @@ export function govinfoPlawHref(congress: number | string, num: number | string)
   return `https://www.govinfo.gov/app/details/PLAW-${congress}publ${num}`;
 }
 
-/** OLRC's statviewer, the target the source tables link their own Stat. pages
- *  to. Only ever built from an integer page: `110 Stat. 3009-587` is a single
- *  page whose label this endpoint cannot take. */
-export function statViewerHref(volume: number | string, page: number | string): string {
-  return `https://uscode.house.gov/statviewer.htm?volume=${volume}&page=${page}`;
+/** The first Statutes at Large volume OLRC serves page images for, at
+ *  `/images/stat/{volume}/{page}.png`, which is what its relaunched tables link
+ *  each Stat. page to. Measured 2026-10-13: 139 and 140 answer, 109 to 138 do
+ *  not, and govinfo's link service answers 121 and 138 and not 139 or 140
+ *  (ADR-0093). */
+export const OLRC_STAT_IMAGES_FROM = 139;
+
+/** One Stat. page: OLRC's page image for the volumes it has them for, govinfo's
+ *  link service for the rest. Only ever built from an integer page:
+ *  `110 Stat. 3009-587` is a single page whose label neither takes. */
+export function statuteHref(volume: number | string, page: number | string): string {
+  return Number(volume) >= OLRC_STAT_IMAGES_FROM
+    ? `https://uscode.house.gov/images/stat/${volume}/${page}.png`
+    : `https://www.govinfo.gov/link/statute/${volume}/${page}`;
 }
 
 /** `/c/5` → `(c)(5)`. USLM's short-form vocabulary is empty below section

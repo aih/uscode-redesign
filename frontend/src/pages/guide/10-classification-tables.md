@@ -6,7 +6,7 @@ summary: Which provision of which public law became which section of the Code, f
 covers:
   routes:
     ["/app/classification", "/app/classification/[congress]", "/app/classification/ecct"]
-  adrs: [67, 68, 70, 71, 72]
+  adrs: [67, 68, 70, 71, 72, 93]
 ---
 
 A public law is not written in the Code's numbering. The Office of the Law Revision Counsel decides
@@ -92,7 +92,7 @@ Five columns, in the source's own order:
   The set of tokens is not fixed, and one this site has not seen prints as the source wrote it.
 - **Pub. L.** — linked to the law on govinfo.
 - **Sec.** — the law's own section designator.
-- **Stat. page** — linked to the OLRC's statviewer where the volume and the page are both known.
+- **Stat. page** — linked where the volume and the page are both known: to the OLRC's page image from volume 139, and to govinfo before it.
 
 ### Ordering a table
 

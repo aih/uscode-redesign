@@ -150,7 +150,7 @@ reconstructing the process is forthcoming. What is checkable, and where:
   counts the characters per rendered line of statutory text in both reading densities and exits
   non-zero when a median leaves 62–70.
 
-The data source is the official [OLRC XML downloads](https://uscode.house.gov/download/download.shtml)
+The data source is the official [OLRC XML downloads](https://uscode.house.gov/download.html)
 (USLM). Release-point download tooling builds on
 [dreamproit/loadusc-xcitedb](https://github.com/dreamproit/loadusc-xcitedb).
 
