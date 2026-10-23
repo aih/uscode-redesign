@@ -5,7 +5,7 @@ order: 3
 summary: Release points, how to ask for one, and what every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36, 44, 45, 56, 82, 83, 85, 87, 91]
+  adrs: [18, 36, 44, 45, 56, 82, 83, 85, 87, 91, 94]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
@@ -149,9 +149,11 @@ steps:
 ```
 
 The site checks uscode.house.gov for a new release point once a day, at 06:41 UTC, and loads a
-release point the OLRC has published as current at the next check. Release points the OLRC no
-longer lists are not on the site: since October 2026 its download pages list only the current
-release point and the one before it, and no release point between 119-111 and 119-118 is loaded.
+release point the OLRC has published as current at the next check. The OLRC's list of prior
+release points begins at 119-73not60 (January 23, 2026). A release point on that list that this
+site does not hold is loaded at the next check, in its place in the list, including one dated
+before the newest release point loaded here. Release points the OLRC no longer lists are not
+loaded.
 
 The release point list also says when the site last looked for a new release point — *“Checked uscode.house.gov
 for new release points 3 hours ago.”* It is a plain line when everything is current and a warning

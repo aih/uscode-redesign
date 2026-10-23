@@ -6,7 +6,7 @@ summary: Which provision of which public law became which section of the Code, f
 covers:
   routes:
     ["/app/classification", "/app/classification/[congress]", "/app/classification/ecct"]
-  adrs: [67, 68, 70, 71, 72, 93]
+  adrs: [67, 68, 70, 71, 72, 93, 94]
 ---
 
 A public law is not written in the Code's numbering. The Office of the Law Revision Counsel decides
@@ -291,6 +291,8 @@ OLRC may have published a newer one since anybody asked.
   is printed as text.
 - **127 rows show no Statutes at Large page, and 2 show no public law.** Their columns ran together
   in the source and could not be separated. Every row keeps the source's own line, which the API
-  returns as `raw_line`.
+  returns as `raw_line`. The source publishes the tables of the 117th Congress's second session
+  and both sessions of the 118th as records rather than lines, and for their rows `raw_line` is
+  the record as JSON.
 - **A change to the Editorial Classification Change Table alone is not visible to the poll**, which
   compares the covered-law sentence the index page carries for each public law table.
