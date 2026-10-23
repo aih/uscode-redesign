@@ -3584,3 +3584,24 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Produced:** `deploy/Caddyfile`, `docker-compose.prod.yml`, `deploy/deploy-on-box.sh`, ADR-0092, `frontend/tests/guide.test.ts` (ADR-0092 exempt as host operations).
 - **Verified:** a GitHub Actions probe from 20:32:51 UTC found `/health`, `/api/v1/status` and `/app/` (with the gate cookie) answering 200 within a minute of the deploy finishing. `bash -n deploy/deploy-on-box.sh`; CI's `caddy validate` step covers the Caddyfile.
 
+## 113 — 2026-10-13 — Session 88, continued: the classification tables at their relaunched addresses (ADR-0093)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** run the catch-up load (Ari chose "Run it tonight" for 119-118 and 119-120). The run loaded both and ended red on the classification poll, which still read `classification/tables.shtml`.
+- **Decided:**
+  - The poll and backfill read `tables.html` and `priortables.html`; table links ending `.html` are read; a Stat. page's (volume, page) comes from `/images/stat/{v}/{p}.png` as well as from `statviewer.htm` (ADR-0093).
+  - A table page that is an empty viewer with no `<pre>` (117-2, 118-1 and 118-2 on 2026-10-13) is skipped and keeps its stored rows.
+  - The reader links a Stat. page to OLRC's image from volume 139 and to govinfo before it, and links `download.html` for the source XML.
+- **Produced:** `ingest/classification.py`, `storage/classification.py`, `api/schemas.py`, `frontend/src/lib/url.ts`, `ClassificationTable.astro`, `SiteHeader.astro`, `SiteFooter.astro`, `about.astro`, `design.astro`, guide chapter 10, `Makefile`, the `*relaunch*` fixtures, ADR-0093.
+- **Verified:** Update corpus run 38347925030 loaded 119-118 and 119-120; `/api/v1/status` then reported 119-120, 0 behind, no incomplete loads. The captured pages parse: `tables.html` 4 documents, `priortables.html` 29, `tbl119pl_2nd.html` 619 rows and `tbl119pl_1st.html` 3,049 rows with 0 warnings. Link targets were probed from a GitHub Actions runner (the table in ADR-0093). `make test`, `make test-web`.
+
+## 114 — 2026-10-23 — PR #96 against the site as it stands ten days on (ADR-0093 addendum)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** review PR #96 against uscode.house.gov, decide whether it is still relevant, update it, and name the next step for the classification tables.
+- **Decided:**
+  - Still relevant: Update corpus run 39218492154 (2026-10-19, `main`) failed on `classification/tables.shtml` exactly as run 38347925030 did.
+  - The relaunched tables now link Stat. pages to `statviewer.html?volume=…&page=…`; `_STATVIEWER_RE` reads both `.htm` and `.html` (ADR-0093 addendum).
+  - The three empty tables now offer `ct{congress}-{last law}{xml,json,txt}.zip`; reading them is the next step and is not in this change.
+- **Produced:** `ingest/classification.py`, a parametrised test in `tests/test_classification_parser.py`, ADR-0093's addendum.
+- **Verified:** the new test fails against the old pattern (`&amp;` and `&` cases) and passes with the change; `make test`.

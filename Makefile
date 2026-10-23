@@ -56,14 +56,17 @@ ci-data: ci-classification-data
 # committed slices copied to the filenames the index pages link, then loaded
 # through `--from-file`, which reads a directory instead of the network. The
 # artifacts go under .ci-data — a slice is ~80 rows and the committed
-# docs/verification/classification-*.json describe the real files.
+# docs/verification/classification-*.json describe the real files. The slices
+# predate OLRC's 2026-10-12 relaunch; the two index pages are copied to the
+# names the loader now asks for, and link the tables by their old names
+# (ADR-0093).
 CLS_DIR = .ci-data/classification
 
 ci-classification-data:
 	uv run alembic upgrade head
 	rm -rf $(CLS_DIR) && mkdir -p $(CLS_DIR)
-	cp tests/fixtures/tables_slice.shtml $(CLS_DIR)/tables.shtml
-	cp tests/fixtures/priortables_slice.shtml $(CLS_DIR)/priortables.shtml
+	cp tests/fixtures/tables_slice.shtml $(CLS_DIR)/tables.html
+	cp tests/fixtures/priortables_slice.shtml $(CLS_DIR)/priortables.html
 	cp tests/fixtures/tbl119pl_2nd_slice.htm $(CLS_DIR)/tbl119pl_2nd.htm
 	cp tests/fixtures/tbl118pl_2nd_slice.htm $(CLS_DIR)/tbl118pl_2nd.htm
 	cp tests/fixtures/tbl110pl_1st_slice.htm $(CLS_DIR)/tbl110pl_1st.htm

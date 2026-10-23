@@ -588,7 +588,7 @@ class SourceCheckOut(BaseModel):
     """When this mirror last asked uscode.house.gov what exists."""
 
     url: str = Field(
-        examples=["https://uscode.house.gov/download/priorreleasepoints.htm"],
+        examples=["https://uscode.house.gov/priorreleasepoints.html"],
         description="The page that is polled — one request per check.",
     )
     last_checked_at: datetime.datetime | None = Field(
@@ -847,7 +847,7 @@ class ClassificationCheckOut(BaseModel):
     answer flap between two unrelated sources (ADR-0067).
     """
 
-    url: str = Field(examples=["https://uscode.house.gov/classification/tables.shtml"])
+    url: str = Field(examples=["https://uscode.house.gov/classification/tables.html"])
     last_checked_at: datetime.datetime | None = Field(
         default=None,
         description="When this site last looked at the source. Before any check "
@@ -1007,7 +1007,7 @@ class ClassificationEntryOut(BaseModel):
         default_factory=list,
         description="Pages that have an integer form. **Empty for 6,053 rows that "
         "do cite a page**, because a page of the Statutes at Large is not always a "
-        "number. A statviewer link is buildable only from a volume and one of these.",
+        "number. A Stat. page link is buildable only from a volume and one of these.",
     )
     stat_page_labels: list[str] = Field(
         default_factory=list,

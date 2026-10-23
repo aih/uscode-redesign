@@ -26,7 +26,7 @@
  * failure `make shots` refuses (ADR-0039). The wrapper takes `tabindex="0"` and
  * a region role so a keyboard can reach the scroll.
  */
-import { appHref, govinfoPlawHref, previewHref, statViewerHref } from "../lib/url";
+import { appHref, govinfoPlawHref, previewHref, statuteHref } from "../lib/url";
 import { resultCitation } from "../lib/cite";
 import type { ClassificationEntry } from "../lib/types";
 
@@ -136,13 +136,13 @@ function volumeOf(entry: ClassificationEntry): number | null {
   return entry.stat_volume ?? statVolume;
 }
 
-/** statviewer takes a page *number*. `110 Stat. 3009-587` and
+/** A Stat. page link takes a page *number*. `110 Stat. 3009-587` and
  *  `113 Stat. 1501A-594` are single pages whose labels it cannot take, so those
  *  rows print their label and link nothing. */
 function statPageHref(entry: ClassificationEntry, label: string): string | null {
   const volume = volumeOf(entry);
   if (volume == null) return null;
-  return /^\d+$/u.test(label) ? statViewerHref(volume, label) : null;
+  return /^\d+$/u.test(label) ? statuteHref(volume, label) : null;
 }
 ---
 

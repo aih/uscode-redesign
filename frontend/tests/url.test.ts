@@ -26,7 +26,7 @@ import {
   normalizeSectionKey,
   sessionNumber,
   sessionSegment,
-  statViewerHref,
+  statuteHref,
   gotoHref,
   loginHref,
   provisionLabel,
@@ -687,9 +687,12 @@ describe("the two source links a classification row carries", () => {
     expect(govinfoPlawHref(118, 42)).toBe("https://www.govinfo.gov/app/details/PLAW-118publ42");
   });
 
-  it("builds OLRC's statviewer from (volume, page)", () => {
-    expect(statViewerHref(138, 290)).toBe(
-      "https://uscode.house.gov/statviewer.htm?volume=138&page=290",
-    );
+  it("links a Stat. page to govinfo before volume 139", () => {
+    expect(statuteHref(138, 290)).toBe("https://www.govinfo.gov/link/statute/138/290");
+  });
+
+  it("links a Stat. page to OLRC's page image from volume 139", () => {
+    expect(statuteHref(139, 1677)).toBe("https://uscode.house.gov/images/stat/139/1677.png");
+    expect(statuteHref("140", "1057")).toBe("https://uscode.house.gov/images/stat/140/1057.png");
   });
 });

@@ -120,13 +120,13 @@ def test_the_check_source_reports_the_first_load_date_before_any_check():
     No database — this is `ClassificationCheckOut.of` alone."""
     from api.schemas import CLASSIFICATION_BASELINE_CHECKED_AT, ClassificationCheckOut
 
-    out = ClassificationCheckOut.of(None, url="https://example.test/tables.shtml")
+    out = ClassificationCheckOut.of(None, url="https://example.test/tables.html")
     assert out.baseline is True
     assert out.last_checked_at == CLASSIFICATION_BASELINE_CHECKED_AT
     assert out.last_checked_at.date().isoformat() == "2026-08-13"
     assert out.ok is True, "nothing failed — nothing was attempted"
     assert out.hours_since_check is not None
-    assert out.url == "https://example.test/tables.shtml"
+    assert out.url == "https://example.test/tables.html"
 
 
 def test_a_recorded_check_is_not_a_baseline():
@@ -137,7 +137,7 @@ def test_a_recorded_check_is_not_a_baseline():
 
     info = ClassificationCheckInfo(
         checked_at=datetime.datetime.now(datetime.timezone.utc),
-        source_url="https://uscode.house.gov/classification/tables.shtml",
+        source_url="https://uscode.house.gov/classification/tables.html",
         ok=True,
         files_seen=33,
         changed_files=(),
@@ -152,7 +152,7 @@ def test_a_recorded_check_is_not_a_baseline():
 def test_the_registry_lists_the_documents_and_when_it_last_looked(api):
     body = api.get("/api/v1/classifications/tables").json()
 
-    assert body["source"]["url"].endswith("/classification/tables.shtml")
+    assert body["source"]["url"].endswith("/classification/tables.html")
     assert body["entry_total"] > 0
     held = {(f["congress"], f["session"]) for f in body["files"] if f["kind"] == "pl"}
     assert REQUIRED_FILES <= held

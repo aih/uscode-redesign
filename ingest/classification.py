@@ -1,8 +1,8 @@
 """The OLRC Classification Tables: which provision of which Public Law landed where.
 
 `118-35 §101(3) → 18 U.S.C. 3551 note` is one row of one table. OLRC publishes one
-table per congress-session in two sorts — Public Law order (`tbl118pl_2nd.htm`) and
-US Code order (`tbl118cd_2nd.htm`) — carrying the same rows; only the `pl` files are
+table per congress-session in two sorts — Public Law order (`tbl118pl_2nd.html`) and
+US Code order (`tbl118cd_2nd.html`) — carrying the same rows; only the `pl` files are
 scraped here, because Code order is a sort in our own display. Alongside them sits
 the Editorial Classification Change Table (`ecct.html`), which records where OLRC
 moved *earlier* laws while classifying the new ones.
@@ -43,7 +43,7 @@ would get wrong, each covered by a test in `tests/test_classification_parser.py`
     screen and must occupy one afterwards.
   * **The volume is in the header, not the row.** `138 Stat.` gives 138 for every row
     of the 118th's second session. The 104th spans two volumes, so its header reads
-    `Stat. Page` and its rows have no volume unless a statviewer link supplies one
+    `Stat. Page` and its rows have no volume unless a Stat. page link supplies one
     (none do — that vintage predates the links).
   * **Appendix rows never derive a `usc_identifier`.** `5A / 101` is a real row, but
     appendix provisions are identified `/us/usc/t5a/pl/92/463/s1`, which `5A / 101`
@@ -97,7 +97,7 @@ CLASSIFICATION_BASE_URL = "https://uscode.house.gov/classification/"
 # names are still addressed as `ingest.classification.<name>` by the CLI, the
 # poll and their tests.
 
-PRIOR_CLASSIFICATION_SOURCE_URL = CLASSIFICATION_BASE_URL + "priortables.shtml"
+PRIOR_CLASSIFICATION_SOURCE_URL = CLASSIFICATION_BASE_URL + "priortables.html"
 """The 104th–118th entry page. Read by the backfill; the daily poll reads only
 `CLASSIFICATION_SOURCE_URL`, since closed congresses do not gain laws."""
 
@@ -111,10 +111,11 @@ MANIFEST_PATH = Path("data/manifests/classification.json")
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 _TAG_RE = re.compile(r"<[^>]+>")
+_BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
 _TABLE_HREF_RE = re.compile(
     r'href="(?P<href>[^"]*?(?P<filename>tbl(?P<congress>\d+)'
     r"(?P<order>pl|cd)(?:_(?P<session>1st|2nd))?"
-    r'\.(?P<ext>htm|pdf)))"',
+    r'\.(?P<ext>html?|pdf)))"',
     re.IGNORECASE,
 )
 _ECCT_FILENAME_RE = re.compile(
@@ -147,9 +148,16 @@ _PRE_OPEN_RE = re.compile(r"<pre[^>]*>", re.IGNORECASE)
 _PRE_CLOSE_RE = re.compile(r"</pre>|</div>", re.IGNORECASE)
 _RULER_RE = re.compile(r"^\s*-{5,}")
 _STATVIEWER_RE = re.compile(
-    r"statviewer\.htm\?volume=(?P<volume>\d+)&(?:amp;)?page=(?P<page>\d+)",
+    r"statviewer\.html?\?volume=(?P<volume>\d+)&(?:amp;)?page=(?P<page>\d+)",
     re.IGNORECASE,
 )
+"""A Stat. page link to OLRC's viewer: `statviewer.htm` before 2026-10-12, and
+`statviewer.html`, which the relaunched tables link by 2026-10-22 in place of the
+page image (ADR-0093's addendum)."""
+_STAT_IMAGE_RE = re.compile(r"/images/stat/(?P<volume>\d+)/(?P<page>\d+)\.png", re.IGNORECASE)
+"""The relaunched site's (ADR-0093) link from a Stat. page to its scanned image —
+the same (volume, page) pair the retired statviewer link carried."""
+_EMPTY_TABLE_RE = re.compile(r'<tbody\s+id="classificationTableBody"\s*>\s*</tbody>', re.IGNORECASE)
 _HEADER_TOKENS = ("Title", "Section", "Description", "Pub. L.", "Sec.")
 _STAT_HEADER_RE = re.compile(r"(?:(?P<volume>\d+)\s+)?Stat\.")
 _FILE_COVERED_RE = re.compile(r"\(\s*(?:Covering\s+)?(?P<text>Public Laws?[^)]*)\)")
@@ -220,6 +228,12 @@ class ClassificationParseError(ValueError):
     missing `<PRE>`, or a header this module cannot read raise."""
 
 
+class ClassificationTableUnavailable(ClassificationParseError):
+    """The page is the relaunched site's table viewer with an empty
+    `classificationTableBody` and no `<PRE>`: OLRC links the table and serves no
+    rows for it. The loader skips such a file and keeps what it stored (ADR-0093)."""
+
+
 # ---------------------------------------------------------------------------------
 # Entry pages
 # ---------------------------------------------------------------------------------
@@ -227,7 +241,7 @@ class ClassificationParseError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class TableLink:
-    """One classification document linked from `tables.shtml` or `priortables.shtml`."""
+    """One classification document linked from `tables.html` or `priortables.html`."""
 
     kind: str
     """`'pl'` or `'ecct'` — a string, not an enum: OLRC has added document kinds
@@ -279,11 +293,17 @@ class TableLink:
         )
 
 
-def parse_tables_index(html: str, *, base_url: str = CLASSIFICATION_BASE_URL) -> list[TableLink]:
+def parse_tables_index(
+    html: str,
+    *,
+    base_url: str = CLASSIFICATION_BASE_URL,
+    source_url: str = CLASSIFICATION_SOURCE_URL,
+) -> list[TableLink]:
     """Every `pl` table and every ECCT linked from one entry page, in page order.
 
-    Handles `tables.shtml` (the current congress) and `priortables.shtml`
-    (104th–118th). `cd` files and the PDF variants some vintages also link are
+    Handles `tables.html` (the current congress) and `priortables.html`
+    (104th–118th), and the `.shtml`/`.htm` pages they replaced on 2026-10-12
+    (ADR-0093). `cd` files and the PDF variants some vintages also link are
     dropped here rather than downstream: Code order is the same rows resorted, and
     HTML exists for every vintage.
 
@@ -295,7 +315,7 @@ def parse_tables_index(html: str, *, base_url: str = CLASSIFICATION_BASE_URL) ->
     seen: set[str] = set()
 
     for match in _TABLE_HREF_RE.finditer(html):
-        if match.group("order").lower() != "pl" or match.group("ext").lower() != "htm":
+        if match.group("order").lower() != "pl" or match.group("ext").lower() == "pdf":
             continue
         filename = match.group("filename")
         if filename in seen:
@@ -344,10 +364,10 @@ def parse_tables_index(html: str, *, base_url: str = CLASSIFICATION_BASE_URL) ->
         )
 
     if not links:
-        raise_if_maintenance(html, CLASSIFICATION_SOURCE_URL)
+        raise_if_maintenance(html, source_url)
         raise ClassificationParseError(
             "no classification tables found on the entry page — the markup at "
-            f"{CLASSIFICATION_SOURCE_URL} has probably changed"
+            f"{source_url} has probably changed"
         )
     return links
 
@@ -711,7 +731,9 @@ def parse_classification_file(
     source_url: str | None = None,
     covered_laws_text: str | None = None,
 ) -> ParsedClassificationFile:
-    """Parse one `tbl{congress}pl[_{session}].htm` into its registry row and its rows.
+    """Parse one `tbl{congress}pl[_{session}].html` into its registry row and its rows.
+
+    The `.htm` name the file had before 2026-10-12 is read the same way.
 
     `covered_laws_text` overrides the range printed in the file's own header. The
     loader passes the entry page's wording, because that is what a poll compares
@@ -1058,7 +1080,7 @@ def parse_description(description: str) -> tuple[bool, str | None, str | None, s
 
 
 def _split_at_linked_page(region: str, links: Sequence[tuple[int, int]]) -> tuple[str, str] | None:
-    """Split an overrun Sec./Stat. region where the row's own statviewer link says
+    """Split an overrun Sec./Stat. region where the row's own Stat. link says
     the page number starts.
 
     `4001(b)(2)(A), (B), (D)(iii)1967` has no whitespace for `_split_near` to cut
@@ -1094,7 +1116,8 @@ def _parse_row(
     # href and the visible text carries only the page.
     links = [
         (int(m.group("volume")), int(m.group("page")))
-        for m in _STATVIEWER_RE.finditer(raw_line)
+        for pattern in (_STATVIEWER_RE, _STAT_IMAGE_RE)
+        for m in pattern.finditer(raw_line)
     ]
 
     cells = [
@@ -1134,7 +1157,7 @@ def _parse_row(
         # in a 22-character column. The boundary test is there because a Sec. cell
         # that overruns with digits — `101, 102, 103, 104, 105` — leaves a Stat. cell
         # of `5 3` that `_STAT_CELL_RE` accepts, and 29 of the 31 files carry no
-        # statviewer links for the cross-check below to catch it with.
+        # Stat. page links for the cross-check below to catch it with.
         region = visible[offsets[4] :]
         overflow = _split_near(region, offsets[5] - offsets[4]) or _split_at_linked_page(
             region, links
@@ -1202,7 +1225,7 @@ def _parse_row(
 
 def _split_filename(filename: str) -> tuple[int, int]:
     match = re.match(
-        r"tbl(?P<congress>\d+)pl(?:_(?P<session>1st|2nd))?\.htm$", filename, re.IGNORECASE
+        r"tbl(?P<congress>\d+)pl(?:_(?P<session>1st|2nd))?\.html?$", filename, re.IGNORECASE
     )
     if match is None:
         raise ClassificationParseError(
@@ -1221,6 +1244,10 @@ def _extract_pre(html: str, filename: str) -> tuple[str, int]:
     opening = _PRE_OPEN_RE.search(html)
     if opening is None:
         raise_if_maintenance(html, filename)
+        if _EMPTY_TABLE_RE.search(html):
+            raise ClassificationTableUnavailable(
+                f"{filename}: the source page carries no rows (an empty table viewer)"
+            )
         raise ClassificationParseError(f"{filename}: no <pre> block — this is not a table page")
     rest = html[opening.end() :]
     closing = _PRE_CLOSE_RE.search(rest)
@@ -1798,7 +1825,7 @@ def run_classification_load(
         if html is None:
             say(f"skipped {page_filename(url)}: not in {from_dir}")
             continue
-        links.extend(parse_tables_index(html))
+        links.extend(parse_tables_index(html, source_url=url))
 
     if from_dir is not None:
         links.extend(links_on_disk(from_dir, exclude={link.filename for link in links}))
@@ -1830,6 +1857,12 @@ def run_classification_load(
                 say(f"skipped {link.filename}: not in {from_dir}")
                 continue
             parsed = _parse_document(link, html)
+        except ClassificationTableUnavailable as exc:
+            # Rows already stored for this file stay as they are; nothing about
+            # an empty page says they are wrong.
+            skipped.append((link.filename, "the source page carries no rows"))
+            say(f"skipped {link.filename}: {exc}")
+            continue
         except Exception as exc:
             failures.append((link.filename, f"{type(exc).__name__}: {exc}"))
             say(f"FAILED {link.filename}: {type(exc).__name__}: {exc}")
@@ -2115,7 +2148,7 @@ def write_classification_manifest(
 
 @dataclass(frozen=True, slots=True)
 class ClassificationCheckResult:
-    """What one poll of `tables.shtml` found. Mirrors the check row it writes."""
+    """What one poll of `tables.html` found. Mirrors the check row it writes."""
 
     ok: bool
     links: tuple[TableLink, ...]
@@ -2170,13 +2203,13 @@ def poll_classification(
     cache_dir: Path | None = CACHE_DIR,
     opener: Opener | None = None,
 ) -> ClassificationCheckResult:
-    """Ask `tables.shtml` whether anything changed, and record the asking.
+    """Ask `tables.html` whether anything changed, and record the asking.
 
     One request and one check row per call, whatever happens. Commits nothing —
     the caller owns the transaction.
 
     Only the current congress's page is polled: a closed congress does not gain
-    laws, so `priortables.shtml` is a backfill concern. A file this database
+    laws, so `priortables.html` is a backfill concern. A file this database
     holds that the page no longer lists fails the check rather than deleting
     anything, the same refusal `poll_source` makes for a vanished release point:
     a document never leaves OLRC's index, so its absence means a truncated
@@ -2186,7 +2219,7 @@ def poll_classification(
     """
     try:
         html = fetch_classification_page(url, cache_dir=cache_dir, opener=opener)
-        links = parse_tables_index(html)
+        links = parse_tables_index(html, source_url=url)
     except Exception as exc:  # network, HTTP, ClassificationParseError, SourceUnderMaintenance
         error = f"{type(exc).__name__}: {exc}"
         record_classification_check(session, source_url=url, ok=False, error=error)
@@ -2248,6 +2281,8 @@ def _latest_covered_text(links: Sequence[TableLink]) -> str | None:
 
 
 def _clean_text(raw: str) -> str:
+    # A `<br>` is a word break: `119-69<br />and 119-71` is two words.
+    raw = _BR_RE.sub(" ", raw)
     return " ".join(htmllib.unescape(_TAG_RE.sub("", raw)).replace("\xa0", " ").split())
 
 
