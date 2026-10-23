@@ -10,6 +10,7 @@ small malformed table inside the site's chrome, and the chrome is part of what t
 parser has to walk past.
 """
 
+import re
 import warnings
 from datetime import date
 
@@ -856,6 +857,26 @@ def test_an_image_link_splits_a_quote_butted_against_its_page():
     assert row.pl_section_raw == "7201(c)(3)"
     assert row.new_section_quote == "Subchapter III"
     assert (row.stat_volume, row.stat_pages) == (139, (1677,))
+
+
+@pytest.mark.parametrize("amp", ["&", "&amp;"])
+def test_a_relaunched_statviewer_link_reads_like_an_image_link(amp):
+    """By 2026-10-22 the relaunched tables link each Stat. page to
+    `statviewer.html?volume=…&page=…` rather than to its image."""
+    html = re.sub(
+        r'/images/stat/(\d+)/(\d+)\.png',
+        lambda m: f"../statviewer.html?volume={m.group(1)}{amp}page={m.group(2)}",
+        (FIXTURES / "tbl119pl_1st_relaunch_slice.html").read_text(),
+    )
+    images = _parse("tbl119pl_1st_relaunch_slice.html", "tbl119pl_1st.html")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        viewer = parse_classification_file(html, filename="tbl119pl_1st.html")
+    assert [(e.pl_section_raw, e.stat_volume, e.stat_pages) for e in viewer.entries] == [
+        (e.pl_section_raw, e.stat_volume, e.stat_pages) for e in images.entries
+    ]
+    row = _row(viewer, '7201(c)(3) "Subchapter III"')
+    assert (row.pl_section_raw, row.stat_pages) == ("7201(c)(3)", (1677,))
 
 
 def test_an_empty_table_viewer_is_unavailable_rather_than_malformed():

@@ -57,3 +57,23 @@ What the relaunched classification pages serve, read from a GitHub Actions runne
   publishes, move the answer, and `OLRC_STAT_IMAGES_FROM` is the one number to change.
 - The reader's own cross references to the Statutes at Large (`lib/refs.ts`) still go to govinfo
   for every volume, so a reference to volume 139 or 140 in the statutory text answers 400 there.
+
+## Addendum (2026-10-23)
+
+Read through a web fetch on 2026-10-22/23, with the site's notice saying it is current through
+Public Law 119-124:
+
+| Address | Answer |
+|---|---|
+| `classification/tables.html` | unchanged in shape; the 2nd session's sentence runs to 119-134 |
+| `classification/priortables.html` | unchanged: the 104th to 118th, 29 `pl` tables, every link `.html` |
+| `tbl119pl_2nd.html` | the same `<pre>` table, through 119-121; each Stat. page now links `statviewer.html?volume=…&page=…` |
+| `tbl117pl_2nd.html`, `tbl118pl_1st.html`, `tbl118pl_2nd.html` | still the empty viewer, now with column headers `Title, Section, Description, Pub. L., Pub. L. Sec., SAL Page, Date` and a "Download raw data as" row linking `ct{congress}-{last law}{xml,json,txt}.zip` (`ct118-273json.zip`, `ct118-34json.zip`) |
+| `statviewer.html?volume=140&page=3` | a viewer page whose image the fetch could not see |
+
+1. `_STATVIEWER_RE` reads `statviewer.html` as well as `statviewer.htm`, so a row's (volume,
+   page) and the split of a quote butted against its page work with either link form.
+2. The reader's `statuteHref` is unchanged: whether `statviewer.html` draws a page image for a
+   volume before 139 was not checkable from here.
+3. The `ct…zip` downloads are the only rows OLRC now publishes for the three empty tables. They
+   are not read yet; their contents were not reachable from here.

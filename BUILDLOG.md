@@ -3595,3 +3595,13 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Produced:** `ingest/classification.py`, `storage/classification.py`, `api/schemas.py`, `frontend/src/lib/url.ts`, `ClassificationTable.astro`, `SiteHeader.astro`, `SiteFooter.astro`, `about.astro`, `design.astro`, guide chapter 10, `Makefile`, the `*relaunch*` fixtures, ADR-0093.
 - **Verified:** Update corpus run 38347925030 loaded 119-118 and 119-120; `/api/v1/status` then reported 119-120, 0 behind, no incomplete loads. The captured pages parse: `tables.html` 4 documents, `priortables.html` 29, `tbl119pl_2nd.html` 619 rows and `tbl119pl_1st.html` 3,049 rows with 0 warnings. Link targets were probed from a GitHub Actions runner (the table in ADR-0093). `make test`, `make test-web`.
 
+## 114 — 2026-10-23 — PR #96 against the site as it stands ten days on (ADR-0093 addendum)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** review PR #96 against uscode.house.gov, decide whether it is still relevant, update it, and name the next step for the classification tables.
+- **Decided:**
+  - Still relevant: Update corpus run 39218492154 (2026-10-19, `main`) failed on `classification/tables.shtml` exactly as run 38347925030 did.
+  - The relaunched tables now link Stat. pages to `statviewer.html?volume=…&page=…`; `_STATVIEWER_RE` reads both `.htm` and `.html` (ADR-0093 addendum).
+  - The three empty tables now offer `ct{congress}-{last law}{xml,json,txt}.zip`; reading them is the next step and is not in this change.
+- **Produced:** `ingest/classification.py`, a parametrised test in `tests/test_classification_parser.py`, ADR-0093's addendum.
+- **Verified:** the new test fails against the old pattern (`&amp;` and `&` cases) and passes with the change; `make test`.

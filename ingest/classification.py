@@ -148,9 +148,12 @@ _PRE_OPEN_RE = re.compile(r"<pre[^>]*>", re.IGNORECASE)
 _PRE_CLOSE_RE = re.compile(r"</pre>|</div>", re.IGNORECASE)
 _RULER_RE = re.compile(r"^\s*-{5,}")
 _STATVIEWER_RE = re.compile(
-    r"statviewer\.htm\?volume=(?P<volume>\d+)&(?:amp;)?page=(?P<page>\d+)",
+    r"statviewer\.html?\?volume=(?P<volume>\d+)&(?:amp;)?page=(?P<page>\d+)",
     re.IGNORECASE,
 )
+"""A Stat. page link to OLRC's viewer: `statviewer.htm` before 2026-10-12, and
+`statviewer.html`, which the relaunched tables link by 2026-10-22 in place of the
+page image (ADR-0093's addendum)."""
 _STAT_IMAGE_RE = re.compile(r"/images/stat/(?P<volume>\d+)/(?P<page>\d+)\.png", re.IGNORECASE)
 """The relaunched site's (ADR-0093) link from a Stat. page to its scanned image —
 the same (volume, page) pair the retired statviewer link carried."""
