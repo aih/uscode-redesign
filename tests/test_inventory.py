@@ -332,13 +332,135 @@ def test_merge_refuses_a_new_release_point_older_than_the_newest_held():
         merge_inventory(KNOWN, stale)
 
 
-def test_merge_refuses_a_new_release_point_listed_before_a_held_one():
+def test_merge_refuses_a_new_release_point_listed_before_an_earlier_held_one():
     published = _known(("119-112", date(2026, 9, 19), ("01",)), ("119-111", date(2026, 9, 18), ()))
-    with pytest.raises(InventoryParseError):
+    with pytest.raises(InventoryParseError, match="newer than 119-111"):
         merge_inventory(KNOWN, published)
 
 
 def test_merge_refuses_held_release_points_in_another_order():
     published = _known(("119-111", date(2026, 9, 18), ()), ("119-110", date(2026, 9, 16), ()))
     with pytest.raises(InventoryParseError):
+        merge_inventory(KNOWN, published)
+
+
+# ------------------------------------- the page of 2026-10-23 (ADR-0094)
+
+
+@pytest.fixture(scope="module")
+def listed_prior() -> list[ReleasePointEntry]:
+    return parse_inventory((FIXTURES / "priorreleasepoints_li_label.html").read_text())
+
+
+@pytest.fixture(scope="module")
+def undated_current() -> ReleasePointEntry:
+    return parse_current_release_point((FIXTURES / "download_undated.html").read_text())
+
+
+def test_the_listed_prior_page_reads_labels_from_the_release_point_pages(listed_prior):
+    """`download/119-121.html` → `119-121`, oldest first, back to January 2026."""
+    labels = [entry.label for entry in listed_prior]
+    assert len(labels) == 22
+    assert labels[0] == "119-73not60"
+    assert labels[-4:] == ["119-117", "119-118", "119-120", "119-121"]
+    assert labels.index("119-102not101") + 1 == labels.index("119-102")
+    assert [entry.seq for entry in listed_prior] == list(range(22))
+
+
+def test_the_listed_prior_page_spells_dates_out_and_lists_changed_titles(listed_prior):
+    by_label = {entry.label: entry for entry in listed_prior}
+    assert by_label["119-121"].currency_date == date(2026, 10, 9)
+    assert by_label["119-117"].titles_affected == ("16", "54")
+    assert by_label["119-73not60"].titles_affected == ("11a", "18", "18a", "22", "28a", "34")
+    assert by_label["119-121"].url == "https://uscode.house.gov/download/119-121.html"
+
+
+def test_the_undated_current_page_reads_the_date_from_its_description(undated_current):
+    assert undated_current.label == "119-124"
+    assert undated_current.currency_date == date(2026, 10, 15)
+    assert undated_current.description.startswith("Public Law 119-124 (10/15/2026)")
+
+
+def test_the_undated_current_page_reads_changed_titles_from_their_zip_links(undated_current):
+    """`<div class="usctitlechanged">16 - Conservation</div>` carries no `id`."""
+    assert undated_current.titles_affected == ("16", "29")
+
+
+def test_a_changed_appendix_row_reads_its_title_from_its_zip_link():
+    page = (
+        '<h3 class="releasepointinformation">Public Law 119-130</h3>'
+        "<p>All files are current through Public Law 119-130 (November 2, 2026).</p>"
+        '<div class="uscitem"><div class="usctitle">5 - Government</div>'
+        '<a href="download/releasepoints/us/pl/119/130/xml_usc05@119-130.zip">[XML]</a></div>'
+        '<div class="uscitem"><div class="usctitleappendixchanged">Appendix</div>'
+        '<a href="download/releasepoints/us/pl/119/130/xml_usc05a@119-130.zip">[XML]</a></div>'
+    )
+    entry = parse_current_release_point(page)
+    assert entry.titles_affected == ("05a",)
+
+
+DEPLOYED = _known(
+    ("119-103", date(2026, 9, 2), ("01", "05")),
+    ("119-108", date(2026, 9, 11), ("26", "31", "40")),
+    ("119-110", date(2026, 9, 16), ("18", "28")),
+    ("119-111", date(2026, 9, 18), ("22", "26", "42", "50")),
+    ("119-118", date(2026, 9, 30), ALL_KNOWN_TITLES),
+    ("119-120", date(2026, 10, 7), ("31", "42")),
+    ("119-121", date(2026, 10, 9), ALL_KNOWN_TITLES),
+)
+"""What the deployed site held on 2026-10-23 from 119-103 on: every release point
+the listed page names but 119-117, which the page of 2026-10-12 did not list."""
+
+
+def test_merge_places_a_release_point_the_site_never_held_where_the_source_lists_it(
+    listed_prior, undated_current
+):
+    published = with_current_release_point(listed_prior, undated_current)
+    window = [entry for entry in published if entry.currency_date >= date(2026, 9, 2)]
+    merged = merge_inventory(DEPLOYED, window)
+
+    assert [entry.label for entry in merged] == [
+        "119-103", "119-108", "119-110", "119-111", "119-117",
+        "119-118", "119-120", "119-121", "119-124",
+    ]
+    assert [entry.seq for entry in merged] == list(range(9))
+    # Held entries keep everything but their position.
+    held = [entry for entry in merged if entry.label != "119-117"][:-1]
+    assert [(e.label, e.currency_date, e.titles_affected) for e in held] == [
+        (e.label, e.currency_date, e.titles_affected) for e in DEPLOYED
+    ]
+    # 119-117 follows 119-111 here and on the source, so its titles are a delta
+    # from text this site holds.
+    assert merged[4].titles_affected == ("16", "54")
+    assert merged[-1].titles_affected == ("16", "29")
+
+
+def test_merge_fetches_in_full_an_inserted_release_point_whose_source_predecessor_is_not_held():
+    """The changed titles are a delta from the release point the source lists
+    before this one; when that is not the one before it here, the delta is from
+    text this site does not hold."""
+    # Nothing listed before it.
+    merged = merge_inventory(
+        KNOWN, _known(("119-109", date(2026, 9, 12), ("01",)), ("119-110", date(2026, 9, 16), ()))
+    )
+    assert [entry.label for entry in merged] == ["119-108", "119-109", "119-110", "119-111"]
+    assert merged[1].titles_affected == ALL_KNOWN_TITLES
+
+    # Listed after 119-108, but 119-110, which the source no longer lists, is between.
+    merged = merge_inventory(
+        KNOWN,
+        _known(
+            ("119-108", date(2026, 9, 11), ()),
+            ("119-110u1", date(2026, 9, 17), ("01",)),
+            ("119-111", date(2026, 9, 18), ()),
+        ),
+    )
+    assert [entry.label for entry in merged] == ["119-108", "119-110", "119-110u1", "119-111"]
+    assert merged[2].titles_affected == ALL_KNOWN_TITLES
+    assert "between 119-110 and this one" in merged[2].description
+
+
+def test_merge_refuses_an_inserted_release_point_dated_before_its_new_neighbour():
+    published = _known(("119-109", date(2026, 9, 1), ("01",)), ("119-110", date(2026, 9, 16), ()))
+    with pytest.raises(InventoryParseError, match="older than 119-108"):
         merge_inventory(KNOWN, published)

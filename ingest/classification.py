@@ -81,9 +81,11 @@ from db.models import ClassificationEntry as ClassificationEntryRow
 from db.models import ClassificationFile as ClassificationFileRow
 from db.models import ClassificationSourceCheck
 from db.models import EcctEntry as EcctEntryRow
+from ingest import source_formats
 from ingest.download import Opener, throttle
 from ingest.inventory import USER_AGENT
 from ingest.maintenance import raise_if_maintenance, raise_if_maintenance_response
+from ingest.source_formats import SourceFormat, UnrecognisedSourceFormat
 from ingest.verification import VERIFICATION_DIR, write_verification_json
 from storage.classification import CLASSIFICATION_SOURCE_URL, law_in_ranges
 
@@ -157,6 +159,10 @@ page image (ADR-0093's addendum)."""
 _STAT_IMAGE_RE = re.compile(r"/images/stat/(?P<volume>\d+)/(?P<page>\d+)\.png", re.IGNORECASE)
 """The relaunched site's (ADR-0093) link from a Stat. page to its scanned image —
 the same (volume, page) pair the retired statviewer link carried."""
+_CT_RECORDS_RE = re.compile(r"\bvar\s+ctRecords\s*=\s*\[")
+_STAT_VOLUME_VAR_RE = re.compile(r'\bvar\s+statVolume\s*=\s*"(?P<volume>\d+)"')
+_SCRIPT_RE = re.compile(r"<script\b[^>]*>.*?</script\s*>", re.DOTALL | re.IGNORECASE)
+_STYLE_OR_SCRIPT_RE = re.compile(r"<(style|script)\b.*?</\1\s*>", re.DOTALL | re.IGNORECASE)
 _EMPTY_TABLE_RE = re.compile(r'<tbody\s+id="classificationTableBody"\s*>\s*</tbody>', re.IGNORECASE)
 _HEADER_TOKENS = ("Title", "Section", "Description", "Pub. L.", "Sec.")
 _STAT_HEADER_RE = re.compile(r"(?:(?P<volume>\d+)\s+)?Stat\.")
@@ -310,7 +316,11 @@ def parse_tables_index(
     The covered-law text is read from the *cell* the link sits in, up to the first
     anchor in it — the run between them says "Sorted in Public Law order", which
     contains the words "Public Law" and would otherwise win a nearest-match search.
+
+    The page's format is detected first (`ingest.source_formats`); both registered
+    formats are read by this one function.
     """
+    detect_format(source_formats.CLASSIFICATION_INDEX, html, source_url)
     links: list[TableLink] = []
     seen: set[str] = set()
 
@@ -577,6 +587,8 @@ class ParsedClassificationFile:
     entries: tuple[ClassificationEntry, ...] = ()
     skipped_lines: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
+    source_format: str = "classification-table/pre-text"
+    """The `ingest.source_formats` id of the page the rows were read from."""
 
     @property
     def row_count(self) -> int:
@@ -601,6 +613,7 @@ class ParsedClassificationFile:
             "entries": [entry.as_json() for entry in self.entries],
             "skipped_lines": list(self.skipped_lines),
             "warnings": list(self.warnings),
+            "source_format": self.source_format,
         }
 
     @classmethod
@@ -625,6 +638,7 @@ class ParsedClassificationFile:
             ),
             skipped_lines=tuple(str(s) for s in record.get("skipped_lines", [])),  # type: ignore[union-attr]
             warnings=tuple(str(w) for w in record.get("warnings", [])),  # type: ignore[union-attr]
+            source_format=str(record.get("source_format", "classification-table/pre-text")),
         )
 
     def report(self) -> "ClassificationParseReport":
@@ -733,13 +747,30 @@ def parse_classification_file(
 ) -> ParsedClassificationFile:
     """Parse one `tbl{congress}pl[_{session}].html` into its registry row and its rows.
 
-    The `.htm` name the file had before 2026-10-12 is read the same way.
+    The `.htm` name the file had before 2026-10-12 is read the same way. The page's
+    format is detected first (`ingest.source_formats`): the fixed-width `<pre>` is
+    parsed here, the embedded-records viewer by `_parse_records_file`, and the empty
+    viewer is `ClassificationTableUnavailable`.
 
     `covered_laws_text` overrides the range printed in the file's own header. The
     loader passes the entry page's wording, because that is what a poll compares
     against and the two are written independently.
     """
     congress, session = _split_filename(filename)
+    source_format = detect_format(source_formats.CLASSIFICATION_TABLE, html, filename)
+    if source_format.id == "classification-table/viewer-empty":
+        raise ClassificationTableUnavailable(
+            f"{filename}: the source page carries no rows (an empty table viewer)"
+        )
+    if source_format.id == "classification-table/viewer-records":
+        return _parse_records_file(
+            html,
+            filename=filename,
+            congress=congress,
+            session=session,
+            source_url=source_url,
+            covered_laws_text=covered_laws_text,
+        )
     pre_text, pre_start = _extract_pre(html, filename)
     raw_lines = pre_text.split("\n")
     lines = [_visible(line) for line in raw_lines]
@@ -823,6 +854,173 @@ def parse_classification_file(
         entries=tuple(entries),
         skipped_lines=tuple(skipped),
         warnings=tuple(collector.messages),
+    )
+
+
+def detect_format(page: str, html: str, url: str) -> SourceFormat:
+    """The registered format `html` is served in (`ingest.source_formats`), or a
+    `ClassificationParseError` naming the formats tried — after the maintenance
+    notice, which matches no format, has been ruled out."""
+    try:
+        return source_formats.detect(page, html, url=url)
+    except UnrecognisedSourceFormat as exc:
+        raise_if_maintenance(html, url)
+        raise ClassificationParseError(str(exc)) from exc
+
+
+def _parse_records_file(
+    html: str,
+    *,
+    filename: str,
+    congress: int,
+    session: int,
+    source_url: str | None,
+    covered_laws_text: str | None,
+) -> ParsedClassificationFile:
+    """`classification-table/viewer-records`: the rows as `var ctRecords = [...]`.
+
+    Each object is one row, its fields already split, so nothing here is
+    recovered from column positions. A row's `raw_line` is its object as JSON,
+    verbatim, which keeps the five fields no column holds (`usckey`,
+    `tableupdate`, `status`, `recordOrder`, `recordlevelcomment`).
+    """
+    start = next(
+        (
+            found
+            for script in _SCRIPT_RE.finditer(html)
+            if (found := _CT_RECORDS_RE.search(html, script.start(), script.end()))
+        ),
+        None,
+    )
+    if start is None:
+        raise ClassificationParseError(f"{filename}: no ctRecords array in a script")
+    try:
+        records, _end = json.JSONDecoder().raw_decode(html, start.end() - 1)
+    except json.JSONDecodeError as exc:
+        raise ClassificationParseError(
+            f"{filename}: the ctRecords array is not JSON ({exc.msg} at {exc.pos})"
+        ) from exc
+    if not isinstance(records, list) or not records:
+        raise ClassificationParseError(f"{filename}: the ctRecords array is empty")
+
+    head_text = _clean_text(_STYLE_OR_SCRIPT_RE.sub(" ", _COMMENT_RE.sub("", html[: start.start()])))
+    prepared_date = _prepared_date(head_text)
+    if covered_laws_text is None:
+        covered = _FILE_COVERED_RE.search(head_text)
+        covered_laws_text = covered.group("text").strip() if covered else ""
+    covered_ranges, first_law, last_law = parse_covered_laws(covered_laws_text)
+    volume_match = _STAT_VOLUME_VAR_RE.search(html)
+    stat_volume = int(volume_match.group("volume")) if volume_match else None
+
+    collector = _Collector()
+    entries: list[ClassificationEntry] = []
+    for record in records:
+        if not isinstance(record, dict):
+            raise ClassificationParseError(f"{filename}: a ctRecords entry is not an object")
+        entries.append(
+            _record_entry(
+                record,
+                row_seq=len(entries),
+                file_stat_volume=stat_volume,
+                filename=filename,
+                collector=collector,
+            )
+        )
+
+    return ParsedClassificationFile(
+        kind="pl",
+        congress=congress,
+        session=session,
+        source_filename=filename,
+        source_url=source_url or (CLASSIFICATION_BASE_URL + filename),
+        covered_laws_text=covered_laws_text,
+        covered_ranges=covered_ranges,
+        first_law=first_law,
+        last_law=last_law,
+        prepared_date=prepared_date,
+        stat_volume=stat_volume,
+        content_hash=hashlib.sha256(
+            json.dumps(records, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest(),
+        column_offsets=(),
+        entries=tuple(entries),
+        warnings=tuple(collector.messages),
+        source_format="classification-table/viewer-records",
+    )
+
+
+def _record_entry(
+    record: dict[str, Any],
+    *,
+    row_seq: int,
+    file_stat_volume: int | None,
+    filename: str,
+    collector: _Collector,
+) -> ClassificationEntry:
+    """One `ctRecords` object → one row, through the same field rules a `<pre>`
+    row's cells go through."""
+
+    def field_text(name: str) -> str:
+        value = record.get(name, "")
+        return "" if value is None else str(value).strip()
+
+    title_raw = field_text("usctitle")
+    section_raw = field_text("uscsection")
+    description_raw = field_text("uscdescription")
+    pl_raw = field_text("publiclaw")
+    section_of_law = field_text("publiclawsection")
+    stat_raw = field_text("statutesatlargepage")
+    raw_line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+
+    pl_match = _PL_CELL_RE.match(pl_raw)
+    if pl_match is None:
+        collector.warn(
+            f"{filename}: row {row_seq} has no parseable Pub. L. ({pl_raw!r}) — "
+            f"keeping the row: {raw_line}"
+        )
+    if not _STAT_CELL_RE.match(stat_raw):
+        collector.warn(
+            f"{filename}: row {row_seq} has no parseable Stat. page ({stat_raw!r}) — "
+            f"keeping the row: {raw_line}"
+        )
+        stat_raw = ""
+
+    new_section_quote = None
+    quoted = _QUOTED_SECTION_RE.match(section_of_law)
+    if quoted is not None:
+        section_of_law = quoted.group("section").strip()
+        new_section_quote = quoted.group("quote")
+
+    stat_page_labels, stat_pages = parse_stat_pages(stat_raw)
+    volume_text = field_text("statutesatlargevolume")
+    stat_volume = int(volume_text) if volume_text.isdigit() else file_stat_volume
+
+    is_appendix = bool(title_raw) and title_raw[-1].isalpha()
+    title_num = title_raw.lower()
+    section_norm = normalize_section(section_raw)
+    is_note, action, counterpart, act_name = parse_description(description_raw)
+
+    return ClassificationEntry(
+        row_seq=row_seq,
+        raw_line=raw_line,
+        title_raw=title_raw,
+        title_num=title_num,
+        is_appendix=is_appendix,
+        section_raw=section_raw,
+        section_norm=section_norm,
+        description_raw=description_raw,
+        is_note=is_note,
+        action=action,
+        transfer_counterpart=counterpart,
+        act_name=act_name,
+        usc_identifier=derive_usc_identifier(title_num, section_norm, is_appendix=is_appendix),
+        pl_congress=int(pl_match.group("congress")) if pl_match else None,
+        pl_num=int(pl_match.group("num")) if pl_match else None,
+        pl_section_raw=section_of_law,
+        new_section_quote=new_section_quote,
+        stat_volume=stat_volume,
+        stat_pages=stat_pages,
+        stat_page_labels=stat_page_labels,
     )
 
 
@@ -1415,6 +1613,7 @@ def parse_ecct(
     Zero data rows is valid: the current table has one. Zero *header* cells is not —
     that means the four columns this reads by position are no longer there.
     """
+    detect_format(source_formats.CLASSIFICATION_ECCT, html, filename)
     rows = list(_ECCT_ROW_RE.finditer(html))
     headers = 0
     entries: list[EcctEntry] = []
@@ -2078,6 +2277,7 @@ def write_verification(
         document = {
             "kind": "pl",
             "source_url": parsed.source_url,
+            "source_format": parsed.source_format,
             "content_hash": parsed.content_hash,
             "column_offsets": list(parsed.column_offsets),
             "prepared_date": (
@@ -2158,6 +2358,8 @@ class ClassificationCheckResult:
 
     latest_covered_text: str | None = None
     error: str | None = None
+    formats: tuple[str, ...] = ()
+    """The format the index page was served in (`ingest.source_formats`)."""
 
     @property
     def has_changes(self) -> bool:
@@ -2173,6 +2375,7 @@ def record_classification_check(
     changed_files: Sequence[str] = (),
     latest_covered_text: str | None = None,
     error: str | None = None,
+    formats: Sequence[str] = (),
 ) -> ClassificationSourceCheck:
     """Write one `classification_source_checks` row. On success *and* on failure.
 
@@ -2191,6 +2394,7 @@ def record_classification_check(
         # diagnosis, and an HTML error page would push a status response into
         # the kilobytes.
         error=(error[:500] if error else None),
+        source_formats=list(formats),
     )
     session.add(row)
     return row
@@ -2219,6 +2423,7 @@ def poll_classification(
     """
     try:
         html = fetch_classification_page(url, cache_dir=cache_dir, opener=opener)
+        formats = (detect_format(source_formats.CLASSIFICATION_INDEX, html, url).id,)
         links = parse_tables_index(html, source_url=url)
     except Exception as exc:  # network, HTTP, ClassificationParseError, SourceUnderMaintenance
         error = f"{type(exc).__name__}: {exc}"
@@ -2248,8 +2453,12 @@ def poll_classification(
             f"{', …' if len(vanished) > 5 else ''}) — refusing to treat a page "
             "that looks truncated as news"
         )
-        record_classification_check(session, source_url=url, ok=False, error=error)
-        return ClassificationCheckResult(ok=False, links=(), changed_files=(), error=error)
+        record_classification_check(
+            session, source_url=url, ok=False, error=error, formats=formats
+        )
+        return ClassificationCheckResult(
+            ok=False, links=(), changed_files=(), error=error, formats=formats
+        )
 
     changed = tuple(
         link.filename
@@ -2264,9 +2473,14 @@ def poll_classification(
         files_seen=len(links),
         changed_files=changed,
         latest_covered_text=latest,
+        formats=formats,
     )
     return ClassificationCheckResult(
-        ok=True, links=tuple(links), changed_files=changed, latest_covered_text=latest
+        ok=True,
+        links=tuple(links),
+        changed_files=changed,
+        latest_covered_text=latest,
+        formats=formats,
     )
 
 
