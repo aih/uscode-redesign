@@ -247,6 +247,39 @@ def test_a_poll_of_the_relaunched_pages_fetches_the_first_new_release_point_in_f
 
 
 @pytest.mark.integration
+def test_a_poll_of_the_pages_of_2026_10_23_records_their_formats(session, monkeypatch):
+    """ADR-0094: the prior page lists every release point back to January and the
+    download page carries 119-124 under an undated heading. The check row names
+    the format each page was read in."""
+    from sqlalchemy import select
+
+    from db.models import SourceCheck
+    from tests.conftest import FIXTURES
+
+    pages = {
+        inventory_mod.PRIOR_RELEASE_POINTS_URL: (
+            FIXTURES / "priorreleasepoints_li_label.html"
+        ).read_text(),
+        inventory_mod.CURRENT_RELEASE_POINT_URL: (FIXTURES / "download_undated.html").read_text(),
+    }
+    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: pages[url])
+
+    result = inventory_mod.poll_source(session, out_path=None, base_path=None, seed=False)
+
+    assert result.ok, result.error
+    assert result.formats == (
+        "prior-release-points/li-label-html",
+        "current-release-point/undated-heading",
+    )
+    assert result.entries[-1].label == "119-124"
+    assert "119-117" in result.new_labels
+    session.flush()
+    check = session.scalars(select(SourceCheck).order_by(SourceCheck.id.desc())).first()
+    assert check is not None
+    assert list(check.source_formats) == list(result.formats)
+
+
+@pytest.mark.integration
 def test_an_unparseable_page_is_a_failed_check_not_an_empty_inventory(session, monkeypatch):
     """OLRC changing its markup must not read as "there are no release points"."""
     monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: "<html/>")
@@ -255,6 +288,7 @@ def test_an_unparseable_page_is_a_failed_check_not_an_empty_inventory(session, m
 
     assert not result.ok
     assert "InventoryParseError" in (result.error or "")
+    assert "no known prior-release-points format" in (result.error or "")
 
 
 # ------------------------------------------------------------------ the route

@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(91 ADRs, numbered to 0093 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(92 ADRs, numbered to 0094 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -498,7 +498,16 @@ release point after a gap, or one with no changed titles marked, is planned in f
 between 119-111 and 119-118 are no longer published and are not loaded. The classification poll
 reads `classification/tables.html` and `priortables.html` (ADR-0093): Stat. pages link
 `/images/stat/{v}/{p}.png` instead of `statviewer.htm`, and a prior table served as an empty
-viewer with no `<pre>` is skipped with its stored rows kept. **The whole site is `Disallow: /` to crawlers**
+viewer with no `<pre>` is skipped with its stored rows kept. **Every source page is matched to a registered format before it is parsed** (ADR-0094,
+`ingest/source_formats.py`, history in `docs/source-formats.md`): the prior page, the download
+page, the classification index, a table and the ECCT, one `SourceFormat` per markup OLRC has
+served, retired ones kept, each with a committed capture its signature is tested against. A page
+matching none is a failed check naming the formats tried; the check rows record the ids
+(`source_formats`). On 2026-10-23 the prior page was a `<li>` list again (`download/119-121.html`,
+dates spelled out, back to 119-73not60), the download page's heading lost its date, and 117-2,
+118-1 and 118-2 carried their rows as `var ctRecords = [...]` in the empty viewer's script. A
+release point the site does not hold is inserted where the source lists it, so 119-117 lands
+between 119-111 and 119-118 and every later `seq` moves up. **The whole site is `Disallow: /` to crawlers**
 (ADR-0037) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
 it; blunt on purpose while the site is a demo, after two AI crawlers walking the `?release=` axis
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A

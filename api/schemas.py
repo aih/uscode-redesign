@@ -946,8 +946,9 @@ class ClassificationEntryOut(BaseModel):
     session_label: str = Field(examples=["2"])
     row_seq: int = Field(description="0-based order within the document.")
     raw_line: str = Field(
-        description="The source line, tag-stripped and verbatim. The fallback for "
-        "the 129 rows whose columns could not all be read."
+        description="The source line, tag-stripped and verbatim, or, for a table "
+        "the source publishes as records (117-2, 118-1, 118-2), the record as JSON. "
+        "The fallback for the 129 rows whose columns could not all be read."
     )
     title_raw: str = Field(examples=["18"])
     title_num: str = Field(

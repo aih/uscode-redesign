@@ -622,6 +622,7 @@ def test_a_successful_poll_records_the_check(factory):
     # Nothing is loaded, so the one document on the page is news.
     assert result.changed_files == ("tbl118pl_2nd.htm",)
     assert list(check.changed_files) == ["tbl118pl_2nd.htm"]
+    assert list(check.source_formats) == ["classification-index/htm-links"]
 
 
 @pytest.mark.integration

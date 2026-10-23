@@ -84,6 +84,11 @@ class SourceCheck(Base):
     latest_label: Mapped[str | None] = mapped_column(String, nullable=True)
     latest_currency_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The `ingest.source_formats` id of each page the check read, in the order
+    # read (ADR-0094). Empty on a check that failed before a page matched one.
+    source_formats: Mapped[list[str]] = mapped_column(
+        ARRAY(String), default=list, server_default="{}"
+    )
 
 
 class Title(Base):
@@ -691,6 +696,10 @@ class ClassificationSourceCheck(Base):
     changed_files: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     latest_covered_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # As on `source_checks` (ADR-0094): the format the index page was served in.
+    source_formats: Mapped[list[str]] = mapped_column(
+        ARRAY(String), default=list, server_default="{}"
+    )
 
 
 class CorpusState(Base):

@@ -468,6 +468,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
         f"checked {args.url}: {len(result.entries)} release points, "
         f"newest {newest.label} ({newest.currency_date})"
     )
+    print(f"source formats: {', '.join(result.formats)}")
     if not result.new_labels:
         print("nothing new since the last check")
         return 0
@@ -806,6 +807,7 @@ def _cmd_classification_check(args: argparse.Namespace) -> int:
         return EXIT_MAINTENANCE if is_maintenance_error(result.error) else 1
 
     print(f"checked {args.url}: {len(result.links)} documents linked")
+    print(f"source format: {', '.join(result.formats)}")
     if result.latest_covered_text:
         print(f"newest table covers: {result.latest_covered_text}")
     if not result.has_changes:

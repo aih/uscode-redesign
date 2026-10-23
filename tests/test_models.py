@@ -270,7 +270,17 @@ def test_classification_source_checks_is_a_sibling_of_source_checks() -> None:
         "changed_files",
         "latest_covered_text",
         "error",
+        "source_formats",
     }
+
+
+def test_both_check_tables_record_the_formats_they_read() -> None:
+    """ADR-0094: every check row names the `ingest.source_formats` id of each page
+    it read, and a row written before that existed holds an empty list."""
+    for table in ("source_checks", "classification_source_checks"):
+        column = Base.metadata.tables[table].columns["source_formats"]
+        assert not column.nullable
+        assert column.server_default is not None
 
 
 def test_classification_source_checks_records_failures_too() -> None:

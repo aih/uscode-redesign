@@ -10,6 +10,8 @@ small malformed table inside the site's chrome, and the chrome is part of what t
 parser has to walk past.
 """
 
+import dataclasses
+import json
 import re
 import warnings
 from datetime import date
@@ -253,7 +255,7 @@ def test_a_missing_header_token_is_a_parse_error():
 
 
 def test_a_page_with_no_pre_block_is_a_parse_error():
-    with pytest.raises(ClassificationParseError, match="no <pre>"):
+    with pytest.raises(ClassificationParseError, match="no known classification-table format"):
         parse_classification_file(
             "<html><body>Service unavailable</body></html>", filename="tbl118pl_2nd.htm"
         )
@@ -788,9 +790,9 @@ def test_an_ecct_row_whose_cells_do_not_close_is_warned_about():
 
 def test_an_ecct_with_no_header_cells_is_a_parse_error():
     """The four columns are read by position; without the headers there is nothing
-    saying they are still the four columns."""
-    with pytest.raises(ClassificationParseError, match="no header cells"):
-        parse_ecct("<html><body><p>Down for maintenance.</p></body></html>")
+    saying they are still the four columns, and no registered ECCT format matches."""
+    with pytest.raises(ClassificationParseError, match="no known classification-ecct format"):
+        parse_ecct("<html><body><p>The table moved.</p></body></html>")
 
 
 def test_ecct_entries_round_trip_through_json(ecct):
@@ -891,3 +893,72 @@ def test_the_relaunched_ecct_parses():
         (FIXTURES / "ecct_relaunch.html").read_text(), filename="ECCT.html", congress=119, session=2
     )
     assert parsed.row_count == 1
+
+
+# --- the embedded-records viewer (ADR-0094) -------------------------------------
+
+
+@pytest.fixture(scope="module")
+def records() -> ParsedClassificationFile:
+    return parse_classification_file(
+        (FIXTURES / "tbl118pl_2nd_records_slice.html").read_text(),
+        filename="tbl118pl_2nd.html",
+    )
+
+
+def test_a_records_viewer_is_read_from_its_script(records):
+    assert records.source_format == "classification-table/viewer-records"
+    assert records.row_count == 84
+    assert records.warnings == ()
+    assert records.covered_laws_text == "Public Laws 118-35 through 118-274"
+    assert records.covered_ranges == ("35-274",)
+    assert records.prepared_date == date(2025, 1, 6)
+    assert records.stat_volume == 138
+    assert records.column_offsets == ()
+
+
+def test_a_records_row_keeps_its_object_verbatim(records):
+    first = records.entries[0]
+    assert json.loads(first.raw_line)["usckey"] == "1800000000355100000000000000000000AS"
+    assert (first.title_num, first.section_norm, first.pl_label, first.pl_section_raw) == (
+        "18", "3551", "118-35", "101(3)"
+    )
+    assert first.usc_identifier == "/us/usc/t18/s3551"
+    assert first.is_note
+
+
+def test_the_two_formats_of_one_table_give_the_same_rows(records):
+    """`tbl118pl_2nd_slice.htm` (the `<pre>` of 2026-08-11) and the records slice
+    hold the same 84 rows. Every parsed field agrees; only the verbatim line and
+    the position in the slice differ."""
+    pre = parse_classification_file(
+        (FIXTURES / "tbl118pl_2nd_slice.htm").read_text(), filename="tbl118pl_2nd.htm"
+    )
+    ignored = {"row_seq", "raw_line", "title_raw"}
+
+    def fields(entry: ClassificationEntry) -> tuple[tuple[str, object], ...]:
+        return tuple(
+            (name, value)
+            for name, value in sorted(dataclasses.asdict(entry).items())
+            if name not in ignored
+        )
+
+    assert sorted(map(fields, pre.entries), key=repr) == sorted(map(fields, records.entries), key=repr)
+
+
+def test_a_records_array_that_is_not_json_is_a_parse_error():
+    page = (FIXTURES / "tbl118pl_2nd_records_slice.html").read_text()
+    broken = page.replace('"usctitle": "18"', "usctitle: 18", 1)
+    with pytest.raises(ClassificationParseError, match="not JSON"):
+        parse_classification_file(broken, filename="tbl118pl_2nd.html")
+
+
+def test_the_empty_viewer_is_still_unavailable():
+    with pytest.raises(ClassificationTableUnavailable):
+        parse_classification_file(
+            (FIXTURES / "tbl118pl_2nd_relaunch.html").read_text(), filename="tbl118pl_2nd.html"
+        )
+
+
+def test_a_pre_table_records_its_format(modern):
+    assert modern.source_format == "classification-table/pre-text"

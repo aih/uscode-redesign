@@ -3605,3 +3605,15 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - The three empty tables now offer `ct{congress}-{last law}{xml,json,txt}.zip`; reading them is the next step and is not in this change.
 - **Produced:** `ingest/classification.py`, a parametrised test in `tests/test_classification_parser.py`, ADR-0093's addendum.
 - **Verified:** the new test fails against the old pattern (`&amp;` and `&` cases) and passes with the change; `make test`.
+
+## 115 — 2026-10-23 — The source's formats, registered and detected (ADR-0094)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** `priorreleasepoints.html` is back with release points since January 2026. Compare its format with the previous one, keep a history of parsing methods, check which format a page is served in before parsing it, and do the same for the classification tables.
+- **Decided:**
+  - `/api/v1/status` showed the poll failing since 2026-10-22 06:41 UTC on the new prior page; the corpus stood at 119-121 against the source's 119-124.
+  - `ingest/source_formats.py` registers twelve formats over five page kinds, retired ones kept; every parse detects first and the match picks the parser; the check rows record the ids (migration `c4d9e2f7a1b3`); `docs/source-formats.md` is the prose history (ADR-0094).
+  - New parsers: the `<li>` list with `download/{label}.html` hrefs, the download page with an undated heading and id-less changed rows, and the classification viewer whose rows are a `ctRecords` array.
+  - `merge_inventory` inserts a release point the site does not hold where the source lists it (119-117, between 119-111 and 119-118), amending ADR-0091's append-only rule.
+- **Produced:** `ingest/source_formats.py`, `ingest/inventory.py`, `ingest/classification.py`, `ingest/__main__.py`, `db/models.py`, the migration, `api/schemas.py` (`raw_line`), guide chapters 03 and 10, `docs/source-formats.md`, ADR-0094, three fixtures captured from a GitHub Actions runner, `tests/test_source_formats.py` and tests in `test_inventory.py`, `test_classification_parser.py`, `test_source_check.py`, `test_classification_loader.py`, `test_models.py`, `test_version_changes.py`.
+- **Verified:** the captured pages parse: the prior page 22 release points (119-73not60 to 119-121, 119-117 titles 16 and 54), `download.html` 119-124 on 10/15/2026 with titles 16 and 29, `tbl117pl_2nd.html` 5,988 rows, `tbl118pl_1st.html` 1,491 and `tbl118pl_2nd.html` 2,987, each the row count of its 2026-08-11 artifact, with 0 warnings; the 84 rows of `tbl118pl_2nd_slice.htm` and the records slice agree on every parsed field. The zips of all 23 release points answered HTTP 200 (titles 1, 16, 42, 54 probed). `make test` against a local `make ci-data` database with `USC_REQUIRE_INTEGRATION=1` (1,034 passed), `make test-web` (512 passed).
