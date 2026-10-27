@@ -464,3 +464,23 @@ def test_merge_refuses_an_inserted_release_point_dated_before_its_new_neighbour(
     published = _known(("119-109", date(2026, 9, 1), ("01",)), ("119-110", date(2026, 9, 16), ()))
     with pytest.raises(InventoryParseError, match="older than 119-108"):
         merge_inventory(KNOWN, published)
+
+
+# ------------------------------------- the pages of 2026-10-27 (ADR-0095)
+
+
+def test_the_prior_page_of_2026_10_27_lists_the_same_window_one_longer():
+    """The site's notice says it is "operating in a temporary format"; the
+    prior page still lists release points back to January 2026."""
+    entries = parse_inventory((FIXTURES / "priorreleasepoints_2026-10-27.html").read_text())
+    labels = [entry.label for entry in entries]
+    assert len(labels) == 23
+    assert labels[0] == "119-73not60"
+    assert labels[-1] == "119-124"
+
+
+def test_the_download_page_of_2026_10_27_is_119_134_with_its_changed_titles():
+    entry = parse_current_release_point((FIXTURES / "download_2026-10-27.html").read_text())
+    assert entry.label == "119-134"
+    assert entry.currency_date == date(2026, 10, 20)
+    assert entry.titles_affected == ("15", "16", "26", "29", "30", "54")

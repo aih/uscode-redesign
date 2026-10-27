@@ -213,6 +213,19 @@ def test_the_url_source_refuses_a_page_that_is_not_uslm(tmp_path, monkeypatch):
         source.fetch("/us/usc/t16/s45f")
 
 
+def test_the_sources_own_section_page_is_html_and_is_refused(tmp_path, monkeypatch):
+    """`https://uscode.house.gov/us/usc/119-134/t16/s2201/`, captured 2026-10-27:
+    the rendered page, with no USLM in it."""
+    monkeypatch.setattr(su, "throttle", lambda: None)
+    page = (REPO_ROOT / "tests" / "fixtures" / "section_page_2026-10-27.html").read_bytes()
+    source = su.UrlSectionSource(
+        "https://uscode.house.gov/us/usc/119-134/t{title}/s{section}/",
+        opener=lambda request, timeout: _Response(page),
+    )
+    with pytest.raises(su.SectionUpdateError, match="not a USLM document"):
+        source.fetch("/us/usc/t16/s2201")
+
+
 def test_the_directory_source_names_files_by_identifier(tmp_path, s45f_xml):
     (tmp_path / su.directory_filename("/us/usc/t16/s45f")).write_text(s45f_xml)
     assert su.directory_filename("/us/usc/t16/s45a–1") == "t16-s45a–1.xml"

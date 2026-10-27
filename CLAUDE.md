@@ -517,7 +517,8 @@ covers stops it (exit 3). The title's file, when it loads, replaces the assemble
 says which kind a section is (`assembled_from`, `fetched_for`, `note`). Title 16 at
 119-102not101 rebuilt from 119-99 by fetching §§ 2201 and 2206 matches its file on all 5,095
 sections (`scripts/section_update_check.py`). `update-corpus.sh` runs it after `load-all`; the
-per-section address (`USC_SECTION_URL`) is not yet captured. **The whole site is `Disallow: /` to crawlers**
+source's per-section page (`/us/usc/t26/s501` → `/us/usc/119-134/t26/s501/`, captured 2026-10-27)
+is HTML, so `USC_SECTION_URL` is unset and the sections come from a title zip. **The whole site is `Disallow: /` to crawlers**
 (ADR-0037) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
 it; blunt on purpose while the site is a demo, after two AI crawlers walking the `?release=` axis
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A

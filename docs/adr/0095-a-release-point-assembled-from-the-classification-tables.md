@@ -11,10 +11,15 @@ ADR-0094 (source formats).
 The release-point path loads a title at a release point from that title's zip: `check` and
 `inventory` learn of the release point, `backfill` downloads the zips of the titles it lists as
 changed, `load-all` loads them. On 2026-10-27 the source was reported to show the current Code
-only, with no history of release points and no download of only the changed titles. This
-session's network does not reach uscode.house.gov, so that report is not confirmed here; the
-newest committed captures (2026-10-23, ADR-0094) still list 22 prior release points and a zip per
-title.
+only, with no history of release points and no download of only the changed titles. Captured
+the same day from a GitHub Actions runner (`tests/fixtures/*_2026-10-27.html`), the site carries a
+notice that it "is currently operating in a temporary format" and is current through Pub. L.
+119-134 (October 20, 2026). `download.html` offers 119-134 as per-title zips and the all-titles
+zip, with six titles marked changed (15, 16, 26, 29, 30, 54), and `priorreleasepoints.html` lists
+23 release points, 119-73not60 to 119-124; both parse with the existing readers. The per-section
+address is `/us/usc/t26/s501`, a page that meta-refreshes to the current edition at
+`/us/usc/119-134/t26/s501/`. That page is rendered HTML with no USLM, and no other edition is
+served there (`/us/usc/119-102not101/t16/s2201/` answers 404).
 
 The classification tables already say, law by law, which sections a public law was classified to
 (144,837 rows, ADR-0067), and ADR-0074 already decides which laws are new at a release point:
@@ -75,6 +80,9 @@ are the only two of 5,095 sections whose guid-stripped content differs between t
 - `structure_nodes` is not updated: a new chapter has no node, and a new section's parent is
   inferred.
 - Carried sections get no guid rows at the assembled release point.
-- **No per-section address is configured.** The page that serves one section's USLM on the
-  relaunched site has not been captured; until it is, `USC_SECTION_URL` is unset and the daily run
-  reports exit 2 whenever there are sections to fetch.
+- **The source publishes no section on its own as USLM.** Its per-section page is HTML, so
+  `--section-url` pointed at it is refused as "not a USLM document" (tested against the
+  capture), and `USC_SECTION_URL` stays unset: the daily run reports exit 2 whenever there are
+  sections to fetch. The sections are read out of a downloaded title zip or the all-titles zip
+  (`--title-file`) instead. Reading the HTML page into a `SectionRecord` would carry no guids and
+  no USLM markup, and is not built.
