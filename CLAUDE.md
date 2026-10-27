@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(92 ADRs, numbered to 0094 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(93 ADRs, numbered to 0095 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -507,7 +507,17 @@ matching none is a failed check naming the formats tried; the check rows record 
 dates spelled out, back to 119-73not60), the download page's heading lost its date, and 117-2,
 118-1 and 118-2 carried their rows as `var ctRecords = [...]` in the empty viewer's script. A
 release point the site does not hold is inserted where the source lists it, so 119-117 lands
-between 119-111 and 119-118 and every later `seq` moves up. **The whole site is `Disallow: /` to crawlers**
+between 119-111 and 119-118 and every later `seq` moves up. **A release point can also be assembled section by section from the
+classification tables** (ADR-0095, `ingest/section_update.py`): `python -m ingest sections-update`
+takes each title's newest completed load as the base, looks up the laws the release point adds
+(`law_in_window`) in the tables and the ECCT, fetches only the sections their rows name, and maps
+every other section to its base version — `title_versions.load_method='sections'`,
+`base_release_id`, and one `section_update_items` row per (section, law). A law no loaded table
+covers stops it (exit 3). The title's file, when it loads, replaces the assembled load. The answer
+says which kind a section is (`assembled_from`, `fetched_for`, `note`). Title 16 at
+119-102not101 rebuilt from 119-99 by fetching §§ 2201 and 2206 matches its file on all 5,095
+sections (`scripts/section_update_check.py`). `update-corpus.sh` runs it after `load-all`; the
+per-section address (`USC_SECTION_URL`) is not yet captured. **The whole site is `Disallow: /` to crawlers**
 (ADR-0037) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
 it; blunt on purpose while the site is a demo, after two AI crawlers walking the `?release=` axis
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A

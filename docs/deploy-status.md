@@ -697,6 +697,14 @@ ADR-0082 is deployed, that load of title 42 is the same kill again and the same 
 
 ## Still owed
 
+**A section source for the classification-table path (ADR-0095).** `python -m ingest
+sections-update` needs `USC_SECTION_URL`, the address of one section's USLM document on
+uscode.house.gov, in the environment `deploy/update-corpus.sh` runs in. No such address has been
+captured; until one is, a run that has sections to fetch exits red with "USC_SECTION_URL sets the
+section source". Captured once from a GitHub Actions runner, the address becomes the template
+(`https://…{identifier}…`) and a fixture under `tests/fixtures/`. `--title-file` with a downloaded
+title zip or the all-titles zip runs the same path by hand meanwhile.
+
 **Finish the ADR-0082 repair on the box — two hand steps.** Both were blocked from the session
 that made the fix (its auto mode refuses remote writes).
 

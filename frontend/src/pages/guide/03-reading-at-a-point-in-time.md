@@ -5,7 +5,7 @@ order: 3
 summary: Release points, how to ask for one, and what every page tells you about the text you are looking at.
 covers:
   routes: ["/app/releases"]
-  adrs: [18, 36, 44, 45, 56, 82, 83, 85, 87, 91, 94]
+  adrs: [18, 36, 44, 45, 56, 82, 83, 85, 87, 91, 94, 95]
 ---
 
 The Code is republished in full at a **release point**, named for the last public law it includes —
@@ -111,6 +111,15 @@ steps:
 
 **Where the text is from.** Not every release point is separately stored. If you ask for one
 that is not, the text comes from the newest release point at or before it, and that is noted on the page.
+
+**A title assembled from the classification tables.** A title at a release point can be built
+from the sections the classification tables classify that release point's new laws to, instead
+of from the title's file: those sections are fetched as the Code publishes them, and every other
+section keeps its text from the title's previous release point. On such a title the page says
+which of the two the section is: fetched for the public laws it names, or carried from the
+previous release point, with that release point's date. The API returns the same sentence in
+`note`, the previous release point in `assembled_from`, and the laws in `fetched_for`. When the
+title's file is loaded for that release point, it replaces the assembled title.
 
 **A section that has left the Code.** A section can stop appearing at a release point without
 being marked repealed: it was renumbered, transferred, or a range of repealed sections was re-cut.
