@@ -12,6 +12,7 @@ EXPECTED_TABLES = {
     "section_version_changes",
     "section_version_change_laws",
     "section_release_map",
+    "section_update_items",
     "guid_map",
     "users",
     "watchlists",

@@ -615,7 +615,16 @@ def test_the_migration_round_trips():
         assert "corpus_state" in tables  # ADR-0078
         assert {"text_hash", "notes_hash"} <= _column_names(scratch_url, "section_versions")
 
-        # Back to a3f8c2d1e6b7 drops the check rows' source formats (ADR-0094)…
+        # Back to c4d9e2f7a1b3 drops the section-update record (ADR-0095)…
+        assert "section_update_items" in tables
+        assert {"load_method", "base_release_id"} <= _column_names(scratch_url, "title_versions")
+        _alembic(scratch_url, "downgrade", "c4d9e2f7a1b3")
+        assert "section_update_items" not in _table_names(scratch_url)
+        assert not (
+            {"load_method", "base_release_id"} & _column_names(scratch_url, "title_versions")
+        )
+
+        # …back to a3f8c2d1e6b7 drops the check rows' source formats (ADR-0094)…
         assert "source_formats" in _column_names(scratch_url, "source_checks")
         _alembic(scratch_url, "downgrade", "a3f8c2d1e6b7")
         assert "source_formats" not in _column_names(scratch_url, "source_checks")
@@ -644,6 +653,7 @@ def test_the_migration_round_trips():
             "section_version_changes",
             "section_version_change_laws",
             "corpus_state",
+            "section_update_items",
         } <= upgraded
     finally:
         admin = create_engine(settings.database_url, isolation_level="AUTOCOMMIT")

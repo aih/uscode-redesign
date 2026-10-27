@@ -104,6 +104,12 @@ export interface Section {
    * have answered; `served_from` is then the most recent release point that
    * contains it (ADR-0083). Optional: an API older than the field omits it. */
   absent_from?: Release | null;
+  /** Set when the title at `served_from` was assembled from the classification
+   * tables; unchanged sections carry this release point's text (ADR-0095).
+   * Optional: an API older than the field omits it. */
+  assembled_from?: Release | null;
+  /** The public laws this section was fetched for on an assembled title. */
+  fetched_for?: string[];
   /** Hex sha256 of the guid-stripped content: two sections with one hash are
    *  one text. Optional: an API older than the field omits it. */
   content_hash?: string;

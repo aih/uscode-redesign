@@ -697,6 +697,13 @@ ADR-0082 is deployed, that load of title 42 is the same kill again and the same 
 
 ## Still owed
 
+**A section source for the classification-table path (ADR-0095).** `python -m ingest
+sections-update` reads sections from a URL template (`USC_SECTION_URL`), a directory or a title
+file. uscode.house.gov serves one section only as rendered HTML (`/us/usc/119-134/t26/s501/`,
+captured 2026-10-27), which the URL source refuses, so `USC_SECTION_URL` is unset and a daily run
+that has sections to fetch exits red with "USC_SECTION_URL sets the section source". `--title-file`
+with a downloaded title zip or the all-titles zip runs the same path by hand.
+
 **Finish the ADR-0082 repair on the box — two hand steps.** Both were blocked from the session
 that made the fix (its auto mode refuses remote writes).
 

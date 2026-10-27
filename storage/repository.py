@@ -219,6 +219,18 @@ class SectionResult:
     say so, and say that the current release point is where its present status
     is. `None` on the ordinary path, where `served_from` holds the section."""
 
+    assembled_from: ReleaseRef | None = None
+    """Set when the title at `served_from` was assembled section by section from
+    the classification tables rather than loaded from its file (ADR-0095): the
+    sections the tables name for the laws `served_from` adds were fetched, and
+    every other section is the text it had at `assembled_from`. `None` for a
+    title loaded from its file."""
+
+    fetched_for: tuple[str, ...] = ()
+    """On an assembled title, the public laws (`119-121`) whose classification
+    rows named this section and sent it to be fetched. Empty when the section
+    was carried forward from `assembled_from` unchanged."""
+
     duplicates: tuple[DuplicateOccurrence, ...] = ()
     """Further elements published under this identifier at this release point, in
     source reading order after this one. Empty for all but a handful of

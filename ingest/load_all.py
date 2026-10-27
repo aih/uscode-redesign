@@ -45,7 +45,7 @@ from db.models import ReleasePoint, Title, TitleVersion
 from ingest.backfill import DownloadLedger, LedgerEntry
 from ingest.download import DOWNLOAD_DIR, FetchStatus
 from ingest.inventory import ReleasePointEntry, normalize_title_num
-from ingest.load import LoadStats, load_release
+from ingest.load import SECTIONS_METHOD, LoadStats, load_release
 from ingest.manifest import write_manifest
 
 
@@ -132,7 +132,8 @@ def completed_pairs(session: Session) -> set[tuple[str, str]]:
     """`(release_label, title_num)` pairs whose load finished, keyed in the
     ledger's vocabulary.
 
-    `sections_loaded IS NOT NULL` is the whole test — see the column's docstring.
+    `sections_loaded IS NOT NULL` is the test — see the column's docstring —
+    for every load of a title's file.
 
     `Title.num` is the *URL* form, taken from `<docNumber>`: `1`, `16`, and what
     `/us/usc/t1/...` resolves against. The ledger and every OLRC filename use the
@@ -146,7 +147,13 @@ def completed_pairs(session: Session) -> set[tuple[str, str]]:
         .select_from(TitleVersion)
         .join(ReleasePoint, ReleasePoint.id == TitleVersion.release_id)
         .join(Title, Title.id == TitleVersion.title_id)
-        .where(TitleVersion.sections_loaded.is_not(None))
+        .where(
+            TitleVersion.sections_loaded.is_not(None),
+            # A load `sections-update` assembled from the classification
+            # tables is complete but not the title's file (ADR-0095): when the
+            # file is on disk, load-all loads it over the top.
+            TitleVersion.load_method != SECTIONS_METHOD,
+        )
     ).all()
     return {(label, _file_form(num)) for label, num in rows}
 

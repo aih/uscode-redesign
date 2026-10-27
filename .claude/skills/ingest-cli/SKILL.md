@@ -1,6 +1,6 @@
 ---
 name: ingest-cli
-description: The `python -m ingest` command-line reference for this project — inventory, fetch, backfill, mirror push/pull, load-all, load, reindex_search, verify, verify-downloads, classification, classification-check, version-changes — plus scripts/vendor_apidocs.py. Use when running, resuming, or debugging any corpus download, load, search-index, classification-table, or verification job.
+description: The `python -m ingest` command-line reference for this project — inventory, fetch, backfill, mirror push/pull, load-all, load, reindex_search, verify, verify-downloads, classification, classification-check, version-changes, sections-update — plus scripts/vendor_apidocs.py. Use when running, resuming, or debugging any corpus download, load, search-index, classification-table, or verification job.
 ---
 
 # `python -m ingest` — command reference
@@ -169,6 +169,26 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   sees them as incomplete, and lets the load stand. `load-all --defer-version-changes` skips
   the hook for a bulk run — follow it with one `version-changes` pass, which computes each
   section once instead of once per release point that touched it.
+
+## python -m ingest sections-update [--release LABEL] [--title N]... [--expected-only] [--plan-only]
+                                   [--section-url TEMPLATE | --from-dir DIR | --title-file PATH]
+                                   [--allow-not-found] [--defer-version-changes] [--report DIR]
+  Assembles a release point section by section from the classification tables (ADR-0095).
+  Default release: the newest in `release_points`. Per title, the base is its newest completed
+  load before the release point; the laws in the window (`law_in_window`) are looked up in
+  `classification_entries` and the ECCT, and only the sections their rows name are fetched.
+  Every other section is mapped to its base version. The `title_versions` row says
+  `load_method='sections'` and names `base_release_id`; `section_update_items` records each
+  (section, law) and what the fetch found. `--plan-only` prints the plan and fetches nothing.
+  Sources: `--section-url` / `$USC_SECTION_URL` (`{identifier}`, `{title}`, `{title_padded}`,
+  `{section}`; cached under `data/sections/{release}/`), `--from-dir` (files named
+  `t16-s45f.xml`), `--title-file` (a title XML, a per-title zip or the all-titles zip; one
+  `--title`). Exit 0 done or nothing to do, 1 a title failed (a planned section not found;
+  nothing written for it), 2 usage or no source, 3 the tables do not cover a law in the window.
+  A later load of the title's file replaces the assembled load. `--expected-only` limits it to
+  the titles the release point lists as changed; it is what `update-corpus.sh` runs after
+  `load-all`. `uv run python scripts/section_update_check.py` rebuilds Title 16 at
+  119-102not101 from 119-99 in a scratch database and compares every section with the file.
 
 ## python -m ingest load <xmlfile> --release <label> [--currency-date YYYY-MM-DD] [--source-url URL]
                                                   [--source-zip PATH]
