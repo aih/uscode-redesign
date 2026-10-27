@@ -163,6 +163,20 @@ class SectionOut(BaseModel):
         "contains it, and `note` says so. A section can leave the Code by being "
         "renumbered or transferred without a `repealed` status (ADR-0083).",
     )
+    assembled_from: ReleaseOut | None = Field(
+        default=None,
+        description="Set when the title at `served_from` was assembled from the "
+        "classification tables rather than loaded from its file: the sections the "
+        "tables classify the release point's new laws to were fetched, and every "
+        "other section is its text at this release point. `note` says which this "
+        "section is (ADR-0095).",
+    )
+    fetched_for: list[str] = Field(
+        default_factory=list,
+        description="On an assembled title, the public laws (`119-121`) the "
+        "classification tables classify to this section, for which it was "
+        "fetched. Empty when the section was carried from `assembled_from`.",
+    )
     content_hash: str = Field(
         description="Hex sha256 of the guid-stripped content (ADR-0007), the "
         "same value the `ETag` carries: two answers with one hash are one "
@@ -213,6 +227,10 @@ class SectionOut(BaseModel):
                 ReleaseOut.of(section.absent_from) if section.absent_from else None
             ),
             content_first_seen=ReleaseOut.of(section.content_first_seen),
+            assembled_from=(
+                ReleaseOut.of(section.assembled_from) if section.assembled_from else None
+            ),
+            fetched_for=list(section.fetched_for),
             content_hash=section.content_hash,
             is_exact=section.is_exact,
             note=note,

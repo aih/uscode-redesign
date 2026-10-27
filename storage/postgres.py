@@ -30,6 +30,7 @@ from db.models import (
     ReleasePoint,
     Section,
     SectionReleaseMap,
+    SectionUpdateItem,
     SectionVersion,
     SectionVersionChange,
     SectionVersionChangeLaw,
@@ -344,6 +345,12 @@ class PostgresRepository:
         assert title is not None and first_seen is not None
 
         guid = self._guid_for(section.identifier, served_from.id)
+        assembled_from, fetched_for = self._assembly(section.id, section.title_id, served_from.id)
+        if guid is None and assembled_from is not None:
+            # A section an assembled load carried forward has no guid of its
+            # own at that release point (ADR-0095); the one it had where it was
+            # carried from pins the same text.
+            guid = self._carried_guid_for(section.identifier, section.title_id, assembled_from)
         duplicates = tuple(
             DuplicateOccurrence(
                 num=other.num,
@@ -382,8 +389,64 @@ class PostgresRepository:
                 self._provision_across(rows, identifier) if remainder else None
             ),
             absent_from=self._ref(absent_from) if absent_from is not None else None,
+            assembled_from=self._ref(assembled_from) if assembled_from is not None else None,
+            fetched_for=fetched_for,
             duplicates=duplicates,
         )
+
+    def _assembly(
+        self, section_id: int, title_id: int, release_id: int
+    ) -> tuple[ReleasePoint | None, tuple[str, ...]]:
+        """For a title assembled from the classification tables at
+        `release_id` (ADR-0095): the release point its unchanged sections were
+        carried from, and the laws that sent this section to be fetched."""
+        base_id = self._session.scalar(
+            select(TitleVersion.base_release_id).where(
+                TitleVersion.title_id == title_id,
+                TitleVersion.release_id == release_id,
+                TitleVersion.load_method == "sections",
+            )
+        )
+        if base_id is None:
+            return None, ()
+        laws = self._session.execute(
+            select(SectionUpdateItem.pl_congress, SectionUpdateItem.pl_num)
+            .where(
+                SectionUpdateItem.release_id == release_id,
+                SectionUpdateItem.section_id == section_id,
+                SectionUpdateItem.outcome != "not-found",
+                SectionUpdateItem.pl_congress.is_not(None),
+            )
+            .distinct()
+            .order_by(SectionUpdateItem.pl_congress, SectionUpdateItem.pl_num)
+        ).all()
+        return (
+            self._session.get(ReleasePoint, base_id),
+            tuple(f"{congress}-{num}" for congress, num in laws),
+        )
+
+    def _carried_guid_for(
+        self, identifier: str, title_id: int, base: ReleasePoint
+    ) -> str | None:
+        """The guid at `base`, or — when `base` was itself assembled and carried
+        the section too — at the release point it was carried from, and so on.
+        Each step is one `(release_id, identifier)` probe of the guid_map index."""
+        release: ReleasePoint | None = base
+        for _hop in range(64):
+            if release is None:
+                return None
+            guid = self._guid_for(identifier, release.id)
+            if guid is not None:
+                return guid
+            base_id = self._session.scalar(
+                select(TitleVersion.base_release_id).where(
+                    TitleVersion.title_id == title_id,
+                    TitleVersion.release_id == release.id,
+                    TitleVersion.load_method == "sections",
+                )
+            )
+            release = self._session.get(ReleasePoint, base_id) if base_id else None
+        return None
 
     def _occurrences(
         self, section_id: int, release_id: int

@@ -131,3 +131,22 @@ def test_a_real_failure_is_still_a_failure(run_script):
 def test_a_real_classification_failure_outranks_maintenance(run_script):
     code, _, out = run_script("--force", classification_check=1, check=75)
     assert code == 1, out
+
+
+def test_the_section_update_runs_after_load_all(run_script):
+    code, calls, out = run_script("--force")
+    assert code == 0, out
+    names = _names(calls)
+    assert names.index("sections-update") == names.index("load-all") + 1
+    assert "--expected-only" in calls[names.index("sections-update")]
+
+
+def test_a_section_update_waiting_on_the_tables_is_not_a_failure(run_script):
+    code, _, out = run_script("--force", sections_update=3)
+    assert code == 0, out
+    assert "waiting for the classification tables" in out
+
+
+def test_a_section_update_without_a_source_is_a_failure(run_script):
+    code, _, out = run_script("--force", sections_update=2)
+    assert code == 1, out

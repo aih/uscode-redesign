@@ -228,6 +228,38 @@ run_load() {
     return $status
 }
 
+# The section-level path (ADR-0095): the newest release point's changed titles
+# that load-all could not load from a file are assembled from the sections the
+# classification tables name for its new laws. Exit 3 is the tables not yet
+# covering a law the release point incorporates: logged, and retried by the
+# next run in which a table moves. Exit 2 (no section source — USC_SECTION_URL
+# unset — with sections to fetch) and a failed title make the run red. A title
+# assembled after load-all counts toward LOADED, so the dump below runs; one
+# assembled on the no-new-release-point path waits for the next dump.
+SECTIONS_STATUS=0
+run_sections_update() {
+    echo "=== $(date -u +%FT%TZ) sections-update --expected-only --quiet ==="
+    local out status assembled
+    out="$($COMPOSE exec -T api uv run python -m ingest sections-update \
+        --expected-only --quiet ${USC_SECTION_URL:+--section-url "$USC_SECTION_URL"} 2>&1)"
+    status=$?
+    echo "$out"
+    case "$status" in
+        0) ;;
+        3)  echo "sections-update is waiting for the classification tables to reach the release point's laws" ;;
+        2)  echo "sections-update could not run — see above (USC_SECTION_URL sets the section source)"
+            SECTIONS_STATUS=1 ;;
+        *)  echo "sections-update exited ${status} — see above"
+            SECTIONS_STATUS=1 ;;
+    esac
+    assembled="$(printf '%s\n' "$out" \
+        | sed -n 's/.*sections-update [^:]*: \([0-9][0-9]*\) title(s) loaded.*/\1/p' | tail -1)"
+    if [[ "$assembled" =~ ^[0-9]+$ ]] && [ "$assembled" -gt 0 ]; then
+        LOADED=$(( ${LOADED:-0} + assembled ))
+    fi
+    return 0
+}
+
 # The classification load, with its summary line captured for the same reason
 # run_load captures its own: the version timeline's law attributions (ADR-0074)
 # are derived from classification_entries, and redoing them corpus-wide is
@@ -332,7 +364,7 @@ SOURCE_DOWN=0
 # How the run ends once the source-independent work is done: a real failure
 # exits 1, the source being under maintenance and nothing else exits 75.
 finish() {
-    if [ "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS))" -ne 0 ]; then
+    if [ "$((CLASSIFICATION_STATUS || VERSION_CHANGES_STATUS || SECTIONS_STATUS))" -ne 0 ]; then
         exit 1
     fi
     if [ "$SOURCE_DOWN" -eq 1 ]; then
@@ -427,6 +459,12 @@ if [ "$MODE" = "check-only" ]; then
     finish
 fi
 if [ "$MODE" != "force" ] && [ "$CHECK_STATUS" -eq 0 ]; then
+    # No new release point, but a table that moved can be what an earlier
+    # sections-update was waiting for (exit 3).
+    if [ "$CLASSIFICATION_CHANGED" -eq 1 ]; then
+        run_sections_update
+        [ "${LOADED:-0}" -gt 0 ] && { run version-changes --quiet || VERSION_CHANGES_STATUS=1; }
+    fi
     echo "=== $(date -u +%FT%TZ) nothing to do ==="
     finish
 fi
@@ -480,6 +518,7 @@ fi
 # not a second ledger. Search stays in step automatically inside
 # ingest/load.py (sync_sections + retire_versions) — no separate reindex step.
 run_load || { echo "load-all failed"; exit 1; }
+run_sections_update
 # The change rows and law attributions for what the load just wrote
 # (ADR-0074). load-all's own hook keeps them current and warns without failing
 # the load, so this is the repair pass behind it: sections whose rows are

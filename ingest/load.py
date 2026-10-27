@@ -24,7 +24,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -40,11 +40,17 @@ from db.models import (
 )
 from ingest import inventory as inventory_mod
 from ingest.parser import parser_for
-from ingest.records import DocumentMeta
+from ingest.records import DocumentMeta, SectionRecord
 from ingest.release_label import parse_label
 from ingest import search_sync
 
 GUID_BATCH_SIZE = 500
+
+RELEASE_POINT_METHOD = "release-point"
+"""`title_versions.load_method` of a load of the title's whole file."""
+SECTIONS_METHOD = "sections"
+"""`title_versions.load_method` of a load `ingest.section_update` assembled
+from the sections the classification tables name (ADR-0095)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +79,127 @@ def known_versions_statement(title_id: int):
         .join(Section, Section.id == SectionVersion.section_id)
         .where(Section.title_id == title_id)
     )
+
+
+class VersionStore:
+    """Resolve each parsed section to a stored version of one title: the
+    version its guid-stripped content already has, or a new one.
+
+    One per load. `load_release` hands it every section of a title's file;
+    `ingest.section_update` hands it the sections a classification-driven
+    update fetched (ADR-0095). Both then write `section_release_map`
+    themselves, since where a section sits is the caller's to decide. What a
+    new version needs in the search index, and which superseded documents to
+    retire, collect here until `flush_search()`, which a caller runs after a
+    commit and never before: indexing text whose transaction then rolled back
+    would advertise a section the database has not got.
+    """
+
+    def __init__(
+        self,
+        session: Session,
+        *,
+        release_id: int,
+        release_seq: int,
+        release_label: str,
+        is_newest_for_title: bool,
+        existing_versions: dict[int, dict[bytes, _KnownVersion]],
+    ) -> None:
+        self.session = session
+        self.release_id = release_id
+        self.release_seq = release_seq
+        self.release_label = release_label
+        self.is_newest_for_title = is_newest_for_title
+        self.existing_versions = existing_versions
+        self.new_versions = 0
+        self.deduped = 0
+        self.versions_to_sync: list[dict[str, Any]] = []
+        self.retire_keys: list[tuple[str, int]] = []
+        # Identifiers this release has already created a *new* version for. A
+        # second one means the source published two elements under the one
+        # identifier at this release point (ADR-0021) — and since the index
+        # document is keyed on (identifier, first release), both are the same
+        # document. The second write overwrites the first and flags it, which
+        # is why flagging only the later occurrence is enough.
+        self.new_version_identifiers: set[str] = set()
+        self.new_version_sections: set[int] = set()
+
+    def store(
+        self,
+        record: SectionRecord,
+        section_id: int,
+        *,
+        parent_identifier: str | None,
+        seq_in_title: int,
+    ) -> _KnownVersion:
+        """The version `record` maps to, creating it when its content is new.
+        Returns the existing version when the content deduplicates."""
+        session = self.session
+        release_id = self.release_id
+        # Hash the guid-stripped form, not the raw XML: guids regenerate at every
+        # release point, so raw XML never repeats and dedupe would collapse nothing
+        # (ADR-0007). `record.xml` is still what gets stored, verbatim.
+        content_hash = hashlib.sha256(record.content_key.encode("utf-8")).digest()
+        siblings = self.existing_versions.get(section_id, {})
+        known = siblings.get(content_hash)
+        if known is None:
+            # Everything this section said before is now superseded. Collected
+            # before the new row joins `siblings`, and only when this release is
+            # the title's newest — a backfill of an older release point creates
+            # versions that were never current and retires nothing.
+            if self.is_newest_for_title:
+                self.retire_keys.extend(
+                    (record.identifier, sibling.first_release_id)
+                    for sibling in siblings.values()
+                    if sibling.first_release_id != release_id
+                )
+            version = SectionVersion(
+                section_id=section_id,
+                first_release_id=release_id,
+                content_hash=content_hash,
+                xml=record.xml,
+                num=record.num,
+                heading=record.heading,
+                status=record.status,
+                source_credit=record.source_credit,
+                text_hash=record.text_hash or None,
+                notes_hash=record.notes_hash or None,
+            )
+            session.add(version)
+            session.flush()
+            known = _KnownVersion(version.id, release_id)
+            self.existing_versions.setdefault(section_id, {})[content_hash] = known
+            self.new_versions += 1
+            self.new_version_sections.add(section_id)
+
+            self.versions_to_sync.append({
+                "identifier": record.identifier,
+                "num": record.num,
+                "heading": record.heading,
+                "xml": record.xml,
+                "status": record.status,
+                "version_id": known.id,
+                # Where this text sits, for `chapter:` and `?sort=citation`:
+                # the two values the caller writes to `section_release_map`,
+                # passed in so the index write does not wait on that upsert.
+                "parent_identifier": parent_identifier,
+                "seq_in_title": seq_in_title,
+                "id_collision": record.identifier in self.new_version_identifiers,
+                "first_release_id": release_id,
+                "first_release_seq": self.release_seq,
+                "first_release_label": self.release_label,
+                "is_current": self.is_newest_for_title,
+            })
+            self.new_version_identifiers.add(record.identifier)
+        else:
+            # A release republishing this text unchanged needs no index write at
+            # all: the document already exists and is already current. This is
+            # why sync stays cheap at 91% dedupe (ADR-0028).
+            self.deduped += 1
+        return known
+
+    def flush_search(self) -> None:
+        _flush_search(self.versions_to_sync, self.retire_keys)
 
 
 class MissingCurrencyDateError(ValueError):
@@ -155,19 +282,8 @@ def load_release(
             )
 
     status_counts: dict[str, int] = {}
-    new_versions = 0
-    deduped = 0
     sections_ingested = 0
     guid_rows: list[dict[str, object]] = []
-    versions_to_sync: list[dict[str, Any]] = []
-    retire_keys: list[tuple[str, int]] = []
-    # Identifiers this release has already created a *new* version for. A second
-    # one means the source published two elements under the one identifier at
-    # this release point (ADR-0021) — and since the index document is keyed on
-    # (identifier, first release), both are the same document. The second write
-    # overwrites the first and flags it, which is why flagging only the later
-    # occurrence is enough.
-    new_version_identifiers: set[str] = set()
     # What this load maps where, for the version-change hook at the bottom
     # (ADR-0074): every section it touched, the version group each one landed
     # on (a set — the source can publish several elements under one identifier
@@ -176,7 +292,6 @@ def load_release(
     # actually have different change rows; recomputing all of them is a
     # whole-title pass per release load.
     mapped_versions: dict[int, set[int]] = {}
-    new_version_sections: set[int] = set()
 
     # Only text from the newest release this title has reached is "in force", and
     # loads do not have to arrive in order — `load-all` walks the inventory's seq,
@@ -203,6 +318,14 @@ def load_release(
     release_label = release.label
 
     title_id = title.id
+    versions = VersionStore(
+        session,
+        release_id=release_id,
+        release_seq=release_seq,
+        release_label=release_label,
+        is_newest_for_title=is_newest_for_title,
+        existing_versions=existing_versions,
+    )
 
     for record in parser.iter_sections(xml_path):
         section_id = existing_sections.get(record.identifier)
@@ -213,68 +336,12 @@ def load_release(
             section_id = section.id
             existing_sections[record.identifier] = section_id
 
-        # Hash the guid-stripped form, not the raw XML: guids regenerate at every
-        # release point, so raw XML never repeats and dedupe would collapse nothing
-        # (ADR-0007). `record.xml` is still what gets stored, verbatim.
-        content_hash = hashlib.sha256(record.content_key.encode("utf-8")).digest()
-        siblings = existing_versions.get(section_id, {})
-        known = siblings.get(content_hash)
-        if known is None:
-            # Everything this section said before is now superseded. Collected
-            # before the new row joins `siblings`, and only when this release is
-            # the title's newest — a backfill of an older release point creates
-            # versions that were never current and retires nothing.
-            if is_newest_for_title:
-                retire_keys.extend(
-                    (record.identifier, sibling.first_release_id)
-                    for sibling in siblings.values()
-                    if sibling.first_release_id != release_id
-                )
-            version = SectionVersion(
-                section_id=section_id,
-                first_release_id=release_id,
-                content_hash=content_hash,
-                xml=record.xml,
-                num=record.num,
-                heading=record.heading,
-                status=record.status,
-                source_credit=record.source_credit,
-                text_hash=record.text_hash or None,
-                notes_hash=record.notes_hash or None,
-            )
-            session.add(version)
-            session.flush()
-            known = _KnownVersion(version.id, release_id)
-            existing_versions.setdefault(section_id, {})[content_hash] = known
-            new_versions += 1
-            new_version_sections.add(section_id)
-
-            versions_to_sync.append({
-                "identifier": record.identifier,
-                "num": record.num,
-                "heading": record.heading,
-                "xml": record.xml,
-                "status": record.status,
-                "version_id": known.id,
-                # Where this text sits, for `chapter:` and `?sort=citation`.
-                # The same two values written to `section_release_map` below,
-                # read from the record rather than from that row so the index
-                # write does not wait on the upsert.
-                "parent_identifier": record.ancestors[-1][1] if record.ancestors else None,
-                "seq_in_title": record.seq,
-                "id_collision": record.identifier in new_version_identifiers,
-                "first_release_id": release_id,
-                "first_release_seq": release_seq,
-                "first_release_label": release_label,
-                "is_current": is_newest_for_title,
-            })
-            new_version_identifiers.add(record.identifier)
-        else:
-            # A release republishing this text unchanged needs no index write at
-            # all: the document already exists and is already current. This is
-            # why sync stays cheap at 91% dedupe (ADR-0028).
-            deduped += 1
-
+        known = versions.store(
+            record,
+            section_id,
+            parent_identifier=record.ancestors[-1][1] if record.ancestors else None,
+            seq_in_title=record.seq,
+        )
         mapped_versions.setdefault(section_id, set()).add(known.id)
 
         # Reading order and parent are this release point's, even when the text
@@ -301,7 +368,7 @@ def load_release(
             session.commit()
             # After the commit, never before: indexing text whose transaction
             # then rolled back would advertise a section the database has not got.
-            _flush_search(versions_to_sync, retire_keys)
+            versions.flush_search()
 
         if record.status:
             status_counts[record.status] = status_counts.get(record.status, 0) + 1
@@ -318,7 +385,7 @@ def load_release(
     title_version.sections_loaded = sections_ingested
     title_version.raw_section_elements = raw_count
     session.commit()
-    _flush_search(versions_to_sync, retire_keys)
+    versions.flush_search()
 
     # Incremental version-change hook (ADR-0074). Runs after the load has
     # committed, over the sections whose change rows this release can actually
@@ -362,45 +429,15 @@ def load_release(
                 file=sys.stderr,
             )
     elif mapped_versions:
-        from ingest import version_changes
-
-        recompute_ids: set[int] = set()
-        try:
-            version_changes.warn_if_unclassified(
-                session,
-                f"the version-change rows for title {meta.doc_number} "
-                f"@ {release_label}",
-            )
-            recompute_ids = version_changes.sections_needing_recompute(
-                session,
-                title_id=title_id,
-                release_id=release_id,
-                mapped_versions=mapped_versions,
-                new_version_sections=new_version_sections,
-            )
-            version_changes.compute_in_batches(session, sorted(recompute_ids))
-        except Exception as exc:
-            session.rollback()
-            print(
-                f"WARNING: version-change recompute failed for "
-                f"{len(recompute_ids)} sections of title {meta.doc_number} "
-                f"@ {release_label} ({type(exc).__name__}: {exc}) — the load "
-                "itself is complete; re-derive the rows with `python -m ingest "
-                f"version-changes --title {meta.doc_number} --recompute`",
-                file=sys.stderr,
-            )
-            try:
-                version_changes.clear_change_rows(session, sorted(recompute_ids))
-                session.commit()
-            except Exception as clear_exc:  # pragma: no cover - the database is gone
-                session.rollback()
-                print(
-                    "WARNING: could not clear the stale change rows either "
-                    f"({type(clear_exc).__name__}: {clear_exc}) — the next "
-                    "`version-changes` run will skip these sections as complete "
-                    "until they are recomputed by hand",
-                    file=sys.stderr,
-                )
+        recompute_version_changes(
+            session,
+            title_id=title_id,
+            title_num=meta.doc_number,
+            release_id=release_id,
+            release_label=release_label,
+            mapped_versions=mapped_versions,
+            new_version_sections=versions.new_version_sections,
+        )
 
     return LoadStats(
         release_label=release_label,
@@ -408,11 +445,71 @@ def load_release(
         schema_version=meta.schema_version,
         raw_section_elements=raw_count,
         sections_ingested=sections_ingested,
-        new_section_versions=new_versions,
-        deduped_section_versions=deduped,
+        new_section_versions=versions.new_versions,
+        deduped_section_versions=versions.deduped,
         structure_nodes=structure_nodes,
         status_counts=status_counts,
     )
+
+
+def recompute_version_changes(
+    session: Session,
+    *,
+    title_id: int,
+    title_num: str,
+    release_id: int,
+    release_label: str,
+    mapped_versions: dict[int, set[int]],
+    new_version_sections: set[int],
+) -> None:
+    """The incremental version-change hook (ADR-0074) after a committed load.
+
+    Recomputes the sections whose change rows this release can actually have
+    moved (`sections_needing_recompute` documents the four cases), in
+    committed batches. A failure warns loudly instead of failing the load —
+    the load itself is complete — and then *deletes* the change rows it was
+    recomputing, so the failure outlives the warning: the resume skip is a
+    count equality, which sees a missing row and not a stale one.
+    """
+    from ingest import version_changes
+
+    recompute_ids: set[int] = set()
+    try:
+        version_changes.warn_if_unclassified(
+            session,
+            f"the version-change rows for title {title_num} "
+            f"@ {release_label}",
+        )
+        recompute_ids = version_changes.sections_needing_recompute(
+            session,
+            title_id=title_id,
+            release_id=release_id,
+            mapped_versions=mapped_versions,
+            new_version_sections=new_version_sections,
+        )
+        version_changes.compute_in_batches(session, sorted(recompute_ids))
+    except Exception as exc:
+        session.rollback()
+        print(
+            f"WARNING: version-change recompute failed for "
+            f"{len(recompute_ids)} sections of title {title_num} "
+            f"@ {release_label} ({type(exc).__name__}: {exc}) — the load "
+            "itself is complete; re-derive the rows with `python -m ingest "
+            f"version-changes --title {title_num} --recompute`",
+            file=sys.stderr,
+        )
+        try:
+            version_changes.clear_change_rows(session, sorted(recompute_ids))
+            session.commit()
+        except Exception as clear_exc:  # pragma: no cover - the database is gone
+            session.rollback()
+            print(
+                "WARNING: could not clear the stale change rows either "
+                f"({type(clear_exc).__name__}: {clear_exc}) — the next "
+                "`version-changes` run will skip these sections as complete "
+                "until they are recomputed by hand",
+                file=sys.stderr,
+            )
 
 
 def _load_structure(
@@ -643,6 +740,16 @@ def _get_or_create_title_version(
         )
     ).first()
     if existing is not None:
+        if existing.load_method == SECTIONS_METHOD:
+            # The title's file has arrived for a release point that
+            # `sections-update` assembled from the classification tables
+            # (ADR-0095). The file is the whole title, so it replaces that
+            # load: its placements go, and this load writes every section's.
+            _unmap_title_release(session, title.id, release.id)
+            existing.load_method = RELEASE_POINT_METHOD
+            existing.base_release_id = None
+            existing.source_zip_sha256 = _sha256_file(source_zip or xml_path)
+            existing.schema_version = meta.schema_version
         return existing
     title_version = TitleVersion(
         title_id=title.id,
@@ -656,6 +763,23 @@ def _get_or_create_title_version(
     session.add(title_version)
     session.flush()
     return title_version
+
+
+def _unmap_title_release(session: Session, title_id: int, release_id: int) -> int:
+    """Delete every `section_release_map` row of one title at one release
+    point. Flushes, never commits."""
+    version_ids = (
+        select(SectionVersion.id)
+        .join(Section, Section.id == SectionVersion.section_id)
+        .where(Section.title_id == title_id)
+    )
+    result = session.execute(
+        delete(SectionReleaseMap).where(
+            SectionReleaseMap.release_id == release_id,
+            SectionReleaseMap.section_version_id.in_(version_ids),
+        )
+    )
+    return result.rowcount or 0
 
 
 def _sha256_file(path: Path) -> str:

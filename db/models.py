@@ -18,6 +18,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -125,6 +126,21 @@ class TitleVersion(Base):
     """`<section>` elements in the source file, including the ~298-per-Title-16
     that live inside `<quotedContent>` and are deliberately not stored (ADR-0005).
     Kept alongside `sections_loaded` so the gap stays visible without a re-parse."""
+
+    load_method: Mapped[str] = mapped_column(
+        String, nullable=False, default="release-point", server_default="release-point"
+    )
+    """`release-point`: the title's file at this release point was loaded whole.
+    `sections`: `python -m ingest sections-update` fetched the sections the
+    classification tables name for the laws this release point adds, and carried
+    every other section forward from `base_release_id` (ADR-0095). A later load
+    of the title's file replaces a `sections` load."""
+
+    base_release_id: Mapped[int | None] = mapped_column(
+        ForeignKey("release_points.id"), nullable=True
+    )
+    """The release point a `sections` load carried its unchanged sections from.
+    NULL for a `release-point` load."""
 
 
 class Section(Base):
@@ -298,6 +314,49 @@ class SectionVersionChangeLaw(Base):
     classification_actions: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     """Distinct `action` values of the matching rows (`''` = amended, `new`,
     `repealed`, `tr to`, …) — display vocabulary for the UI."""
+
+
+class SectionUpdateItem(Base):
+    """One section a `sections` load fetched, and the public law that sent it
+    there (ADR-0095).
+
+    A row per (release point, section, law): the classification table row
+    (`basis='classification'`) or ECCT row (`basis='ecct'`) that named the
+    section for a law the release point adds, with that row's `action` and
+    `is_note`. `outcome` is what the fetch found — `new-version` (the text
+    differs from the base release point's), `unchanged`, `new-section` (the
+    base release point did not hold it) or `not-found` — and
+    `section_version_id` the version the section was mapped to. Reading these
+    rows by law is the effect of one public law on the Code at the release
+    point that incorporated it, as far as the tables record it.
+
+    `outcome` is a string and not an enum, like every vocabulary here.
+    """
+
+    __tablename__ = "section_update_items"
+    __table_args__ = (
+        Index("ix_section_update_items_release_title", "release_id", "title_id"),
+        Index("ix_section_update_items_law", "pl_congress", "pl_num"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    release_id: Mapped[int] = mapped_column(ForeignKey("release_points.id"))
+    title_id: Mapped[int] = mapped_column(ForeignKey("titles.id"))
+    identifier: Mapped[str] = mapped_column(String)
+    section_id: Mapped[int | None] = mapped_column(ForeignKey("sections.id"), nullable=True)
+    pl_congress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pl_num: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    basis: Mapped[str] = mapped_column(String)  # 'classification' | 'ecct'
+    action: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_note: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    outcome: Mapped[str] = mapped_column(String)
+    section_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("section_versions.id"), nullable=True
+    )
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    fetched_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class SectionReleaseMap(Base):

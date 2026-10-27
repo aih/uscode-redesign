@@ -126,6 +126,24 @@ def served_note(section: SectionResult, resolved: ResolvedRelease) -> str | None
             f"({section.served_from.currency_date.isoformat()}), which is the "
             "latest release point at or before it that carries this title."
         )
+    if section.assembled_from is not None:
+        # The title at this release point was assembled from the
+        # classification tables rather than loaded from its file (ADR-0095).
+        served, base = section.served_from, section.assembled_from
+        if section.fetched_for:
+            laws = ", ".join(f"Pub. L. {law}" for law in section.fetched_for)
+            parts.append(
+                f"Title {section.title_num} at {served.label} was assembled from "
+                f"the classification tables: this section was fetched from the "
+                f"Code because the tables classify {laws} to it."
+            )
+        else:
+            parts.append(
+                f"Title {section.title_num} at {served.label} was assembled from "
+                f"the classification tables. They classify no law {served.label} "
+                f"adds to this section, so this is its text as published at "
+                f"{base.label} ({base.currency_date.isoformat()})."
+            )
     return " ".join(parts) or None
 
 

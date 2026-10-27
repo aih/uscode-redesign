@@ -312,6 +312,79 @@ def main(argv: list[str] | None = None) -> int:
     )
     version_changes_parser.add_argument("--quiet", action="store_true")
 
+    sections_update_parser = subparsers.add_parser(
+        "sections-update",
+        help="Update a release point section by section: the classification "
+        "tables name the sections the release point's new laws changed, and only "
+        "those are fetched (ADR-0095)",
+    )
+    sections_update_parser.add_argument(
+        "--release",
+        default=None,
+        metavar="LABEL",
+        help="Release point to assemble (default: the newest in release_points)",
+    )
+    sections_update_parser.add_argument(
+        "--title",
+        action="append",
+        default=None,
+        metavar="NUM",
+        help="Restrict to a title; repeatable. Default: every loaded title",
+    )
+    sections_update_parser.add_argument(
+        "--expected-only",
+        action="store_true",
+        help="Only the titles the release point lists as changed (all of them "
+        "when it lists none)",
+    )
+    sections_update_parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Print which sections each law names and fetch nothing",
+    )
+    source = sections_update_parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "--section-url",
+        default=None,
+        metavar="TEMPLATE",
+        help="URL template for one section's USLM document, with {identifier}, "
+        "{title}, {title_padded} and {section} (default: $USC_SECTION_URL)",
+    )
+    source.add_argument(
+        "--from-dir",
+        type=Path,
+        default=None,
+        help="Read sections from files named t16-s45f.xml in this directory",
+    )
+    source.add_argument(
+        "--title-file",
+        type=Path,
+        default=None,
+        help="Read the planned sections out of this title XML or zip (a "
+        "per-title zip or the all-titles zip); needs exactly one --title",
+    )
+    sections_update_parser.add_argument(
+        "--allow-not-found",
+        action="store_true",
+        help="Carry a planned section's base text forward when the source does "
+        "not have it, recording it not-found, instead of failing the title",
+    )
+    sections_update_parser.add_argument(
+        "--defer-version-changes",
+        action="store_true",
+        help="Leave the version-change rows to a following "
+        "`python -m ingest version-changes`",
+    )
+    sections_update_parser.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Write section-update-{release}.json (the plan and each title's "
+        "result) to this directory",
+    )
+    sections_update_parser.add_argument("--quiet", action="store_true")
+
     hf_export_parser = subparsers.add_parser(
         "hf-export",
         help="Export the corpus as Hugging Face parquet shards (ADR-0069)",
@@ -396,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
         "classification": _cmd_classification,
         "classification-check": _cmd_classification_check,
         "version-changes": _cmd_version_changes,
+        "sections-update": _cmd_sections_update,
         "hf-export": _cmd_hf_export,
         "hf-upload": _cmd_hf_upload,
         "load": _cmd_load,
@@ -815,6 +889,121 @@ def _cmd_classification_check(args: argparse.Namespace) -> int:
         return 0
     print(f"CHANGED ({len(result.changed_files)}): {', '.join(result.changed_files)}")
     return 10
+
+
+def _cmd_sections_update(args: argparse.Namespace) -> int:
+    """Plan, and unless `--plan-only` apply, a section-level update (ADR-0095).
+
+    Exit 0 when every planned title loaded (or there was nothing to do), 1 when
+    a title failed, 2 on a usage error, and 3 when the classification tables
+    do not yet cover a law the release point incorporates — the state the
+    update waits out, which `deploy/update-corpus.sh` reports and retries.
+    """
+    import json
+
+    from sqlalchemy import func, select
+
+    from db.models import ReleasePoint
+    from ingest import section_update as su
+    from ingest.verification import write_verification_json
+
+    on_event = None if args.quiet else print
+    if args.title_file is not None and len(args.title or []) != 1:
+        print("--title-file reads one title: give exactly one --title", file=sys.stderr)
+        return 2
+
+    with SessionLocal() as session:
+        label = args.release
+        if label is None:
+            label = session.scalar(
+                select(ReleasePoint.label).where(
+                    ReleasePoint.seq == select(func.max(ReleasePoint.seq)).scalar_subquery()
+                )
+            )
+            if label is None:
+                print("sections-update: release_points is empty", file=sys.stderr)
+                return 2
+        try:
+            plan = su.plan_update(
+                session, label, titles=args.title, expected_only=args.expected_only
+            )
+        except su.SectionUpdateError as exc:
+            print(f"sections-update: {exc}", file=sys.stderr)
+            return 2
+        if on_event is not None or args.plan_only:
+            su.print_plan(plan)
+
+        def write_report(results: list) -> None:
+            if args.report is None:
+                return
+            payload = plan.as_json() | {"results": [r.as_json() for r in results]}
+            path = write_verification_json(
+                payload, f"section-update-{plan.target.label}.json", args.report
+            )
+            print(f"report: {path}")
+
+        if not plan.ok:
+            print(
+                f"sections-update: the classification tables do not yet cover "
+                f"{', '.join(f'{c}-{n}' for c, n in plan.uncovered_laws)}",
+                file=sys.stderr,
+            )
+            write_report([])
+            return 3
+        if args.plan_only or not plan.ready:
+            write_report([])
+            if not plan.ready:
+                print(f"nothing to fetch for {plan.target.label}")
+            return 0
+
+        if args.from_dir is not None:
+            source = su.DirectorySectionSource(args.from_dir)
+            source_for = lambda _title: source  # noqa: E731
+        elif args.title_file is not None:
+            title_source = su.TitleFileSource(args.title_file, plan.ready[0].title_num)
+            source_for = lambda _title: title_source  # noqa: E731
+        else:
+            template = args.section_url or su.default_section_url()
+            if not template:
+                print(
+                    "sections-update: no section source — give --section-url, "
+                    f"${su.SECTION_URL_ENV}, --from-dir or --title-file",
+                    file=sys.stderr,
+                )
+                return 2
+            url_source = su.UrlSectionSource(
+                template, cache_dir=Path("data") / "sections" / plan.target.label
+            )
+            source_for = lambda _title: url_source  # noqa: E731
+
+        try:
+            results = su.apply_plan(
+                session,
+                plan,
+                source_for,
+                allow_not_found=args.allow_not_found,
+                defer_version_changes=args.defer_version_changes,
+                on_event=on_event,
+            )
+        except su.SectionUpdateError as exc:
+            print(f"sections-update: {exc}", file=sys.stderr)
+            return 2
+
+    write_report(results)
+    loaded = sum(1 for r in results if r.status == "loaded")
+    failed = [r for r in results if r.status != "loaded"]
+    print(
+        f"sections-update {plan.target.label}: {loaded} title(s) loaded, "
+        f"{len(failed)} failed"
+        + (
+            " (" + "; ".join(f"title {r.title_num}: not found {', '.join(r.not_found)}" for r in failed) + ")"
+            if failed
+            else ""
+        )
+    )
+    if on_event is not None:
+        print(json.dumps([r.as_json() for r in results], indent=2))
+    return 1 if failed else 0
 
 
 def _cmd_version_changes(args: argparse.Namespace) -> int:
