@@ -28,22 +28,28 @@ jobs:
             echo "--- first 1500 bytes"
             head -c 1500 "out/$i.body"; echo
             echo "--- hrefs mentioning xml/uslm/download/pl"
-            grep -oiE '(href|src)="[^"]*(xml|uslm|download|zip|/pl/|pl[0-9]|format|print)[^"]*"' "out/$i.body" | sort -u | head -40
+            grep -oiE '(href|src)="[^"]*(xml|uslm|download|zip|/pl/|pl[0-9]|format|print)[^"]*"' "out/$i.body" | sort -u | head -80
             sleep 1
           }
           H="text/html"
           X="application/xml, text/xml;q=0.9, */*;q=0.1"
-          probe https://uscode.house.gov/us/usc/t26/s501 "$H"
-          probe https://uscode.house.gov/us/usc/t26/s501 "$X"
-          probe https://uscode.house.gov/us/usc/t16/s2201 "$X"
-          probe "https://uscode.house.gov/us/usc/t16/s45a%E2%80%931" "$X"
-          probe "https://uscode.house.gov/us/usc/t26/s501?format=xml" "$X"
-          probe https://uscode.house.gov/us/usc/t26/s501.xml "$X"
-          probe https://uscode.house.gov/us/usc/t26 "$H"
-          probe https://uscode.house.gov/download/download.html "$H"
-          probe https://uscode.house.gov/download/priorreleasepoints.html "$H"
-          echo "=================== full bodies of 2..6, gzip+base64"
-          for n in 2 3 4 5 6; do echo "### body $n"; gzip -9c "out/$n.body" | base64 -w0; echo; done
+          B=https://uscode.house.gov
+          probe $B/119-134/t26/s501/ "$H"
+          probe $B/119-134/t26/s501/ "$X"
+          probe $B/119-134/t16/s2201/ "$H"
+          probe $B/119-134/t16/s45a-1/ "$H"
+          probe "$B/119-134/t16/s45a%E2%80%931/" "$H"
+          probe $B/us/usc/t16/s45a-1 "$H"
+          probe $B/119-134/t26/ "$H"
+          probe $B/119-134/ "$H"
+          probe $B/119-133/t26/s501/ "$H"
+          probe $B/119-102not101/t16/s2201/ "$H"
+          probe $B/download.html "$H"
+          probe $B/browse.html "$H"
+          probe $B/currency.html "$H"
+          probe $B/classification/tables.html "$H"
+          echo "=================== full bodies, gzip+base64"
+          for n in $(seq 1 14); do echo "### body $n"; gzip -9c "out/$n.body" | base64 -w0; echo; done
       - uses: actions/upload-artifact@v4
         with:
           name: probe
