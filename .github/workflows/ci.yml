@@ -235,6 +235,16 @@ jobs:
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
+  # The edge log shipper (ADR-0096): deploy/alloy/ run against a real Caddy
+  # logging in the edge's format and the GeoIP databases the box downloads,
+  # with Grafana Cloud replaced by an OTLP receiver that prints what arrives.
+  edge-logs:
+    name: edge log pipeline works
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash tests/alloy/run.sh
+
   # What the slow suite covers. It is off the per-push path by design — it
   # parses the 32 MB usc16.xml — but a parser change should be measured before
   # it merges rather than at 06:17 the next morning.
@@ -293,7 +303,7 @@ jobs:
   # therefore files an issue, and a later one comments on the issue already open.
   nightly-report:
     name: report a failed nightly
-    needs: [python, web, e2e, compose, slow]
+    needs: [python, web, e2e, compose, edge-logs, slow]
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
 

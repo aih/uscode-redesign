@@ -9,7 +9,7 @@
 # up from scratch arrives with its schedule instead of arriving without one and
 # looking fine for as long as nobody checks.
 #
-# Three jobs. The daily one is the reason this file was written (ADR-0036);
+# Four jobs. The daily one is the reason this file was written (ADR-0036);
 # the every-minute one is the reason it was edited (ADR-0073):
 #
 #   * DAILY, the source check. Polls uscode.house.gov's release-points page,
@@ -30,6 +30,9 @@
 #     Every minute is not aggressive for a probe that costs two local HTTP
 #     requests, and the threshold rather than the period is what keeps it from
 #     acting on noise.
+#   * MONTHLY, on the 3rd, the GeoIP databases the edge log shipper reads
+#     (ADR-0096). DB-IP publishes a new pair each month; the shipper is
+#     restarted to open them. A deploy also refreshes them.
 #
 # The database dump used to be a third job, nightly. It is not here any more and
 # that is not an omission: the US Code changes a few dozen times a year, so a
@@ -79,6 +82,7 @@ PATH=/usr/local/bin:/usr/bin:/bin
 # It writes its own log and takes the deploy lock before restarting anything,
 # so this line stays quiet — a probe that succeeds prints nothing.
 * * * * * root cd ${REPO_DIR} && sudo -u ec2-user bash deploy/watchdog.sh >/dev/null 2>&1
+17 4 3 * * root cd ${REPO_DIR} && bash deploy/geoip-update.sh ${DATA_ROOT}/geoip >> ${DATA_ROOT}/logs/geoip.log 2>&1 && docker compose -f docker-compose.prod.yml --profile observability restart alloy >> ${DATA_ROOT}/logs/geoip.log 2>&1
 EOF
 
 chmod 0644 "$CRON_FILE"

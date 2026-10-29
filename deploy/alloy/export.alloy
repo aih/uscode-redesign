@@ -1,0 +1,40 @@
+// Sends the edge's enriched access log to Grafana Cloud over the OTLP endpoint
+// and credentials the api already uses (ADR-0089, ADR-0096). In Loki it is
+// the stream {service_name="edge-proxy"}, one JSON line per request.
+otelcol.receiver.loki "edge" {
+  output {
+    logs = [otelcol.processor.transform.edge.input]
+  }
+}
+
+otelcol.processor.transform "edge" {
+  error_mode = "ignore"
+
+  log_statements {
+    context    = "resource"
+    statements = [
+      `set(resource.attributes["service.name"], "edge-proxy")`,
+      `set(resource.attributes["deployment.environment"], "prod")`,
+    ]
+  }
+
+  output {
+    logs = [otelcol.processor.batch.edge.input]
+  }
+}
+
+otelcol.processor.batch "edge" {
+  output {
+    logs = [otelcol.exporter.otlphttp.grafana.input]
+  }
+}
+
+// OTEL_EXPORTER_OTLP_HEADERS is the SDK's form, `Authorization=Basic%20…`.
+otelcol.exporter.otlphttp "grafana" {
+  client {
+    endpoint = sys.env("OTEL_EXPORTER_OTLP_ENDPOINT")
+    headers  = {
+      "Authorization" = string.replace(string.trim_prefix(sys.env("OTEL_EXPORTER_OTLP_HEADERS"), "Authorization="), "%20", " "),
+    }
+  }
+}

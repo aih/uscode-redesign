@@ -1,0 +1,28 @@
+# A stand-in for the edge (tests/alloy/run.sh): it logs in the edge's format
+# and answers the way the two sites' proxies do. The test sends the client
+# address in X-Forwarded-For, which Caddy trusts from a private address, so the
+# log carries a public address the GeoIP databases know.
+{
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:8080 {
+	log {
+		output stdout
+		format console
+	}
+
+	route {
+		@crawlers header_regexp User-Agent (?i)gptbot
+		respond @crawlers 403
+
+		@gate path /app/*
+		header @gate Set-Cookie "usc_h=1; Path=/"
+		respond @gate 403
+
+		respond /limited 429
+		respond "ok" 200
+	}
+}

@@ -1,0 +1,22 @@
+// The edge Caddy's access log, read from Docker (ADR-0096). The edge is the
+// statutes repository's compose project `edge` (deploy/edge/ there); it is the
+// one place on the box that writes a request's client address and User-Agent.
+discovery.docker "edge" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=edge"]
+  }
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.service=caddy"]
+  }
+}
+
+loki.source.docker "edge" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.edge.targets
+  forward_to = [loki.process.edge.receiver]
+}

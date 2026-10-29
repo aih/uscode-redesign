@@ -30,11 +30,22 @@ class _Recorder:
 
 
 def test_dashboard_panels_have_unique_ids_and_queries() -> None:
-    dashboard = json.loads((GRAFANA / "dashboard.json").read_text())
-    ids = [panel["id"] for panel in dashboard["panels"]]
-    assert len(ids) == len(set(ids))
-    assert all(panel["targets"] for panel in dashboard["panels"])
-    assert dashboard["uid"] == "uscode-sites"
+    for name, uid in (("dashboard.json", "uscode-sites"), ("traffic.json", "uscode-traffic")):
+        dashboard = json.loads((GRAFANA / name).read_text())
+        ids = [panel["id"] for panel in dashboard["panels"]]
+        assert len(ids) == len(set(ids))
+        assert all(panel["targets"] for panel in dashboard["panels"])
+        assert dashboard["uid"] == uid
+
+
+def test_traffic_queries_read_the_edge_stream() -> None:
+    """Every panel reads the stream deploy/alloy/export.alloy names (ADR-0096)."""
+    dashboard = json.loads((GRAFANA / "traffic.json").read_text())
+    export = (GRAFANA.parent / "alloy" / "export.alloy").read_text()
+    assert '"service.name"], "edge-proxy"' in export
+    for panel in dashboard["panels"]:
+        for target in panel["targets"]:
+            assert '{service_name="edge-proxy"} | json' in target["expr"], panel["title"]
 
 
 def test_apply_fills_the_rules_and_replaces_the_group() -> None:
@@ -44,7 +55,7 @@ def test_apply_fills_the_rules_and_replaces_the_group() -> None:
 
     paths = [(method, path) for method, path, _ in grafana.calls]
     assert ("POST", "/api/folders") in paths
-    assert ("POST", "/api/dashboards/db") in paths
+    assert paths.count(("POST", "/api/dashboards/db")) == 2
     assert ("PUT", "/api/v1/provisioning/contact-points/uscode-email") in paths
 
     method, path, group = grafana.calls[-1]
@@ -224,3 +235,22 @@ def test_instant_stops_on_a_query_error(monkeypatch) -> None:
     )
     with pytest.raises(SystemExit, match="bad_data"):
         grafana.instant("prom", "up(")
+
+
+def test_traffic_panels_use_fields_the_pipeline_writes() -> None:
+    """The fields the panels group by and print are the ones stage.pack writes."""
+    import re
+
+    process = (GRAFANA.parent / "alloy" / "process.alloy").read_text()
+    packed = set(
+        re.findall(r'"(\w+)"', re.search(r"stage\.pack \{\s*labels\s*=\s*\[([^\]]*)\]", process)[1])
+    ) | {"_entry"}
+    dashboard = json.loads((GRAFANA / "traffic.json").read_text())
+    used: set[str] = set()
+    for panel in dashboard["panels"]:
+        for target in panel["targets"]:
+            for group in re.findall(r"sum by \(([^)]*)\)", target["expr"]):
+                used |= {name.strip() for name in group.split(",")}
+            used |= set(re.findall(r"\{\{\s*\.?(\w+)\s*\}\}", target["expr"] + target["legendFormat"]))
+            used |= set(re.findall(r"\| (\w+)\s*=~?\"", target["expr"]))
+    assert used and used <= packed, used - packed

@@ -213,4 +213,20 @@ if [ -n "$SITE_HOST" ]; then
     done
 fi
 
+# The edge log shipper (ADR-0096), last and never fatal: the site is up and
+# checked by now, and a shipper that will not start costs only the traffic
+# dashboard. Recreated every time, since it reads deploy/alloy/ at start.
+echo "=== starting the edge log shipper ==="
+bash deploy/geoip-update.sh "$DATA_ROOT/geoip" || true
+if ! grep -qE '^OTEL_EXPORTER_OTLP_ENDPOINT=.' .env; then
+    echo "(no OTLP endpoint in .env; the log shipper is not started)"
+elif [ ! -s "$DATA_ROOT/geoip/dbip-city-lite.mmdb" ] || [ ! -s "$DATA_ROOT/geoip/dbip-asn-lite.mmdb" ]; then
+    echo "(no GeoIP databases in $DATA_ROOT/geoip; the log shipper is not started)"
+else
+    mkdir -p "$DATA_ROOT/alloy"
+    docker compose -f docker-compose.prod.yml --profile observability \
+        up -d --no-deps --force-recreate alloy \
+        || echo "(the log shipper did not start; the site is unaffected)"
+fi
+
 echo "=== $(date -u +%FT%TZ) deploy of $TAG complete ==="

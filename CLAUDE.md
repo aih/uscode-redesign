@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(93 ADRs, numbered to 0095 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(94 ADRs, numbered to 0096 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -587,6 +587,15 @@ database started on the statutes cluster, two postmasters on one data directory,
 `postmaster.pid` missed because each container has its own PID namespace. `bootstrap-box.sh` now
 writes the UUID and verifies the mount. A `docker restart` does **not** apply a new log cap; the
 container must be recreated.
+
+**The edge's access log is in Grafana** (ADR-0096). The `alloy` service (compose profile
+`observability`, started last and non-fatally by `deploy-on-box.sh`) reads `edge-caddy-1` over the
+Docker socket, adds location and ASN from DB-IP's free databases (`deploy/geoip-update.sh` →
+`$DATA_ROOT/geoip`), classifies network (`cloud`/`isp`/`education`/`government`/`unknown`), client
+(`ai-crawler`/`search-engine`/`other-bot`/`script`/`browser`/…) and outcome, and sends one JSON line
+per request over the api's OTLP credentials as `{service_name="edge-proxy"}`; the "Traffic
+sources" dashboard (`deploy/grafana/traffic.json`) reads it with `| json`. `tests/alloy/run.sh`
+(CI `edge-logs`) runs the config unchanged against a real Caddy.
 
 **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.

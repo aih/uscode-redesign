@@ -91,6 +91,7 @@ const INFRASTRUCTURE_ADRS = new Set([
   89, // OpenTelemetry export to Grafana Cloud — operations, no reader change
   90, // Grafana dashboard and alert rules as code — operations, no reader change
   92, // a deploy holds requests through the backend recreate — host operations
+  96, // the edge's access log in Grafana — operations, no reader change
 ]);
 
 const chapters = readChapters();
