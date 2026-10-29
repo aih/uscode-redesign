@@ -7,7 +7,9 @@
 #
 # A Caddy carrying the edge's compose labels logs six requests; Alloy finds it
 # through the Docker socket, exactly as on the box, and sends the enriched lines
-# to an OTLP receiver inside itself (loop.alloy), which prints them.
+# to an OTLP receiver inside itself (loop.alloy), which prints them. The
+# printing exporter is experimental in Alloy, so the test allows that level;
+# the box runs at the default, generally-available.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -31,7 +33,8 @@ docker run -d --name usc-test-alloy --user 0:0 \
     -v "$WORK/geoip:/geoip:ro" \
     -e OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 \
     -e "OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20dGVzdDp0ZXN0" \
-    "$ALLOY_IMAGE" run /etc/alloy --storage.path=/tmp/alloy >/dev/null
+    "$ALLOY_IMAGE" run /etc/alloy --storage.path=/tmp/alloy \
+    --stability.level=experimental >/dev/null
 
 sleep 15
 if [ "$(docker inspect -f '{{.State.Running}}' usc-test-alloy)" != true ]; then
