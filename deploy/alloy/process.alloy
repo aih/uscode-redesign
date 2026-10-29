@@ -1,0 +1,163 @@
+// Turns each access-log line of the edge Caddy into one JSON line for Loki
+// (ADR-0096): who asked (address, location, network, User-Agent), what they
+// asked for, and what the edge answered.
+//
+// The edge logs in Caddy's console format: a timestamp, the level, the logger
+// and the message, tab-separated, then the entry as JSON. Lines that are not
+// access-log entries (startup, certificate renewal) are dropped.
+//
+// Location and network come from DB-IP's free City Lite and ASN Lite
+// databases (CC BY 4.0, https://db-ip.com), which deploy/geoip-update.sh
+// downloads into /geoip. The classifications below are regular expressions
+// over the ASN's organisation name and the User-Agent.
+loki.process "edge" {
+  forward_to = [otelcol.receiver.loki.edge.receiver]
+
+  stage.static_labels {
+    values = { source = "edge" }
+  }
+
+  stage.match {
+    selector            = `{source="edge"} !~ "handled request"`
+    action              = "drop"
+    drop_counter_reason = "not_an_access_log_entry"
+  }
+
+  stage.regex {
+    expression = `^[^{]*(?P<entry>\{.*\})\s*$`
+  }
+
+  stage.json {
+    source      = "entry"
+    expressions = {
+      site       = "request.host",
+      method     = "request.method",
+      uri        = "request.uri",
+      client_ip  = "request.client_ip",
+      user_agent = `request.headers."User-Agent"[0]`,
+      referer    = "request.headers.Referer[0]",
+      status     = "status",
+      duration   = "duration",
+      set_cookie = `resp_headers."Set-Cookie"[0]`,
+    }
+  }
+
+  // JSON numbers arrive as numbers; the comparisons below are on strings.
+  stage.template {
+    source   = "status"
+    template = "{{ .Value }}"
+  }
+
+  stage.geoip {
+    source  = "client_ip"
+    db      = "/geoip/dbip-city-lite.mmdb"
+    db_type = "city"
+  }
+
+  stage.geoip {
+    source  = "client_ip"
+    db      = "/geoip/dbip-asn-lite.mmdb"
+    db_type = "asn"
+  }
+
+  // The kind of network the address belongs to, from its ASN's organisation.
+  stage.template {
+    source   = "network"
+    template = `{{- with .geoip_autonomous_system_organization -}}
+{{- $o := ToLower . -}}
+{{- if eq (regexReplaceAll "^.*(amazon|aws|google|microsoft|azure|digitalocean|linode|akamai|ovh|hetzner|oracle|alibaba|aliyun|tencent|huawei|cloudflare|vultr|choopa|constant company|contabo|leaseweb|m247|datacamp|scaleway|ionos|godaddy|hostinger|hosting|webhost|data cent|datacent|cloud|vps|server|fastly|facebook|meta platforms|bytedance|yandex|baidu|apple|psychz|quadranet|zenlayer|gcore|g-core|cogent|hurricane electric|worldstream|clouvider|hivelocity|liquid web|rackspace|softlayer|kamatera|netcup|selectel|timeweb|aeza|stark industries|ucloud|kingsoft|internet data center).*$" $o "y") "y" -}}cloud
+{{- else if eq (regexReplaceAll "^.*(universit|college|school|institute of technology|polytechnic|academ|education|research network|internet2).*$" $o "y") "y" -}}education
+{{- else if eq (regexReplaceAll "^.*(government|federal|department of|ministry|senate|house of representatives|library of congress|national institutes|nasa|u\\.s\\. army|u\\.s\\. navy|air force|county of|city of|state of ).*$" $o "y") "y" -}}government
+{{- else -}}isp
+{{- end -}}
+{{- else -}}unknown
+{{- end -}}`
+  }
+
+  // The kind of client, from its User-Agent.
+  stage.template {
+    source   = "client"
+    template = `{{- with .user_agent -}}
+{{- $u := ToLower . -}}
+{{- if eq (regexReplaceAll "^.*(gptbot|chatgpt-user|oai-searchbot|claudebot|claude-user|claude-searchbot|anthropic-ai|perplexity|ccbot|bytespider|meta-externalagent|meta-externalfetcher|facebookbot|amazonbot|applebot-extended|google-extended|cohere|diffbot|imagesiftbot|timpibot|youbot|omgili|ai2bot).*$" $u "y") "y" -}}ai-crawler
+{{- else if eq (regexReplaceAll "^.*(googlebot|google-inspectiontool|bingbot|yandexbot|baiduspider|duckduckbot|applebot|slurp|sogou|seznambot|petalbot|yeti|qwantbot|mojeekbot).*$" $u "y") "y" -}}search-engine
+{{- else if eq (regexReplaceAll "^.*(bot|crawl|spider|scraper|monitor|uptime|pingdom|statuscake|headless|lighthouse|semrush|ahrefs|dataforseo).*$" $u "y") "y" -}}other-bot
+{{- else if eq (regexReplaceAll "^(curl|wget|python|go-http-client|java|okhttp|axios|node|undici|libwww|httpx|aiohttp|scrapy|php|ruby|postmanruntime|insomnia|powershell|apache-httpclient|guzzle).*$" $u "y") "y" -}}script
+{{- else if eq (regexReplaceAll "^mozilla/.*$" $u "y") "y" -}}browser
+{{- else -}}other
+{{- end -}}
+{{- else -}}none
+{{- end -}}`
+  }
+
+  // What the edge answered. A 403 carrying Set-Cookie is a cookie gate's
+  // challenge (ADR-0088 here, ADR-0030 in the statutes site); any other 403 is
+  // a crawler block.
+  stage.template {
+    source   = "outcome"
+    template = `{{- if eq .status "429" -}}rate-limited
+{{- else if eq .status "403" -}}{{ if .set_cookie }}cookie-gate{{ else }}blocked{{ end }}
+{{- else if eq (regexReplaceAll "^5..$" .status "y") "y" -}}server-error
+{{- else if eq (regexReplaceAll "^4..$" .status "y") "y" -}}client-error
+{{- else -}}served
+{{- end -}}`
+  }
+
+  // Which part of a site was asked for, and whether the address pins a
+  // release point, date or guid (the axis the crawls of ADR-0073 and
+  // ADR-0088 walked).
+  stage.template {
+    source   = "area"
+    template = `{{- with .uri -}}
+{{- if eq (regexReplaceAll "^/app/(_astro|fonts|icons|uswds)/.*$" . "y") "y" -}}asset
+{{- else if eq (regexReplaceAll "^/app([/?].*)?$" . "y") "y" -}}reader
+{{- else if eq (regexReplaceAll "^/api([/?].*)?$" . "y") "y" -}}api
+{{- else if eq (regexReplaceAll "^/us/.*$" . "y") "y" -}}citation
+{{- else -}}other
+{{- end -}}
+{{- end -}}`
+  }
+
+  stage.template {
+    source   = "pinned"
+    template = `{{- with .uri -}}{{ if eq (regexReplaceAll "^.*[?&](release|date|id)=.*$" . "y") "y" }}yes{{ else }}no{{ end }}{{- end -}}`
+  }
+
+  stage.labels {
+    values = {
+      site         = "",
+      method       = "",
+      client_ip    = "",
+      user_agent   = "",
+      referer      = "",
+      status       = "",
+      duration     = "",
+      network      = "",
+      client       = "",
+      outcome      = "",
+      area         = "",
+      pinned       = "",
+      country      = "geoip_country_name",
+      country_code = "geoip_country_code",
+      region       = "geoip_subdivision_name",
+      city         = "geoip_city_name",
+      asn          = "geoip_autonomous_system_number",
+      asn_org      = "geoip_autonomous_system_organization",
+    }
+  }
+
+  // The line becomes {"_entry": <the address asked for>, <each label>: …};
+  // the labels leave the stream, so Loki indexes none of them.
+  stage.output {
+    source = "uri"
+  }
+
+  stage.pack {
+    labels           = ["site", "method", "client_ip", "user_agent", "referer", "status", "duration", "network", "client", "outcome", "area", "pinned", "country", "country_code", "region", "city", "asn", "asn_org"]
+    ingest_timestamp = false
+  }
+
+  stage.label_drop {
+    values = ["source"]
+  }
+}

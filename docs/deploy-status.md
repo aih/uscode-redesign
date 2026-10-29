@@ -90,6 +90,10 @@ because both probe with HEAD by default.
   the `GRAFANA_URL` and `GRAFANA_TOKEN` secrets (a service account with the Admin role; Editor is refused `datasources:read`).
   The weekly summary (`.github/workflows/weekly-summary.yml`, Mondays 13:07 UTC) mails through
   `uscode-alerts` and needs `deploy/admin-grant.sh` re-run once for `sns:Publish`.
+- **Traffic sources (ADR-0096).** Each deploy now starts `alloy`, which ships the edge's access
+  log to Loki as `{service_name="edge-proxy"}`; the deploy log's "starting the edge log shipper"
+  section says whether it started. Owed: the first deploy's check that the "Traffic sources"
+  dashboard fills, and `sudo bash deploy/install-crons.sh` once for the monthly GeoIP refresh.
 
 **One thing.** The manual install pass on real devices, once the PWA phases deploy — the first
 item under [Still owed](#still-owed), which is otherwise a record of finished work as of

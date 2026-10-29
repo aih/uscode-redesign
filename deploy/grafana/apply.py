@@ -1,4 +1,4 @@
-"""Applies the dashboard and alert rules in this directory to Grafana Cloud.
+"""Applies the dashboards and alert rules in this directory to Grafana Cloud.
 
     GRAFANA_URL=https://<stack>.grafana.net GRAFANA_TOKEN=... \
         ALERT_EMAIL=... python3 deploy/grafana/apply.py [--discover-only]
@@ -27,6 +27,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 JOBS = 'job=~"uscode-api|statutes-api"'
 HISTOGRAM = "http_server_request_duration_seconds_count"
+# "US Code and Statutes sites" (ADR-0090) and "Traffic sources" (ADR-0096).
+DASHBOARDS = ("dashboard.json", "traffic.json")
 # A GET (or a query) that meets a 5xx or no answer at all is tried again after
 # each of these pauses: Grafana Cloud answered 503 DatasourceError to the
 # weekly summary's first query at 13:31 and 15:43 on 2026-10-05, and to its
@@ -171,17 +173,18 @@ def apply(grafana: Grafana, prom_uid: str, email: str) -> None:
         grafana.call("POST", "/api/folders", folder)
     print(f"folder: {folder['title']}")
 
-    dashboard = json.loads((HERE / "dashboard.json").read_text())
-    _, saved = grafana.call(
-        "POST",
-        "/api/dashboards/db",
-        {
-            "dashboard": {**dashboard, "id": None},
-            "folderUid": folder["uid"],
-            "overwrite": True,
-        },
-    )
-    print(f"dashboard: {grafana.url}{saved.get('url', '')}")
+    for name in DASHBOARDS:
+        dashboard = json.loads((HERE / name).read_text())
+        _, saved = grafana.call(
+            "POST",
+            "/api/dashboards/db",
+            {
+                "dashboard": {**dashboard, "id": None},
+                "folderUid": folder["uid"],
+                "overwrite": True,
+            },
+        )
+        print(f"dashboard: {grafana.url}{saved.get('url', '')}")
 
     receiver = "grafana-default-email"
     if email:

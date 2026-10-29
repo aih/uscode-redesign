@@ -312,6 +312,35 @@ services:
       - ${DATA_ROOT:-/var/lib/uscode}/caddy:/data
     restart: unless-stopped
 
+  # The edge's access log, with each request's location and network, sent to
+  # Grafana Cloud's Loki over the api's OTLP endpoint (ADR-0096). Its own
+  # profile, so the stack's `up -d --wait` neither starts it nor waits on it;
+  # deploy/deploy-on-box.sh starts it last, and a failure there leaves the
+  # site as it was. The Docker socket is how it finds and reads the edge,
+  # which is another compose project's container.
+  alloy:
+    logging: *logging
+    image: grafana/alloy:v1.10.0
+    profiles: ["observability"]
+    user: "0:0"
+    command:
+      - run
+      - /etc/alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=127.0.0.1:12345
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+    volumes:
+      - ./deploy/alloy:/etc/alloy:ro
+      - ${DATA_ROOT:-/var/lib/uscode}/geoip:/geoip:ro
+      # Where it has read each container's log up to, so a restart neither
+      # skips nor repeats lines.
+      - ${DATA_ROOT:-/var/lib/uscode}/alloy:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    mem_limit: 384m
+
 # The network shared with the edge and the statutes site, created by the
 # statutes repository's deploy/edge/up.sh (10.83.0.0/24). `external` means
 # `docker compose down` here never removes it.
