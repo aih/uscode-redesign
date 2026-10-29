@@ -75,12 +75,15 @@ expect() {  # description, extended regex
 count="$(grep -c '"_entry"' "$WORK/records.json" || true)"
 if [ "$count" = 6 ]; then echo "ok   six records, one per request"; else echo "FAIL $count records, expected 6" >&2; failed=1; fi
 expect "location and network are filled in" '"asn_org":"[^"]+"[^}]*"country_code":"US"'
+expect "8.8.8.8 is Google's network, in the US" '"asn_org":"Google LLC"[^}]*"client_ip":"8.8.8.8"[^}]*"country_code":"US"'
+expect "a university's network is education" '"client_ip":"128.32.0.1"[^}]*"network":"education"'
 expect "8.8.8.8 is cloud" '"client_ip":"8.8.8.8"[^}]*"network":"cloud"|"network":"cloud"[^}]*"client_ip":"8.8.8.8"'
 expect "the gate's 403 is cookie-gate" '"outcome":"cookie-gate"'
 expect "GPTBot is an ai-crawler, blocked" '"client":"ai-crawler"[^}]*"outcome":"blocked"'
-expect "an asset is an asset" '"_entry":"/app/_astro/site.css"[^}]*"area":"asset"'
+expect "an asset is an asset" '"area":"asset"[^}]*"_entry":"/app/_astro/site.css"'
 expect "curl is a script, rate-limited" '"client":"script"[^}]*"outcome":"rate-limited"'
-expect "a pinned release is marked" '"_entry":"/app/us/usc/t16/s45f\?release=119-99"[^}]*"pinned":"yes"'
+expect "a pinned release is marked" '"pinned":"yes"[^}]*"_entry":"/app/us/usc/t16/s45f\?release=119-99"'
+if grep -q 'loki.attribute.labels' "$WORK/records.log"; then echo "FAIL a label reached the record unpacked" >&2; failed=1; fi
 grep -q 'service.name: Str(edge-proxy)' "$WORK/records.log" || { echo "FAIL resource service.name" >&2; failed=1; }
 if [ "$failed" != 0 ]; then
     echo "--- alloy log"

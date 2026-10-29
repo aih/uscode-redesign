@@ -13,8 +13,8 @@ otelcol.processor.transform "edge" {
   log_statements {
     context    = "resource"
     statements = [
-      `set(attributes["service.name"], "edge-proxy")`,
-      `set(attributes["deployment.environment"], "prod")`,
+      `set(resource.attributes["service.name"], "edge-proxy")`,
+      `set(resource.attributes["deployment.environment"], "prod")`,
     ]
   }
 

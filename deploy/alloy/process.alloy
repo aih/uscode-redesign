@@ -123,6 +123,38 @@ loki.process "edge" {
     template = `{{- with .uri -}}{{ if eq (regexReplaceAll "^.*[?&](release|date|id)=.*$" . "y") "y" }}yes{{ else }}no{{ end }}{{- end -}}`
   }
 
+  // Under the names the line carries: stage.pack reads the extracted value
+  // of each label it packs by the label's own name.
+  stage.template {
+    source   = "country"
+    template = "{{ with .geoip_country_name }}{{ . }}{{ end }}"
+  }
+
+  stage.template {
+    source   = "country_code"
+    template = "{{ with .geoip_country_code }}{{ . }}{{ end }}"
+  }
+
+  stage.template {
+    source   = "region"
+    template = "{{ with .geoip_subdivision_name }}{{ . }}{{ end }}"
+  }
+
+  stage.template {
+    source   = "city"
+    template = "{{ with .geoip_city_name }}{{ . }}{{ end }}"
+  }
+
+  stage.template {
+    source   = "asn"
+    template = "{{ with .geoip_autonomous_system_number }}{{ . }}{{ end }}"
+  }
+
+  stage.template {
+    source   = "asn_org"
+    template = "{{ with .geoip_autonomous_system_organization }}{{ . }}{{ end }}"
+  }
+
   stage.labels {
     values = {
       site         = "",
@@ -137,12 +169,12 @@ loki.process "edge" {
       outcome      = "",
       area         = "",
       pinned       = "",
-      country      = "geoip_country_name",
-      country_code = "geoip_country_code",
-      region       = "geoip_subdivision_name",
-      city         = "geoip_city_name",
-      asn          = "geoip_autonomous_system_number",
-      asn_org      = "geoip_autonomous_system_organization",
+      country      = "",
+      country_code = "",
+      region       = "",
+      city         = "",
+      asn          = "",
+      asn_org      = "",
     }
   }
 
