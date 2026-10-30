@@ -168,6 +168,8 @@ services:
       # that makes the Secure cookie independent of proxy configuration.
       USC_COOKIE_SECURE: "true"
       USC_MIRROR_BUCKET: ${USC_MIRROR_BUCKET:-}
+      # Named API tokens, digests only (ADR-0096). Empty: no tokens.
+      USC_API_TOKENS: ${USC_API_TOKENS:-}
       SEARCH_URL: https://opensearch:9200
       SEARCH_PASSWORD: ${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
       # An explicit, overridable decision rather than a library default.

@@ -266,3 +266,98 @@ def test_the_search_route_bounds_deep_paging():
     with TestClient(app) as unloaded:
         response = unloaded.get(f"/api/v1/search?q=conservation&offset={MAX_OFFSET + 1}")
         assert response.status_code == 422
+
+
+# ------------------------------------------------------- API tokens (ADR-0096)
+
+
+def _bearer(token: str, client=("47.82.52.29", 1234)):
+    from fastapi import Request
+
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/sections/us/usc/t16/s45f/versions",
+            "query_string": b"from=2026-01-01",
+            "headers": [(b"authorization", f"Bearer {token}".encode())],
+            "client": client,
+        }
+    )
+
+
+@pytest.fixture
+def a_token(monkeypatch):
+    import hashlib
+
+    import params
+
+    token = "usc_test-token"
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    monkeypatch.setattr(
+        params, "API_TOKENS", params.parse_api_tokens(f'{{"reintro": {{"sha256": "{digest}", "scale": 4}}}}')
+    )
+    return token
+
+
+def test_a_token_scales_the_budget_and_keys_it_on_the_token(a_token):
+    from fastapi import HTTPException
+
+    from params import client_key, rate_limit
+
+    limit = rate_limit("t-token", capacity=2, per_second=0.01)
+    assert client_key(_bearer(a_token)) == "token:reintro"
+
+    for _ in range(8):  # 2 x scale 4
+        limit(_bearer(a_token))
+    with pytest.raises(HTTPException) as refused:
+        limit(_bearer(a_token))
+    assert refused.value.status_code == 429
+
+    # The token's bucket is its own: the same address without it still has 2.
+    limit(_request())
+    limit(_request())
+
+
+def test_the_same_token_shares_one_bucket_across_addresses(a_token):
+    from fastapi import HTTPException
+
+    from params import rate_limit
+
+    limit = rate_limit("t-token-addresses", capacity=1, per_second=0.01)
+    for i in range(4):
+        limit(_bearer(a_token, client=(f"47.82.52.{i}", 1)))
+    with pytest.raises(HTTPException):
+        limit(_bearer(a_token, client=("39.109.2.7", 1)))
+
+
+def test_an_unknown_token_is_refused_rather_than_ignored(a_token):
+    from fastapi import HTTPException
+
+    from params import rate_limit
+
+    limit = rate_limit("t-token-unknown", capacity=100, per_second=1.0)
+    with pytest.raises(HTTPException) as refused:
+        limit(_bearer("usc_not-a-token"))
+    assert refused.value.status_code == 401
+    assert refused.value.headers["WWW-Authenticate"].startswith("Bearer")
+
+
+def test_a_token_holder_is_exempt_from_the_shared_budget(a_token):
+    from params import global_rate_limit
+
+    limit = global_rate_limit("t-global-token", capacity=1, per_second=0.01)
+    for _ in range(5):
+        limit(_bearer(a_token))  # never refused
+
+
+def test_the_tokens_setting_is_checked_at_start_up():
+    from params import parse_api_tokens
+
+    assert parse_api_tokens("") == {}
+    with pytest.raises(ValueError):
+        parse_api_tokens('{"x": {"sha256": "abc"}}')
+    with pytest.raises(ValueError):
+        parse_api_tokens('{"x": {"sha256": "' + "0" * 64 + '", "scale": 0.5}}')
+    t = parse_api_tokens('{"x": {"sha256": "' + "A" * 64 + '"}}')
+    assert list(t.values())[0].scale == 10

@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(93 ADRs, numbered to 0095 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(94 ADRs, numbered to 0096 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -587,6 +587,12 @@ database started on the statutes cluster, two postmasters on one data directory,
 `postmaster.pid` missed because each container has its own PID namespace. `bootstrap-box.sh` now
 writes the UUID and verifies the mount. A `docker restart` does **not** apply a new log cap; the
 container must be recreated.
+
+**A caller the site knows can carry a token** (ADR-0096). `Authorization: Bearer <token>`,
+checked against `USC_API_TOKENS` (named SHA-256 digests with a `scale`, made by
+`scripts/api_token.py`): the per-caller limiters key on `token:<name>` and multiply burst and
+refill by the scale, the shared budget on pinned routes does not apply, and an unrecognised bearer
+token is a `401`. Written for reintroductions-us, which checks every US Code section a bill cites.
 
 **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.
