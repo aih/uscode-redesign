@@ -3645,3 +3645,11 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Produced:** `params.py`, `tests/test_rate_limit.py`, `scripts/api_token.py`, `docker-compose.prod.yml`, `.env.example`, guide chapter 08, ADR-0096.
 - **Verified:** `uv run pytest tests/test_rate_limit.py` (five new tests: scaled budget keyed on the token, one bucket across addresses, `401` for an unknown token, exemption from the shared budget, the setting validated at start-up); `make test` without a database (799 passed, 280 skipped); `npx vitest run tests/guide.test.ts` (8 passed). Not run here: the rest of `make test-web` and the integration suite.
 
+## 118 — 2026-10-30 — How to generate, store and use an API token
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Document how to generate, store and use the ADR-0096 tokens.
+- **Decided:** One page, `docs/api-tokens.md`: `scripts/api_token.py` (standard library only, so `python3` from any checkout), the `USC_API_TOKENS` line in the box's `.env` in single quotes, `docker compose … up -d --no-deps --force-recreate --wait api` to apply it, the caller's side, the `401`/`429` table, rotation and revocation. Linked from the README and CLAUDE.md; `.env.example` shows the quoted form.
+- **Produced:** `docs/api-tokens.md`, `README.md`, `CLAUDE.md`, `.env.example`.
+- **Verified:** `docker compose config` over a `.env` holding the single-quoted JSON passes the value through unchanged, and `pydantic_settings` reads the same line as the same string; `python3 scripts/api_token.py demo --scale 5` prints the entry. Not run against the box.
+

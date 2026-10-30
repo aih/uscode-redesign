@@ -164,7 +164,9 @@ deploys by SSM
 and records every check, successful or not
 ([ADR-0036](docs/adr/0036-record-every-check-of-the-source.md)); `GET /api/v1/status` and
 `/app/releases` say when it last looked. Live state and outstanding items are in
-[`docs/deploy-status.md`](docs/deploy-status.md).
+[`docs/deploy-status.md`](docs/deploy-status.md). A caller can be issued a token that raises its rate limits on
+`/api/v1` ([ADR-0096](docs/adr/0096-api-tokens-for-known-callers.md)); generating, storing and
+using one is [`docs/api-tokens.md`](docs/api-tokens.md).
 
 **The reader and the API are separate** (BUILDLOG 006–007, 014). The reader is an
 Astro 5 + TypeScript app styled with [USWDS](https://designsystem.digital.gov/) at `/app`, server-rendered:

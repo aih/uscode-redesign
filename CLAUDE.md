@@ -593,6 +593,7 @@ checked against `USC_API_TOKENS` (named SHA-256 digests with a `scale`, made by
 `scripts/api_token.py`): the per-caller limiters key on `token:<name>` and multiply burst and
 refill by the scale, the shared budget on pinned routes does not apply, and an unrecognised bearer
 token is a `401`. Written for reintroductions-us, which checks every US Code section a bill cites.
+Generating, storing on the box, using, rotating and revoking a token: `docs/api-tokens.md`.
 
 **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.
