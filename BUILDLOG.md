@@ -3633,3 +3633,15 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
   - `ingest/load.py`'s per-section version logic moved into `VersionStore` and its change-row hook into `recompute_version_changes`, both shared with the new path.
 - **Produced:** `ingest/section_update.py`, `ingest/load.py`, `ingest/load_all.py`, `ingest/__main__.py`, `db/models.py`, the migration, `storage/repository.py`, `storage/postgres.py`, `params.py`, `api/schemas.py`, `frontend/src/lib/types.ts`, guide chapter 03, `deploy/update-corpus.sh`, `scripts/section_update_check.py`, `docs/verification/section-update-check.json`, ADR-0095, the `ingest-cli` skill, `docs/deploy-status.md`, `tests/test_section_update.py` and tests in `test_update_corpus.py`, `test_models.py`, `test_version_changes.py`.
 - **Verified:** `uv run python scripts/section_update_check.py` — Title 16 at 119-99 plus the committed table slices plans §§ 2201 and 2206 for 119-102not101 (laws 119-100 and 119-102; 119-100 classifies nothing in the slice), reads only those two from the 119-102not101 file, and the 5,095 assembled sections match the file's 5,095 by content hash. `make test` against a local `make ci-data` database with `USC_REQUIRE_INTEGRATION=1` (1,062 passed), `make test-web` (512 passed).
+
+## 117 — 2026-10-30 — API tokens for known callers (ADR-0096)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** For the reintroductions site, which checks every US Code section a bill cites against this API: plan token-based API access if it helps, and open a PR.
+- **Decided:**
+  - `Authorization: Bearer <token>`; `USC_API_TOKENS` holds each named token's SHA-256 digest and a `scale` as JSON. A token keys the per-caller limiters as `token:<name>`, multiplies each budget's burst and refill by `scale` (default 10), and exempts its holder from the shared budget on pinned routes. An unrecognised bearer token is a `401` (ADR-0096).
+  - `RateLimiter.check` takes the scale per call, so one limiter serves both kinds of caller.
+  - `scripts/api_token.py` makes a token and prints its settings entry; `docker-compose.prod.yml` passes `USC_API_TOKENS` through to the api service.
+- **Produced:** `params.py`, `tests/test_rate_limit.py`, `scripts/api_token.py`, `docker-compose.prod.yml`, `.env.example`, guide chapter 08, ADR-0096.
+- **Verified:** `uv run pytest tests/test_rate_limit.py` (five new tests: scaled budget keyed on the token, one bucket across addresses, `401` for an unknown token, exemption from the shared budget, the setting validated at start-up); `make test` without a database (799 passed, 280 skipped); `npx vitest run tests/guide.test.ts` (8 passed). Not run here: the rest of `make test-web` and the integration suite.
+
