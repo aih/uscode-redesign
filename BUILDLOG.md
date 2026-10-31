@@ -3653,3 +3653,11 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Produced:** `docs/api-tokens.md`, `README.md`, `CLAUDE.md`, `.env.example`.
 - **Verified:** `docker compose config` over a `.env` holding the single-quoted JSON passes the value through unchanged, and `pydantic_settings` reads the same line as the same string; `python3 scripts/api_token.py demo --scale 5` prints the entry. Not run against the box.
 
+
+## 119 — 2026-10-31 — Proof-of-concept credit in the footer and About
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Say in the footer and on About that the site was made as a proof-of-concept by Ari Hershowitz, linked to aih.github.io.
+- **Decided:** The existing byline (BUILDLOG on `.doc-meta--byline`) already names Ari Hershowitz and links aih.github.io on both surfaces, so its wording changes in place rather than adding a second line: "This site was made as a proof-of-concept by Ari Hershowitz (profile), lawyer and legal technologist." About keeps its clause about how it was implemented.
+- **Produced:** `frontend/src/components/SiteFooter.astro`, `frontend/src/pages/about.astro`, `frontend/src/pages/guide/02-reading.md` (caption), this entry.
+- **Verified:** The chapter-02 assertion (`.doc-meta--byline` contains "Ari Hershowitz") still holds against the new text. Not built or run locally.
