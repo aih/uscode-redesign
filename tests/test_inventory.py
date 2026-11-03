@@ -5,6 +5,7 @@ comment. Nothing in this file touches the network.
 """
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -484,3 +485,14 @@ def test_the_download_page_of_2026_10_27_is_119_134_with_its_changed_titles():
     assert entry.label == "119-134"
     assert entry.currency_date == date(2026, 10, 20)
     assert entry.titles_affected == ("15", "16", "26", "29", "30", "54")
+
+
+def test_the_banner_names_the_law_the_code_is_current_through():
+    """"The United States Code Online is current through Public Law 119-134
+    (October 20, 2026)." on both release-point pages, captured 2026-10-27."""
+    from ingest.inventory import CurrentThrough, parse_current_through
+
+    for name in ("priorreleasepoints_2026-10-27.html", "download_2026-10-27.html"):
+        html = (Path(__file__).parent / "fixtures" / name).read_text()
+        assert parse_current_through(html) == CurrentThrough("119-134", date(2026, 10, 20))
+    assert parse_current_through("<html><body>no banner</body></html>") is None

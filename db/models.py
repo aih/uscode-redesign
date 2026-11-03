@@ -84,6 +84,10 @@ class SourceCheck(Base):
     new_labels: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     latest_label: Mapped[str | None] = mapped_column(String, nullable=True)
     latest_currency_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    # "current through Public Law 119-136 (October 22, 2026)" on the source's
+    # pages. Later than `latest_label` when the laws after it changed no title.
+    current_through_law: Mapped[str | None] = mapped_column(String, nullable=True)
+    current_through_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # The `ingest.source_formats` id of each page the check read, in the order
     # read (ADR-0094). Empty on a check that failed before a page matched one.

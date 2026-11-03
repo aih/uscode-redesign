@@ -164,8 +164,11 @@ site does not hold is loaded at the next check, in its place in the list, includ
 before the newest release point loaded here. Release points the OLRC no longer lists are not
 loaded.
 
-The release point list also says when the site last looked for a new release point — *“Checked uscode.house.gov
-for new release points 3 hours ago.”* It is a plain line when everything is current and a warning
+The release point list also says when the site last looked for a new release point. When everything
+is current it names the public law uscode.house.gov says the Code is current through — *“Up to date
+through Public Law 119-136 (10/22/2026). Checked uscode.house.gov 3 hours ago.”* A public law that
+changes no title of the Code gets no release point, so that law can be later than the newest release
+point; the line then adds *“Public Law 119-137 did not change any Code title.”* It is a plain line when everything is current and a warning
 when it is not, including when the last check **failed**. When uscode.house.gov answered the check
 with its maintenance notice, the warning says that the official site is under maintenance and quotes
 the notice. The API answers the same question at `/api/v1/status`, where `under_maintenance` is

@@ -125,3 +125,21 @@ nothing.
   section I am reading out of date" — the second question is what the version timeline is for.
 - **Nothing here makes the corpus load faster.** A release point that touches Title 42 still costs
   what it costs; the daily check only means the clock starts within a day.
+
+## Addendum (2026-11-03) — the law the Code is current through
+
+Every release-point page on uscode.house.gov carries the sentence "The United States Code Online is
+current through Public Law 119-136 (October 22, 2026)." A public law that changes no title of the
+Code gets no release point, so this sentence can name a law later than the newest release point.
+
+- `poll_source` reads it from the prior page, or from the current release point's page when the
+  prior page lacks it, and records `current_through_law` and `current_through_date` on the
+  `source_checks` row (migration `b5e1d8f3c2a9`). NULL when neither page carries it.
+- `/api/v1/status` reports both under `source`.
+- When everything is current, the currency note leads with "Up to date through Public Law
+  119-136 (10/22/2026)." When the law is later than the newest release point loaded, the detail
+  adds "Public Law 119-137 did not change any Code title." (or "Public Laws 119-137 through
+  119-140 …"). Without the field the note reads as before.
+
+Whether OLRC moves the sentence for a law that changes nothing has not been observed; the
+captures so far all name the newest release point's law.

@@ -37,6 +37,11 @@ export interface SourceCheck {
   new_release_points: string[];
   latest_published_label: string | null;
   latest_published_date: string | null;
+  /** The public law uscode.house.gov says the Code is current through. Later
+   * than `latest_published_label` when the laws after it changed no title.
+   * Absent from an API older than the field. */
+  current_through_law?: string | null;
+  current_through_date?: string | null;
   error: string | null;
   /** The last check failed because uscode.house.gov showed its maintenance
    * notice. Absent from an API older than the field. */

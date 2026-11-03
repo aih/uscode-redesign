@@ -3661,3 +3661,12 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Decided:** The existing byline (BUILDLOG on `.doc-meta--byline`) already names Ari Hershowitz and links aih.github.io on both surfaces, so its wording changes in place rather than adding a second line: "This site was made as a proof-of-concept by Ari Hershowitz (profile), lawyer and legal technologist." About keeps its clause about how it was implemented.
 - **Produced:** `frontend/src/components/SiteFooter.astro`, `frontend/src/pages/about.astro`, `frontend/src/pages/guide/02-reading.md` (caption), this entry.
 - **Verified:** The chapter-02 assertion (`.doc-meta--byline` contains "Ari Hershowitz") still holds against the new text. Not built or run locally.
+
+## 121 — 2026-11-03 — Up to date through a law that changed no title
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** When the latest public law does not change the US Code, still say the site is up to date through that law, noting that no Code titles were changed.
+- **Decided:** The source's banner, "The United States Code Online is current through Public Law 119-136 (October 22, 2026).", is on the prior and current release-point pages; the check records it as `current_through_law`/`current_through_date`, `/api/v1/status` reports it, and the currency note leads with "Up to date through Public Law …" and adds "Public Law 119-137 did not change any Code title." when that law is later than the newest release point loaded (ADR-0036 addendum). Guide chapter 03 says so.
+- **Produced:** `ingest/inventory.py`, `db/models.py`, migration `b5e1d8f3c2a9`, `storage/repository.py`, `storage/postgres.py`, `api/schemas.py`, `frontend/src/lib/types.ts`, `frontend/src/lib/currency.ts`, `frontend/tests/currency.test.ts`, `tests/test_inventory.py`, guide chapter 03, ADR-0036 addendum.
+- **Verified:** both 2026-10-27 captures parse to 119-134 (10/20/2026); `uv run pytest tests` without a database (801 passed, 280 skipped); `npx vitest run` (515 passed). The integration suite and the migration were not run here.
+
