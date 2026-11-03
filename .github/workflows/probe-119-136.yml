@@ -10,27 +10,26 @@ jobs:
     steps:
       - name: Fetch
         run: |
-          mkdir out && cd out
           UA="uscode-redesign probe"
-          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/status -o status.json || true
-          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/releases -o releases.json || true
-          curl -sS -A "$UA" https://uscode.house.gov/download/download.html -o download.html || true
-          curl -sS -A "$UA" https://uscode.house.gov/download/priorreleasepoints.html -o prior.html || true
-          for rp in 119-134 119-136; do
-            c=${rp%%-*}; n=${rp#*-}
-            for t in 47 15 26; do
-              u="https://uscode.house.gov/download/releasepoints/us/pl/$c/$n/xml_usc$t@$rp.zip"
-              echo "$u $(curl -sS -A "$UA" -o /dev/null -I -w '%{http_code} %{content_type} %{size_download}' "$u")"
-              echo "GET $(curl -sS -A "$UA" -r 0-3 -o head.bin -w '%{http_code} %{content_type}' "$u") $(xxd -p head.bin | head -c 8)"
-            done
-            u="https://uscode.house.gov/download/releasepoints/us/pl/$c/$n/usc-rp@$rp.htm"
-            curl -sS -A "$UA" "$u" -o rp-$rp.htm -w "$u %{http_code}\n" || true
-          done | tee zips.txt
-          python3 -m json.tool status.json || cat status.json
-          echo "=== releases"; python3 -c "import json;d=json.load(open('releases.json'));r=d if isinstance(d,list) else d.get('releases',d);print(json.dumps(r[-8:] if isinstance(r,list) else r, indent=1)[:6000])" || head -c 3000 releases.json
-          for f in download.html prior.html rp-119-134.htm rp-119-136.htm; do echo "=== $f"; sed -e 's/<[^>]*>/ /g' "$f" | tr -s ' \t' ' ' | grep -v '^ *$' | head -c 5000; echo; grep -o 'class="[^"]*changed[^"]*"[^<]*<[^>]*>[^<]*' "$f" | head -70; done
-          grep -n -i 'usctitlechanged' download.html | head -80
-      - uses: actions/upload-artifact@v4
-        with:
-          name: probe
-          path: out/
+          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/releases -o releases.json
+          curl -sS -A "$UA" https://uscode.house.gov/download.html -o download.html
+          curl -sS -A "$UA" https://uscode.house.gov/priorreleasepoints.html -o prior.html
+          for rp in 119-130 119-134 119-136; do c=${rp%%-*}; n=${rp#*-}
+            curl -sS -A "$UA" "https://uscode.house.gov/download/releasepoints/us/pl/$c/$n/usc-rp@$rp.htm" -o rp-$rp.htm; done
+          python3 - <<'PY'
+          import json, re
+          d = json.load(open('releases.json'))
+          r = d if isinstance(d, list) else d.get('releases', d)
+          for e in r[:8]:
+              print(e['label'], e['currency_date'], 'affected', e['titles_affected'], 'ingested', e['ingested_titles'], e.get('caveat'))
+          for f in ['download.html', 'prior.html', 'rp-119-130.htm', 'rp-119-134.htm', 'rp-119-136.htm']:
+              h = open(f, errors='replace').read()
+              print('===', f, len(h), 'Page Not Found' in h)
+              print('  title:', re.findall(r'<title>(.*?)</title>', h, re.S)[:1])
+              print('  h3:', [re.sub(r'<[^>]+>', '', x).strip() for x in re.findall(r'<h3[^>]*>.*?</h3>', h, re.S)][:3])
+              print('  changed:', re.findall(r'class="usctitle(?:appendix)?changed"[^>]*>\s*(?:<[^>]+>\s*)*([^<]+)', h)[:60])
+              print('  minor:', re.findall(r'class="usctitleminoreditorialchange"[^>]*>\s*(?:<[^>]+>\s*)*([^<]+)', h)[:60])
+              print('  current:', re.findall(r'current through[^<]*', h)[:3])
+              print('  119-13x mentions:', sorted(set(re.findall(r'119-13\d', h))))
+          PY
+          grep -n -i -B2 -A2 'title 47\|usc47' rp-119-136.htm rp-119-134.htm | head -40
