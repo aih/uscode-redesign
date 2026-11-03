@@ -115,6 +115,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Re-ask for release/title pairs the server has already denied",
     )
     backfill_parser.add_argument(
+        "--retry-recent",
+        type=int,
+        default=backfill_mod.DEFAULT_RETRY_RECENT,
+        metavar="N",
+        help="Re-ask for denied pairs at the N newest release points "
+        f"(default {backfill_mod.DEFAULT_RETRY_RECENT}; 0 turns it off)",
+    )
+    backfill_parser.add_argument(
         "--attempts", type=int, default=backfill_mod.DEFAULT_ATTEMPTS, help="Retries per file"
     )
     backfill_parser.add_argument(
@@ -637,6 +645,7 @@ def _cmd_backfill(args: argparse.Namespace) -> int:
             dest_dir=args.dest,
             attempts=args.attempts,
             retry_unavailable=args.retry_unavailable,
+            retry_recent=args.retry_recent,
             limit=args.limit,
             on_event=None if args.quiet else print,
         )

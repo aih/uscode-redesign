@@ -148,3 +148,34 @@ turns it into mail rather than into six quiet days.
 **The half-loaded row on the box is deleted by hand**, not by this change: the reader ignores it
 either way, and `load-all` redoes any pair without the marker on its next run, which is the weekly
 sweep or the next new release point. The command is in `docs/deploy-status.md`.
+
+## Addendum (2026-11-03) — a zip denied before it was posted
+
+On 2026-11-03 `/api/v1/status` reported `unloaded_titles: ["119-136/47"]`: 119-136 (10/22/2026)
+changes only Title 47, and the corpus held it at no release point newer than 119-121. The same
+day a GitHub Actions runner fetched `xml_usc47@119-136.zip` from the source as a valid zip
+(`PK\x03\x04`). The box's ledger was not read; the mechanism below is the one the code allows,
+and the one that fits a release point first seen on the source's page that week:
+
+- `fetch_zip` records a 200 response whose body is not a zip — the source's "Page Not Found" page
+  — as `unavailable` after one confirming retry.
+- `backfill` never re-asks an `unavailable` pair unless `--retry-unavailable` is passed, which
+  `update-corpus.sh` does not.
+- The daily run only goes past the poll when the poll finds a new release point, so a title
+  missed on the day its release point appears waits for the weekly sweep, and the sweep's
+  backfill skips it as settled.
+
+Three changes:
+
+1. **`backfill --retry-recent N`** (default 3) re-asks an `unavailable` pair at the N newest
+   release points in the plan. The 44 historical `unavailable` pairs are older than that and stay
+   settled.
+2. **The daily run goes on when the corpus has a gap.** With no new release point,
+   `update-corpus.sh` reads `corpus_health().problems`; when it is above zero the run continues
+   into mirror pull, inventory, backfill and load-all, as for a new release point. A gap the
+   source never fills costs that chain once a day until the release point drops out of the
+   newest three.
+3. **The classification load's parser warnings are counted, not printed.** The forced sweep's
+   thousands of `UserWarning` lines took the 2026-11-02 weekly run's output past the 24,000
+   characters SSM returns, and the run failed with nothing after the classification step in its
+   log.

@@ -181,6 +181,18 @@ print(health.problems)
         && echo "published USCode/CorpusIncomplete=${count}"
 }
 
+# The same count, for deciding whether the daily run has work with no new
+# release point: a title the source lists as changed and this corpus does not
+# hold is retried every day rather than waiting for the weekly sweep.
+corpus_gap() {
+    $COMPOSE exec -T api python -c "
+from db.base import SessionLocal
+from storage.postgres import PostgresRepository
+with SessionLocal() as session:
+    print(PostgresRepository(session).corpus_health().problems)
+" 2>/dev/null | tail -1 | tr -d '[:space:]'
+}
+
 # Every exit path publishes it — the early `exit 1` after a failed load-all is
 # the path that matters most. The trap runs after the lock is taken, so an
 # overlapping run that exits 0 above does not publish a second reading.
@@ -276,7 +288,14 @@ run_classification() {
     local out status changed
     out="$($COMPOSE exec -T api uv run python -m ingest classification "$@" 2>&1)"
     status=$?
-    echo "$out"
+    # The parser warns once per row it keeps without a Stat. cell — thousands
+    # of lines on a forced sweep. Printed whole, they pushed the rest of the
+    # run past the 24,000 characters SSM returns, and the 2026-11-02 weekly
+    # run failed with nothing after this step in its output. Count them instead.
+    local warnings
+    warnings="$(printf '%s\n' "$out" | grep -c 'UserWarning' || true)"
+    printf '%s\n' "$out" | grep -v -e 'UserWarning' -e '^  _parse_row($'
+    [ "${warnings:-0}" -gt 0 ] && echo "(${warnings} parser warnings not shown)"
     if [ "$status" -eq 75 ]; then
         SOURCE_DOWN=1
         return 75
@@ -458,7 +477,18 @@ if [ "$MODE" = "check-only" ]; then
     echo "=== $(date -u +%FT%TZ) check complete (check-only) ==="
     finish
 fi
-if [ "$MODE" != "force" ] && [ "$CHECK_STATUS" -eq 0 ]; then
+# No new release point, but a title a known release point changed is not
+# loaded (ADR-0082): run the chain, so backfill re-asks for its zip.
+GAP=0
+if [ "$MODE" = "auto" ] && [ "$CHECK_STATUS" -eq 0 ]; then
+    GAP="$(corpus_gap)"
+    if [[ "$GAP" =~ ^[0-9]+$ ]] && [ "$GAP" -gt 0 ]; then
+        echo "${GAP} title-release(s) the source lists are not loaded — running the chain"
+    else
+        GAP=0
+    fi
+fi
+if [ "$MODE" != "force" ] && [ "$CHECK_STATUS" -eq 0 ] && [ "$GAP" -eq 0 ]; then
     # No new release point, but a table that moved can be what an earlier
     # sections-update was waiting for (exit 3).
     if [ "$CLASSIFICATION_CHANGED" -eq 1 ]; then

@@ -609,6 +609,12 @@ OLRC has published nothing — nothing else. When the poll finds a release point
 (`python -m ingest check` exits 10) it runs the whole download-and-load chain there and then, so new
 law is picked up within a day rather than within a week.
 
+**A title the corpus lacks also starts the chain (ADR-0082 addendum, 2026-11-03).** With no new
+release point, the daily run reads `corpus_health().problems` and continues into the chain when it is
+above zero, and `backfill` re-asks a denied zip at the three newest release points. Title 47 at
+119-136 had been recorded `unavailable` and was skipped by every run after; the first daily run after
+this deploys fetches it.
+
 The weekly Actions job now dispatches `--force`, which makes it the backstop rather than the primary
 schedule: it runs the full chain whether or not anything was published, so a load that half-finished
 or a zip that never reached the mirror is repaired within the week. The two schedules fail
