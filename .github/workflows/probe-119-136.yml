@@ -1,0 +1,33 @@
+name: Probe 119-136 (temporary)
+on:
+  push:
+    branches: [claude/probe-119-136]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch
+        run: |
+          mkdir out && cd out
+          UA="uscode-redesign probe"
+          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/status -o status.json || true
+          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/releases -o releases.json || true
+          curl -sS -A "$UA" https://uscode.house.gov/download/download.html -o download.html || true
+          curl -sS -A "$UA" https://uscode.house.gov/download/priorreleasepoints.html -o prior.html || true
+          for rp in 119-134 119-136; do
+            c=${rp%%-*}; n=${rp#*-}
+            for t in 47 15 26; do
+              u="https://uscode.house.gov/download/releasepoints/us/pl/$c/$n/xml_usc$t@$rp.zip"
+              echo "$u $(curl -sS -A "$UA" -o /dev/null -I -w '%{http_code} %{content_type} %{size_download}' "$u")"
+              echo "GET $(curl -sS -A "$UA" -r 0-3 -o head.bin -w '%{http_code} %{content_type}' "$u") $(xxd -p head.bin | head -c 8)"
+            done
+            u="https://uscode.house.gov/download/releasepoints/us/pl/$c/$n/usc-rp@$rp.htm"
+            curl -sS -A "$UA" "$u" -o rp-$rp.htm -w "$u %{http_code}\n" || true
+          done | tee zips.txt
+          python3 -m json.tool status.json || cat status.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe
+          path: out/
