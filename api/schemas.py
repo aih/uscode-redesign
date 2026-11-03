@@ -631,6 +631,13 @@ class SourceCheckOut(BaseModel):
         default=None, description="The newest release point OLRC published, as of that check."
     )
     latest_published_date: datetime.date | None = None
+    current_through_law: str | None = Field(
+        default=None,
+        description="The public law uscode.house.gov says the Code is current "
+        "through, as of that check. Later than `latest_published_label` when the "
+        "laws after that release point changed no Code title.",
+    )
+    current_through_date: datetime.date | None = None
     error: str | None = Field(
         default=None, description="Why the last check failed, if it did."
     )
@@ -657,6 +664,8 @@ class SourceCheckOut(BaseModel):
             new_release_points=list(check.new_labels),
             latest_published_label=check.latest_label,
             latest_published_date=check.latest_currency_date,
+            current_through_law=check.current_through_law,
+            current_through_date=check.current_through_date,
             error=check.error,
             under_maintenance=is_maintenance_error(check.error),
         )

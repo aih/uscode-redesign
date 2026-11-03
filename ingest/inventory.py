@@ -92,6 +92,11 @@ _ENTRY_RE = re.compile(
 _HREF_RE = re.compile(r"releasepoints/us/pl/\d+/[^/]+/usc-rp@(?P<label>[^.]+)\.htm")
 _LABEL_HTML_HREF_RE = re.compile(r"^(?:download/)?(?P<label>\d+-[0-9a-z]+)\.html$")
 _CURRENT_THROUGH_RE = r"current through Public Law\s+{label}\s*\((?P<date>[^)]*)\)"
+_CODE_CURRENT_THROUGH_RE = re.compile(
+    r"United States Code Online is current through Public Law\s+"
+    r"(?P<law>\d+-\d+)\s*\((?P<date>[^)]*)\)",
+    re.IGNORECASE,
+)
 _ITEM_START_RE = re.compile(r'<div class="uscitem')
 _CHANGED_ROW_RE = re.compile(r'class="usctitle(?:appendix)?changed"')
 _ITEM_ZIP_RE = re.compile(r"xml_usc(?P<num>[0-9][0-9a-zA-Z]*)@")
@@ -597,6 +602,26 @@ class InventoryFetch:
     entries: list[ReleasePointEntry]
     formats: tuple[str, ...]
     """The `ingest.source_formats` id of each page read, in the order read."""
+    current_through: CurrentThrough | None = None
+    """The public law the source's banner says the Code is current through."""
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentThrough:
+    """"The United States Code Online is current through Public Law 119-136
+    (October 22, 2026)." The law can be later than the newest release point: a law
+    that changes no title gets no release point."""
+
+    law: str
+    date: date | None
+
+
+def parse_current_through(html: str) -> CurrentThrough | None:
+    """The banner sentence on the source's pages, or None when a page lacks it."""
+    match = _CODE_CURRENT_THROUGH_RE.search(_clean_text(html))
+    if match is None:
+        return None
+    return CurrentThrough(law=match.group("law"), date=_parse_date(match.group("date")))
 
 
 def fetch_inventory(
@@ -610,15 +635,17 @@ def fetch_inventory(
     prior_html = fetch_inventory_html(url)
     formats = [detect_format(source_formats.PRIOR_RELEASE_POINTS, prior_html, url).id]
     entries = parse_inventory(prior_html)
+    through = parse_current_through(prior_html)
     if current_url is not None:
         current_html = fetch_inventory_html(current_url)
+        through = through or parse_current_through(current_html)
         formats.append(
             detect_format(source_formats.CURRENT_RELEASE_POINT, current_html, current_url).id
         )
         entries = with_current_release_point(entries, parse_current_release_point(current_html))
     if known:
         entries = merge_inventory(known, entries)
-    return InventoryFetch(entries=entries, formats=tuple(formats))
+    return InventoryFetch(entries=entries, formats=tuple(formats), current_through=through)
 
 
 def fetch_entries(
@@ -752,6 +779,7 @@ def record_source_check(
     new_labels: tuple[str, ...] = (),
     error: str | None = None,
     formats: tuple[str, ...] = (),
+    current_through: CurrentThrough | None = None,
 ) -> SourceCheck:
     """Write one `source_checks` row. Called on success *and* on failure.
 
@@ -768,6 +796,8 @@ def record_source_check(
         new_labels=list(new_labels),
         latest_label=newest.label if newest else None,
         latest_currency_date=newest.currency_date if newest else None,
+        current_through_law=current_through.law if current_through else None,
+        current_through_date=current_through.date if current_through else None,
         # Truncated: an error here is a one-line diagnosis, and a stack trace or
         # an HTML error page would push a status response into the kilobytes.
         error=(error[:500] if error else None),
@@ -884,6 +914,7 @@ def poll_source(
         entries=entries,
         new_labels=new_labels,
         formats=formats,
+        current_through=fetched.current_through,
     )
     return CheckResult(
         ok=True,

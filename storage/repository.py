@@ -502,6 +502,10 @@ class SourceCheckInfo:
     latest_label: str | None
     latest_currency_date: datetime.date | None
     error: str | None
+    current_through_law: str | None = None
+    """The public law the source says the Code is current through — later than
+    `latest_label` when the laws after it changed no title."""
+    current_through_date: datetime.date | None = None
 
     def age(self, *, now: datetime.datetime | None = None) -> datetime.timedelta:
         now = now or datetime.datetime.now(datetime.timezone.utc)

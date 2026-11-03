@@ -231,6 +231,8 @@ class PostgresRepository:
             latest_label=row.latest_label,
             latest_currency_date=row.latest_currency_date,
             error=row.error,
+            current_through_law=row.current_through_law,
+            current_through_date=row.current_through_date,
         )
 
     def corpus_health(self) -> CorpusHealth:
