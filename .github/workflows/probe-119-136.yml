@@ -27,6 +27,9 @@ jobs:
             curl -sS -A "$UA" "$u" -o rp-$rp.htm -w "$u %{http_code}\n" || true
           done | tee zips.txt
           python3 -m json.tool status.json || cat status.json
+          echo "=== releases"; python3 -c "import json;d=json.load(open('releases.json'));r=d if isinstance(d,list) else d.get('releases',d);print(json.dumps(r[-8:] if isinstance(r,list) else r, indent=1)[:6000])" || head -c 3000 releases.json
+          for f in download.html prior.html rp-119-134.htm rp-119-136.htm; do echo "=== $f"; sed -e 's/<[^>]*>/ /g' "$f" | tr -s ' \t' ' ' | grep -v '^ *$' | head -c 5000; echo; grep -o 'class="[^"]*changed[^"]*"[^<]*<[^>]*>[^<]*' "$f" | head -70; done
+          grep -n -i 'usctitlechanged' download.html | head -80
       - uses: actions/upload-artifact@v4
         with:
           name: probe
