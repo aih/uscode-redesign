@@ -30,7 +30,7 @@ from ingest.backfill import (
     write_verification,
 )
 from ingest.download import FetchStatus, fetch_zip
-from ingest.inventory import ReleasePointEntry
+from ingest.inventory import ReleasePointEntry, title_zip_url
 
 
 # --------------------------------------------------------------------------
@@ -405,6 +405,31 @@ def test_retry_unavailable_re_asks(tmp_path, entries):
     )
 
     assert len(server.requests) > before
+
+
+def test_retry_recent_re_asks_only_the_newest_release_points(tmp_path, entries):
+    """OLRC can list a release point before its zips are posted; the fetch in that
+    window reads the "Page Not Found" body as the file not existing. 119-136's
+    Title 47 was recorded that way and never asked for again."""
+    not_found = b"<html><title>Page Not Found - US Code</title></html>"
+    server = FakeServer(default=not_found)
+    tasks = plan_backfill(entries, include_baseline=False)
+    ledger = DownloadLedger(tmp_path / "ledger.json")
+    run_backfill(tasks, ledger, dest_dir=tmp_path, opener=server.opener)
+    assert {e.status for e in ledger.entries.values()} == {FetchStatus.UNAVAILABLE}
+
+    newest = max(entries, key=lambda e: e.seq)
+    for title in newest.titles_affected:
+        server.bodies[title_zip_url(newest.label, title)] = _zip_bytes()
+    server.requests.clear()
+
+    report = run_backfill(tasks, ledger, dest_dir=tmp_path, opener=server.opener, retry_recent=1)
+
+    assert {url for url in server.requests} == {
+        title_zip_url(newest.label, t) for t in newest.titles_affected
+    }
+    assert report.downloaded == len(newest.titles_affected)
+    assert ledger.get(tasks[-1]).status == FetchStatus.OK
 
 
 def test_failed_entries_are_retried_on_the_next_run(tmp_path, entries):
