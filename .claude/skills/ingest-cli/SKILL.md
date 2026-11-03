@@ -30,13 +30,15 @@ The `make` targets stay in `CLAUDE.md`; this file covers the module CLI beneath 
   Raises on failure — the interactive single-title path. The bulk path records and continues.
 
 ## python -m ingest backfill [--title N]... [--release LABEL]... [--limit N] [--plan-only]
-                          [--retry-unavailable] [--no-baseline]
+                          [--retry-unavailable] [--retry-recent N] [--no-baseline]
   The full corpus, resumably (ADR-0012). Plans from data/uscreleasepoints.json driven by
   titlesAffected — 3,197 downloads, not 382×58=22,156 — with the oldest RP fetched in full
   as the baseline a delta needs. Re-run to resume: outcomes live in data/releases/ledger.json
   (ok / unavailable / failed), and a zip on disk with no ledger entry is re-hashed and
   adopted, so a lost ledger costs a hashing pass rather than a re-download. Hours long and
-  interruptible; Ctrl-C saves the ledger.
+  interruptible; Ctrl-C saves the ledger. An `unavailable` pair is not re-asked, except at
+  the --retry-recent N newest release points (default 3; ADR-0082 addendum), where a zip
+  can be listed before it is posted.
 
 ## python -m ingest mirror {push,pull} [--bucket B] [--title N]... [--release L]...
   S3 mirror of the corpus (ADR-0013; bucket from $USC_MIRROR_BUCKET; ops guide

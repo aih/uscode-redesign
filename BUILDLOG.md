@@ -3662,6 +3662,17 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Produced:** `frontend/src/components/SiteFooter.astro`, `frontend/src/pages/about.astro`, `frontend/src/pages/guide/02-reading.md` (caption), this entry.
 - **Verified:** The chapter-02 assertion (`.doc-meta--byline` contains "Ari Hershowitz") still holds against the new text. Not built or run locally.
 
+## 120 — 2026-11-03 — Title 47 at 119-136 not loaded
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Why 119-136 is not loaded, and why Title 47 as of 119-134 is not loaded.
+- **Decided:**
+  - A temporary workflow on a scratch branch read the public pages from a GitHub runner (this session's proxy refuses both hosts). `/api/v1/status`: `latest_published_label` 119-136, `unloaded_titles` `["119-136/47"]`, `newest_complete_release` 119-134. `usc-rp@119-136.htm` marks Title 47 alone as changed; `usc-rp@119-134.htm` marks 15, 16, 26, 29, 30 and 54, not 47. `xml_usc47@119-136.zip` answers 200 with a zip body.
+  - Cause, inferred from the code and not read from the box's ledger: a fetch made before the zip was posted reads the source's 200 "Page Not Found" as `unavailable`, which backfill never re-asks (ADR-0082 addendum).
+  - `backfill --retry-recent 3` by default; the daily run continues into the chain when `corpus_health().problems` is above zero; the classification parser's warnings are counted in `update-corpus.sh` instead of printed.
+- **Produced:** `ingest/backfill.py`, `ingest/__main__.py`, `deploy/update-corpus.sh`, `tests/test_backfill.py`, `tests/test_update_corpus.py`, ADR-0082 addendum, `docs/deploy-status.md`.
+- **Verified:** `uv run pytest tests` without a database (806 passed, 280 skipped), including the new tests: a soft-404 at the newest release point is re-asked and loaded with `retry_recent=1` while older ones are not; the daily poll with a gap runs inventory, backfill, mirror push and load-all; three warning lines print as a count. Not run on the box.
+
 ## 121 — 2026-11-03 — Up to date through a law that changed no title
 
 - **Tool/model:** Claude Code (project thread), Opus 5.5.
