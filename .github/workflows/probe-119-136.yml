@@ -10,26 +10,4 @@ jobs:
     steps:
       - name: Fetch
         run: |
-          UA="uscode-redesign probe"
-          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/releases -o releases.json
-          curl -sS -A "$UA" https://uscode.house.gov/download.html -o download.html
-          curl -sS -A "$UA" https://uscode.house.gov/priorreleasepoints.html -o prior.html
-          for rp in 119-130 119-134 119-136; do c=${rp%%-*}; n=${rp#*-}
-            curl -sS -A "$UA" "https://uscode.house.gov/download/releasepoints/us/pl/$c/$n/usc-rp@$rp.htm" -o rp-$rp.htm; done
-          python3 - <<'PY'
-          import json, re
-          d = json.load(open('releases.json'))
-          r = d if isinstance(d, list) else d.get('releases', d)
-          for e in r[:8]:
-              print(e['label'], e['currency_date'], 'affected', e['titles_affected'], 'ingested', e['ingested_titles'], e.get('caveat'))
-          for f in ['download.html', 'prior.html', 'rp-119-130.htm', 'rp-119-134.htm', 'rp-119-136.htm']:
-              h = open(f, errors='replace').read()
-              print('===', f, len(h), 'Page Not Found' in h)
-              print('  title:', re.findall(r'<title>(.*?)</title>', h, re.S)[:1])
-              print('  h3:', [re.sub(r'<[^>]+>', '', x).strip() for x in re.findall(r'<h3[^>]*>.*?</h3>', h, re.S)][:3])
-              print('  changed:', re.findall(r'class="usctitle(?:appendix)?changed"[^>]*>\s*(?:<[^>]+>\s*)*([^<]+)', h)[:60])
-              print('  minor:', re.findall(r'class="usctitleminoreditorialchange"[^>]*>\s*(?:<[^>]+>\s*)*([^<]+)', h)[:60])
-              print('  current:', re.findall(r'current through[^<]*', h)[:3])
-              print('  119-13x mentions:', sorted(set(re.findall(r'119-13\d', h))))
-          PY
-          grep -n -i -B2 -A2 'title 47\|usc47' rp-119-136.htm rp-119-134.htm | head -40
+          curl -sS -A "uscode-redesign probe" https://uscode.linkedlegislation.org/api/v1/status | python3 -m json.tool
