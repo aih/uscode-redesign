@@ -31,7 +31,7 @@
 #     requests, and the threshold rather than the period is what keeps it from
 #     acting on noise.
 #   * MONTHLY, on the 3rd, the GeoIP databases the edge log shipper reads
-#     (ADR-0096). DB-IP publishes a new pair each month; the shipper is
+#     (ADR-0097). DB-IP publishes a new pair each month; the shipper is
 #     restarted to open them. A deploy also refreshes them.
 #
 # The database dump used to be a third job, nightly. It is not here any more and

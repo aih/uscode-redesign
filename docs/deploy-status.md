@@ -90,7 +90,7 @@ because both probe with HEAD by default.
   the `GRAFANA_URL` and `GRAFANA_TOKEN` secrets (a service account with the Admin role; Editor is refused `datasources:read`).
   The weekly summary (`.github/workflows/weekly-summary.yml`, Mondays 13:07 UTC) mails through
   `uscode-alerts` and needs `deploy/admin-grant.sh` re-run once for `sns:Publish`.
-- **Traffic sources (ADR-0096).** Each deploy now starts `alloy`, which ships the edge's access
+- **Traffic sources (ADR-0097).** Each deploy now starts `alloy`, which ships the edge's access
   log to Loki as `{service_name="edge-proxy"}`; the deploy log's "starting the edge log shipper"
   section says whether it started. Owed: the first deploy's check that the "Traffic sources"
   dashboard fills, and `sudo bash deploy/install-crons.sh` once for the monthly GeoIP refresh.
@@ -612,6 +612,12 @@ uscode.house.gov, one `source_checks` row, and — on the ~360 days a year when
 OLRC has published nothing — nothing else. When the poll finds a release point this box has not seen
 (`python -m ingest check` exits 10) it runs the whole download-and-load chain there and then, so new
 law is picked up within a day rather than within a week.
+
+**A title the corpus lacks also starts the chain (ADR-0082 addendum, 2026-11-03).** With no new
+release point, the daily run reads `corpus_health().problems` and continues into the chain when it is
+above zero, and `backfill` re-asks a denied zip at the three newest release points. Title 47 at
+119-136 had been recorded `unavailable` and was skipped by every run after; the first daily run after
+this deploys fetches it.
 
 The weekly Actions job now dispatches `--force`, which makes it the backstop rather than the primary
 schedule: it runs the full chain whether or not anything was published, so a load that half-finished

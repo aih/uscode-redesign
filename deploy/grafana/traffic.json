@@ -8,7 +8,7 @@
   "refresh": "1m",
   "schemaVersion": 39,
   "editable": true,
-  "description": "Requests at the edge by location, network and client (ADR-0096). Location and network: IP Geolocation by DB-IP (https://db-ip.com), CC BY 4.0.",
+  "description": "Requests at the edge by location, network and client (ADR-0097). Location and network: IP Geolocation by DB-IP (https://db-ip.com), CC BY 4.0.",
   "time": {
     "from": "now-6h",
     "to": "now"

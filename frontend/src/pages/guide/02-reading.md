@@ -138,7 +138,7 @@ steps:
   - expect: { selector: '.footnav ul[aria-labelledby="footnav-developers"]', contains: "API documentation" }
     caption: The API reference is under Developers.
   - expect: { selector: ".doc-meta--byline", contains: "Ari Hershowitz" }
-    caption: Under them, who built the site.
+    caption: Under them, who made the site, as a proof-of-concept.
 ```
 
 The header menu opens over the page rather than pushing it down, so the text stays where it was.

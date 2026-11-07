@@ -1,4 +1,4 @@
-# ADR-0096 — The edge's access log in Grafana, by location and network
+# ADR-0097 — The edge's access log in Grafana, by location and network
 
 **Status:** accepted (2026-10-29)
 

@@ -83,6 +83,25 @@ export function describeUnloaded(pairs: string[]): string {
   return `${pairs.length} titles across ${byRelease.size} release points are`;
 }
 
+/** `119-136` → [119, 136]; `119-73not60` → [119, 73]. Null for anything else. */
+function lawNumber(label: string | null | undefined): [number, number] | null {
+  const match = /^(\d+)-(\d+)/.exec(label ?? "");
+  return match ? [Number(match[1]), Number(match[2])] : null;
+}
+
+/** The laws after release point `release`, through `law`, that the source says
+ * changed no Code title: "Public Law 119-137 did not change", "Public Laws
+ * 119-137 through 119-140 did not change". Null when `law` is not later. */
+export function unchangedLaws(release: string | null, law: string | null | undefined): string | null {
+  const held = lawNumber(release);
+  const through = lawNumber(law);
+  if (!held || !through || held[0] !== through[0] || through[1] <= held[1]) return null;
+  const first = `${held[0]}-${held[1] + 1}`;
+  return first === law
+    ? `Public Law ${law} did not change any Code title`
+    : `Public Laws ${first} through ${law} did not change any Code title`;
+}
+
 export function currencyNote(status: Status | null): CurrencyNote | null {
   if (!status) return null;
   const { source, corpus } = status;
@@ -156,6 +175,22 @@ export function currencyNote(status: Status | null): CurrencyNote | null {
       tone: "warning",
       text: `uscode.house.gov was last checked ${ago} — longer ago than this site intends.`,
       detail: `${held} It may not be the newest published.`,
+    };
+  }
+
+  // The source's own "current through Public Law …" sentence. A law that
+  // changes no title gets no release point, so this can name a later law than
+  // the newest release point, and the note says so rather than reading as behind.
+  const law = source.current_through_law ?? null;
+  if (law) {
+    const lawDate = usDate(source.current_through_date ?? null);
+    const unchanged = unchangedLaws(corpus.latest_release, law);
+    return {
+      tone: "ok",
+      text:
+        `Up to date through Public Law ${law}${lawDate ? ` (${lawDate})` : ""}. ` +
+        `Checked uscode.house.gov ${ago}.`,
+      detail: unchanged ? `${held} ${unchanged}.` : held,
     };
   }
 

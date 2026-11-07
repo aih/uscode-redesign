@@ -235,7 +235,7 @@ jobs:
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
-  # The edge log shipper (ADR-0096): deploy/alloy/ run against a real Caddy
+  # The edge log shipper (ADR-0097): deploy/alloy/ run against a real Caddy
   # logging in the edge's format and the GeoIP databases the box downloads,
   # with Grafana Cloud replaced by an OTLP receiver that prints what arrives.
   edge-logs:

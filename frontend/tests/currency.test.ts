@@ -14,6 +14,7 @@ import {
   currencyNote,
   describeUnloaded,
   humanizeAge,
+  unchangedLaws,
   usDate,
 } from "../src/lib/currency";
 import type { ClassificationSource, Status } from "../src/lib/types";
@@ -69,6 +70,40 @@ describe("currencyNote", () => {
   it("renders nothing at all when the status endpoint could not be reached", () => {
     // A note *about* the law must never be able to take down the law.
     expect(currencyNote(null)).toBeNull();
+  });
+
+  it("says the law it is up to date through, from the source's own sentence", () => {
+    const note = currencyNote(
+      status(
+        { latest_published_label: "119-136", current_through_law: "119-136", current_through_date: "2026-10-22" },
+        { latest_release: "119-136", latest_currency_date: "2026-10-22" },
+      ),
+    )!;
+    expect(note.tone).toBe("ok");
+    expect(note.text).toBe("Up to date through Public Law 119-136 (10/22/2026). Checked uscode.house.gov 3 hours ago.");
+    expect(note.detail).toBe("The newest release point loaded here is 119-136 (10/22/2026).");
+  });
+
+  it("names a later law that changed no Code title, rather than reading as behind", () => {
+    const note = currencyNote(
+      status(
+        { latest_published_label: "119-136", current_through_law: "119-137", current_through_date: "2026-10-30" },
+        { latest_release: "119-136", latest_currency_date: "2026-10-22" },
+      ),
+    )!;
+    expect(note.tone).toBe("ok");
+    expect(note.text).toContain("Up to date through Public Law 119-137 (10/30/2026).");
+    expect(note.detail).toContain("Public Law 119-137 did not change any Code title.");
+  });
+
+  it("names a range of laws that changed no Code title", () => {
+    expect(unchangedLaws("119-136", "119-140")).toBe(
+      "Public Laws 119-137 through 119-140 did not change any Code title",
+    );
+    expect(unchangedLaws("119-73not60", "119-74")).toBe("Public Law 119-74 did not change any Code title");
+    expect(unchangedLaws("119-136", "119-136")).toBeNull();
+    expect(unchangedLaws("119-136", null)).toBeNull();
+    expect(unchangedLaws("118-274", "119-1")).toBeNull();
   });
 
   it("is quiet when the check is recent and nothing newer exists", () => {

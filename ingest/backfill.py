@@ -59,6 +59,9 @@ from ingest.inventory import ReleasePointEntry, normalize_title_num, title_zip_u
 LEDGER_PATH = DOWNLOAD_DIR / "ledger.json"
 LEDGER_VERSION = 1
 
+DEFAULT_RETRY_RECENT = 3
+"""How many of the newest release points `backfill` re-asks for a denied zip."""
+
 
 @dataclass(frozen=True, slots=True)
 class DownloadTask:
@@ -275,6 +278,7 @@ def run_backfill(
     dest_dir: Path = DOWNLOAD_DIR,
     attempts: int = DEFAULT_ATTEMPTS,
     retry_unavailable: bool = False,
+    retry_recent: int = 0,
     limit: int | None = None,
     save_every: int = 1,
     opener: Opener | None = None,
@@ -286,8 +290,15 @@ def run_backfill(
     denied. Off by default: an `unavailable` is an answer about what OLRC
     publishes, and re-asking 3,000 times a run is exactly the impoliteness the
     etiquette rule exists to prevent.
+
+    `retry_recent` re-attempts an `unavailable` pair when its release point is
+    one of the N newest in the plan. OLRC can list a release point before its
+    zips are posted, and a fetch in that window reads the HTML "Page Not Found"
+    body as the file not existing. Without this, that answer is kept forever:
+    119-136's Title 47 was recorded that way and never asked for again.
     """
     report = BackfillReport(planned=len(tasks))
+    recent_seqs = set(sorted({t.seq for t in tasks}, reverse=True)[:retry_recent])
     started = time.monotonic()
     say = on_event or (lambda message: None)
     completed_since_save = 0
@@ -300,7 +311,7 @@ def run_backfill(
         target = zip_target(task.release_label, task.title_num, dest_dir=dest_dir)
         existing = ledger.get(task)
         if existing is not None and _settled(
-            existing, target, retry_unavailable=retry_unavailable
+            existing, target, retry_unavailable=retry_unavailable or task.seq in recent_seqs
         ):
             report.skipped += 1
             if existing.status == FetchStatus.UNAVAILABLE:

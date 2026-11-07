@@ -17,10 +17,14 @@ dependency, per CLAUDE.md architecture rule 1.
 from __future__ import annotations
 
 import datetime
+import hashlib
+import hmac
 import ipaddress
+import json
 import re
 import threading
 import time
+from dataclasses import dataclass
 from typing import Annotated, Callable, Literal
 
 from fastapi import Depends, HTTPException, Query, Request, Response
@@ -303,29 +307,35 @@ class RateLimiter:
         self._lock = threading.Lock()
         self._swept = time.monotonic()
 
-    def check(self, key: str) -> float | None:
+    def check(self, key: str, scale: float = 1.0) -> float | None:
         """None if the request may proceed; otherwise seconds until it may.
+
+        `scale` multiplies both the capacity and the refill rate for this key —
+        an API token's tier (ADR-0096). The time a bucket takes to refill is the
+        same at every scale, so the sweep below needs no change.
 
         Under a threadpool this is called concurrently, so the whole
         read-modify-write is inside the lock. It is a few microseconds of
         arithmetic — the thing it is protecting takes milliseconds to seconds.
         """
+        capacity = self.capacity * scale
+        per_second = self.per_second * scale
         now = time.monotonic()
         with self._lock:
             if now - self._swept > self.SWEEP_INTERVAL:
                 self._sweep(now)
             bucket = self._buckets.get(key)
             if bucket is None:
-                bucket = _Bucket(self.capacity, now)
+                bucket = _Bucket(capacity, now)
                 self._buckets[key] = bucket
             bucket.tokens = min(
-                self.capacity, bucket.tokens + (now - bucket.updated) * self.per_second
+                capacity, bucket.tokens + (now - bucket.updated) * per_second
             )
             bucket.updated = now
             if bucket.tokens < 1.0:
                 # Ceil, so a client that obeys the header comes back with a whole
                 # token rather than a fraction of one and a second 429.
-                return max(1.0, (1.0 - bucket.tokens) / self.per_second)
+                return max(1.0, (1.0 - bucket.tokens) / per_second)
             bucket.tokens -= 1.0
             return None
 
@@ -346,8 +356,75 @@ class RateLimiter:
             self._swept = time.monotonic()
 
 
+# ------------------------------------------------------------- API tokens
+
+
+class ApiTokenSettings(BaseSettings):
+    """Named API tokens (ADR-0096), configured on the box and never in the code."""
+
+    usc_api_tokens: str = ""
+    """JSON: `{"name": {"sha256": "<hex digest of the token>", "scale": 20}}`.
+
+    Only the digest is stored, so the setting can be read without revealing a
+    token. `scale` multiplies every per-caller budget the token's holder meets;
+    it defaults to 10. Removing an entry revokes the token at the next restart.
+    `scripts/api_token.py` makes a token and prints its entry."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+@dataclass(frozen=True)
+class ApiToken:
+    name: str
+    scale: float
+
+
+def parse_api_tokens(raw: str) -> dict[str, ApiToken]:
+    """The setting's JSON as {digest: token}. A malformed setting is an error at
+    start-up rather than a silently unauthenticated deployment."""
+    if not raw.strip():
+        return {}
+    out: dict[str, ApiToken] = {}
+    for name, entry in json.loads(raw).items():
+        digest = str(entry["sha256"]).lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError(f"USC_API_TOKENS[{name!r}].sha256 is not a SHA-256 hex digest")
+        scale = float(entry.get("scale", 10))
+        if scale < 1:
+            raise ValueError(f"USC_API_TOKENS[{name!r}].scale is below 1")
+        out[digest] = ApiToken(name=name, scale=scale)
+    return out
+
+
+API_TOKENS: dict[str, ApiToken] = parse_api_tokens(ApiTokenSettings().usc_api_tokens)
+
+
+def api_token(request: Request) -> ApiToken | None:
+    """The token an `Authorization: Bearer` header names, or None without one.
+
+    A bearer token that names no configured token is a 401 rather than a
+    silent fall back to the anonymous budget, so a caller with a revoked or
+    mistyped token finds out at once instead of at its first 429. Any other
+    `Authorization` scheme is ignored.
+    """
+    headers = getattr(request, "headers", None) or {}
+    header = headers.get("authorization", "")
+    scheme, _, presented = header.partition(" ")
+    if scheme.lower() != "bearer" or not presented.strip():
+        return None
+    digest = hashlib.sha256(presented.strip().encode()).hexdigest()
+    for known, token in API_TOKENS.items():
+        if hmac.compare_digest(known, digest):
+            return token
+    raise HTTPException(
+        status_code=401,
+        detail="unknown API token",
+        headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
+    )
+
+
 def client_key(request: Request) -> str:
-    """The rate-limit bucket key: the caller's address.
+    """The rate-limit bucket key: the caller's token name, or else its address.
 
     `request.client` and not the raw `X-Forwarded-For`, for the reason spelled
     out at `api.auth._client_ip` — uvicorn's proxy-headers middleware fills it
@@ -356,6 +433,9 @@ def client_key(request: Request) -> str:
     request with no client at all (an ASGI transport with no peer, which is what
     a test client is) falls into one shared bucket, which is the safe direction.
     """
+    token = api_token(request)
+    if token is not None:
+        return f"token:{token.name}"
     return request.client.host if request.client else "-"
 
 
@@ -377,7 +457,8 @@ def rate_limit(
     LIMITERS[name] = limiter
 
     def dependency(request: Request) -> None:
-        retry_after = limiter.check(client_key(request))
+        token = api_token(request)
+        retry_after = limiter.check(client_key(request), scale=token.scale if token else 1.0)
         if retry_after is not None:
             raise HTTPException(
                 status_code=429,
@@ -429,7 +510,8 @@ def global_rate_limit(
     LIMITERS[name] = limiter
 
     def dependency(request: Request) -> None:
-        if is_internal_caller(request):
+        # A token holder is a known caller with a budget of its own (ADR-0096).
+        if is_internal_caller(request) or api_token(request) is not None:
             return
         retry_after = limiter.check("*")
         if retry_after is not None:

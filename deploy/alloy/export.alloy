@@ -1,5 +1,5 @@
 // Sends the edge's enriched access log to Grafana Cloud over the OTLP endpoint
-// and credentials the api already uses (ADR-0089, ADR-0096). In Loki it is
+// and credentials the api already uses (ADR-0089, ADR-0097). In Loki it is
 // the stream {service_name="edge-proxy"}, one JSON line per request.
 otelcol.receiver.loki "edge" {
   output {

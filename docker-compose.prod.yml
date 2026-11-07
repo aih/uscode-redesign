@@ -168,6 +168,8 @@ services:
       # that makes the Secure cookie independent of proxy configuration.
       USC_COOKIE_SECURE: "true"
       USC_MIRROR_BUCKET: ${USC_MIRROR_BUCKET:-}
+      # Named API tokens, digests only (ADR-0096). Empty: no tokens.
+      USC_API_TOKENS: ${USC_API_TOKENS:-}
       SEARCH_URL: https://opensearch:9200
       SEARCH_PASSWORD: ${SEARCH_PASSWORD:?set SEARCH_PASSWORD in .env}
       # An explicit, overridable decision rather than a library default.
@@ -313,7 +315,7 @@ services:
     restart: unless-stopped
 
   # The edge's access log, with each request's location and network, sent to
-  # Grafana Cloud's Loki over the api's OTLP endpoint (ADR-0096). Its own
+  # Grafana Cloud's Loki over the api's OTLP endpoint (ADR-0097). Its own
   # profile, so the stack's `up -d --wait` neither starts it nor waits on it;
   # deploy/deploy-on-box.sh starts it last, and a failure there leaves the
   # site as it was. The Docker socket is how it finds and reads the edge,

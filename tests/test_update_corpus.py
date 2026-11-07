@@ -31,7 +31,7 @@ DOCKER = textwrap.dedent(
         code_var="EXIT_$(echo "$name" | tr 'a-z-' 'A-Z_')"
         exit "${!code_var:-0}"
         ;;
-      *"python -c"*) echo 0 ;;
+      *"python -c"*) echo "${STUB_CORPUS_GAP:-0}" ;;
     esac
     exit 0
     """
@@ -58,7 +58,12 @@ def run_script(tmp_path):
             "PATH": f"{bin_dir}:{os.environ['PATH']}",
             "DATA_ROOT": str(tmp_path / "data"),
             "CALLS": str(calls),
-            **{f"EXIT_{name.upper()}": str(code) for name, code in exits.items()},
+            **{
+                f"EXIT_{name.upper()}": str(code)
+                for name, code in exits.items()
+                if name != "gap"
+            },
+            "STUB_CORPUS_GAP": str(exits.get("gap", 0)),
         }
         calls.write_text("")
         done = subprocess.run(
@@ -150,3 +155,34 @@ def test_a_section_update_waiting_on_the_tables_is_not_a_failure(run_script):
 def test_a_section_update_without_a_source_is_a_failure(run_script):
     code, _, out = run_script("--force", sections_update=2)
     assert code == 1, out
+
+
+def test_the_daily_poll_with_nothing_new_and_no_gap_stops(run_script):
+    code, calls, out = run_script()
+    assert code == 0, out
+    assert _names(calls) == ["classification-check", "check"]
+
+
+def test_the_daily_poll_runs_the_chain_for_a_title_not_loaded(run_script):
+    """119-136 listed, its Title 47 not loaded, and nothing new published: the
+    daily run goes on to backfill and load rather than waiting for the sweep."""
+    code, calls, out = run_script(gap=1)
+    assert code == 0, out
+    names = _names(calls)
+    assert {"inventory", "backfill", "mirror push", "load-all"} <= set(names)
+    assert "not loaded" in out
+
+
+def test_parser_warnings_are_counted_not_printed(run_script, tmp_path):
+    docker = tmp_path / "bin" / "docker"
+    docker.write_text(
+        docker.read_text().replace(
+            'classification) echo "4 documents',
+            'classification) for i in 1 2 3; do echo "x.py:1: UserWarning: row $i"; '
+            'echo "  _parse_row("; done; echo "4 documents',
+        )
+    )
+    code, _, out = run_script("--force")
+    assert code == 0, out
+    assert "UserWarning" not in out
+    assert "(3 parser warnings not shown)" in out

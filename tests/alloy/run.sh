@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs deploy/alloy/ against a real Caddy and real GeoIP databases, and checks
-# what it would send to Grafana Cloud (ADR-0096). CI runs it; it needs Docker
+# what it would send to Grafana Cloud (ADR-0097). CI runs it; it needs Docker
 # and network access to download.db-ip.com.
 #
 #   bash tests/alloy/run.sh

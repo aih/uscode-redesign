@@ -3634,11 +3634,68 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Produced:** `ingest/section_update.py`, `ingest/load.py`, `ingest/load_all.py`, `ingest/__main__.py`, `db/models.py`, the migration, `storage/repository.py`, `storage/postgres.py`, `params.py`, `api/schemas.py`, `frontend/src/lib/types.ts`, guide chapter 03, `deploy/update-corpus.sh`, `scripts/section_update_check.py`, `docs/verification/section-update-check.json`, ADR-0095, the `ingest-cli` skill, `docs/deploy-status.md`, `tests/test_section_update.py` and tests in `test_update_corpus.py`, `test_models.py`, `test_version_changes.py`.
 - **Verified:** `uv run python scripts/section_update_check.py` — Title 16 at 119-99 plus the committed table slices plans §§ 2201 and 2206 for 119-102not101 (laws 119-100 and 119-102; 119-100 classifies nothing in the slice), reads only those two from the 119-102not101 file, and the 5,095 assembled sections match the file's 5,095 by content hash. `make test` against a local `make ci-data` database with `USC_REQUIRE_INTEGRATION=1` (1,062 passed), `make test-web` (512 passed).
 
-## 117 — 2026-10-29 — Traffic sources in Grafana (ADR-0096)
+## 117 — 2026-10-30 — API tokens for known callers (ADR-0096)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** For the reintroductions site, which checks every US Code section a bill cites against this API: plan token-based API access if it helps, and open a PR.
+- **Decided:**
+  - `Authorization: Bearer <token>`; `USC_API_TOKENS` holds each named token's SHA-256 digest and a `scale` as JSON. A token keys the per-caller limiters as `token:<name>`, multiplies each budget's burst and refill by `scale` (default 10), and exempts its holder from the shared budget on pinned routes. An unrecognised bearer token is a `401` (ADR-0096).
+  - `RateLimiter.check` takes the scale per call, so one limiter serves both kinds of caller.
+  - `scripts/api_token.py` makes a token and prints its settings entry; `docker-compose.prod.yml` passes `USC_API_TOKENS` through to the api service.
+- **Produced:** `params.py`, `tests/test_rate_limit.py`, `scripts/api_token.py`, `docker-compose.prod.yml`, `.env.example`, guide chapter 08, ADR-0096.
+- **Verified:** `uv run pytest tests/test_rate_limit.py` (five new tests: scaled budget keyed on the token, one bucket across addresses, `401` for an unknown token, exemption from the shared budget, the setting validated at start-up); `make test` without a database (799 passed, 280 skipped); `npx vitest run tests/guide.test.ts` (8 passed). Not run here: the rest of `make test-web` and the integration suite.
+
+## 118 — 2026-10-30 — How to generate, store and use an API token
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Document how to generate, store and use the ADR-0096 tokens.
+- **Decided:** One page, `docs/api-tokens.md`: `scripts/api_token.py` (standard library only, so `python3` from any checkout), the `USC_API_TOKENS` line in the box's `.env` in single quotes, `docker compose … up -d --no-deps --force-recreate --wait api` to apply it, the caller's side, the `401`/`429` table, rotation and revocation. Linked from the README and CLAUDE.md; `.env.example` shows the quoted form.
+- **Produced:** `docs/api-tokens.md`, `README.md`, `CLAUDE.md`, `.env.example`.
+- **Verified:** `docker compose config` over a `.env` holding the single-quoted JSON passes the value through unchanged, and `pydantic_settings` reads the same line as the same string; `python3 scripts/api_token.py demo --scale 5` prints the entry. Not run against the box.
+
+
+## 119 — 2026-10-31 — Proof-of-concept credit in the footer and About
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Say in the footer and on About that the site was made as a proof-of-concept by Ari Hershowitz, linked to aih.github.io.
+- **Decided:** The existing byline (BUILDLOG on `.doc-meta--byline`) already names Ari Hershowitz and links aih.github.io on both surfaces, so its wording changes in place rather than adding a second line: "This site was made as a proof-of-concept by Ari Hershowitz (profile), lawyer and legal technologist." About keeps its clause about how it was implemented.
+- **Produced:** `frontend/src/components/SiteFooter.astro`, `frontend/src/pages/about.astro`, `frontend/src/pages/guide/02-reading.md` (caption), this entry.
+- **Verified:** The chapter-02 assertion (`.doc-meta--byline` contains "Ari Hershowitz") still holds against the new text. Not built or run locally.
+
+## 120 — 2026-11-03 — Title 47 at 119-136 not loaded
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Why 119-136 is not loaded, and why Title 47 as of 119-134 is not loaded.
+- **Decided:**
+  - A temporary workflow on a scratch branch read the public pages from a GitHub runner (this session's proxy refuses both hosts). `/api/v1/status`: `latest_published_label` 119-136, `unloaded_titles` `["119-136/47"]`, `newest_complete_release` 119-134. `usc-rp@119-136.htm` marks Title 47 alone as changed; `usc-rp@119-134.htm` marks 15, 16, 26, 29, 30 and 54, not 47. `xml_usc47@119-136.zip` answers 200 with a zip body.
+  - Cause, inferred from the code and not read from the box's ledger: a fetch made before the zip was posted reads the source's 200 "Page Not Found" as `unavailable`, which backfill never re-asks (ADR-0082 addendum).
+  - `backfill --retry-recent 3` by default; the daily run continues into the chain when `corpus_health().problems` is above zero; the classification parser's warnings are counted in `update-corpus.sh` instead of printed.
+- **Produced:** `ingest/backfill.py`, `ingest/__main__.py`, `deploy/update-corpus.sh`, `tests/test_backfill.py`, `tests/test_update_corpus.py`, ADR-0082 addendum, `docs/deploy-status.md`.
+- **Verified:** `uv run pytest tests` without a database (806 passed, 280 skipped), including the new tests: a soft-404 at the newest release point is re-asked and loaded with `retry_recent=1` while older ones are not; the daily poll with a gap runs inventory, backfill, mirror push and load-all; three warning lines print as a count. Not run on the box.
+
+## 121 — 2026-11-03 — Up to date through a law that changed no title
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** When the latest public law does not change the US Code, still say the site is up to date through that law, noting that no Code titles were changed.
+- **Decided:** The source's banner, "The United States Code Online is current through Public Law 119-136 (October 22, 2026).", is on the prior and current release-point pages; the check records it as `current_through_law`/`current_through_date`, `/api/v1/status` reports it, and the currency note leads with "Up to date through Public Law …" and adds "Public Law 119-137 did not change any Code title." when that law is later than the newest release point loaded (ADR-0036 addendum). Guide chapter 03 says so.
+- **Produced:** `ingest/inventory.py`, `db/models.py`, migration `b5e1d8f3c2a9`, `storage/repository.py`, `storage/postgres.py`, `api/schemas.py`, `frontend/src/lib/types.ts`, `frontend/src/lib/currency.ts`, `frontend/tests/currency.test.ts`, `tests/test_inventory.py`, guide chapter 03, ADR-0036 addendum.
+- **Verified:** both 2026-10-27 captures parse to 119-134 (10/20/2026); `uv run pytest tests` without a database (801 passed, 280 skipped); `npx vitest run` (515 passed). The integration suite and the migration were not run here.
+
+
+## 122 — 2026-11-07 — Changed titles corrected against the source's release-point pages
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Review uscode.house.gov's Prior Release Points page and correct this site where it differs; 119-121 changed only Title 15 but is shown as changing every title.
+- **Decided:**
+  - A temporary workflow on a scratch branch read `priorreleasepoints.html`, `download.html`, every `download/{label}.html` the prior page links, and `/api/v1/releases` from a GitHub runner (this session's proxy refuses both hosts). Every release-point page marks the same titles as the prior page. The site differs on 119-118 (all titles; source 42), 119-121 (all titles; source 15) and 119-134 (adds 54, which the source marked on 2026-10-27 and no longer does). The other 23 match, including 119-138.
+  - `merge_inventory` takes the source's changed titles for a held release point when the source lists some and they differ; order, dates and `seq` are unchanged (ADR-0094 addendum). `python -m ingest check` prints the corrected labels.
+- **Produced:** `ingest/inventory.py`, `ingest/__main__.py`, `tests/test_inventory.py`, `tests/test_source_check.py`, ADR-0094 addendum.
+- **Verified:** `make test` against a local `make ci-data` database with `USC_REQUIRE_INTEGRATION=1` (1,078 passed, 9 skipped). The parsers run over the 2026-11-07 captures give the table in the addendum. Not run on the box; the first daily check after deploy applies the correction.
+
+## 123 — 2026-11-07 — Traffic sources in Grafana (ADR-0097)
 
 - **Tool/model:** Claude Code (project thread), Opus 5.5.
 - **Asked:** Ari: Grafana alerts show 2 to 3 requests a second on the US Code site; gather where the traffic comes from in Grafana, organised by location and domain type.
-- **Decided:** The edge Caddy's access log is the only record of client address and User-Agent, so an Alloy container reads it from Docker, adds DB-IP City Lite and ASN Lite lookups and three classifications (network, client, outcome), and sends it over the existing OTLP credentials as `{service_name="edge-proxy"}`; a second dashboard, "Traffic sources", reads it. "Domain type" is read as the network's kind from its ASN organisation, beside the client's kind from its User-Agent. Alloy is outside the stack's `--wait` and started last, never fatally (ADR-0096).
-- **Produced:** `deploy/alloy/{source,process,export}.alloy`, `deploy/geoip-update.sh`, the `alloy` service in `docker-compose.prod.yml`, the deploy step in `deploy/deploy-on-box.sh`, the monthly cron in `deploy/install-crons.sh`, `deploy/grafana/traffic.json`, `apply.py` applying both dashboards, `tests/alloy/`, the `edge-logs` CI job, `tests/test_grafana.py`, ADR-0096.
+- **Decided:** The edge Caddy's access log is the only record of client address and User-Agent, so an Alloy container reads it from Docker, adds DB-IP City Lite and ASN Lite lookups and three classifications (network, client, outcome), and sends it over the existing OTLP credentials as `{service_name="edge-proxy"}`; a second dashboard, "Traffic sources", reads it. "Domain type" is read as the network's kind from its ASN organisation, beside the client's kind from its User-Agent. Alloy is outside the stack's `--wait` and started last, never fatally (ADR-0097).
+- **Produced:** `deploy/alloy/{source,process,export}.alloy`, `deploy/geoip-update.sh`, the `alloy` service in `docker-compose.prod.yml`, the deploy step in `deploy/deploy-on-box.sh`, the monthly cron in `deploy/install-crons.sh`, `deploy/grafana/traffic.json`, `apply.py` applying both dashboards, `tests/alloy/`, the `edge-logs` CI job, `tests/test_grafana.py`, ADR-0097.
 - **Verified:** `bash tests/alloy/run.sh` (CI `edge-logs`) — six requests to a Caddy logging in the edge's format arrive as six records with location, ASN, network, client, outcome, area and `pinned`; `uv run pytest tests/test_grafana.py` — every dashboard query reads the `edge-proxy` stream and uses only fields the pipeline packs. Not verified here: the box's first run, which the deploy log reports.
-

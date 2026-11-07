@@ -5,7 +5,7 @@ order: 8
 summary: The same answers as JSON or as the source XML, at the same addresses, for anyone who would rather ask a program than a browser.
 covers:
   routes: ["/app/docs"]
-  adrs: [29, 32, 57, 73, 84, 88]
+  adrs: [29, 32, 57, 73, 84, 88, 96]
 ---
 
 Everything the reader shows comes from a public API at `/api/v1`. The reader calls the same routes
@@ -113,6 +113,12 @@ capacity, refilled at a sustained rate:
 Over the limit you get a `429` with a `Retry-After` header saying how long to wait.
 `POST /api/v1/auth/login` is throttled by failure count instead: five failures for one email
 address, or fifty from one caller, and further attempts answer `429`.
+
+**API tokens.** A caller the site has issued a token to sends it as
+`Authorization: Bearer <token>`. Each per-caller budget above is then counted for the token
+rather than for the address it comes from, and multiplied by the token's scale, typically 10 or
+20. A token holder does not draw on the shared budget for pinned lookups described below. A token
+the site does not recognise is answered `401`. Tokens are issued by the site's operator.
 
 **When the API is busy.** Past 64 requests in flight the API answers `503` without queueing the
 request. This is separate from the per-caller limits above: a `429` means you asked too often, a

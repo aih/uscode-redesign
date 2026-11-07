@@ -5,12 +5,14 @@ comment. Nothing in this file touches the network.
 """
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
 from ingest.inventory import (
     InventoryParseError,
     ReleasePointEntry,
+    corrected_labels,
     latest_release_affecting,
     merge_inventory,
     normalize_title_num,
@@ -424,11 +426,16 @@ def test_merge_places_a_release_point_the_site_never_held_where_the_source_lists
         "119-118", "119-120", "119-121", "119-124",
     ]
     assert [entry.seq for entry in merged] == list(range(9))
-    # Held entries keep everything but their position.
+    # Held entries keep their dates; their changed titles are the source's.
     held = [entry for entry in merged if entry.label != "119-117"][:-1]
-    assert [(e.label, e.currency_date, e.titles_affected) for e in held] == [
-        (e.label, e.currency_date, e.titles_affected) for e in DEPLOYED
+    assert [(e.label, e.currency_date) for e in held] == [
+        (e.label, e.currency_date) for e in DEPLOYED
     ]
+    by_label = {entry.label: entry for entry in merged}
+    assert by_label["119-118"].titles_affected == ("42",)
+    assert by_label["119-121"].titles_affected == ("15",)
+    assert by_label["119-121"].description.endswith("affecting title 15.")
+    assert by_label["119-120"].titles_affected == ("31", "42")
     # 119-117 follows 119-111 here and on the source, so its titles are a delta
     # from text this site holds.
     assert merged[4].titles_affected == ("16", "54")
@@ -460,6 +467,35 @@ def test_merge_fetches_in_full_an_inserted_release_point_whose_source_predecesso
     assert "between 119-110 and this one" in merged[2].description
 
 
+def test_merge_takes_the_sources_changed_titles_for_a_held_release_point():
+    """119-121 was recorded as changing every title before the source marked
+    Title 15; 119-134 was recorded with Title 54, which the source later unmarked."""
+    known = _known(
+        ("119-120", date(2026, 10, 7), ("31", "42")),
+        ("119-121", date(2026, 10, 9), ALL_KNOWN_TITLES),
+        ("119-134", date(2026, 10, 20), ("15", "16", "26", "29", "30", "54")),
+    )
+    published = _known(
+        ("119-120", date(2026, 10, 7), ("31", "42")),
+        ("119-121", date(2026, 10, 9), ("15",)),
+        ("119-134", date(2026, 10, 20), ("15", "16", "26", "29", "30")),
+    )
+    merged = merge_inventory(known, published)
+    assert [(e.label, e.titles_affected) for e in merged] == [
+        ("119-120", ("31", "42")),
+        ("119-121", ("15",)),
+        ("119-134", ("15", "16", "26", "29", "30")),
+    ]
+    assert [e.seq for e in merged] == [0, 1, 2]
+    assert corrected_labels(known, merged) == ("119-121", "119-134")
+
+
+def test_merge_keeps_held_changed_titles_the_source_lists_in_another_spelling():
+    known = _known(("119-121", date(2026, 10, 9), ("05a", "15")))
+    published = _known(("119-121", date(2026, 10, 9), ("15", "5a")))
+    assert merge_inventory(known, published) == known
+
+
 def test_merge_refuses_an_inserted_release_point_dated_before_its_new_neighbour():
     published = _known(("119-109", date(2026, 9, 1), ("01",)), ("119-110", date(2026, 9, 16), ()))
     with pytest.raises(InventoryParseError, match="older than 119-108"):
@@ -484,3 +520,14 @@ def test_the_download_page_of_2026_10_27_is_119_134_with_its_changed_titles():
     assert entry.label == "119-134"
     assert entry.currency_date == date(2026, 10, 20)
     assert entry.titles_affected == ("15", "16", "26", "29", "30", "54")
+
+
+def test_the_banner_names_the_law_the_code_is_current_through():
+    """"The United States Code Online is current through Public Law 119-134
+    (October 20, 2026)." on both release-point pages, captured 2026-10-27."""
+    from ingest.inventory import CurrentThrough, parse_current_through
+
+    for name in ("priorreleasepoints_2026-10-27.html", "download_2026-10-27.html"):
+        html = (Path(__file__).parent / "fixtures" / name).read_text()
+        assert parse_current_through(html) == CurrentThrough("119-134", date(2026, 10, 20))
+    assert parse_current_through("<html><body>no banner</body></html>") is None

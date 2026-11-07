@@ -1,4 +1,4 @@
-// The edge Caddy's access log, read from Docker (ADR-0096). The edge is the
+// The edge Caddy's access log, read from Docker (ADR-0097). The edge is the
 // statutes repository's compose project `edge` (deploy/edge/ there); it is the
 // one place on the box that writes a request's client address and User-Agent.
 discovery.docker "edge" {

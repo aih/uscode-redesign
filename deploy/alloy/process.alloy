@@ -1,5 +1,5 @@
 // Turns each access-log line of the edge Caddy into one JSON line for Loki
-// (ADR-0096): who asked (address, location, network, User-Agent), what they
+// (ADR-0097): who asked (address, location, network, User-Agent), what they
 // asked for, and what the edge answered.
 //
 // The edge logs in Caddy's console format: a timestamp, the level, the logger

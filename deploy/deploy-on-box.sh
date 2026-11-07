@@ -213,7 +213,7 @@ if [ -n "$SITE_HOST" ]; then
     done
 fi
 
-# The edge log shipper (ADR-0096), last and never fatal: the site is up and
+# The edge log shipper (ADR-0097), last and never fatal: the site is up and
 # checked by now, and a shipper that will not start costs only the traffic
 # dashboard. Recreated every time, since it reads deploy/alloy/ at start.
 echo "=== starting the edge log shipper ==="

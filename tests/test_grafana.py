@@ -39,7 +39,7 @@ def test_dashboard_panels_have_unique_ids_and_queries() -> None:
 
 
 def test_traffic_queries_read_the_edge_stream() -> None:
-    """Every panel reads the stream deploy/alloy/export.alloy names (ADR-0096)."""
+    """Every panel reads the stream deploy/alloy/export.alloy names (ADR-0097)."""
     dashboard = json.loads((GRAFANA / "traffic.json").read_text())
     export = (GRAFANA.parent / "alloy" / "export.alloy").read_text()
     assert '"service.name"], "edge-proxy"' in export

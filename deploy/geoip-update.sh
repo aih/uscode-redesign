@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Downloads DB-IP's free IP to City Lite and IP to ASN Lite databases
-# (CC BY 4.0, https://db-ip.com) for the edge log shipper (ADR-0096).
+# (CC BY 4.0, https://db-ip.com) for the edge log shipper (ADR-0097).
 #
 #   bash deploy/geoip-update.sh [DIR]     # default /var/lib/uscode/geoip
 #

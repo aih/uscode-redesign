@@ -588,7 +588,14 @@ database started on the statutes cluster, two postmasters on one data directory,
 writes the UUID and verifies the mount. A `docker restart` does **not** apply a new log cap; the
 container must be recreated.
 
-**The edge's access log is in Grafana** (ADR-0096). The `alloy` service (compose profile
+**A caller the site knows can carry a token** (ADR-0096). `Authorization: Bearer <token>`,
+checked against `USC_API_TOKENS` (named SHA-256 digests with a `scale`, made by
+`scripts/api_token.py`): the per-caller limiters key on `token:<name>` and multiply burst and
+refill by the scale, the shared budget on pinned routes does not apply, and an unrecognised bearer
+token is a `401`. Written for reintroductions-us, which checks every US Code section a bill cites.
+Generating, storing on the box, using, rotating and revoking a token: `docs/api-tokens.md`.
+
+**The edge's access log is in Grafana** (ADR-0097). The `alloy` service (compose profile
 `observability`, started last and non-fatally by `deploy-on-box.sh`) reads `edge-caddy-1` over the
 Docker socket, adds location and ASN from DB-IP's free databases (`deploy/geoip-update.sh` →
 `$DATA_ROOT/geoip`), classifies network (`cloud`/`isp`/`education`/`government`/`unknown`), client

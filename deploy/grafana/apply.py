@@ -27,7 +27,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 JOBS = 'job=~"uscode-api|statutes-api"'
 HISTOGRAM = "http_server_request_duration_seconds_count"
-# "US Code and Statutes sites" (ADR-0090) and "Traffic sources" (ADR-0096).
+# "US Code and Statutes sites" (ADR-0090) and "Traffic sources" (ADR-0097).
 DASHBOARDS = ("dashboard.json", "traffic.json")
 # A GET (or a query) that meets a 5xx or no answer at all is tried again after
 # each of these pauses: Grafana Cloud answered 503 DatasourceError to the

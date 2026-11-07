@@ -92,6 +92,11 @@ _ENTRY_RE = re.compile(
 _HREF_RE = re.compile(r"releasepoints/us/pl/\d+/[^/]+/usc-rp@(?P<label>[^.]+)\.htm")
 _LABEL_HTML_HREF_RE = re.compile(r"^(?:download/)?(?P<label>\d+-[0-9a-z]+)\.html$")
 _CURRENT_THROUGH_RE = r"current through Public Law\s+{label}\s*\((?P<date>[^)]*)\)"
+_CODE_CURRENT_THROUGH_RE = re.compile(
+    r"United States Code Online is current through Public Law\s+"
+    r"(?P<law>\d+-\d+)\s*\((?P<date>[^)]*)\)",
+    re.IGNORECASE,
+)
 _ITEM_START_RE = re.compile(r'<div class="uscitem')
 _CHANGED_ROW_RE = re.compile(r'class="usctitle(?:appendix)?changed"')
 _ITEM_ZIP_RE = re.compile(r"xml_usc(?P<num>[0-9][0-9a-zA-Z]*)@")
@@ -508,9 +513,9 @@ def merge_inventory(
     """The inventory this site holds, oldest first, with what the source now
     publishes added to it (ADR-0091, ADR-0094).
 
-    `known` is never rewritten: its entries keep their relative order, dates and
-    titles, so a release point read from `download.html` while it was current
-    keeps the changed titles the prior page no longer marks. `published` may hold
+    `known` keeps its relative order and dates. A held release point takes the
+    changed titles the source now lists for it (`correct_changed_titles`); one the
+    source lists with no changed titles keeps what this site recorded. `published` may hold
     the whole history (the pre-2026-10-12 page) or only a window of it.
 
     A release point this site does not hold goes where the source lists it:
@@ -534,7 +539,7 @@ def merge_inventory(
     if not known:
         return [replace(entry, seq=seq) for seq, entry in enumerate(ordered)]
 
-    known = sorted(known, key=lambda entry: entry.seq)
+    known = correct_changed_titles(sorted(known, key=lambda entry: entry.seq), ordered)
     position = {entry.label: index for index, entry in enumerate(known)}
 
     previous = -1
@@ -590,6 +595,50 @@ def merge_inventory(
     return [replace(entry, seq=seq) for seq, entry in enumerate(merged)]
 
 
+def correct_changed_titles(
+    known: list[ReleasePointEntry], published: list[ReleasePointEntry]
+) -> list[ReleasePointEntry]:
+    """`known`, with each release point's changed titles replaced by the ones the
+    source lists for it when the source lists any and they differ.
+
+    119-118 and 119-121 were added while the source did not mark their changed
+    titles, so they were recorded as changing every title (ADR-0091, ADR-0094);
+    the source later marked 42 and 15. 119-134 was recorded from `download.html`
+    on 2026-10-27 with Title 54 marked; its own page and the prior page no longer
+    mark it. Only `titles_affected` and the description change: the order, date
+    and `seq` stay this site's."""
+    listed = {entry.label: entry for entry in published if entry.titles_affected}
+    corrected: list[ReleasePointEntry] = []
+    for entry in known:
+        source = listed.get(entry.label)
+        if source is not None and _title_set(source.titles_affected) != _title_set(
+            entry.titles_affected
+        ):
+            entry = replace(
+                entry,
+                titles_affected=source.titles_affected,
+                description=source.description or entry.description,
+            )
+        corrected.append(entry)
+    return corrected
+
+
+def corrected_labels(
+    before: list[ReleasePointEntry], after: list[ReleasePointEntry]
+) -> tuple[str, ...]:
+    """The labels whose changed titles differ between two inventories."""
+    old = {entry.label: _title_set(entry.titles_affected) for entry in before}
+    return tuple(
+        entry.label
+        for entry in after
+        if entry.label in old and old[entry.label] != _title_set(entry.titles_affected)
+    )
+
+
+def _title_set(titles: tuple[str, ...]) -> frozenset[str]:
+    return frozenset(normalize_title_num(t) for t in titles)
+
+
 @dataclass(frozen=True, slots=True)
 class InventoryFetch:
     """What one read of the source's release-point pages found."""
@@ -597,6 +646,26 @@ class InventoryFetch:
     entries: list[ReleasePointEntry]
     formats: tuple[str, ...]
     """The `ingest.source_formats` id of each page read, in the order read."""
+    current_through: CurrentThrough | None = None
+    """The public law the source's banner says the Code is current through."""
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentThrough:
+    """"The United States Code Online is current through Public Law 119-136
+    (October 22, 2026)." The law can be later than the newest release point: a law
+    that changes no title gets no release point."""
+
+    law: str
+    date: date | None
+
+
+def parse_current_through(html: str) -> CurrentThrough | None:
+    """The banner sentence on the source's pages, or None when a page lacks it."""
+    match = _CODE_CURRENT_THROUGH_RE.search(_clean_text(html))
+    if match is None:
+        return None
+    return CurrentThrough(law=match.group("law"), date=_parse_date(match.group("date")))
 
 
 def fetch_inventory(
@@ -610,15 +679,17 @@ def fetch_inventory(
     prior_html = fetch_inventory_html(url)
     formats = [detect_format(source_formats.PRIOR_RELEASE_POINTS, prior_html, url).id]
     entries = parse_inventory(prior_html)
+    through = parse_current_through(prior_html)
     if current_url is not None:
         current_html = fetch_inventory_html(current_url)
+        through = through or parse_current_through(current_html)
         formats.append(
             detect_format(source_formats.CURRENT_RELEASE_POINT, current_html, current_url).id
         )
         entries = with_current_release_point(entries, parse_current_release_point(current_html))
     if known:
         entries = merge_inventory(known, entries)
-    return InventoryFetch(entries=entries, formats=tuple(formats))
+    return InventoryFetch(entries=entries, formats=tuple(formats), current_through=through)
 
 
 def fetch_entries(
@@ -737,6 +808,9 @@ class CheckResult:
     error: str | None = None
     formats: tuple[str, ...] = ()
     """The format each page was served in (`ingest.source_formats`)."""
+    corrected: tuple[str, ...] = ()
+    """Held release points whose changed titles this check replaced with the
+    source's (`correct_changed_titles`)."""
 
     @property
     def has_new_release_points(self) -> bool:
@@ -752,6 +826,7 @@ def record_source_check(
     new_labels: tuple[str, ...] = (),
     error: str | None = None,
     formats: tuple[str, ...] = (),
+    current_through: CurrentThrough | None = None,
 ) -> SourceCheck:
     """Write one `source_checks` row. Called on success *and* on failure.
 
@@ -768,6 +843,8 @@ def record_source_check(
         new_labels=list(new_labels),
         latest_label=newest.label if newest else None,
         latest_currency_date=newest.currency_date if newest else None,
+        current_through_law=current_through.law if current_through else None,
+        current_through_date=current_through.date if current_through else None,
         # Truncated: an error here is a one-line diagnosis, and a stack trace or
         # an HTML error page would push a status response into the kilobytes.
         error=(error[:500] if error else None),
@@ -838,7 +915,8 @@ def poll_source(
     prior page lists only a window of recent release points (ADR-0091).
     """
     try:
-        fetched = fetch_inventory(url, current_url, known=known_entries(session, base_path))
+        held = known_entries(session, base_path)
+        fetched = fetch_inventory(url, current_url, known=held)
     except Exception as exc:  # network, HTTP, InventoryParseError, or SourceUnderMaintenance
         record_source_check(session, source_url=url, ok=False, error=f"{type(exc).__name__}: {exc}")
         return CheckResult(ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}")
@@ -872,6 +950,7 @@ def poll_source(
         write_inventory(entries, out_path, source_url=url)
 
     new_labels = tuple(entry.label for entry in entries if entry.label not in known)
+    corrected = corrected_labels(held, entries)
 
     inserted = updated = 0
     if seed:
@@ -884,6 +963,7 @@ def poll_source(
         entries=entries,
         new_labels=new_labels,
         formats=formats,
+        current_through=fetched.current_through,
     )
     return CheckResult(
         ok=True,
@@ -892,6 +972,7 @@ def poll_source(
         inserted=inserted,
         updated=updated,
         formats=formats,
+        corrected=corrected,
     )
 
 
