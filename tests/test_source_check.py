@@ -280,6 +280,42 @@ def test_a_poll_of_the_pages_of_2026_10_23_records_their_formats(session, monkey
 
 
 @pytest.mark.integration
+def test_a_poll_takes_the_sources_changed_titles_for_a_held_release_point(session, monkeypatch):
+    """119-121 was recorded as changing every title while the source did not
+    mark its titles; the source now marks Title 15 alone, and the poll writes
+    that to `release_points.titles_affected` (and nothing else about the row)."""
+    from sqlalchemy import select
+
+    from db.models import ReleasePoint
+
+    newest = session.scalars(select(ReleasePoint).order_by(ReleasePoint.seq.desc())).first()
+    assert newest is not None
+    label, held_date, held_seq = newest.label, newest.currency_date, newest.seq
+    newest.titles_affected = ["01", "15", "16", "42"]
+    session.flush()
+
+    path = label.replace("-", "/", 1)
+    page = (
+        '<li class="releasepoint"><a class="releasepoint" '
+        f'href="releasepoints/us/pl/{path}/usc-rp@{label}.htm">'
+        f"Public Law {label} ({held_date:%m/%d/%Y}), affecting title 15</a></li>"
+    )
+    monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: page)
+
+    result = inventory_mod.poll_source(
+        session, current_url=None, out_path=None, base_path=None, seed=True
+    )
+    session.flush()
+
+    assert result.ok, result.error
+    assert result.new_labels == ()
+    assert result.corrected == (label,)
+    row = session.scalars(select(ReleasePoint).where(ReleasePoint.label == label)).one()
+    assert list(row.titles_affected) == ["15"]
+    assert (row.currency_date, row.seq) == (held_date, held_seq)
+
+
+@pytest.mark.integration
 def test_an_unparseable_page_is_a_failed_check_not_an_empty_inventory(session, monkeypatch):
     """OLRC changing its markup must not read as "there are no release points"."""
     monkeypatch.setattr(inventory_mod, "fetch_inventory_html", lambda url, **kw: "<html/>")

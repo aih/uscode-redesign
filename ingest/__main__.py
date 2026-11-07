@@ -551,6 +551,11 @@ def _cmd_check(args: argparse.Namespace) -> int:
         f"newest {newest.label} ({newest.currency_date})"
     )
     print(f"source formats: {', '.join(result.formats)}")
+    if result.corrected:
+        print(
+            f"changed titles corrected from the source ({len(result.corrected)}): "
+            f"{', '.join(result.corrected)}"
+        )
     if not result.new_labels:
         print("nothing new since the last check")
         return 0

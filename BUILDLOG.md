@@ -3681,3 +3681,13 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Produced:** `ingest/inventory.py`, `db/models.py`, migration `b5e1d8f3c2a9`, `storage/repository.py`, `storage/postgres.py`, `api/schemas.py`, `frontend/src/lib/types.ts`, `frontend/src/lib/currency.ts`, `frontend/tests/currency.test.ts`, `tests/test_inventory.py`, guide chapter 03, ADR-0036 addendum.
 - **Verified:** both 2026-10-27 captures parse to 119-134 (10/20/2026); `uv run pytest tests` without a database (801 passed, 280 skipped); `npx vitest run` (515 passed). The integration suite and the migration were not run here.
 
+
+## 122 — 2026-11-07 — Changed titles corrected against the source's release-point pages
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Review uscode.house.gov's Prior Release Points page and correct this site where it differs; 119-121 changed only Title 15 but is shown as changing every title.
+- **Decided:**
+  - A temporary workflow on a scratch branch read `priorreleasepoints.html`, `download.html`, every `download/{label}.html` the prior page links, and `/api/v1/releases` from a GitHub runner (this session's proxy refuses both hosts). Every release-point page marks the same titles as the prior page. The site differs on 119-118 (all titles; source 42), 119-121 (all titles; source 15) and 119-134 (adds 54, which the source marked on 2026-10-27 and no longer does). The other 23 match, including 119-138.
+  - `merge_inventory` takes the source's changed titles for a held release point when the source lists some and they differ; order, dates and `seq` are unchanged (ADR-0094 addendum). `python -m ingest check` prints the corrected labels.
+- **Produced:** `ingest/inventory.py`, `ingest/__main__.py`, `tests/test_inventory.py`, `tests/test_source_check.py`, ADR-0094 addendum.
+- **Verified:** `make test` against a local `make ci-data` database with `USC_REQUIRE_INTEGRATION=1` (1,078 passed, 9 skipped). The parsers run over the 2026-11-07 captures give the table in the addendum. Not run on the box; the first daily check after deploy applies the correction.
