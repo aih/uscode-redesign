@@ -1,0 +1,27 @@
+name: Probe release history (temporary)
+on:
+  push:
+    branches: [claude/probe-release-history]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch
+        run: |
+          mkdir out && cd out
+          UA="uscode-redesign probe"
+          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/releases -o releases.json
+          curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/status -o status.json
+          curl -sS -A "$UA" https://uscode.house.gov/priorreleasepoints.html -o prior.html
+          curl -sS -A "$UA" https://uscode.house.gov/download/priorreleasepoints.htm -o prior-old.htm
+          curl -sS -A "$UA" https://uscode.house.gov/download.html -o download.html
+          curl -sS -A "$UA" https://uscode.house.gov/download/download.shtml -o download-old.shtml
+          for rp in $(grep -o 'download/119-[0-9a-z]*\.html' prior.html | sort -u | sed 's#download/##;s#\.html##'); do
+            curl -sS -A "$UA" "https://uscode.house.gov/download/$rp.html" -o "rp-$rp.html"; sleep 1; done
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe
+          path: out
