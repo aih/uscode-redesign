@@ -1,0 +1,17 @@
+// The test's stand-in for Grafana Cloud (tests/alloy/run.sh): an OTLP
+// receiver inside the same Alloy, which prints every log record it receives.
+// deploy/alloy/export.alloy is pointed at it with
+// OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318.
+otelcol.receiver.otlp "loop" {
+  http {
+    endpoint = "127.0.0.1:4318"
+  }
+
+  output {
+    logs = [otelcol.exporter.debug.loop.input]
+  }
+}
+
+otelcol.exporter.debug "loop" {
+  verbosity = "detailed"
+}

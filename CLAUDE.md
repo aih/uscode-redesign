@@ -595,6 +595,15 @@ refill by the scale, the shared budget on pinned routes does not apply, and an u
 token is a `401`. Written for reintroductions-us, which checks every US Code section a bill cites.
 Generating, storing on the box, using, rotating and revoking a token: `docs/api-tokens.md`.
 
+**The edge's access log is in Grafana** (ADR-0097). The `alloy` service (compose profile
+`observability`, started last and non-fatally by `deploy-on-box.sh`) reads `edge-caddy-1` over the
+Docker socket, adds location and ASN from DB-IP's free databases (`deploy/geoip-update.sh` →
+`$DATA_ROOT/geoip`), classifies network (`cloud`/`isp`/`education`/`government`/`unknown`), client
+(`ai-crawler`/`search-engine`/`other-bot`/`script`/`browser`/…) and outcome, and sends one JSON line
+per request over the api's OTLP credentials as `{service_name="edge-proxy"}`; the "Traffic
+sources" dashboard (`deploy/grafana/traffic.json`) reads it with `| json`. `tests/alloy/run.sh`
+(CI `edge-logs`) runs the config unchanged against a real Caddy.
+
 **Live state and what is still owed are in
 [docs/deploy-status.md](docs/deploy-status.md)** — read that before touching the deployment.
 
