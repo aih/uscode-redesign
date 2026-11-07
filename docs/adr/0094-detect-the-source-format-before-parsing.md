@@ -83,3 +83,36 @@ the source had served and when was recoverable only from the ADRs.
 - A signature that is too loose turns a changed page into a wrong parse rather than a failure.
   Each signature is checked against every other capture of its page kind; nothing checks it
   against a markup nobody has captured.
+
+## Addendum (2026-11-07) — a held release point takes the source's changed titles
+
+Amends decision 5's consequence "A held entry is not rewritten", and ADR-0091 decision 2's "Held
+release points keep … changed titles".
+
+Read from a GitHub Actions runner on 2026-11-07, `priorreleasepoints.html` lists 25 release
+points, 119-73not60 to 119-136, and `download.html` lists 119-138 (titles 21 and 22). Each listed
+release point's own page, `download/{label}.html`, marks the same changed titles as the prior page.
+`/api/v1/releases` agreed on 23 of the 26 and differed on three:
+
+| Release point | This site | The source |
+|---|---|---|
+| 119-118 | all 58 titles | 42 |
+| 119-121 | all 58 titles | 15 |
+| 119-134 | 15, 16, 26, 29, 30, 54 | 15, 16, 26, 29, 30 |
+
+119-118 and 119-121 were added while the source marked no titles for them (ADR-0091, ADR-0094).
+119-134 was added from `download.html` of 2026-10-27, which marked Title 54
+(`tests/fixtures/download_2026-10-27.html`); neither page marks it now.
+
+`merge_inventory` now passes the held release points through `correct_changed_titles` first: a
+held release point that the source lists with changed titles takes those titles and the source's
+description when they differ as a set. Order, date and `seq` stay this site's, and a release point
+the source lists with no changed titles keeps what this site recorded. `CheckResult.corrected`
+names the release points a poll changed, and `python -m ingest check` prints them. The first daily
+check after deploy writes 42, 15 and the five titles to the three rows; `/app/releases` and the
+per-title release list follow `titles_affected`.
+
+The title files already loaded at those release points stay. They are the source's text at that
+release point and dedupe to the versions before them, so no section's timeline changes.
+`corpus_health` and `sections-update --expected-only` read the shorter lists; every title they
+name is already loaded.

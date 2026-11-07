@@ -513,9 +513,9 @@ def merge_inventory(
     """The inventory this site holds, oldest first, with what the source now
     publishes added to it (ADR-0091, ADR-0094).
 
-    `known` is never rewritten: its entries keep their relative order, dates and
-    titles, so a release point read from `download.html` while it was current
-    keeps the changed titles the prior page no longer marks. `published` may hold
+    `known` keeps its relative order and dates. A held release point takes the
+    changed titles the source now lists for it (`correct_changed_titles`); one the
+    source lists with no changed titles keeps what this site recorded. `published` may hold
     the whole history (the pre-2026-10-12 page) or only a window of it.
 
     A release point this site does not hold goes where the source lists it:
@@ -539,7 +539,7 @@ def merge_inventory(
     if not known:
         return [replace(entry, seq=seq) for seq, entry in enumerate(ordered)]
 
-    known = sorted(known, key=lambda entry: entry.seq)
+    known = correct_changed_titles(sorted(known, key=lambda entry: entry.seq), ordered)
     position = {entry.label: index for index, entry in enumerate(known)}
 
     previous = -1
@@ -593,6 +593,50 @@ def merge_inventory(
             )
         merged.insert(at, entry)
     return [replace(entry, seq=seq) for seq, entry in enumerate(merged)]
+
+
+def correct_changed_titles(
+    known: list[ReleasePointEntry], published: list[ReleasePointEntry]
+) -> list[ReleasePointEntry]:
+    """`known`, with each release point's changed titles replaced by the ones the
+    source lists for it when the source lists any and they differ.
+
+    119-118 and 119-121 were added while the source did not mark their changed
+    titles, so they were recorded as changing every title (ADR-0091, ADR-0094);
+    the source later marked 42 and 15. 119-134 was recorded from `download.html`
+    on 2026-10-27 with Title 54 marked; its own page and the prior page no longer
+    mark it. Only `titles_affected` and the description change: the order, date
+    and `seq` stay this site's."""
+    listed = {entry.label: entry for entry in published if entry.titles_affected}
+    corrected: list[ReleasePointEntry] = []
+    for entry in known:
+        source = listed.get(entry.label)
+        if source is not None and _title_set(source.titles_affected) != _title_set(
+            entry.titles_affected
+        ):
+            entry = replace(
+                entry,
+                titles_affected=source.titles_affected,
+                description=source.description or entry.description,
+            )
+        corrected.append(entry)
+    return corrected
+
+
+def corrected_labels(
+    before: list[ReleasePointEntry], after: list[ReleasePointEntry]
+) -> tuple[str, ...]:
+    """The labels whose changed titles differ between two inventories."""
+    old = {entry.label: _title_set(entry.titles_affected) for entry in before}
+    return tuple(
+        entry.label
+        for entry in after
+        if entry.label in old and old[entry.label] != _title_set(entry.titles_affected)
+    )
+
+
+def _title_set(titles: tuple[str, ...]) -> frozenset[str]:
+    return frozenset(normalize_title_num(t) for t in titles)
 
 
 @dataclass(frozen=True, slots=True)
@@ -764,6 +808,9 @@ class CheckResult:
     error: str | None = None
     formats: tuple[str, ...] = ()
     """The format each page was served in (`ingest.source_formats`)."""
+    corrected: tuple[str, ...] = ()
+    """Held release points whose changed titles this check replaced with the
+    source's (`correct_changed_titles`)."""
 
     @property
     def has_new_release_points(self) -> bool:
@@ -868,7 +915,8 @@ def poll_source(
     prior page lists only a window of recent release points (ADR-0091).
     """
     try:
-        fetched = fetch_inventory(url, current_url, known=known_entries(session, base_path))
+        held = known_entries(session, base_path)
+        fetched = fetch_inventory(url, current_url, known=held)
     except Exception as exc:  # network, HTTP, InventoryParseError, or SourceUnderMaintenance
         record_source_check(session, source_url=url, ok=False, error=f"{type(exc).__name__}: {exc}")
         return CheckResult(ok=False, entries=[], new_labels=(), error=f"{type(exc).__name__}: {exc}")
@@ -902,6 +950,7 @@ def poll_source(
         write_inventory(entries, out_path, source_url=url)
 
     new_labels = tuple(entry.label for entry in entries if entry.label not in known)
+    corrected = corrected_labels(held, entries)
 
     inserted = updated = 0
     if seed:
@@ -923,6 +972,7 @@ def poll_source(
         inserted=inserted,
         updated=updated,
         formats=formats,
+        corrected=corrected,
     )
 
 
