@@ -14,12 +14,6 @@ jobs:
           UA="uscode-redesign probe"
           curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/releases -o releases.json
           curl -sS -A "$UA" https://uscode.linkedlegislation.org/api/v1/status -o status.json
-          curl -sS -A "$UA" https://uscode.house.gov/priorreleasepoints.html -o prior.html
-          curl -sS -A "$UA" https://uscode.house.gov/download/priorreleasepoints.htm -o prior-old.htm
-          curl -sS -A "$UA" https://uscode.house.gov/download.html -o download.html
-          curl -sS -A "$UA" https://uscode.house.gov/download/download.shtml -o download-old.shtml
-          for id in t1/s1 t1/s112b t5/s552 t7/s2012 t10/s101 t12/s1813 t17/s107 t18/s1001 t20/s1070 t21/s321 t26/s501 t26/s1 t28/s1331 t29/s206 t35/s101 t38/s101 t42/s1983 t47/s230 t49/s40101 t50/s3001 t15/s45 t15/s78a t16/s1 t11/s101; do
-            curl -sS -A "$UA" "https://uscode.linkedlegislation.org/api/v1/sections/us/usc/$id/versions" -o "v-${id//\//_}.json"; sleep 1; done
           ls -la
       - name: Commit pages to a separate branch
         run: |
