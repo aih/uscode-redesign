@@ -73,6 +73,14 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps api uv run alembic 
 echo "=== fetching the demo video, if one is published ==="
 bash deploy/publish-demo.sh --fetch || echo "(no demo video; continuing)"
 
+# Google's and Bing's crawler ranges for the landing-page exemption
+# (ADR-0098). Never fatal: on a failed fetch the file from the last deploy
+# stays, and with no file at all the exemption matches nobody, which is the
+# closed site as it was before ADR-0098.
+echo "=== refreshing the search engine address ranges ==="
+SEARCHBOTS="$(bash deploy/searchbot-ranges.sh || echo failed)"
+echo "search engine ranges: $SEARCHBOTS"
+
 echo "=== bringing the stack up ==="
 docker compose -f docker-compose.prod.yml up -d --wait
 
@@ -107,8 +115,8 @@ echo "=== recreating the proxy if deploy/Caddyfile changed ==="
 REPO_CADDYFILE_SUM="$(sha256sum deploy/Caddyfile | awk '{print $1}')"
 LIVE_CADDYFILE_SUM="$(docker compose -f docker-compose.prod.yml exec -T proxy \
     sha256sum /etc/caddy/Caddyfile 2>/dev/null | awk '{print $1}' || true)"
-if [ "$LIVE_CADDYFILE_SUM" = "$REPO_CADDYFILE_SUM" ]; then
-    echo "the running proxy has the current Caddyfile; left running"
+if [ "$LIVE_CADDYFILE_SUM" = "$REPO_CADDYFILE_SUM" ] && [ "$SEARCHBOTS" != changed ]; then
+    echo "the running proxy has the current Caddyfile and ranges; left running"
 else
     docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate proxy
 fi
@@ -184,7 +192,8 @@ if [ -n "$SITE_HOST" ]; then
         echo "compose project: bash deploy/edge/up.sh from that checkout on this box." >&2
         exit 1
     fi
-    if ! printf '%s\n' "$ROBOTS" | grep -qx 'Disallow: /'; then
+    if ! printf '%s\n' "$ROBOTS" | grep -qx 'Disallow: /' \
+            || ! printf '%s\n' "$ROBOTS" | grep -q '^Sitemap: https://'; then
         echo "the edge answered, but robots.txt is not the current Caddyfile's:" >&2
         printf '%s\n' "$ROBOTS" >&2
         exit 1

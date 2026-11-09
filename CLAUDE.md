@@ -476,7 +476,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(94 ADRs, numbered to 0096 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(96 ADRs, numbered to 0098 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.
@@ -519,7 +519,7 @@ says which kind a section is (`assembled_from`, `fetched_for`, `note`). Title 16
 sections (`scripts/section_update_check.py`). `update-corpus.sh` runs it after `load-all`; the
 source's per-section page (`/us/usc/t26/s501` → `/us/usc/119-134/t26/s501/`, captured 2026-10-27)
 is HTML, so `USC_SECTION_URL` is unset and the sections come from a title zip. **The whole site is `Disallow: /` to crawlers**
-(ADR-0037) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
+(ADR-0037) — except the landing pages in `/sitemap.xml`, which Googlebot and Bingbot may fetch from their published address ranges (ADR-0098, `deploy/searchbot-ranges.sh`) — served from the Caddyfile, because `robots.txt` belongs to the host and one Caddy owns
 it; blunt on purpose while the site is a demo, after two AI crawlers walking the `?release=` axis
 (25M reader pages behind it) pinned the box at 43,068 requests/hour against ~48 human ones. A
 Caddyfile change only reaches the running proxy because `deploy-on-box.sh` **force-recreates** it:

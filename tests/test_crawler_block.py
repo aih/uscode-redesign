@@ -66,7 +66,7 @@ def crawler_pattern() -> re.Pattern[str]:
     the file it is meant to be about.
     """
     source = CADDYFILE.read_text()
-    match = re.search(r'@crawlers header_regexp User-Agent "\(\?i\)\((.*)\)"', source)
+    match = re.search(r'header_regexp User-Agent "\(\?i\)\((.*)\)"', source)
     assert match, "no @crawlers matcher in deploy/Caddyfile"
     # Caddy reads the file's `\b` as a literal backslash-b in the regex; Python
     # gets the same two characters out of the file and needs no unescaping.

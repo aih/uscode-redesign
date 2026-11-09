@@ -18,7 +18,7 @@
  */
 import { expect, test } from "@playwright/test";
 
-test("robots.txt is served, as text, and disallows everything", async ({ request }) => {
+test("robots.txt is served, as text, and disallows everything to every other agent", async ({ request }) => {
   const response = await request.get("/robots.txt");
 
   expect(response.status()).toBe(200);
@@ -26,18 +26,32 @@ test("robots.txt is served, as text, and disallows everything", async ({ request
   // is entitled to ignore the whole thing.
   expect(response.headers()["content-type"]).toContain("text/plain");
 
-  const body = await response.text();
-  expect(body).toContain("User-agent: *");
-  expect(body).toContain("Disallow: /");
-
   // The directives must be on their own lines. A heredoc that lost its
-  // newlines would still satisfy the two assertions above and would parse as
-  // one meaningless line, so assert the shape rather than the substrings.
-  const directives = body
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  expect(directives).toEqual(["User-agent: *", "Disallow: /"]);
+  // newlines would parse as one meaningless line, so assert the shape rather
+  // than the substrings. Since ADR-0098 the first group lets Googlebot and
+  // Bingbot fetch the landing pages; the group for `*` is unchanged.
+  const groups = (await response.text())
+    .split(/\n\s*\n/)
+    .map((group) =>
+      group
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    )
+    .filter((group) => group.length);
+  expect(groups[0].slice(0, 2)).toEqual(["User-agent: Googlebot", "User-agent: Bingbot"]);
+  expect(groups[0].at(-1)).toBe("Disallow: /");
+  expect(groups[1]).toEqual(["User-agent: *", "Disallow: /"]);
+  expect(groups[2]).toEqual([expect.stringMatching(/^Sitemap: https:\/\/.+\/sitemap\.xml$/)]);
+});
+
+test("the sitemap is served as XML and lists the front page", async ({ request }) => {
+  const response = await request.get("/sitemap.xml");
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("application/xml");
+  const body = await response.text();
+  expect(body.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
+  expect(body).toMatch(/<loc>https:\/\/[^<]+\/app\/<\/loc>/);
 });
 
 test("the reader still answers while robots.txt is disallowing it", async ({ request }) => {

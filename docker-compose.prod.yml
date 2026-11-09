@@ -308,6 +308,10 @@ services:
           - uscode-proxy
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Google's and Bing's crawler ranges (ADR-0098), written by
+      # deploy/searchbot-ranges.sh. A directory, so the file can be replaced
+      # under it; Caddy still reads it only at start.
+      - ./deploy/searchbots:/etc/caddy/searchbots:ro
       # Certificates outlive the container. Behind the edge this Caddy issues
       # none; the volume keeps the certificate from before the edge, which the
       # rollback (docs/deploy.md §9) reuses.
