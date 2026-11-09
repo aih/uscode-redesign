@@ -5,7 +5,7 @@ order: 1
 summary: A reader for the United States Code where every provision has an address, at every point in time it has existed.
 covers:
   routes: ["/app/", "/app/about", "/app/demo"]
-  adrs: [37, 38, 65, 69, 73]
+  adrs: [37, 38, 65, 69, 73, 98]
 ---
 
 This is a conceptual redesign of the [Office of the Law Revision Counsel](https://uscode.house.gov/)'s
@@ -82,14 +82,17 @@ Their controls are still visible on the page to explain their intended functiona
 
 ## Automated access
 
-`robots.txt` is `Disallow: /` for every agent: the site asks not to be crawled or indexed at all.
+`robots.txt` is `Disallow: /` for every agent except Googlebot and Bingbot, which may fetch the
+front page, the [About page](/app/about), this guide and the list of titles. Those pages are listed
+in `/sitemap.xml`. Every other page is disallowed to them as well.
 
 The address space is large. Every section can be requested at each of 382 release points, which is
 about 25 million reader pages, and every provision also answers to a guid, of which there are
 96,185,732. A crawler following those links does not run out of pages to fetch.
 
-An agent that identifies itself as a crawler receives `403` on every path, `robots.txt` included,
-on the reader and the API alike. The match is on the User-Agent, so a client that does not announce
+An agent that identifies itself as a crawler receives `403` on every path other than `robots.txt`
+and `sitemap.xml`, on the reader and the API alike. A request from an address in Google's or Bing's
+published crawler ranges, for a page in the sitemap, is served. The match is on the User-Agent, so a client that does not announce
 itself as a crawler is unaffected.
 
 Two crawlers have been blocked this way after ignoring `robots.txt`:
@@ -104,10 +107,11 @@ limits that apply there.
 
 ```scenario
 id: robots-disallows-everything
-title: robots.txt asks every agent not to crawl the site
+title: robots.txt asks every agent not to crawl the site, and names the sitemap
 steps:
   - goto: /robots.txt
   - expect: { selector: "body", contains: "Disallow: /" }
+  - expect: { selector: "body", contains: "Sitemap: " }
 ```
 
 ## The corpus as a dataset

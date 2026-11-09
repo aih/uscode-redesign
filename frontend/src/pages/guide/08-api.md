@@ -129,7 +129,8 @@ point — `?release=`, `?date=`, or `?id=` — draw on one budget shared by ever
 site: a burst of 120, refilled at 6 a second. Over it, `429` with `Retry-After`. Requests for the
 current text of a section are not counted against it.
 
-**Automated crawling.** `robots.txt` is `Disallow: /`. An agent that identifies itself as a crawler
+**Automated crawling.** `robots.txt` is `Disallow: /`, apart from a few landing pages it allows
+Googlebot and Bingbot (none of them under `/api/v1`). An agent that identifies itself as a crawler
 gets `403` on every path. Scripted use of `/api/v1` is not affected — the block is on self-declared
 crawlers, not on programmatic callers.
 

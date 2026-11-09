@@ -246,3 +246,6 @@ static/demo/
 
 # Playwright run output
 test-results/
+
+# Google and Bing crawler ranges, written on the box by deploy/searchbot-ranges.sh (ADR-0098)
+/deploy/searchbots/

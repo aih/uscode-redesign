@@ -41,6 +41,22 @@
 	}
 }
 
+# Google and Bing on the landing pages (ADR-0098). A request matches when it
+# comes from an address in Google's or Bing's published crawler ranges, asks
+# for one of the pages robots.txt allows them, and carries no query string.
+# Such a request skips the crawler 403 and the cookie gate below.
+#
+# The ranges are `client_ip` lines in /etc/caddy/searchbots/*.caddy, written
+# on the box by deploy/searchbot-ranges.sh. 192.0.2.255 is a documentation
+# address that no client has, so with no ranges file (the dev stack, CI, or a
+# box where the fetch has never succeeded) this matches nothing.
+(search_engine_landing) {
+	client_ip 192.0.2.255/32
+	import /etc/caddy/searchbots/*.caddy
+	path / /app /app/ /app/about /app/guide /app/guide/* /app/us/usc /app/us/usc/ /sitemap.xml /favicon.svg /app/_astro/* /app/fonts/* /app/uswds/* /app/icons/* /app/manifest.webmanifest
+	expression {http.request.uri.query} == ""
+}
+
 {$SITE_ADDRESS::8000} {
 	encode gzip zstd
 
@@ -90,12 +106,65 @@
 	# Shaping the crawl instead (index the ~66k current-text sections, disallow
 	# the permutation space) is the setting to come back to when the site should
 	# be discoverable; it is a change to this block and nothing else.
+	#
+	# Since ADR-0098, Googlebot and Bingbot may also fetch the landing pages:
+	# the home page, About, the guide and the list of titles. Everything else
+	# stays disallowed to them, and to every other agent all of it does.
+	# `$` ends a rule at the end of the URL, so `/app/?release=…` is still
+	# disallowed. The list matches `(search_engine_landing)` above and the
+	# sitemap below.
 	handle /robots.txt {
 		header Content-Type "text/plain; charset=utf-8"
 		respond <<ROBOTS
+			User-agent: Googlebot
+			User-agent: Bingbot
+			Allow: /$
+			Allow: /app$
+			Allow: /app/$
+			Allow: /app/about$
+			Allow: /app/guide$
+			Allow: /app/guide/
+			Allow: /app/us/usc$
+			Allow: /app/us/usc/$
+			Allow: /sitemap.xml$
+			Allow: /favicon.svg$
+			Allow: /app/_astro/
+			Allow: /app/fonts/
+			Allow: /app/uswds/
+			Allow: /app/icons/
+			Allow: /app/manifest.webmanifest$
+			Disallow: /
+
 			User-agent: *
 			Disallow: /
+
+			Sitemap: {$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/sitemap.xml
 			ROBOTS 200
+	}
+
+	# The landing pages, for Search Console (ADR-0098). Served to anyone, from
+	# here, at no cost to either backend.
+	handle /sitemap.xml {
+		header Content-Type "application/xml; charset=utf-8"
+		respond <<SITEMAP
+			<?xml version="1.0" encoding="UTF-8"?>
+			<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/about</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/us/usc</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/01-what-this-site-is</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/02-reading</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/03-reading-at-a-point-in-time</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/04-version-history-and-redlines</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/05-search-and-citations</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/06-working-with-the-text</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/07-accounts</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/08-api</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/09-checking-this-site</loc></url>
+			<url><loc>{$USC_SITE_ORIGIN:https://uscode.linkedlegislation.org}/app/guide/10-classification-tables</loc></url>
+			</urlset>
+			SITEMAP 200
 	}
 
 	# robots.txt is advisory, and on 2026-08-19 that stopped being enough
@@ -127,7 +196,14 @@
 	# matches curl, uvicorn's healthcheck, or a script written against /api/v1 —
 	# programmatic use of the API is the point of the API, and only self-declared
 	# crawling is refused.
-	@crawlers header_regexp User-Agent "(?i)(meta-externalagent|meta-webindexer|facebookexternalhit|claudebot|claude-web|gptbot|oai-searchbot|chatgpt-user|perplexitybot|perplexity-user|google-extended|googleother|applebot|amazonbot|bytespider|ccbot|cohere-ai|diffbot|imagesift|omgili|dataforseo|semrush|ahrefs|mj12|dotbot|petalbot|yandex|timpibot|webzio|scrapy|bot[/ ]|[ /(]bot\b|crawler|spider)"
+	#
+	# A search engine on a landing page is the exception (ADR-0098).
+	@crawlers {
+		header_regexp User-Agent "(?i)(meta-externalagent|meta-webindexer|facebookexternalhit|claudebot|claude-web|gptbot|oai-searchbot|chatgpt-user|perplexitybot|perplexity-user|google-extended|googleother|applebot|amazonbot|bytespider|ccbot|cohere-ai|diffbot|imagesift|omgili|dataforseo|semrush|ahrefs|mj12|dotbot|petalbot|yandex|timpibot|webzio|scrapy|bot[/ ]|[ /(]bot\b|crawler|spider)"
+		not {
+			import search_engine_landing
+		}
+	}
 	handle @crawlers {
 		header Content-Type "text/plain; charset=utf-8"
 		respond "This site is closed to automated crawling. See /robots.txt." 403
@@ -182,6 +258,10 @@
 		path /app*
 		not path /app/sw.js /app/manifest.webmanifest /app/offline /app/_astro/* /app/icons/* /app/fonts/*
 		not header Cookie *{$USC_GATE_COOKIE:usc_h}=*
+		# Googlebot and Bingbot keep no cookies (ADR-0098).
+		not {
+			import search_engine_landing
+		}
 	}
 	handle @gate {
 		header Content-Type "text/html; charset=utf-8"
