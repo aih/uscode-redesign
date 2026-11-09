@@ -232,6 +232,8 @@ What is different now:
 - Container logs capped at **50m × 3**, in `docker-compose.prod.yml` and in `/etc/docker/daemon.json`
   so containers this repository does not define are covered too.
 - `uscode-root-disk-high` on `path=/`, and both disk alarms now `treat-missing-data: breaching`.
+- `reintro-disk-high` on `path=/var/lib/reintro` (the reintroductions site's volume, same threshold and
+  missing-data treatment), defined in `deploy/alarms.sh`; its path is in `deploy/cloudwatch-agent.json`.
 - The agent's config is `deploy/cloudwatch-agent.json`, installed by
   `deploy/install-cloudwatch-agent.sh` from `bootstrap-box.sh`.
 - `/etc/fstab` mounts the data volume **by UUID** (see below).
