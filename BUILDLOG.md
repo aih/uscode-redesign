@@ -3707,3 +3707,11 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Decided:** ADR-0098. `robots.txt` gains a Googlebot/Bingbot group allowing the front page, About, the guide and `/app/us/usc`; `/sitemap.xml` lists them; `(search_engine_landing)` exempts Google's and Bing's published crawler ranges from the crawler 403 and the cookie gate on those paths only. The ranges are fetched on the box by `deploy/searchbot-ranges.sh` at each deploy and are not committed; with no ranges file the matcher matches nobody.
 - **Produced:** `deploy/Caddyfile`, `deploy/searchbot-ranges.sh`, `deploy/deploy-on-box.sh`, `docker-compose.prod.yml`, `tests/test_search_engines.py`, `frontend/tests/e2e/robots.spec.ts`, guide chapters 01 and 08.
 - **Verified:** `uv run pytest tests/test_search_engines.py tests/test_crawler_block.py` (37 passed); `make test-web` (515 passed). The Caddyfile was run under Caddy 2.10.2 with `127.0.0.1/32` written as the ranges file: a Googlebot User-Agent from that address reached the upstream on `/`, `/app/`, `/app/about`, `/app/guide/02-reading`, `/app/us/usc` and `/app/_astro/*`, and got 403 on `/app/?release=119-1`, `/app/us/usc/t16/s45f` and `/api/v1/status`; with no ranges file every one of them was 403. `make test-e2e` was not run here.
+
+## 125 — 2026-11-09 — A disk alarm for the reintroductions volume
+
+- **Tool/model:** Claude Code, Haiku 5.5 for the change, from the reintroductions-us storage thread.
+- **Asked:** The reintroductions site shares this box and keeps its data on its own volume at `/var/lib/reintro`; nothing alarmed when it filled.
+- **Decided:** The box's CloudWatch agent config and alarms live here, so the new alarm does too: `reintro-disk-high`, the same shape as `uscode-disk-high` (80%, two 5-minute periods, missing data breaching). No ADR; it extends ADR-0086's alarms.
+- **Produced:** `deploy/cloudwatch-agent.json` measures `/var/lib/reintro`; `deploy/alarms.sh` defines the alarm; `docs/deploy-status.md` lists it.
+- **Verified:** Not on the box yet. It reaches it by `sudo bash deploy/install-cloudwatch-agent.sh` on the box and `bash deploy/alarms.sh` with admin credentials; then `aws cloudwatch describe-alarms --alarm-names reintro-disk-high` shows it, and `aws cloudwatch list-metrics --namespace CWAgent --metric-name disk_used_percent` lists `path=/var/lib/reintro`.

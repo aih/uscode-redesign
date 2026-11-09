@@ -21,7 +21,7 @@
       },
       "disk": {
         "measurement": ["used_percent", "inodes_free"],
-        "resources": ["/", "/var/lib/uscode"],
+        "resources": ["/", "/var/lib/uscode", "/var/lib/reintro"],
         "ignore_file_system_types": ["overlay", "squashfs", "tmpfs", "devtmpfs"],
         "drop_device": true
       }

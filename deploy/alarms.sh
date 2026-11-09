@@ -222,6 +222,23 @@ aws cloudwatch put-metric-alarm \
     --treat-missing-data breaching \
     --region "$REGION"
 
+echo "==> alarm reintro-disk-high (needs the CloudWatch agent on the box)"
+aws cloudwatch put-metric-alarm \
+    --alarm-name reintro-disk-high \
+    --alarm-description "Reintroductions data volume over 80% full — the reintroductions site shares this box" \
+    --namespace CWAgent \
+    --metric-name disk_used_percent \
+    --statistic Average \
+    --period 300 \
+    --evaluation-periods 2 \
+    --threshold 80 \
+    --comparison-operator GreaterThanThreshold \
+    --dimensions "$DIM" "Name=path,Value=/var/lib/reintro" \
+    --alarm-actions "$TOPIC_ARN" \
+    --ok-actions "$TOPIC_ARN" \
+    --treat-missing-data breaching \
+    --region "$REGION"
+
 echo
 echo "Done — but not delivering yet. Confirm the subscription in $ALERT_EMAIL"
 echo "(the link expires after three days), then check that it took:"
