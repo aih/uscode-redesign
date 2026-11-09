@@ -5,7 +5,7 @@ order: 1
 summary: A reader for the United States Code where every provision has an address, at every point in time it has existed.
 covers:
   routes: ["/app/", "/app/about", "/app/demo"]
-  adrs: [37, 38, 65, 69, 73, 98]
+  adrs: [37, 38, 65, 69, 73, 98, 99]
 ---
 
 This is a conceptual redesign of the [Office of the Law Revision Counsel](https://uscode.house.gov/)'s
@@ -42,6 +42,41 @@ Appendix titles are an edge case. For example, `5 U.S.C. App. 3` parses to `/us/
 Office of the Law Revision Counsel does not publish these as such: appendix provisions are filed under
 the law that enacted them, at addresses like `/us/usc/t5a/pl/92/463/s1` or
 `/us/usc/t50a/act/1917-05-18/ch15/s212`. This site does yet translate one form into the other.
+
+## Addresses with no page
+
+An address under `/app` that is not a page of this site answers 404. The page names the address and
+offers:
+
+- **Did you mean**: up to three addresses near it. An address that contains a title segment is read as
+  a citation (`/app/usc/t16/s45f` offers `/app/us/usc/t16/s45f`); otherwise the site's pages spelled
+  most like it (`/app/abuot` offers `/app/about`).
+- **Look up**: the address's words sent to the search box, which goes to a citation it recognises and
+  searches the Code for anything else.
+- **Pages on this site**: the sections of the site.
+
+An address that differs from a page only in letter case or a trailing slash goes straight to that page
+(`/app/About` → `/app/about`). In a browser, an address outside `/app` and `/api` goes to the same
+address under `/app` (`/about` → `/app/about`); other clients get the API's JSON 404.
+
+```scenario
+id: notfound-did-you-mean
+title: A misspelt page offers the page it is closest to
+steps:
+  - goto: /app/abuot
+  - expect: { selector: ".lede", contains: "There is no page at /app/abuot" }
+  - expect: { selector: ".notfound__list--near a", contains: "/app/about" }
+  - click: ".notfound__list--near a"
+  - expect: { url: "/app/about" }
+```
+
+```scenario
+id: notfound-case-redirect
+title: A page in the wrong letter case goes to the page
+steps:
+  - goto: /app/About
+  - expect: { url: "/app/about" }
+```
 
 ## Landing page
 

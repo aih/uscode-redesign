@@ -317,7 +317,12 @@ rewritten to `/app/429` **at the URL it asked for**, while a fetch still gets th
 is in the chrome at every width, and a second would duplicate the `site-q` id `/` reaches by. The
 **redirects table gotcha 3 suggests is declined** — OLRC publishes no machine-readable map from a
 vanished identifier to where its subject matter went, and one populated by guessing would send a
-reader silently to the wrong provision.
+reader silently to the wrong provision. **An address that is no page at all gets the reintroductions-us
+404** (ADR-0099): the page names it, 301s a letter-case or trailing-slash variant of a page,
+offers up to three near misses (the path read as a citation when a segment is `t16`, then pages
+within 0.8 similarity from `lib/notfound.ts`'s `STATIC_PAGES`, which `tests/notfound.test.ts` holds
+equal to `src/pages`), a lookup link to `/app/goto` and the sections of the site; a browser's 404
+outside `/app` and `/api` is a 302 to the same path under `/app`.
 
 **Comparing is one click, and the API stopped diffing the guids** (ADR-0066). `CompareWith` is a
 `<details>` on every section header: one named comparison plus a `<select>` of every older release
@@ -476,7 +481,7 @@ fixtures via `make ci-data`, `USC_REQUIRE_INTEGRATION=1` so a misconfigured job 
 nothing).
 
 **Session history lives in [BUILDLOG.md](BUILDLOG.md)** — one entry per session, and in `docs/adr/`
-(96 ADRs, numbered to 0098 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
+(97 ADRs, numbered to 0099 — there is no ADR-0048, and 0077 is claimed on an open branch). Read the entry you need rather than assuming; this file deliberately no longer restates them.
 
 **Deployed** to one EC2 box at `uscode.linkedlegislation.org` (ADR-0020 + ADR-0035): images built by
 Actions on arm64 and pushed to ECR, deploys by SSM, corpus seeded by `pg_restore` from the mirror.

@@ -3170,6 +3170,43 @@ main[id] {
   color: var(--muted);
 }
 
+/* The 404 for a path no route serves (ADR-0099): near misses, a lookup of the
+ * path's words, and the sections of the site. */
+.notfound__block {
+  margin-top: 1.5rem;
+}
+
+.notfound__heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--ui);
+  font-size: 1.1rem;
+}
+
+.notfound__list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-family: var(--ui);
+}
+
+.notfound__list li + li {
+  margin-top: 0.25rem;
+}
+
+.notfound__list--near a {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.notfound__note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.notfound__lookup {
+  margin-top: 1.5rem;
+  overflow-wrap: anywhere;
+}
+
 .cite {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
@@ -4766,6 +4803,7 @@ dialog.palette {
   font-size: 1.05rem;
   color: var(--muted);
   max-width: none;
+  overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------------------- the footer

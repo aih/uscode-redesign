@@ -90,3 +90,36 @@ test("a provision absent at this release point says where in time it does exist"
     "/app/versions/us/usc/t16/s45f",
   );
 });
+
+test.describe("an address that is not a page (ADR-0099)", () => {
+  test("names the address and offers the page it is closest to", async ({ page }) => {
+    const response = await page.goto("/app/abuot");
+    expect(response?.status()).toBe(404);
+    await expect(page.locator(".lede")).toContainText("There is no page at /app/abuot");
+    await expect(page.locator(".notfound__list--near a").first()).toHaveAttribute(
+      "href",
+      "/app/about",
+    );
+    await expect(page.locator(".notfound__lookup a")).toHaveAttribute("href", "/app/goto?q=abuot");
+  });
+
+  test("reads a path with a title segment as a citation", async ({ page }) => {
+    await page.goto("/app/usc/t16/s45f");
+    await expect(page.locator(".notfound__list--near a").first()).toHaveAttribute(
+      "href",
+      "/app/us/usc/t16/s45f",
+    );
+  });
+
+  test("sends a letter-case variant of a page to the page", async ({ page }) => {
+    await page.goto("/app/About");
+    await expect(page).toHaveURL(/\/app\/about$/u);
+  });
+
+  test("lists the sections of the site and renders no second search box", async ({ page }) => {
+    await page.goto("/app/abuot");
+    await expect(page.locator("#notfound-pages + .notfound__list a")).toHaveCount(10);
+    await expect(page.locator("#site-q")).toHaveCount(1);
+    await expect(page.locator("main input[name='q']")).toHaveCount(0);
+  });
+});
