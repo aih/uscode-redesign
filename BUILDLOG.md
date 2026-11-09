@@ -3715,3 +3715,11 @@ is unchanged at 20,412 against 21,000, since none of the four ships script.
 - **Decided:** The box's CloudWatch agent config and alarms live here, so the new alarm does too: `reintro-disk-high`, the same shape as `uscode-disk-high` (80%, two 5-minute periods, missing data breaching). No ADR; it extends ADR-0086's alarms.
 - **Produced:** `deploy/cloudwatch-agent.json` measures `/var/lib/reintro`; `deploy/alarms.sh` defines the alarm; `docs/deploy-status.md` lists it.
 - **Verified:** Not on the box yet. It reaches it by `sudo bash deploy/install-cloudwatch-agent.sh` on the box and `bash deploy/alarms.sh` with admin credentials; then `aws cloudwatch describe-alarms --alarm-names reintro-disk-high` shows it, and `aws cloudwatch list-metrics --namespace CWAgent --metric-name disk_used_percent` lists `path=/var/lib/reintro`.
+
+## 126 — 2026-11-09 — A 404 for an address with no page (ADR-0099)
+
+- **Tool/model:** Claude Code (project thread), Opus 5.5.
+- **Asked:** Ari: improve the 404 page, following the model in reintroductions-us.
+- **Decided:** ADR-0099. The reader's 404 names the address; a letter-case or trailing-slash variant of a page is a 301 to it; "Did you mean" lists the address read as a citation (a `t16` segment) and the pages spelled most like it (similarity 0.8, reintroductions-us's cutoff); a "Look up" link sends the address's words to `/app/goto`; "Pages on this site" lists ten sections. The search box stays in the chrome alone (ADR-0065). FastAPI's 404 handler now catches Starlette's exception, and a browser's 404 outside `/app` and `/api` is a 302 to the same path under `/app`.
+- **Produced:** `frontend/src/lib/notfound.ts`, `frontend/src/pages/404.astro`, a slot in `ErrorPage.astro`, `.notfound__*` in `site.scss`, `frontend/tests/notfound.test.ts`, four tests in `tests/e2e/deadend.spec.ts`, two scenarios in guide chapter 01, `main.py`, `tests/test_reader_404.py`, ADR-0099.
+- **Verified:** `uv run pytest` without a database (827 passed, 281 skipped); `npx vitest run` (529 passed); `astro build`; against the built reader with no API, the four new `deadend.spec.ts` tests and the two new guide scenarios (6 passed), and axe over `/app/abuot` at 1280 and 375 in both themes (0 violations). The full `make test-e2e` was not run here.

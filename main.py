@@ -26,15 +26,22 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.openapi.docs import (
     get_redoc_html,
     get_swagger_ui_html,
     get_swagger_ui_oauth2_redirect_html,
 )
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.telemetry import TelemetryConfig
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.auth import auth
 from api.classification import router as classification_router
@@ -42,7 +49,7 @@ from api.routes import api
 from api.settings import settings
 from api.watchlists import default_watchlist, watchlists
 from citation import router as citation_router
-from params import NO_STORE, PRIVATE_PREFIXES
+from params import NO_STORE, PRIVATE_PREFIXES, negotiated_format
 from storage import RepositoryUnavailableError, cache_status, close_cache_client
 
 DESCRIPTION = """
@@ -278,8 +285,31 @@ def repository_unavailable(request: Request, exc: RepositoryUnavailableError) ->
     )
 
 
-@app.exception_handler(HTTPException)
-def http_exception(request: Request, exc: HTTPException) -> Response:
+def _reader_404(request: Request, exc: StarletteHTTPException) -> RedirectResponse | None:
+    """A browser's 404 outside `/api` and `/app`, sent to the same path under `/app` (ADR-0099).
+
+    `/about` lands on `/app/about`; a path the reader has no page for either
+    lands on the reader's 404, which says so and offers what is near it. Only a
+    GET or HEAD whose `Accept:` prefers HTML is redirected; every other caller
+    keeps the JSON body. `/app` is excluded so that `make dev` without the proxy,
+    where FastAPI answers `/app` itself, does not redirect in a loop.
+    """
+    path = request.url.path
+    if (
+        exc.status_code != 404
+        or request.method not in ("GET", "HEAD")
+        or path.startswith(("/api/", "/app"))
+        or negotiated_format(request, None) != "html"
+    ):
+        return None
+    target = f"/app{path}"
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return RedirectResponse(target, status_code=302, headers={"Vary": "Accept"})
+
+
+@app.exception_handler(StarletteHTTPException)
+def http_exception(request: Request, exc: StarletteHTTPException) -> Response:
     """Errors are JSON, because everything this process serves is.
 
     The reader renders its own error pages from the status the API returns — a
@@ -293,6 +323,8 @@ def http_exception(request: Request, exc: HTTPException) -> Response:
     cache is free to heuristically store an uncacheable-looking error and hand it
     to the next reader.
     """
+    if (redirect := _reader_404(request, exc)) is not None:
+        return redirect
     response = JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},

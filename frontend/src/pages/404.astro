@@ -1,12 +1,90 @@
 ---
-/** Anything under /app that is not a citation. */
+/**
+ * Anything under /app that no route serves (ADR-0099).
+ *
+ * A path that differs from a page only in letter case or a trailing slash is
+ * redirected there with a 301. Otherwise the page names the path, offers the
+ * near misses `lib/notfound.ts` finds — the path read as a citation, then the
+ * pages spelled most like it — a link that puts the path's words to the search
+ * box's own target, and the sections of the site.
+ */
 import Base from "../layouts/Base.astro";
 import ErrorPage from "../components/ErrorPage.astro";
+import {
+  SITE_SECTIONS,
+  caseRedirect,
+  citationPath,
+  lookupHref,
+  lookupQuery,
+  sectionLabel,
+  suggestions,
+} from "../lib/notfound";
+
+const path = Astro.url.pathname;
+const method = Astro.request.method;
+
+const moved = method === "GET" || method === "HEAD" ? caseRedirect(path) : null;
+if (moved) {
+  return Astro.redirect(`${moved}${Astro.url.search}`, 301);
+}
+
+// `/app/404` is a route of its own, and the axe matrix scans it as the 404.
+const asked = path.replace(/\/+$/u, "") === "/app/404" ? null : path;
+let shown = asked;
+try {
+  shown = asked === null ? null : decodeURIComponent(asked);
+} catch {
+  /* a malformed escape is shown as it was sent */
+}
+
+const near = asked ? suggestions(asked) : [];
+const query = asked ? lookupQuery(asked) : null;
+// A path read as a citation is already the first suggestion; its words as a
+// query would only repeat it.
+const lookup = asked && !citationPath(asked) ? lookupHref(asked) : null;
+
+const detail = shown
+  ? `There is no page at ${shown}. A citation looks like /us/usc/t16/s45f/c/5.`
+  : "There is no page here. A citation looks like /us/usc/t16/s45f/c/5.";
 ---
 
 <Base title="404 · U.S. Code">
-  <ErrorPage
-    status={404}
-    detail="There is no page here. A citation looks like /us/usc/t16/s45f/c/5."
-  />
+  <ErrorPage status={404} detail={detail}>
+    {
+      near.length > 0 && (
+        <section class="notfound__block" aria-labelledby="notfound-near">
+          <h2 class="notfound__heading" id="notfound-near">Did you mean</h2>
+          <ul class="notfound__list notfound__list--near">
+            {near.map((href) => (
+              <li>
+                <a href={href}>{href}</a>
+                {sectionLabel(href) && <span class="notfound__note"> {sectionLabel(href)}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    {
+      lookup && query && (
+        <p class="notfound__lookup">
+          <a href={lookup}>Look up “{query}”</a> as a citation, or search the Code for it.
+        </p>
+      )
+    }
+
+    <section class="notfound__block" aria-labelledby="notfound-pages">
+      <h2 class="notfound__heading" id="notfound-pages">Pages on this site</h2>
+      <ul class="notfound__list">
+        {
+          SITE_SECTIONS.map(({ href, label }) => (
+            <li>
+              <a href={href}>{label}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+  </ErrorPage>
 </Base>
