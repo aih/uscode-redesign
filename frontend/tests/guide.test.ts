@@ -92,6 +92,7 @@ const INFRASTRUCTURE_ADRS = new Set([
   90, // Grafana dashboard and alert rules as code — operations, no reader change
   92, // a deploy holds requests through the backend recreate — host operations
   97, // the edge's access log in Grafana — operations, no reader change
+  100, // Cloudflare in front of the reader, alerts on the edge log — operations; the reader's pages are unchanged
 ]);
 
 const chapters = readChapters();
