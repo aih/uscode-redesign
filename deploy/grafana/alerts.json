@@ -12,7 +12,7 @@
       "condition": "C",
       "for": "10m",
       "noDataState": "OK",
-      "execErrState": "Error",
+      "execErrState": "KeepLast",
       "data": [
         {
           "refId": "A",
@@ -23,7 +23,7 @@
           "datasourceUid": "${PROM}",
           "model": {
             "refId": "A",
-            "expr": "sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 3 * (sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m] offset 1w)) or sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) * 0) and sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 2",
+            "expr": "sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 3 * (sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m] offset 1w)) or sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) * 0) and sum by (job) (rate(http_server_request_duration_seconds_count{job=~\"uscode-api|statutes-api\"}[10m])) > 8",
             "instant": true,
             "intervalMs": 60000,
             "maxDataPoints": 43200
@@ -61,7 +61,7 @@
       ],
       "annotations": {
         "summary": "{{ $labels.job }} is serving {{ humanize $values.B.Value }} requests a second",
-        "description": "Over three times the rate at the same time last week, and over 2 requests a second, for 10 minutes."
+        "description": "Over three times the rate at the same time last week, and over 8 requests a second, for 10 minutes."
       },
       "labels": {
         "team": "uscode"
@@ -76,7 +76,7 @@
       "condition": "C",
       "for": "10m",
       "noDataState": "OK",
-      "execErrState": "Error",
+      "execErrState": "KeepLast",
       "data": [
         {
           "refId": "A",
@@ -126,6 +126,70 @@
       "annotations": {
         "summary": "{{ $labels.job }}: {{ humanizePercentage $values.B.Value }} of responses are 5xx",
         "description": "Over 5% of responses were server errors for 10 minutes."
+      },
+      "labels": {
+        "team": "uscode"
+      },
+      "notification_settings": {
+        "receiver": "${RECEIVER}"
+      }
+    },
+    {
+      "uid": "uscode-reader-errors",
+      "title": "Reader errors",
+      "condition": "C",
+      "for": "10m",
+      "noDataState": "OK",
+      "execErrState": "KeepLast",
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "${LOKI}",
+          "model": {
+            "refId": "A",
+            "expr": "sum by (site) (count_over_time({service_name=\"edge-proxy\"} | json | site=~\"uscode.linkedlegislation.org|statutes.linkedlegislation.org\" | area=\"reader\" | outcome=\"server-error\" [10m])) / sum by (site) (count_over_time({service_name=\"edge-proxy\"} | json | site=~\"uscode.linkedlegislation.org|statutes.linkedlegislation.org\" | area=\"reader\" | outcome=~\"served|client-error|server-error\" [10m])) > 0.05 and sum by (site) (count_over_time({service_name=\"edge-proxy\"} | json | site=~\"uscode.linkedlegislation.org|statutes.linkedlegislation.org\" | area=\"reader\" | outcome=~\"served|client-error|server-error\" [10m])) > 300",
+            "queryType": "instant",
+            "intervalMs": 60000,
+            "maxDataPoints": 43200
+          }
+        },
+        {
+          "refId": "B",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "B",
+            "type": "reduce",
+            "expression": "A",
+            "reducer": "last"
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "B",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "annotations": {
+        "summary": "{{ $labels.site }}: {{ humanizePercentage $values.B.Value }} of reader pages answered 5xx at the edge",
+        "description": "Over 5% of reader pages past the edge's 403s answered 500, 502, 503 or 504 for 10 minutes, with over 300 pages in the 10 minutes. Read from the edge log, so it counts the reader's own failures, which the Server errors rule, reading the API's metrics, does not."
       },
       "labels": {
         "team": "uscode"

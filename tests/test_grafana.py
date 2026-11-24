@@ -51,7 +51,7 @@ def test_traffic_queries_read_the_edge_stream() -> None:
 def test_apply_fills_the_rules_and_replaces_the_group() -> None:
     apply = _load_apply()
     grafana = _Recorder()
-    apply.apply(grafana, "prom-uid", "someone@example.org")
+    apply.apply(grafana, "prom-uid", "someone@example.org", "loki-uid")
 
     paths = [(method, path) for method, path, _ in grafana.calls]
     assert ("POST", "/api/folders") in paths
@@ -68,11 +68,39 @@ def test_apply_fills_the_rules_and_replaces_the_group() -> None:
     assert {rule["uid"] for rule in group["rules"]} == {
         "uscode-traffic-spike",
         "uscode-server-errors",
+        "uscode-reader-errors",
     }
     for rule in group["rules"]:
-        assert rule["data"][0]["datasourceUid"] == "prom-uid"
+        source = "loki-uid" if rule["uid"] == "uscode-reader-errors" else "prom-uid"
+        assert rule["data"][0]["datasourceUid"] == source
         assert rule["notification_settings"] == {"receiver": "uscode-email"}
         assert rule["folderUID"] == "uscode"
+        # A failed query keeps the rule's state instead of mailing an error.
+        assert rule["execErrState"] == "KeepLast"
+
+
+def test_without_a_logs_source_the_log_rules_are_left_out() -> None:
+    apply = _load_apply()
+    grafana = _Recorder()
+    apply.apply(grafana, "prom-uid", "")
+    _, _, group = grafana.calls[-1]
+    assert "${" not in json.dumps(group)
+    assert {rule["uid"] for rule in group["rules"]} == {
+        "uscode-traffic-spike",
+        "uscode-server-errors",
+    }
+
+
+def test_the_reader_error_rule_reads_fields_the_pipeline_writes() -> None:
+    """The stream and the outcome and area values come from deploy/alloy (ADR-0097)."""
+    rules = json.loads((GRAFANA / "alerts.json").read_text())["rules"]
+    (rule,) = [r for r in rules if r["uid"] == "uscode-reader-errors"]
+    expr = rule["data"][0]["model"]["expr"]
+    assert '{service_name="edge-proxy"} | json' in expr
+    process = (GRAFANA.parent / "alloy" / "process.alloy").read_text()
+    for value in ("server-error", "client-error", "served", "reader"):
+        assert value in expr
+        assert value in process
 
 
 def test_without_an_email_the_default_contact_point_is_used() -> None:

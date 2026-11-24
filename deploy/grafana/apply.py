@@ -139,7 +139,7 @@ class Grafana:
         return {"result": result}
 
 
-def discover(grafana: Grafana) -> str:
+def discover(grafana: Grafana) -> tuple[str, str]:
     _, sources = grafana.call("GET", "/api/datasources")
     print("data sources:")
     for source in sources:
@@ -150,6 +150,9 @@ def discover(grafana: Grafana) -> str:
     if not proms:
         sys.exit("no Prometheus data source named *-prom")
     uid = proms[0]["uid"]
+    logs = [s for s in sources if s["type"] == "loki" and s["name"].endswith("-logs")]
+    loki_uid = logs[0]["uid"] if logs else ""
+    print(f"logs data source: {loki_uid or '(none: the log-based rules are skipped)'}")
 
     names = grafana.prom(
         uid, "query", {"query": f"count by (__name__, job) ({{{JOBS}}})"}
@@ -162,10 +165,10 @@ def discover(grafana: Grafana) -> str:
         )
     labels = grafana.prom(uid, "labels", {"match[]": f"{HISTOGRAM}{{{JOBS}}}"})
     print(f"labels on {HISTOGRAM}: {', '.join(labels or []) or '(none: no data yet)'}")
-    return uid
+    return uid, loki_uid
 
 
-def apply(grafana: Grafana, prom_uid: str, email: str) -> None:
+def apply(grafana: Grafana, prom_uid: str, email: str, loki_uid: str = "") -> None:
     alerts = json.loads((HERE / "alerts.json").read_text())
     folder = alerts["folder"]
     status, _ = grafana.call("GET", f"/api/folders/{folder['uid']}", ok=(404,))
@@ -205,9 +208,14 @@ def apply(grafana: Grafana, prom_uid: str, email: str) -> None:
             grafana.call("POST", "/api/v1/provisioning/contact-points", point)
     print(f"contact point: {receiver}")
 
+    # A rule that reads the edge log (`${LOKI}`) is left out when the stack
+    # has no logs data source.
     rules = json.loads(
-        json.dumps(alerts["rules"])
+        json.dumps(
+            [r for r in alerts["rules"] if loki_uid or "${LOKI}" not in json.dumps(r)]
+        )
         .replace("${PROM}", prom_uid)
+        .replace("${LOKI}", loki_uid)
         .replace("${RECEIVER}", receiver)
     )
     for rule in rules:
@@ -231,9 +239,9 @@ def require_env() -> tuple[str, str]:
 def main() -> None:
     url, token = require_env()
     grafana = Grafana(url, token)
-    prom_uid = discover(grafana)
+    prom_uid, loki_uid = discover(grafana)
     if "--discover-only" not in sys.argv:
-        apply(grafana, prom_uid, os.environ.get("ALERT_EMAIL", ""))
+        apply(grafana, prom_uid, os.environ.get("ALERT_EMAIL", ""), loki_uid)
 
 
 if __name__ == "__main__":
