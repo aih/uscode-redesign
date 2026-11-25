@@ -47,3 +47,13 @@ second: its 2/s floor was below the week's average of 2.6. The reader's 5xx neve
 - A reader may see Cloudflare's challenge page before the first page.
 - A crawler that solves Cloudflare's challenge is not covered. Cloudflare's rate-limiting rule is
   the next step if one does.
+
+
+## Addendum, 2026-11-25: the challenge POST
+
+A browser that passes the challenge POSTs its answer to the page it asked for,
+and Cloudflare forwards that POST to the origin. The reader has no POST route,
+and Astro's origin check answered it with "Cross-site POST form submissions are
+forbidden", so every challenged reader got that page instead of the site. The
+proxy now answers a POST to `/app*` with a 303 to the same address, less the
+`__cf_chl_*` token parameters, and the browser fetches the page with GET.
