@@ -209,6 +209,31 @@
 		respond "This site is closed to automated crawling. See /robots.txt." 403
 	}
 
+	# After a Cloudflare challenge (ADR-0100) the browser POSTs its answer to the
+	# page it asked for, and Cloudflare forwards that POST here. The reader has
+	# no POST route, and Astro's origin check answers a form POST with "Cross-site
+	# POST form submissions are forbidden". A 303 sends the browser back to the
+	# same page with GET, less the challenge's token parameters. `route` keeps the
+	# order as written: Caddy otherwise sorts `redir` ahead of `uri`.
+	@challenge_post {
+		method POST
+		path /app*
+	}
+	handle @challenge_post {
+		route {
+			uri query {
+				-__cf_chl_tk
+				-__cf_chl_rt_tk
+				-__cf_chl_f_tk
+				-__cf_chl_managed_tk__
+				-__cf_chl_captcha_tk__
+				-__cf_chl_jschl_tk__
+			}
+			header Cache-Control "no-store"
+			redir {uri} 303
+		}
+	}
+
 	# The third measurement, 2026-09-19 (ADR-0088), and the first one neither
 	# robots.txt nor the block above can touch. One hour of this proxy's log:
 	# 15,307 requests from **11,835 distinct addresses** — 1.3 requests each,
